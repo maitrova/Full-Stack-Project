@@ -5,6 +5,8 @@ import ProductCategories from '../components/productcategory'
 import NewArrivalsWithImage from '../components/Newarrivals'
 import CustomerReviews from '../components/customerreview'
 import Footer from '../components/Footer'
+import PromotionalProductsComponent from '../components/promotionalproducts'
+
 
 const Homepage = () => {
   return (
@@ -12,7 +14,7 @@ const Homepage = () => {
     <Header/>
     <Hero/>
     <ProductCategories/>
-    
+    <PromotionalProductsComponent/>
     <NewArrivalsWithImage/>
     <CustomerReviews/>
     <Footer/>
