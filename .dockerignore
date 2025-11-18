@@ -1,0 +1,10 @@
+.git
+.gitignore
+*.md
+.DS_Store
+.vscode
+.env
+.env.local
+node_modules
+dist
+tshirt_recolor_output
