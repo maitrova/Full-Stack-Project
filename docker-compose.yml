@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+
+  # 🍃 MongoDB
+
+  mongo:
+
+    image: mongo:7
+
+    container_name: mongo-service
+
+    restart: always
+
+    environment:
+
+      MONGO_INITDB_ROOT_USERNAME: root
+
+      MONGO_INITDB_ROOT_PASSWORD: Nari@1998
+
+    ports:
+
+      - "27017:27017"
+
+    networks: [app-network]
+
+  # ⚙ Backend
+
+  backend:
+
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+
+    image: maibackend:latest
+
+    container_name: backend-service
+
+    restart: always
+
+    ports:
+
+      - "5000:5000"
+
+    environment:
+
+      # 👉 Fixed MongoDB connection string
+      MONGOOSE_URL: mongodb://root:Nari%401998@mongo:27017/appdb?authSource=admin
+      APP_ENV: production
+      PORT: 5000
+      JWT_SECRET: "maitrova"
+      MONGOOSE_PASSWORD: "Nari@1998"
+
+    depends_on:
+
+      - mongo
+
+    networks: [app-network]
+
+  # 🎨 Frontend
+
+  frontend:
+
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api/auth
+
+    image: maifrontend:latest
+
+    container_name: frontend-service
+
+    restart: always
+
+    ports:
+
+      - "80:80"
+
+    depends_on:
+
+      - backend
+
+    networks: [app-network]
+
+networks:
+
+  app-network:
+
+    driver: bridge
+
+volumes:
+
+  caddy_data:
+
+  mongo_data:
+ 
