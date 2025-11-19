@@ -1,97 +1,63 @@
 version: '3.8'
 
 services:
-
-  # 🍃 MongoDB
-
-  mongo:
-
-    image: mongo:7
-
-    container_name: mongo-service
-
-    restart: always
-
-    environment:
-
-      MONGO_INITDB_ROOT_USERNAME: root
-
-      MONGO_INITDB_ROOT_PASSWORD: Nari@1998
-
+  # 🌐 Public entry (Caddy) — HTTP only for IP testing
+  caddy:
+    image: caddy:2
+    container_name: caddy
+    restart: unless-stopped
     ports:
-
-      - "27017:27017"
-
+      - "80:80"                         # Ivisit http://<PUBLIC_IP>
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - frontend
+      - backend
     networks: [app-network]
-
-  # ⚙ Backend
-
-  backend:
-
-    build:
-      context: ./server
-      dockerfile: Dockerfile
-
-    image: maibackend:latest
-
-    container_name: backend-service
-
+  # 🧱 Mongo DB
+  mongo:
+    image: mongo:7
+    container_name: mongo-service
     restart: always
-
-    ports:
-
-      - "5000:5000"
-
+    volumes:
+      - /home/sai/mongo_data:/var/lib/mongo
     environment:
-
-      # 👉 Fixed MongoDB connection string
-      MONGOOSE_URL: mongodb://root:Nari%401998@mongo:27017/appdb?authSource=admin
+      MONGO_INITDB_ROOT_USERNAME: maitrova
+      MONGO_INITDB_ROOT_PASSWORD: Saigollapalli@122
+    ports:
+      - "27017:27017"
+    networks: [app-network] 
+  backend:
+    image: docker.io/maitrova/maitrova:backend
+    container_name: backend-service
+    restart: always
+    expose:
+      - "5000"                          # internal only; Caddy proxies
+    environment:
+      MONGOOSE_URL: mongodb://maitrova:Saigollapalli%40122@mongo:27017/appdb?authSource=admin
       APP_ENV: production
       PORT: 5000
       JWT_SECRET: "maitrova"
-      MONGOOSE_PASSWORD: "Nari@1998"
-
+      MONGOOSE_PASSWORD: "Saigollapalli@122"
     depends_on:
-
       - mongo
-
     networks: [app-network]
 
   # 🎨 Frontend
-
   frontend:
-
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: /api/auth
-
-    image: maifrontend:latest
-
+    image: docker.io/maitrova/maitrova:frontend
     container_name: frontend-service
-
     restart: always
-
-    ports:
-
-      - "80:80"
-
+    expose:
+      - "80"                          # internal only; Caddy proxies
     depends_on:
-
       - backend
-
     networks: [app-network]
 
 networks:
-
   app-network:
-
     driver: bridge
 
 volumes:
-
-  caddy_data:
-
-  mongo_data:
- 

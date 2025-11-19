@@ -45,6 +45,8 @@ jobs:
           tags: |
             ${{ secrets.IMAGE_NAME }}:frontend
             ${{ secrets.IMAGE_NAME }}:f-${{ steps.get_tag.outputs.tag }}
+          build-args: |
+            VITE_API_URL=/api/auth
       
       - name: Build backend and push Docker image
         uses: docker/build-push-action@v6
