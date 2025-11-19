@@ -26,16 +26,21 @@ jobs:
           echo "Checking latest tag for $IMAGE..."
           
           # Fetch tags from Docker Hub API
-          TAGS=$(curl -s "https://hub.docker.com/v2/repositories/${IMAGE}/tags/?page_size=100" | \
-                jq -r '.results[].name' | \
-                grep -oP '(?<=-v)\d+' | \
-                sort -n)
+          RESPONSE=$(curl -s "https://hub.docker.com/v2/repositories/${IMAGE}/tags/?page_size=100")
+          
+          # Debug: show the response
+          echo "API Response: $RESPONSE"
+          
+          # Extract version numbers after -v pattern
+          TAGS=$(echo "$RESPONSE" | jq -r '.results[]?.name // empty' 2>/dev/null | grep -oP '(?<=-v)\d+' | sort -n)
           
           if [ -z "$TAGS" ]; then
             NEW_NUM=1
+            echo "No existing tags found, starting with v1"
           else
             LAST_NUM=$(echo "$TAGS" | tail -n 1)
             NEW_NUM=$((LAST_NUM + 1))
+            echo "Found highest version: v${LAST_NUM}"
           fi
           
           echo "New tag version will be: v${NEW_NUM}"
