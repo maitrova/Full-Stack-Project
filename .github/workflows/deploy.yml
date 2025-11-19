@@ -70,9 +70,14 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
+            echo "Executing Docker compose down"
             docker-compose down
+            echo "Sleeping for 15 sec"
             sleep 15
-            docker-compose up -d --pull always
+            echo "Executing Docker compose down"
+            docker-compose pull
+            echo "Executing Docker compose down"
+            docker-compose up -d
 
 
   
