@@ -51,7 +51,7 @@ services:
     container_name: frontend-service
     restart: always
     expose:
-      - "80"                          # internal only; Caddy proxies
+      - "80"                          # internal only; Caddy proxies 
     depends_on:
       - backend
     networks: [app-network]
