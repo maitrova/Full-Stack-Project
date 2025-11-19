@@ -24,60 +24,65 @@ jobs:
         run: |
           IMAGE=${{ secrets.IMAGE_NAME }}
           echo "Checking latest tag for $IMAGE..."
+          
           # Fetch tags from Docker Hub API
-          TAGS=$(curl -s "https://hub.docker.com/v2/repositories/${IMAGE}/tags/?page_size=100" | jq -r '.results[].name' | grep -o 'v[0-9]\+' | grep '^v[0-9]\+$' | sort -V)
+          TAGS=$(curl -s "https://hub.docker.com/v2/repositories/${IMAGE}/tags/?page_size=100" | \
+                jq -r '.results[].name' | \
+                grep -oP '(?<=-v)\d+' | \
+                sort -n)
+          
           if [ -z "$TAGS" ]; then
-            NEW_TAG="v1"
+            NEW_NUM=1
           else
-            LAST_TAG=$(echo "$TAGS" | tail -n 1)
-            LAST_NUM=${LAST_TAG#v}
-            NEW_TAG="v$((LAST_NUM + 1))"
+            LAST_NUM=$(echo "$TAGS" | tail -n 1)
+            NEW_NUM=$((LAST_NUM + 1))
           fi
-          echo "New tag will be: $NEW_TAG"
-          echo "tag=$NEW_TAG" >> $GITHUB_OUTPUT
+          
+          echo "New tag version will be: v${NEW_NUM}"
+          echo "tag=v${NEW_NUM}" >> $GITHUB_OUTPUT
 
-      - name: Build frontend and push Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./frontend
-          file: ./frontend/Dockerfile
-          push: true
-          tags: |
-            ${{ secrets.IMAGE_NAME }}:frontend
-            ${{ secrets.IMAGE_NAME }}:f-${{ steps.get_tag.outputs.tag }}
-          build-args: |
-            VITE_API_URL=/api/auth
+  #     - name: Build frontend and push Docker image
+  #       uses: docker/build-push-action@v6
+  #       with:
+  #         context: ./frontend
+  #         file: ./frontend/Dockerfile
+  #         push: true
+  #         tags: |
+  #           ${{ secrets.IMAGE_NAME }}:frontend
+  #           ${{ secrets.IMAGE_NAME }}:f-${{ steps.get_tag.outputs.tag }}
+  #         build-args: |
+  #           VITE_API_URL=/api/auth
       
-      - name: Build backend and push Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./server
-          file: ./server/Dockerfile
-          push: true
-          tags: |
-            ${{ secrets.IMAGE_NAME }}:backend
-            ${{ secrets.IMAGE_NAME }}:b-${{ steps.get_tag.outputs.tag }}
+  #     - name: Build backend and push Docker image
+  #       uses: docker/build-push-action@v6
+  #       with:
+  #         context: ./server
+  #         file: ./server/Dockerfile
+  #         push: true
+  #         tags: |
+  #           ${{ secrets.IMAGE_NAME }}:backend
+  #           ${{ secrets.IMAGE_NAME }}:b-${{ steps.get_tag.outputs.tag }}
             
-  deploy:
-    needs: build_and_push
-    runs-on: ubuntu-latest
-    steps:
-      - name: SSH to VPS and deploy
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          port: ${{ secrets.VPS_PORT }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          script: |
-            echo "Executing Docker compose down"
-            docker-compose down
-            echo "Sleeping for 15 sec"
-            sleep 15
-            echo "Executing Docker compose pull"
-            docker-compose pull
-            echo "Executing Docker compose up"
-            docker-compose up -d
+  # deploy:
+  #   needs: build_and_push
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: SSH to VPS and deploy
+  #       uses: appleboy/ssh-action@v1.2.0
+  #       with:
+  #         host: ${{ secrets.VPS_HOST }}
+  #         username: ${{ secrets.VPS_USER }}
+  #         port: ${{ secrets.VPS_PORT }}
+  #         password: ${{ secrets.VPS_PASSWORD }}
+  #         script: |
+  #           echo "Executing Docker compose down"
+  #           docker-compose down
+  #           echo "Sleeping for 15 sec"
+  #           sleep 15
+  #           echo "Executing Docker compose pull"
+  #           docker-compose pull
+  #           echo "Executing Docker compose up"
+  #           docker-compose up -d
 
 
   
