@@ -11,7 +11,7 @@ git clone https://github.com/maitrova/Full-Stack-Project.git
 cd Full-Stack-Project
 
 
-### backend setup
+###  backend setup
 
 cd server
 npm install
