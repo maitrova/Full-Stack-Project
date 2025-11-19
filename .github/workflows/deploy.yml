@@ -39,7 +39,7 @@ jobs:
       - name: Build frontend and push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./frontend
           file: ./frontend/Dockerfile
           push: true
           tags: |
@@ -49,7 +49,7 @@ jobs:
       - name: Build backend and push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./server
           file: ./server/Dockerfile
           push: true
           tags: |
