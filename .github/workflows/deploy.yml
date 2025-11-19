@@ -36,48 +36,48 @@ jobs:
           echo "New tag will be: $NEW_TAG"
           echo "tag=$NEW_TAG" >> $GITHUB_OUTPUT
 
-  #     - name: Build frontend and push Docker image
-  #       uses: docker/build-push-action@v6
-  #       with:
-  #         context: ./frontend
-  #         file: ./frontend/Dockerfile
-  #         push: true
-  #         tags: |
-  #           ${{ secrets.IMAGE_NAME }}:frontend
-  #           ${{ secrets.IMAGE_NAME }}:f-${{ steps.get_tag.outputs.tag }}
-  #         build-args: |
-  #           VITE_API_URL=/api/auth
+      - name: Build frontend and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.IMAGE_NAME }}:frontend
+            ${{ secrets.IMAGE_NAME }}:f-${{ steps.get_tag.outputs.tag }}
+          build-args: |
+            VITE_API_URL=/api/auth
       
-  #     - name: Build backend and push Docker image
-  #       uses: docker/build-push-action@v6
-  #       with:
-  #         context: ./server
-  #         file: ./server/Dockerfile
-  #         push: true
-  #         tags: |
-  #           ${{ secrets.IMAGE_NAME }}:backend
-  #           ${{ secrets.IMAGE_NAME }}:b-${{ steps.get_tag.outputs.tag }}
+      - name: Build backend and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.IMAGE_NAME }}:backend
+            ${{ secrets.IMAGE_NAME }}:b-${{ steps.get_tag.outputs.tag }}
             
-  # deploy:
-  #   needs: build_and_push
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: SSH to VPS and deploy
-  #       uses: appleboy/ssh-action@v1.2.0
-  #       with:
-  #         host: ${{ secrets.VPS_HOST }}
-  #         username: ${{ secrets.VPS_USER }}
-  #         port: ${{ secrets.VPS_PORT }}
-  #         password: ${{ secrets.VPS_PASSWORD }}
-  #         script: |
-  #           echo "Executing Docker compose down"
-  #           docker-compose down
-  #           echo "Sleeping for 15 sec"
-  #           sleep 15
-  #           echo "Executing Docker compose pull"
-  #           docker-compose pull
-  #           echo "Executing Docker compose up"
-  #           docker-compose up -d
+  deploy:
+    needs: build_and_push
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH to VPS and deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            echo "Executing Docker compose down"
+            docker-compose down
+            echo "Sleeping for 15 sec"
+            sleep 15
+            echo "Executing Docker compose pull"
+            docker-compose pull
+            echo "Executing Docker compose up"
+            docker-compose up -d
 
 
   
