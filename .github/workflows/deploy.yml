@@ -25,12 +25,8 @@ jobs:
           IMAGE=${{ secrets.IMAGE_NAME }}
           echo "Checking latest tags for $IMAGE..."
           
-          # Use Docker CLI to list tags (works with any registry after docker login)
-          # Fetch all tags and extract version numbers after -v
-          TAGS=$(docker images --format "{{.Tag}}" ${IMAGE} 2>/dev/null | grep -oP '(?<=-v)\d+' | sort -n)
-          
-          # Alternative: Use crane (if available) to list remote tags without pulling
-          # TAGS=$(crane ls ${IMAGE} 2>/dev/null | grep -oP '(?<=-v)\d+' | sort -n)
+          # Use skopeo to list tags from remote registry (no pull needed)
+          TAGS=$(skopeo list-tags docker://${IMAGE} 2>/dev/null | jq -r '.Tags[]' | grep -oP '(?<=-v)\d+' | sort -n)
           
           if [ -z "$TAGS" ]; then
             NEW_NUM=1
@@ -38,7 +34,8 @@ jobs:
           else
             LAST_NUM=$(echo "$TAGS" | tail -n 1)
             NEW_NUM=$((LAST_NUM + 1))
-            echo "Found highest version: v${LAST_NUM}, incrementing to v${NEW_NUM}"
+            echo "Found tags with versions, highest: v${LAST_NUM}"
+            echo "Next version: v${NEW_NUM}"
           fi
           
           echo "tag=v${NEW_NUM}" >> $GITHUB_OUTPUT
