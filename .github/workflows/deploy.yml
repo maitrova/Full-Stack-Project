@@ -23,27 +23,24 @@ jobs:
         id: get_tag
         run: |
           IMAGE=${{ secrets.IMAGE_NAME }}
-          echo "Checking latest tag for $IMAGE..."
+          echo "Checking latest tags for $IMAGE..."
           
-          # Fetch tags from Docker Hub API
-          RESPONSE=$(curl -s "https://hub.docker.com/v2/repositories/${IMAGE}/tags/?page_size=100")
+          # Use Docker CLI to list tags (works with any registry after docker login)
+          # Fetch all tags and extract version numbers after -v
+          TAGS=$(docker images --format "{{.Tag}}" ${IMAGE} 2>/dev/null | grep -oP '(?<=-v)\d+' | sort -n)
           
-          # Debug: show the response
-          echo "API Response: $RESPONSE"
-          
-          # Extract version numbers after -v pattern
-          TAGS=$(echo "$RESPONSE" | jq -r '.results[]?.name // empty' 2>/dev/null | grep -oP '(?<=-v)\d+' | sort -n)
+          # Alternative: Use crane (if available) to list remote tags without pulling
+          # TAGS=$(crane ls ${IMAGE} 2>/dev/null | grep -oP '(?<=-v)\d+' | sort -n)
           
           if [ -z "$TAGS" ]; then
             NEW_NUM=1
-            echo "No existing tags found, starting with v1"
+            echo "No existing version tags found, starting with v1"
           else
             LAST_NUM=$(echo "$TAGS" | tail -n 1)
             NEW_NUM=$((LAST_NUM + 1))
-            echo "Found highest version: v${LAST_NUM}"
+            echo "Found highest version: v${LAST_NUM}, incrementing to v${NEW_NUM}"
           fi
           
-          echo "New tag version will be: v${NEW_NUM}"
           echo "tag=v${NEW_NUM}" >> $GITHUB_OUTPUT
 
   #     - name: Build frontend and push Docker image
