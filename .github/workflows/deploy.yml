@@ -1,0 +1,59 @@
+name: Build → Push → Deploy (Compose, immutable tag)
+
+on:
+  push:
+    branches: [ develop ]
+
+jobs:
+  build_and_push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Get latest image tag
+        id: get_tag
+        run: |
+          IMAGE=${{ secrets.IMAGE_NAME }}
+          echo "Checking latest tag for $IMAGE..."
+          # Fetch tags from Docker Hub API
+          TAGS=$(curl -s "https://hub.docker.com/v2/repositories/${IMAGE}/tags/?page_size=100" | jq -r '.results[].name' | grep '^v[0-9]\+$' | sort -V)
+          if [ -z "$TAGS" ]; then
+            NEW_TAG="v1"
+          else
+            LAST_TAG=$(echo "$TAGS" | tail -n 1)
+            LAST_NUM=${LAST_TAG#v}
+            NEW_TAG="v$((LAST_NUM + 1))"
+          fi
+          echo "New tag will be: $NEW_TAG"
+          echo "tag=$NEW_TAG" >> $GITHUB_OUTPUT
+
+      - name: Build frontend and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend/
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.IMAGE_NAME }}:frontend
+            ${{ secrets.IMAGE_NAME }}:f-${{ steps.get_tag.outputs.tag }}
+      
+      - name: Build backend and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server/
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.IMAGE_NAME }}:backend
+            ${{ secrets.IMAGE_NAME }}:b-${{ steps.get_tag.outputs.tag }}
+
+  
