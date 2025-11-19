@@ -39,8 +39,8 @@ jobs:
       - name: Build frontend and push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: ./frontend/
-          file: ./Dockerfile
+          context: .
+          file: ./frontend/Dockerfile
           push: true
           tags: |
             ${{ secrets.IMAGE_NAME }}:frontend
@@ -49,8 +49,8 @@ jobs:
       - name: Build backend and push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: ./server/
-          file: ./Dockerfile
+          context: .
+          file: ./server/Dockerfile
           push: true
           tags: |
             ${{ secrets.IMAGE_NAME }}:backend
