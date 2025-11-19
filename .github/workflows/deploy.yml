@@ -24,15 +24,21 @@ jobs:
         run: |
           IMAGE=${{ secrets.IMAGE_NAME }}
           echo "Checking latest tag for $IMAGE..."
-          # Fetch tags from Docker Hub API
-          TAGS=$(curl -s "https://hub.docker.com/v2/repositories/${IMAGE}/tags/?page_size=100" | jq -r '.results[].name' | grep '^v[0-9]\+$' | sort -V)
+          # Fetch all tags and find the highest numeric version used across ALL service tags.
+          TAGS=$(curl -s "https://hub.docker.com/v2/repositories/${IMAGE}/tags/?page_size=100" | \
+                jq -r '.results[].name' | \
+                grep -o 'v[0-9]\+' | \
+                grep '^v[0-9]\+$' | \
+                sort -V)
+
           if [ -z "$TAGS" ]; then
-            NEW_TAG="v1"
+              NEW_TAG="v1"
           else
-            LAST_TAG=$(echo "$TAGS" | tail -n 1)
-            LAST_NUM=${LAST_TAG#v}
-            NEW_TAG="v$((LAST_NUM + 1))"
+              LAST_TAG=$(echo "$TAGS" | tail -n 1)
+              LAST_NUM=${LAST_TAG#v}
+              NEW_TAG="v$((LAST_NUM + 1))"
           fi
+
           echo "New tag will be: $NEW_TAG"
           echo "tag=$NEW_TAG" >> $GITHUB_OUTPUT
 
@@ -74,9 +80,9 @@ jobs:
             docker-compose down
             echo "Sleeping for 15 sec"
             sleep 15
-            echo "Executing Docker compose down"
+            echo "Executing Docker compose pull"
             docker-compose pull
-            echo "Executing Docker compose down"
+            echo "Executing Docker compose up"
             docker-compose up -d
 
 
