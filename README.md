@@ -1,7 +1,7 @@
 
 ---
 
-## 🧭 How to Run This Project (After Cloning)
+##  🧭 How to Run This Project (After Cloning)
 
 If you’ve just cloned this repository, follow these steps 👇
 
@@ -16,15 +16,15 @@ cd Full-Stack-Project
 cd server
 npm install
 
-to run the server : npm run dev
+to run the server : npm start
 
 ### front end setup
 
 cd frontend
 npm install
 
-to run the server : npm start
 
+to run the server : npm run dev
 
 visit the localhost found in the terminal
 
