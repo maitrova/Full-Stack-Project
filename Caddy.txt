@@ -1,0 +1,27 @@
+{
+  email narendrareddy00@gmail.com
+}
+
+narifighter.online {
+  encode gzip
+
+  # --- Security headers ---
+  header {
+    Strict-Transport-Security "max-age=15552000; includeSubDomains; preload"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "no-referrer-when-downgrade"
+    Permissions-Policy "geolocation=(), microphone=(), camera=()"
+  }
+
+  # --- API routes: backend ---
+  @api path /api/*
+  handle @api {
+    reverse_proxy backend-service:5000
+  }
+
+  # --- All other routes: frontend ---
+  handle {
+    reverse_proxy frontend-service:80
+  }
+}
