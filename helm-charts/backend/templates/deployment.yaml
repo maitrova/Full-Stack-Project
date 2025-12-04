@@ -18,6 +18,8 @@ spec:
         {{- include "backend.selectorLabels" . | nindent 8 }}
         env: {{ .Values.env }}
     spec:
+      imagePullSecrets:
+        - name: docker-registry-secret
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
