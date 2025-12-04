@@ -35,7 +35,10 @@ spec:
             {{- end }}
             {{- range $key, $value := .Values.envSecrets }}
             - name: {{ $key }}
-              value: {{ $value | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "backend.fullname" . }}-secret
+                  key: {{ $key }}
             {{- end }}
           {{- if .Values.livenessProbe.enabled }}
           livenessProbe:
