@@ -22,13 +22,14 @@ services:
     container_name: mongo-service
     restart: always
     volumes:
-      - /home/sai/mongo_data:/var/lib/mongo
+      - /home/sai/mongo_data:/data/db
     environment:
       MONGO_INITDB_ROOT_USERNAME: maitrova
       MONGO_INITDB_ROOT_PASSWORD: Saigollapalli@122
     ports:
       - "27017:27017"
-    networks: [app-network] 
+    networks: [app-network]
+    command: ["--bind_ip_all"]
   backend:
     image: docker.io/maitrova/maitrova:backend
     container_name: backend-service
@@ -51,15 +52,13 @@ services:
     container_name: frontend-service
     restart: always
     expose:
-      - "80"                          # internal only; Caddy proxies 
+      - "80"                          # internal only; Caddy proxies
     depends_on:
       - backend
     networks: [app-network]
-
 networks:
   app-network:
     driver: bridge
 
 volumes:
   caddy_data:
-  mongo_data:
