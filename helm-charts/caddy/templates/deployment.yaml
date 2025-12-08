@@ -41,6 +41,9 @@ spec:
             httpGet:
               path: {{ .Values.livenessProbe.httpGet.path }}
               port: {{ .Values.livenessProbe.httpGet.port }}
+              httpHeaders:
+                - name: Host
+                  value: narifighter.online
             initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
             timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
@@ -51,6 +54,9 @@ spec:
             httpGet:
               path: {{ .Values.readinessProbe.httpGet.path }}
               port: {{ .Values.readinessProbe.httpGet.port }}
+              httpHeaders:
+                - name: Host
+                  value: narifighter.online
             initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
             timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}

@@ -2,7 +2,7 @@
 name: caddy
 fullnameOverride: caddy
 
-replicaCount: 2
+replicaCount: 1
 
 image:
   repository: caddy
