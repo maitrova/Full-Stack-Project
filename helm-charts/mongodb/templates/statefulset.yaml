@@ -34,7 +34,7 @@ spec:
             - name: {{ $key }}
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "mongodb.fullname" . }}-secret
+                  name: {{ include "mongodb.fullname" $ }}-secret
                   key: {{ $key }}
             {{- end }}
           {{- if .Values.livenessProbe.enabled }}
