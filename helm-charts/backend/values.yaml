@@ -73,11 +73,11 @@ pdb:
   enabled: true
   minAvailable: 1
 
-# Persistent Storage Configuration (for logs, uploads, temp files, etc.)
+# Persistent Storage Configuration
 persistence:
   enabled: true
-  storageClass: "local-path"  # K3s default StorageClass
-  accessMode: ReadWriteMany  # Multiple backend pods can share the same volume
+  storageClass: "local-path"
+  accessMode: ReadWriteMany
   size: 5Gi
-  hostPath: /home/sai/backend_data  # Shared storage for all backend pods
-  mountPath: /app/data  # Where to mount inside the container
+  hostPath: /home/sai/backend_data
+  mountPath: /app/data

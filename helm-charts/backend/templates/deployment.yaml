@@ -28,18 +28,21 @@ spec:
             - name: http
               containerPort: {{ .Values.service.targetPort }}
               protocol: TCP
+
           env:
             {{- range $key, $value := .Values.envVars }}
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+
             {{- range $key, $value := .Values.envSecrets }}
             - name: {{ $key }}
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "backend.fullname" . }}-secret
+                  name: {{ include "backend.fullname" $ }}-secret
                   key: {{ $key }}
             {{- end }}
+
           {{- if .Values.livenessProbe.enabled }}
           livenessProbe:
             httpGet:
@@ -50,6 +53,7 @@ spec:
             timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
             failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
           {{- end }}
+
           {{- if .Values.readinessProbe.enabled }}
           readinessProbe:
             httpGet:
@@ -60,13 +64,16 @@ spec:
             timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
             failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
           {{- end }}
+
           {{- if .Values.persistence.enabled }}
           volumeMounts:
             - name: data
               mountPath: {{ .Values.persistence.mountPath }}
           {{- end }}
+
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+
       {{- if .Values.persistence.enabled }}
       volumes:
         - name: data
