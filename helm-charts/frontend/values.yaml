@@ -2,7 +2,7 @@
 name: frontend
 fullnameOverride: frontend
 
-replicaCount: 2
+replicaCount: 1
 
 image:
   repository: docker.io/maitrova/maitrova
@@ -39,7 +39,7 @@ resources:
 
 # Health Checks
 livenessProbe:
-  enabled: true
+  enabled: false
   httpGet:
     path: /
     port: 80
@@ -49,7 +49,7 @@ livenessProbe:
   failureThreshold: 3
 
 readinessProbe:
-  enabled: true
+  enabled: false
   httpGet:
     path: /
     port: 80
@@ -61,8 +61,8 @@ readinessProbe:
 # Autoscaling
 autoscaling:
   enabled: true
-  minReplicas: 2
-  maxReplicas: 5
+  minReplicas: 1
+  maxReplicas: 2
   targetCPUUtilizationPercentage: 70
   targetMemoryUtilizationPercentage: 80
 
