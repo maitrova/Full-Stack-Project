@@ -1,12 +1,12 @@
 // src/pages/DesignerPage.jsx
 import React, { useState, useEffect, useRef } from "react";
-import { useParams, useSearchParams, useNavigate } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProductBySlug } from "../redux/slices/productsSlice.js";
 import RecolorEditor from "./RecolorEditor.jsx";
 import {selectCurrentToken} from "../redux/slices/Userslice.js"
 
-const API_URL = "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const FONT_OPTIONS = [
   "Impact, sans-serif",
@@ -1067,9 +1067,19 @@ export default function DesignerPage() {
       {/* Top bar */}
       <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-6">
         <div className="flex items-center gap-4">
-          <div className="text-lg font-extrabold tracking-wide text-orange-500">
-            MYPRINT
-          </div>
+          <div className="flex items-center gap-3">
+  <div className="text-lg font-extrabold tracking-wide text-orange-500">
+    MYPRINT
+  </div>
+
+  <Link
+    to="/usersaved_designs"
+    className="rounded-full border border-sky-600 px-3 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-50 transition"
+  >
+    My Designs
+  </Link>
+</div>
+
           <div className="text-xs text-slate-500">
             {isEditMode ? "Edit Design" : "My Designs"} <span className="mx-1">›</span>{" "}
             <span className="font-medium text-slate-700">

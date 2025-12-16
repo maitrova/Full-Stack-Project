@@ -4,7 +4,7 @@ import axios from "axios";
 
 // If you want a base URL, you can set it once:
 axios.defaults.baseURL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+  import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 // Thunk: fetch all products for listing
 export const fetchProducts = createAsyncThunk(

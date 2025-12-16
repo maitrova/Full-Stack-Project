@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {selectCurrentToken} from "../redux/slices/Userslice.js"
 import { useSelector } from "react-redux";
-const API_URL = "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function Usersaveddesigns() {
   const [designs, setDesigns] = useState([]);
@@ -201,10 +201,10 @@ export default function Usersaveddesigns() {
           <div className="text-lg font-extrabold tracking-wide text-orange-500">
             MYPRINT
           </div>
-          <div className="text-xs text-slate-500">
+          {/* <div className="text-xs text-slate-500">
             Admin <span className="mx-1">›</span>{" "}
             <span className="font-medium text-slate-700">Saved Designs</span>
-          </div>
+          </div> */}
         </div>
 
         <div className="flex items-center gap-4 text-xs">
