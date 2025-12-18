@@ -18,10 +18,10 @@ const FONT_OPTIONS = [
 ];
 
 // Pricing constants
-const BASE_PRICE = 600;
 const FIXED_SIZE_INCHES = 4; // 4x4 inches included in base price
 const PRICE_PER_SQ_INCH = 6;
 const SLEEVE_PRICE = 30;
+const MINIMUM_DESIGN_CHARGE = 30; // Minimum ₹30 for any design up to 4x4 inches
 const DISPLAY_DPI = 72; // Like Custom Ink - for display to users
 const PRINT_DPI = 300; // For actual print production
 
@@ -36,7 +36,7 @@ const createDefaultTextLayer = () => ({
   rotation: 0,
 });
 
-const createDesignLayer = (id, imageUrl, file, width, height) => {
+const createDesignLayer = (id, imageUrl, file, width, height, basePrice = 0) => {
   // Calculate display dimensions in inches (using 72 DPI like Custom Ink)
   const displayWidthInches = width / DISPLAY_DPI;
   const displayHeightInches = height / DISPLAY_DPI;
@@ -49,7 +49,20 @@ const createDesignLayer = (id, imageUrl, file, width, height) => {
   
   const fixedArea = FIXED_SIZE_INCHES * FIXED_SIZE_INCHES;
   const additionalPrintArea = Math.max(0, printAreaInches - fixedArea);
-  const layerPrice = additionalPrintArea * PRICE_PER_SQ_INCH;
+  
+  // Calculate layer price with minimum charge logic
+  let layerPrice = 0;
+  const scaledPrintArea = printAreaInches * 0.35 * 0.35;
+  const scaledFixedArea = fixedArea * 0.35 * 0.35;
+  
+  if (scaledPrintArea <= scaledFixedArea) {
+    layerPrice = MINIMUM_DESIGN_CHARGE;
+  } else {
+    layerPrice = additionalPrintArea * PRICE_PER_SQ_INCH * 0.35 * 0.35;
+    if (layerPrice < MINIMUM_DESIGN_CHARGE) {
+      layerPrice = MINIMUM_DESIGN_CHARGE;
+    }
+  }
   
   return {
     id,
@@ -80,8 +93,9 @@ const createDesignLayer = (id, imageUrl, file, width, height) => {
     currentPrintWidthInches: printWidthInches * 0.35,
     currentPrintHeightInches: printHeightInches * 0.35,
     currentPrintAreaInches: printAreaInches * 0.35 * 0.35,
-    currentAdditionalArea: Math.max(0, (printAreaInches * 0.35 * 0.35) - fixedArea),
-    layerPrice: layerPrice * 0.35 * 0.35, // Scale the price too
+    currentAdditionalArea: Math.max(0, (printAreaInches * 0.35 * 0.35) - (fixedArea * 0.35 * 0.35)),
+    layerPrice: layerPrice,
+    minimumChargeApplied: scaledPrintArea <= scaledFixedArea
   };
 };
 
@@ -95,6 +109,9 @@ export default function DesignerPage() {
     (state) => state.products
   );
 
+  // Get base price from product or use default
+  const BASE_PRICE = product?.basePrice || 600;
+  
   const [productColor, setProductColor] = useState("#FFFFFF");
   const [viewStates, setViewStates] = useState({});
   const [viewCode, setViewCode] = useState("front");
@@ -106,7 +123,7 @@ export default function DesignerPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [calculatingPrice, setCalculatingPrice] = useState(false);
   
-  // Price state
+  // Price state - initialize with product's base price
   const [price, setPrice] = useState(BASE_PRICE);
   const [priceBreakdown, setPriceBreakdown] = useState({
     basePrice: BASE_PRICE,
@@ -114,6 +131,7 @@ export default function DesignerPage() {
     text: { count: 0, total: 0, items: [] },
     sleeves: { count: 0, total: 0 },
     additionalArea: 0,
+    minimumCharges: 0,
     totalPrice: BASE_PRICE
   });
 
@@ -158,7 +176,17 @@ export default function DesignerPage() {
     // Calculate additional area beyond fixed size (using print dimensions for pricing)
     const fixedArea = FIXED_SIZE_INCHES * FIXED_SIZE_INCHES;
     const additionalArea = Math.max(0, currentPrintAreaInches - fixedArea);
-    const layerPrice = additionalArea * PRICE_PER_SQ_INCH;
+    
+    // Calculate layer price with minimum charge logic
+    let layerPrice = 0;
+    if (currentPrintAreaInches <= fixedArea) {
+      layerPrice = MINIMUM_DESIGN_CHARGE;
+    } else {
+      layerPrice = additionalArea * PRICE_PER_SQ_INCH;
+      if (layerPrice < MINIMUM_DESIGN_CHARGE) {
+        layerPrice = MINIMUM_DESIGN_CHARGE;
+      }
+    }
     
     return {
       ...layer,
@@ -172,6 +200,7 @@ export default function DesignerPage() {
       layerPrice,
       renderedWidthPx: layer.originalWidthPx * currentScale,
       renderedHeightPx: layer.originalHeightPx * currentScale,
+      minimumChargeApplied: currentPrintAreaInches <= fixedArea
     };
   };
 
@@ -179,6 +208,9 @@ export default function DesignerPage() {
   const calculatePrice = async (updateUI = true) => {
     try {
       if (updateUI) setCalculatingPrice(true);
+      
+      // Get current base price from product
+      const currentBasePrice = product?.basePrice || BASE_PRICE;
       
       // Collect all layers from all views
       const allDesignLayers = [];
@@ -219,7 +251,12 @@ export default function DesignerPage() {
       });
 
       // Calculate price locally
-      const { totalPrice, breakdown } = calculateLocalPrice(allDesignLayers, allTextLayers, allZones);
+      const { totalPrice, breakdown } = calculateLocalPrice(
+        allDesignLayers, 
+        allTextLayers, 
+        allZones,
+        currentBasePrice
+      );
       
       if (updateUI) {
         setPrice(totalPrice);
@@ -239,15 +276,16 @@ export default function DesignerPage() {
     }
   };
 
-  const calculateLocalPrice = (designLayers, textLayers, zones) => {
-    let totalPrice = BASE_PRICE;
+  const calculateLocalPrice = (designLayers, textLayers, zones, basePrice) => {
+    let totalPrice = basePrice;
     const breakdown = {
-      basePrice: BASE_PRICE,
+      basePrice: basePrice,
       images: { count: 0, total: 0, items: [] },
       text: { count: 0, total: 0, items: [] },
       sleeves: { count: 0, total: 0 },
       additionalArea: 0,
-      totalPrice: BASE_PRICE
+      minimumCharges: 0,
+      totalPrice: basePrice
     };
 
     // Calculate price for design layers (images)
@@ -266,7 +304,8 @@ export default function DesignerPage() {
           price: SLEEVE_PRICE,
           zone: zone,
           viewCode: layer.viewCode,
-          displaySize: `${layer.currentDisplayWidthInches?.toFixed(2)}" × ${layer.currentDisplayHeightInches?.toFixed(2)}"`
+          displaySize: `${layer.currentDisplayWidthInches?.toFixed(2)}" × ${layer.currentDisplayHeightInches?.toFixed(2)}"`,
+          note: 'Sleeve - fixed price'
         });
       } else {
         // Use current print area in inches for pricing
@@ -275,10 +314,31 @@ export default function DesignerPage() {
         // Calculate additional area beyond fixed size
         const fixedArea = FIXED_SIZE_INCHES * FIXED_SIZE_INCHES;
         const additionalArea = layer.currentAdditionalArea || Math.max(0, printAreaInches - fixedArea);
-        const layerPrice = layer.layerPrice || (additionalArea * PRICE_PER_SQ_INCH);
         
-        if (additionalArea > 0) {
-          breakdown.additionalArea += additionalArea;
+        // Calculate per sq inch price
+        const perSqInchPrice = additionalArea * PRICE_PER_SQ_INCH;
+        
+        // Apply minimum charge: ₹30 for any design, even below 4x4 inches
+        let layerPrice = 0;
+        
+        if (printAreaInches > 0) {
+          if (printAreaInches <= fixedArea) {
+            // For designs up to 4x4 inches (16 sq.in), charge minimum amount
+            layerPrice = MINIMUM_DESIGN_CHARGE;
+            breakdown.minimumCharges += MINIMUM_DESIGN_CHARGE;
+          } else {
+            // For designs larger than 4x4 inches
+            layerPrice = perSqInchPrice;
+            if (perSqInchPrice < MINIMUM_DESIGN_CHARGE) {
+              // Ensure minimum charge if per sq inch calculation is less than minimum
+              layerPrice = MINIMUM_DESIGN_CHARGE;
+              breakdown.minimumCharges += MINIMUM_DESIGN_CHARGE;
+            }
+          }
+          
+          if (additionalArea > 0) {
+            breakdown.additionalArea += additionalArea;
+          }
         }
         
         totalPrice += layerPrice;
@@ -296,6 +356,9 @@ export default function DesignerPage() {
           zone: zone,
           viewCode: layer.viewCode,
           scale: layer.scale,
+          note: printAreaInches <= fixedArea ? 
+                `Minimum charge (${printAreaInches.toFixed(1)} sq.in ≤ ${fixedArea} sq.in)` : 
+                `Area-based pricing`
         });
       }
     });
@@ -320,7 +383,13 @@ export default function DesignerPage() {
       // Calculate additional area beyond fixed size
       const fixedArea = FIXED_SIZE_INCHES * FIXED_SIZE_INCHES;
       const additionalArea = Math.max(0, areaInches - fixedArea);
-      const textPrice = additionalArea * PRICE_PER_SQ_INCH;
+      let textPrice = additionalArea * PRICE_PER_SQ_INCH;
+      
+      // Apply minimum charge for text if it has any size
+      if (areaInches > 0 && textPrice < MINIMUM_DESIGN_CHARGE && areaInches <= fixedArea) {
+        textPrice = MINIMUM_DESIGN_CHARGE;
+        breakdown.minimumCharges += MINIMUM_DESIGN_CHARGE;
+      }
       
       if (additionalArea > 0) {
         breakdown.additionalArea += additionalArea;
@@ -349,7 +418,7 @@ export default function DesignerPage() {
     return { totalPrice, breakdown };
   };
 
-  // Auto-calculate price when layers change
+  // Auto-calculate price when layers change OR when product changes
   useEffect(() => {
     if (Object.keys(viewStates).length > 0) {
       const timeoutId = setTimeout(() => {
@@ -358,6 +427,18 @@ export default function DesignerPage() {
       return () => clearTimeout(timeoutId);
     }
   }, [viewStates]);
+
+  // Update price when product changes (base price might be different)
+  useEffect(() => {
+    if (product?.basePrice) {
+      setPrice(product.basePrice);
+      setPriceBreakdown(prev => ({
+        ...prev,
+        basePrice: product.basePrice,
+        totalPrice: product.basePrice + (prev.totalPrice - prev.basePrice)
+      }));
+    }
+  }, [product?.basePrice]);
 
   // -------- IMAGE UPLOAD FUNCTION --------
   const uploadDesignImage = async (file) => {
@@ -620,7 +701,7 @@ export default function DesignerPage() {
         const { width, height } = await getImageNaturalSize(serverUrl);
         
         // Create design layer with proper dimensions
-        newLayers.push(createDesignLayer(id, serverUrl, file, width, height));
+        newLayers.push(createDesignLayer(id, serverUrl, file, width, height, BASE_PRICE));
       }
 
       const all = [...designLayers, ...newLayers];
@@ -863,7 +944,7 @@ export default function DesignerPage() {
              printWidthInches, printHeightInches, printAreaInches,
              currentDisplayWidthInches, currentDisplayHeightInches,
              currentPrintWidthInches, currentPrintHeightInches, currentPrintAreaInches,
-             currentAdditionalArea, layerPrice }) => ({
+             currentAdditionalArea, layerPrice, minimumChargeApplied }) => ({
             id, imageUrl, hasBgRemoved: !!hasBgRemoved, x, y, scale, rotation,
             zone: zone || null, insideSafeArea: typeof insideSafeArea === "boolean" ? insideSafeArea : true,
             originalWidthPx, originalHeightPx, 
@@ -872,7 +953,7 @@ export default function DesignerPage() {
             printWidthInches, printHeightInches, printAreaInches,
             currentDisplayWidthInches, currentDisplayHeightInches,
             currentPrintWidthInches, currentPrintHeightInches, currentPrintAreaInches,
-            currentAdditionalArea, layerPrice
+            currentAdditionalArea, layerPrice, minimumChargeApplied
           })
         );
 
@@ -892,7 +973,7 @@ export default function DesignerPage() {
         productColor,
         previewImage: mainPreview,
         views: viewsPayload,
-        basePrice: BASE_PRICE,
+        basePrice: BASE_PRICE, // Use product's base price
         calculatedPrice: totalPrice,
         priceBreakdown: priceBreakdown,
       };
@@ -1001,6 +1082,7 @@ export default function DesignerPage() {
 
   const debugPriceCalculation = () => {
     console.log("=== PRICE CALCULATION DEBUG ===");
+    console.log("Product Base Price:", BASE_PRICE);
     console.log("Design Layers:", designLayers.map(l => ({
       id: l.id,
       displaySize: `${l.currentDisplayWidthInches?.toFixed(2)}" × ${l.currentDisplayHeightInches?.toFixed(2)}"`,
@@ -1008,7 +1090,8 @@ export default function DesignerPage() {
       printArea: l.currentPrintAreaInches?.toFixed(2),
       scale: l.scale,
       additionalArea: l.currentAdditionalArea?.toFixed(2),
-      layerPrice: l.layerPrice
+      layerPrice: l.layerPrice,
+      minimumChargeApplied: l.minimumChargeApplied
     })));
     
     console.log("Text Layers:", textLayers.map(t => ({
@@ -1068,17 +1151,17 @@ export default function DesignerPage() {
       <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-6">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3">
-  <div className="text-lg font-extrabold tracking-wide text-orange-500">
-    MYPRINT
-  </div>
+            <div className="text-lg font-extrabold tracking-wide text-orange-500">
+              MYPRINT
+            </div>
 
-  <Link
-    to="/usersaved_designs"
-    className="rounded-full border border-sky-600 px-3 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-50 transition"
-  >
-    My Designs
-  </Link>
-</div>
+            <Link
+              to="/usersaved_designs"
+              className="rounded-full border border-sky-600 px-3 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-50 transition"
+            >
+              My Designs
+            </Link>
+          </div>
 
           <div className="text-xs text-slate-500">
             {isEditMode ? "Edit Design" : "My Designs"} <span className="mx-1">›</span>{" "}
@@ -1147,7 +1230,7 @@ export default function DesignerPage() {
             
             <div className="space-y-2 text-xs">
               <div className="flex justify-between">
-                <span>Base Price:</span>
+                <span>Base Price ({product?.name || "Product"}):</span>
                 <span className="font-medium">₹{BASE_PRICE.toFixed(2)}</span>
               </div>
               
@@ -1165,6 +1248,7 @@ export default function DesignerPage() {
                     <div className="text-[10px] text-slate-500 ml-2">
                       {item.type === 'sleeve' ? 'Sleeve' : `Display: ${item.displaySize}`}
                       {item.type !== 'sleeve' && <div className="text-[9px]">Print: {item.printSize}</div>}
+                      {item.note && <div className="text-[9px] text-amber-600">{item.note}</div>}
                     </div>
                   </div>
                   <span>₹{item.price.toFixed(2)}</span>
@@ -1183,6 +1267,13 @@ export default function DesignerPage() {
                 </div>
               ))}
               
+              {priceBreakdown.minimumCharges > 0 && (
+                <div className="flex justify-between text-amber-700">
+                  <span>Minimum Design Charges:</span>
+                  <span>₹{priceBreakdown.minimumCharges.toFixed(2)}</span>
+                </div>
+              )}
+              
               {priceBreakdown.additionalArea > 0 && (
                 <div className="flex justify-between text-green-700">
                   <span>Additional Area ({priceBreakdown.additionalArea.toFixed(2)} sq.in):</span>
@@ -1198,8 +1289,10 @@ export default function DesignerPage() {
               </div>
               
               <div className="text-[10px] text-green-600 mt-2">
+                <p>• Base price for {product?.name || "product"}: ₹{BASE_PRICE.toFixed(2)}</p>
                 <p>• Base includes {FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}" area</p>
-                <p>• Additional: ₹{PRICE_PER_SQ_INCH} per sq.inch</p>
+                <p>• Minimum design charge: ₹{MINIMUM_DESIGN_CHARGE} (up to {FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}")</p>
+                <p>• Additional: ₹{PRICE_PER_SQ_INCH} per sq.inch beyond {FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}"</p>
                 <p>• Sleeves: Fixed ₹{SLEEVE_PRICE} each</p>
                 <p>• Display size uses 72 DPI (screen)</p>
                 <p>• Print size uses 300 DPI (actual production)</p>
@@ -1284,9 +1377,13 @@ export default function DesignerPage() {
                     <div className="mt-1 text-center">
                       <span className="text-slate-500">Print Area:</span>
                       <span className="font-medium ml-1">{activeDesign.currentPrintAreaInches?.toFixed(2)} sq.in</span>
-                      {activeDesign.currentAdditionalArea > 0 && (
+                      {activeDesign.currentAdditionalArea > 0 ? (
                         <span className="ml-2 text-green-600">
                           (+{activeDesign.currentAdditionalArea?.toFixed(2)} sq.in extra)
+                        </span>
+                      ) : activeDesign.minimumChargeApplied && (
+                        <span className="ml-2 text-amber-600">
+                          (Minimum ₹{MINIMUM_DESIGN_CHARGE} charge)
                         </span>
                       )}
                     </div>
@@ -1326,6 +1423,12 @@ export default function DesignerPage() {
                     <span>Status:</span>
                     <span className={activeDesign.hasBgRemoved ? "font-semibold text-emerald-600" : "font-medium text-slate-600"}>
                       {activeDesign.hasBgRemoved ? "Background removed" : "Original (saved on server)"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <span>Pricing:</span>
+                    <span className={activeDesign.minimumChargeApplied ? "font-semibold text-amber-600" : "font-medium text-green-600"}>
+                      {activeDesign.minimumChargeApplied ? `₹${MINIMUM_DESIGN_CHARGE} minimum charge` : `₹${activeDesign.layerPrice?.toFixed(2)} area-based`}
                     </span>
                   </div>
                   <p className="mt-1 text-[10px] text-slate-500">

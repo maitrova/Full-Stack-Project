@@ -12,7 +12,7 @@ import designrouter from './routes/designRoutes.js';
 import designsrouters from './routes/uploadDesignRoutes.js';
 import authrouter from './routes/auth.js';
 import cartrouter from './routes/addtocartroutes.js';
-
+import adminrouter from './routes/admincontrols.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -36,6 +36,7 @@ app.use('/api', designsrouters);
 app.use("/api/products", router);
 app.use('/api/auth',authrouter);
 app.use('/api/cart',cartrouter);
+app.use('/api/admin',adminrouter);
 // Error handling
 app.use((err, req, res, next) => {
   console.error("Server error:", err);

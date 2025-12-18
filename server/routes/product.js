@@ -23,4 +23,5 @@ productrouter.put('/update/:id', upload.array('images', 5), updateProduct);
 productrouter.delete('/products/delete/:id', deleteProduct); 
 
 
+
 export default productrouter;

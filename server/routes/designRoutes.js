@@ -16,6 +16,5 @@ designrouter.put("/:id", updateDesign);
 designrouter.delete("/:id", deleteDesign);
 
 
-      // ✅ public
-
+// designrouter.put("/products/:id/pricing", protect,updateProductPricingControls);
 export default designrouter;

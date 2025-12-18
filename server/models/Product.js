@@ -5,19 +5,19 @@ const productViewSchema = new mongoose.Schema(
   {
     code: {
       type: String,
-      required: true, // 'front', 'back', 'right', 'left'
+      required: true,
     },
     label: {
       type: String,
-      required: true, // 'Front', 'Back', 'Right Sleeve', ...
+      required: true,
     },
     mockupUrl: {
       type: String,
-      required: true, // e.g. "/mockups/hoodie/front.png"
+      required: true,
     },
     maskUrl: {
       type: String,
-      required: true, // e.g. "/masks/hoodie/front_mask.png"
+      required: true,
     },
   },
   { _id: false }
@@ -27,26 +27,71 @@ const productSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: true, // "Hoodie"
+      required: true,
     },
     slug: {
       type: String,
       required: true,
-      unique: true, // "hoodie"
+      unique: true,
     },
     category: {
       type: String,
-      default: "apparel", // you can group later: 'hoodie', 'tshirt', 'womens', etc.
+      default: "apparel",
     },
     views: {
       type: [productViewSchema],
       default: [],
     },
-    // optional: base price, description, etc.
+    
+    // Base price for the product
     basePrice: {
       type: Number,
-      default: 0,
+      default: 600,
     },
+    
+    // PRICING MODE: 'normal' or 'unlimited'
+    pricingMode: {
+      type: String,
+      enum: ['normal', 'unlimited'],
+      default: 'normal'
+    },
+    
+    // UNLIMITED MODE CONFIGURATION
+    unlimitedPricing: {
+      enabled: {
+        type: Boolean,
+        default: false
+      },
+      flatCharge: {
+        type: Number,
+        default: 200
+      },
+      label: {
+        type: String,
+        default: "Unlimited Design"
+      },
+      description: {
+        type: String,
+        default: "Design as much as you want at a fixed price"
+      }
+    },
+    
+    // NORMAL MODE CONFIGURATION (Size-based pricing)
+    normalPricing: {
+      fixedSizeInches: {
+        type: Number,
+        default: 4
+      },
+      pricePerSqInch: {
+        type: Number,
+        default: 6
+      },
+      sleevePrice: {
+        type: Number,
+        default: 30
+      }
+    },
+    
     currency: {
       type: String,
       default: "INR",
