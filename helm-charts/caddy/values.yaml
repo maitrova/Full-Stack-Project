@@ -1,0 +1,100 @@
+# Caddy Configuration
+name: caddy
+fullnameOverride: caddy
+
+replicaCount: 1
+
+image:
+  repository: caddy
+  tag: "2"
+  pullPolicy: IfNotPresent
+
+# Service Configuration
+service:
+  type: LoadBalancer  # For K3s, this will use the built-in ServiceLB (Klipper)
+  # type: NodePort    # Alternative: Use NodePort if you don't want LoadBalancer
+  ports:
+    http:
+      port: 80
+      targetPort: 80
+      nodePort: 30082  # Uncomment if using NodePort
+    https:
+      port: 443
+      targetPort: 443
+      nodePort: 30082  # Uncomment if using NodePort
+
+# Caddyfile Configuration
+caddyfile: |
+  {
+    email narendrareddy00@gmail.com
+  }
+
+  narifighter.online {
+    encode gzip
+
+    # --- Security headers ---
+    header {
+      Strict-Transport-Security "max-age=15552000; includeSubDomains; preload"
+      X-Content-Type-Options "nosniff"
+      X-Frame-Options "DENY"
+      Referrer-Policy "no-referrer-when-downgrade"
+      Permissions-Policy "geolocation=(), microphone=(), camera=()"
+    }
+
+    # --- API routes: backend ---
+    @api path /backend/*
+    handle @api {
+      reverse_proxy backend:5000
+    }
+
+    # --- All other routes: frontend ---
+    handle {
+      reverse_proxy frontend:80
+    }
+  }
+
+# Environment Configuration
+env: production
+
+# Persistent Volume for Caddy data (certificates, etc.)
+persistence:
+  enabled: true
+  storageClass: "local-path"  # K3s default StorageClass
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  hostPath: /home/sai/caddy_data  # Separate directory for Caddy SSL certs
+
+# Resource Limits
+resources:
+  limits:
+    cpu: "500m"
+    memory: 512Mi
+  requests:
+    cpu: "100m"
+    memory: 128Mi
+
+# Health Checks
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 80
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /
+    port: 80
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# Pod Disruption Budget
+pdb:
+  enabled: true
+  minAvailable: 1

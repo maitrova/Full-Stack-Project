@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 const NewArrivalsWithImage = () => {
   return (
     <section className="py-16">
@@ -19,22 +21,25 @@ const NewArrivalsWithImage = () => {
                   </p>
                 </div>
                 
-                <button className="bg-blue-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-blue-700 transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center group w-fit">
-                  Shop Now
-                  <svg 
-                    className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    viewBox="0 0 24 24"
-                  >
-                    <path 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round" 
-                      strokeWidth={2} 
-                      d="M14 5l7 7m0 0l-7 7m7-7H3" 
-                    />
-                  </svg>
-                </button>
+                <Link to="/products">
+  <button className="bg-blue-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-blue-700 transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl flex items-center group w-fit">
+    Shop Now
+    <svg
+      className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M14 5l7 7m0 0l-7 7m7-7H3"
+      />
+    </svg>
+  </button>
+</Link>
+
               </div>
 
               {/* Image Section */}
