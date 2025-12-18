@@ -18,8 +18,7 @@ COPY package*.json ./
 # Install Node.js dependencies
 RUN npm ci 
 
-# Install Python dependencies
-COPY recolor_tshirt.py ./
+
 RUN pip3 install --no-cache-dir \
     rembg \
     Pillow \
