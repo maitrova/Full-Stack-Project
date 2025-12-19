@@ -29,7 +29,7 @@ COPY . .
 
 # Create output directory
 RUN mkdir -p tshirt_recolor_output
-
+RUN mkdir -p /app/outputs/designs
 # Expose port
 EXPOSE 5000
 

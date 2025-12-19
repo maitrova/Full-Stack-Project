@@ -1,0 +1,26 @@
+{{- if .Values.persistence.enabled }}
+---
+# PersistentVolume for Caddy (SSL certificates and data)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ include "caddy.fullname" . }}-pv
+  labels:
+    {{- include "caddy.labels" . | nindent 4 }}
+spec:
+  capacity:
+    storage: {{ .Values.persistence.size }}
+  accessModes:
+    - {{ .Values.persistence.accessMode }}
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.persistence.storageClass }}
+  hostPath:
+    path: {{ .Values.persistence.hostPath }}
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: Exists
+{{- end }}
