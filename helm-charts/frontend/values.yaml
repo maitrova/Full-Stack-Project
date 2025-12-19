@@ -12,7 +12,7 @@ image:
 # Service Configuration
 service:
   type: ClusterIP
-  port: 80
+  port: 5173
   targetPort: 5173
 
 # Environment Configuration
