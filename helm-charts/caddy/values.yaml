@@ -40,10 +40,11 @@ caddyfile: |
       Referrer-Policy "no-referrer-when-downgrade"
       Permissions-Policy "geolocation=(), microphone=(), camera=()"
     }
-
+  
     # --- API routes: backend ---
-    @api path /api/*
+    @api path /backend/*
     handle @api {
+      uri strip_prefix /backend
       reverse_proxy backend:5000
     }
 
