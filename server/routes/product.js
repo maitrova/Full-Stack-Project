@@ -6,21 +6,21 @@ const productrouter = express.Router();
 
 // Use multer middleware for multiple file uploads (max 5 images)
 productrouter.post('/add-product', upload.array('images', 5), addProduct);
-productrouter.get('/', getProducts);
+productrouter.get('/products', getProducts);
 
 // Get products by main category
-productrouter.get('/category/:mainCategory', getProductsByMainCategory);
+productrouter.get('/products/category/:mainCategory', getProductsByMainCategory);
 // Get products by main category and sub category
-productrouter.get('/category/:mainCategory/:subCategory', getProductsBySubCategory);
+productrouter.get('/products/category/:mainCategory/:subCategory', getProductsBySubCategory);
 
 // Get single product by ID
-productrouter.get('/:id', getProductById);
+productrouter.get('/products/:id', getProductById);
 
 // Update product with optional file upload
 productrouter.put('/update/:id', upload.array('images', 5), updateProduct);
 
 
-productrouter.delete('/delete/:id', deleteProduct); 
+productrouter.delete('/products/delete/:id', deleteProduct); 
 
 
 
