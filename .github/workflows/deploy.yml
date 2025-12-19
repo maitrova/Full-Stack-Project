@@ -62,23 +62,3 @@ jobs:
             ${{ secrets.IMAGE_NAME }}:backend
             ${{ secrets.IMAGE_NAME }}:b-${{ steps.get_tag.outputs.tag }}
             
-  deploy:
-    needs: build_and_push
-    runs-on: ubuntu-latest
-    steps:
-      - name: SSH to VPS and deploy
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          port: ${{ secrets.VPS_PORT }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          script: |
-            echo "Executing Docker compose down"
-            docker-compose down
-            echo "Sleeping for 15 sec"
-            sleep 15
-            echo "Executing Docker compose pull"
-            docker-compose pull
-            echo "Executing Docker compose up"
-            docker-compose up -d
