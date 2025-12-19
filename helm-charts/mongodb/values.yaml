@@ -25,9 +25,10 @@ envSecrets:
 
 # Service Configuration
 service:
-  type: ClusterIP
+  type: NodePort
   port: 27017
   targetPort: 27017
+  nodePort: 30017  # Explicitly set a port in the 30000-32767 range
 
 # Persistent Storage Configuration
 persistence:
