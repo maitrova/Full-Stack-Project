@@ -23,7 +23,8 @@ callbackrouter.get('/callback', async (req, res) => {
 
     // Redirect to another route and pass the token via URL
     const accessToken = tokens.access_token;
-    const redirectUrl = `http://localhost:5000/api/drive/files?access_token=${accessToken}`;
+    const apiUrl = process.env.API_URL || "https://narifighter.online/backend";
+    const redirectUrl = `${apiUrl}/api/drive/files?access_token=${accessToken}`;
 
     res.redirect(redirectUrl);  // Redirect with the token in the URL
   } catch (error) {

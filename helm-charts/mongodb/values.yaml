@@ -1,0 +1,72 @@
+# MongoDB Configuration
+name: mongodb
+fullnameOverride: mongodb
+
+replicaCount: 1  # For single VPS, use 1. For production HA, use 3 (replica set)
+
+image:
+  repository: mongo
+  tag: "7"
+  pullPolicy: IfNotPresent
+
+# Authentication
+auth:
+  rootUsername: maitrova
+  database: appdb
+
+# Application Environment Variables
+envVars:
+  MONGO_INITDB_DATABASE: appdb
+
+# Secret Environment Variables (manage all secrets here)
+envSecrets:
+  MONGO_INITDB_ROOT_USERNAME: maitrova
+  MONGO_INITDB_ROOT_PASSWORD: "Saigollapalli@122"  # Change this in production!
+
+# Service Configuration
+service:
+  type: ClusterIP
+  port: 27017
+  targetPort: 27017
+
+# Persistent Storage Configuration
+persistence:
+  enabled: true
+  storageClass: "local-path"  # K3s default StorageClass
+  accessMode: ReadWriteOnce
+  size: 20Gi  # Adjust based on your needs
+  # For single VPS, use hostPath mount
+  hostPath: /home/sai/mongo_data  # Your existing path from docker-compose
+
+# Resource Limits
+resources:
+  limits:
+    cpu: "1"
+    memory: 2Gi
+  requests:
+    cpu: "500m"
+    memory: 1Gi
+
+# Health Checks
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+
+# MongoDB specific arguments
+mongodbExtraFlags:
+  - "--bind_ip_all"
+
+# Environment (dev/qa/prod)
+env: production

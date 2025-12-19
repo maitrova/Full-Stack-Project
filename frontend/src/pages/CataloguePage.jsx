@@ -11,7 +11,7 @@ import {
   Eye
 } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
 
 export default function CataloguePage() {
   const [designs, setDesigns] = useState([]);

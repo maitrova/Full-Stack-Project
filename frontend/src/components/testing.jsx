@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { fetchProductBySlug } from "../redux/slices/productsSlice.js";
 import RecolorEditor from "./RecolorEditor.jsx";
 import {selectCurrentToken} from "../redux/slices/Userslice.js"
-const API_URL = "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
 
 const FONT_OPTIONS = [
   "Impact, sans-serif",

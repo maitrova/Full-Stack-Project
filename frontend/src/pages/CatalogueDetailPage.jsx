@@ -20,7 +20,7 @@ import {
   Star
 } from "lucide-react";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
 
 console.log("API_URL:", API_URL);
 
