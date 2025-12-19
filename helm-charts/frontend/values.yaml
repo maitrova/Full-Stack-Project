@@ -21,6 +21,8 @@ env: production
 # Application Environment Variables
 envVars:
   NODE_ENV: production
+  VITE_API_URL: https://narifighter.online/backend
+
   # Add any frontend env vars here
 
 # Secret Environment Variables (if frontend needs any)
