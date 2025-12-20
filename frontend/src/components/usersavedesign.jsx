@@ -545,7 +545,7 @@ export default function Usersaveddesigns() {
                                       )}
                                     >
                                       <img
-                                        src={d.imageUrl}
+                                        src={`http://localhost:5000${d.imageUrl}`}
                                         alt="design layer"
                                         className="max-h-16 max-w-16 object-contain"
                                       />
