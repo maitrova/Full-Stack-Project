@@ -1,0 +1,6 @@
+apiVersion: v2
+name: caddy
+description: Caddy Reverse Proxy & Ingress Helm chart for K3s
+type: application
+version: 1.0.0
+appVersion: "2"

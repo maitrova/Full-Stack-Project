@@ -3,8 +3,8 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
 // Base URL for your API
-const API_URL = `${import.meta.env.VITE_API_URL}/api/auth`;
-
+const BASE_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
+const API_URL = `${BASE_URL}/api/auth`;
 
 // Async thunk for user registration
 export const registerUser = createAsyncThunk(

@@ -254,8 +254,9 @@ export const saveDesign = async (req, res) => {
 
       const designLayers = (view.designLayers || []).map((layer) => {
         let imageUrl = layer.imageUrl;
-        if (imageUrl && imageUrl.includes("http://localhost:5000")) {
-          imageUrl = imageUrl.replace("http://localhost:5000", "");
+        const apiUrl = process.env.API_URL || "https://narifighter.online/backend";
+        if (imageUrl && imageUrl.includes(apiUrl)) {
+          imageUrl = imageUrl.replace(apiUrl, "");
         }
 
         let widthInches, heightInches, areaInches;
@@ -406,8 +407,9 @@ export const updateDesign = async (req, res) => {
 
       const updatedDesignLayers = (view.designLayers || []).map((layer) => {
         let imageUrl = layer.imageUrl;
-        if (imageUrl && imageUrl.includes('http://localhost:5000')) {
-          imageUrl = imageUrl.replace('http://localhost:5000', '');
+        const apiUrl = process.env.API_URL || "https://narifighter.online/backend";
+        if (imageUrl && imageUrl.includes(apiUrl)) {
+          imageUrl = imageUrl.replace(apiUrl, "");
         }
 
         let widthInches, heightInches, areaInches;
@@ -522,7 +524,7 @@ export const publishDesign = async (req, res) => {
 
 export const listCatalogueDesigns = async (req, res) => {
   try {
-    const apiUrl = process.env.API_URL || "http://localhost:5000";
+    const apiUrl = process.env.API_URL || "https://narifighter.online/backend";
 
     const designs = await Design.find({ isPublished: true })
       .sort({ publishedAt: -1 })
@@ -557,7 +559,7 @@ export const getDesign = async (req, res) => {
       return res.status(404).json({ error: "Design not found" });
     }
     
-    const apiUrl = process.env.API_URL || 'http://localhost:5000';
+    const apiUrl = process.env.API_URL || 'https://narifighter.online/backend';
     
     if (design.views) {
       design.views = design.views.map(view => ({
@@ -581,7 +583,7 @@ export const getDesign = async (req, res) => {
 // For admin listing all designs
 export const listDesigns = async (req, res) => {
   try {
-    const apiUrl = process.env.API_URL || "http://localhost:5000";
+    const apiUrl = process.env.API_URL || "https://narifighter.online/backend";
 
     const filter = req.user?.role === "admin"
       ? {}

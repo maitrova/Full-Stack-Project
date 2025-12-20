@@ -25,7 +25,11 @@ const app = express();
 // Middleware
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+app.use(cors({ origin: [
+    "http://localhost:5173", 
+    "http://narifighter.online", 
+    "https://narifighter.online"
+  ], credentials: true }));
 
 // Static files
 app.use("/outputs", express.static(path.join(__dirname, "outputs")));

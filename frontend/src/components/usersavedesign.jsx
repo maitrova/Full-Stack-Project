@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {selectCurrentToken} from "../redux/slices/Userslice.js"
 import { useSelector } from "react-redux";
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
 
 export default function Usersaveddesigns() {
   const [designs, setDesigns] = useState([]);
