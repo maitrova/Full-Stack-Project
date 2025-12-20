@@ -22,7 +22,8 @@ RUN npm ci
 RUN pip3 install --no-cache-dir \
     rembg \
     Pillow \
-    requests
+    requests \
+    onnxruntime
 
 # Copy application code
 COPY . .
