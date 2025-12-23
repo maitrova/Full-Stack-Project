@@ -4,7 +4,8 @@ import { persistStore, persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, 
 import storage from 'redux-persist/lib/storage'; // defaults to localStorage
 import productsReducer from "./slices/productsSlice.js";
 import userReducer from "./slices/Userslice.js";
-
+import readymadeSliceReducer from "./slices/predesignedslice.js";
+import cartSliceReducer from "./slices/Cartslice.js";
 // Persist configuration for user slice only
 const persistConfig = {
   key: 'user', // key for localStorage
@@ -20,7 +21,9 @@ const persistedUserReducer = persistReducer(persistConfig, userReducer);
 export const store = configureStore({
   reducer: {
     products: productsReducer,
-    user: persistedUserReducer, // Use persisted reducer instead of regular one
+    user: persistedUserReducer,
+    readymadeproducts: readymadeSliceReducer,
+    cart: cartSliceReducer, // Use persisted reducer instead of regular one
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

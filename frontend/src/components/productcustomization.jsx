@@ -18,12 +18,20 @@ const FONT_OPTIONS = [
 ];
 
 // Pricing constants
-const FIXED_SIZE_INCHES = 4; // 4x4 inches included in base price
+const FIXED_SIZE_INCHES = 4;
 const PRICE_PER_SQ_INCH = 6;
 const SLEEVE_PRICE = 30;
-const MINIMUM_DESIGN_CHARGE = 30; // Minimum ₹30 for any design up to 4x4 inches
-const DISPLAY_DPI = 72; // Like Custom Ink - for display to users
-const PRINT_DPI = 300; // For actual print production
+const MINIMUM_DESIGN_CHARGE = 30;
+const DISPLAY_DPI = 72;
+const PRINT_DPI = 300;
+
+// Tab options
+const TABS = {
+  PRODUCT_COLORS: 'productColors',
+  DESIGNS: 'designs',
+  TEXT: 'text',
+  VIEWS: 'views'
+};
 
 const createDefaultTextLayer = () => ({
   id: "text-" + Date.now() + "-" + Math.random().toString(36).slice(2),
@@ -36,13 +44,11 @@ const createDefaultTextLayer = () => ({
   rotation: 0,
 });
 
-const createDesignLayer = (id, imageUrl, file, width, height, basePrice = 0) => {
-  // Calculate display dimensions in inches (using 72 DPI like Custom Ink)
+const createDesignLayer = (id, imageUrl, file, width, height) => {
   const displayWidthInches = width / DISPLAY_DPI;
   const displayHeightInches = height / DISPLAY_DPI;
   const displayAreaInches = displayWidthInches * displayHeightInches;
   
-  // Calculate print dimensions in inches (using 300 DPI for actual print)
   const printWidthInches = width / PRINT_DPI;
   const printHeightInches = height / PRINT_DPI;
   const printAreaInches = printWidthInches * printHeightInches;
@@ -50,7 +56,6 @@ const createDesignLayer = (id, imageUrl, file, width, height, basePrice = 0) => 
   const fixedArea = FIXED_SIZE_INCHES * FIXED_SIZE_INCHES;
   const additionalPrintArea = Math.max(0, printAreaInches - fixedArea);
   
-  // Calculate layer price with minimum charge logic
   let layerPrice = 0;
   const scaledPrintArea = printAreaInches * 0.35 * 0.35;
   const scaledFixedArea = fixedArea * 0.35 * 0.35;
@@ -78,23 +83,19 @@ const createDesignLayer = (id, imageUrl, file, width, height, basePrice = 0) => 
     renderedWidthPx: width * 0.35,
     renderedHeightPx: height * 0.35,
     originalFile: file,
-    // Display dimensions (72 DPI - like Custom Ink shows to users)
-    displayWidthInches: displayWidthInches,
-    displayHeightInches: displayHeightInches,
-    displayAreaInches: displayAreaInches,
-    // Current display dimensions (scaled)
+    displayWidthInches,
+    displayHeightInches,
+    displayAreaInches,
     currentDisplayWidthInches: displayWidthInches * 0.35,
     currentDisplayHeightInches: displayHeightInches * 0.35,
-    // Print dimensions (300 DPI - for actual production and pricing)
-    printWidthInches: printWidthInches,
-    printHeightInches: printHeightInches,
-    printAreaInches: printAreaInches,
-    // Current print dimensions (scaled)
+    printWidthInches,
+    printHeightInches,
+    printAreaInches,
     currentPrintWidthInches: printWidthInches * 0.35,
     currentPrintHeightInches: printHeightInches * 0.35,
     currentPrintAreaInches: printAreaInches * 0.35 * 0.35,
     currentAdditionalArea: Math.max(0, (printAreaInches * 0.35 * 0.35) - (fixedArea * 0.35 * 0.35)),
-    layerPrice: layerPrice,
+    layerPrice,
     minimumChargeApplied: scaledPrintArea <= scaledFixedArea
   };
 };
@@ -109,7 +110,6 @@ export default function DesignerPage() {
     (state) => state.products
   );
 
-  // Get base price from product or use default
   const BASE_PRICE = product?.basePrice || 600;
   
   const [productColor, setProductColor] = useState("#FFFFFF");
@@ -123,7 +123,6 @@ export default function DesignerPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [calculatingPrice, setCalculatingPrice] = useState(false);
   
-  // Price state - initialize with product's base price
   const [price, setPrice] = useState(BASE_PRICE);
   const [priceBreakdown, setPriceBreakdown] = useState({
     basePrice: BASE_PRICE,
@@ -141,6 +140,9 @@ export default function DesignerPage() {
   const [loadingEditData, setLoadingEditData] = useState(false);
   const [originalDesign, setOriginalDesign] = useState(null);
   const [editModeInitialized, setEditModeInitialized] = useState(false);
+
+  // Active tab state
+  const [activeTab, setActiveTab] = useState(TABS.PRODUCT_COLORS);
 
   const editorRef = useRef(null);
 
@@ -160,24 +162,19 @@ export default function DesignerPage() {
       img.src = url;
     });
 
-  // Helper function to update design layer dimensions when scale changes
   const updateDesignLayerDimensions = (layer, scale = null) => {
     const currentScale = scale !== null ? scale : layer.scale;
     
-    // Calculate current display dimensions (72 DPI)
     const currentDisplayWidthInches = layer.displayWidthInches * currentScale;
     const currentDisplayHeightInches = layer.displayHeightInches * currentScale;
     
-    // Calculate current print dimensions (300 DPI)
     const currentPrintWidthInches = layer.printWidthInches * currentScale;
     const currentPrintHeightInches = layer.printHeightInches * currentScale;
     const currentPrintAreaInches = layer.printAreaInches * currentScale * currentScale;
     
-    // Calculate additional area beyond fixed size (using print dimensions for pricing)
     const fixedArea = FIXED_SIZE_INCHES * FIXED_SIZE_INCHES;
     const additionalArea = Math.max(0, currentPrintAreaInches - fixedArea);
     
-    // Calculate layer price with minimum charge logic
     let layerPrice = 0;
     if (currentPrintAreaInches <= fixedArea) {
       layerPrice = MINIMUM_DESIGN_CHARGE;
@@ -209,19 +206,15 @@ export default function DesignerPage() {
     try {
       if (updateUI) setCalculatingPrice(true);
       
-      // Get current base price from product
       const currentBasePrice = product?.basePrice || BASE_PRICE;
       
-      // Collect all layers from all views
       const allDesignLayers = [];
       const allTextLayers = [];
       const allZones = [];
 
       Object.entries(viewStates).forEach(([viewCode, viewState]) => {
-        // Design layers
         if (viewState.designLayers) {
           viewState.designLayers.forEach(layer => {
-            // Determine zone based on view code if not set
             let zone = layer.zone;
             if (!zone) {
               if (viewCode === 'left') zone = 'sleeve-left';
@@ -239,7 +232,6 @@ export default function DesignerPage() {
           });
         }
 
-        // Text layers
         if (viewState.textLayers) {
           viewState.textLayers.forEach(textLayer => {
             allTextLayers.push({
@@ -250,7 +242,6 @@ export default function DesignerPage() {
         }
       });
 
-      // Calculate price locally
       const { totalPrice, breakdown } = calculateLocalPrice(
         allDesignLayers, 
         allTextLayers, 
@@ -288,12 +279,10 @@ export default function DesignerPage() {
       totalPrice: basePrice
     };
 
-    // Calculate price for design layers (images)
     designLayers.forEach((layer, index) => {
       const zone = layer.zone || zones[index] || 'front-full';
       
       if (zone === "sleeve-left" || zone === "sleeve-right") {
-        // Fixed price for sleeves
         breakdown.sleeves.count += 1;
         breakdown.sleeves.total += SLEEVE_PRICE;
         totalPrice += SLEEVE_PRICE;
@@ -308,29 +297,20 @@ export default function DesignerPage() {
           note: 'Sleeve - fixed price'
         });
       } else {
-        // Use current print area in inches for pricing
         const printAreaInches = layer.currentPrintAreaInches || 0;
-        
-        // Calculate additional area beyond fixed size
         const fixedArea = FIXED_SIZE_INCHES * FIXED_SIZE_INCHES;
         const additionalArea = layer.currentAdditionalArea || Math.max(0, printAreaInches - fixedArea);
-        
-        // Calculate per sq inch price
         const perSqInchPrice = additionalArea * PRICE_PER_SQ_INCH;
         
-        // Apply minimum charge: ₹30 for any design, even below 4x4 inches
         let layerPrice = 0;
         
         if (printAreaInches > 0) {
           if (printAreaInches <= fixedArea) {
-            // For designs up to 4x4 inches (16 sq.in), charge minimum amount
             layerPrice = MINIMUM_DESIGN_CHARGE;
             breakdown.minimumCharges += MINIMUM_DESIGN_CHARGE;
           } else {
-            // For designs larger than 4x4 inches
             layerPrice = perSqInchPrice;
             if (perSqInchPrice < MINIMUM_DESIGN_CHARGE) {
-              // Ensure minimum charge if per sq inch calculation is less than minimum
               layerPrice = MINIMUM_DESIGN_CHARGE;
               breakdown.minimumCharges += MINIMUM_DESIGN_CHARGE;
             }
@@ -363,29 +343,23 @@ export default function DesignerPage() {
       }
     });
 
-    // Calculate price for text layers - more accurate calculation
     textLayers.forEach((textLayer) => {
-      // Better text area estimation using canvas
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       ctx.font = `${textLayer.fontSize}px ${textLayer.fontFamily}`;
       
-      // Measure text width
       const textMetrics = ctx.measureText(textLayer.text);
       const textWidthPx = textMetrics.width;
-      const textHeightPx = textLayer.fontSize * 1.2; // Approx line height
+      const textHeightPx = textLayer.fontSize * 1.2;
       
-      // Convert to print inches (300 DPI for pricing)
       const widthInches = textWidthPx / PRINT_DPI;
       const heightInches = textHeightPx / PRINT_DPI;
       const areaInches = widthInches * heightInches;
       
-      // Calculate additional area beyond fixed size
       const fixedArea = FIXED_SIZE_INCHES * FIXED_SIZE_INCHES;
       const additionalArea = Math.max(0, areaInches - fixedArea);
       let textPrice = additionalArea * PRICE_PER_SQ_INCH;
       
-      // Apply minimum charge for text if it has any size
       if (areaInches > 0 && textPrice < MINIMUM_DESIGN_CHARGE && areaInches <= fixedArea) {
         textPrice = MINIMUM_DESIGN_CHARGE;
         breakdown.minimumCharges += MINIMUM_DESIGN_CHARGE;
@@ -418,17 +392,15 @@ export default function DesignerPage() {
     return { totalPrice, breakdown };
   };
 
-  // Auto-calculate price when layers change OR when product changes
   useEffect(() => {
     if (Object.keys(viewStates).length > 0) {
       const timeoutId = setTimeout(() => {
         calculatePrice();
-      }, 300); // Debounce
+      }, 300);
       return () => clearTimeout(timeoutId);
     }
   }, [viewStates]);
 
-  // Update price when product changes (base price might be different)
   useEffect(() => {
     if (product?.basePrice) {
       setPrice(product.basePrice);
@@ -440,7 +412,6 @@ export default function DesignerPage() {
     }
   }, [product?.basePrice]);
 
-  // -------- IMAGE UPLOAD FUNCTION --------
   const uploadDesignImage = async (file) => {
     try {
       const formData = new FormData();
@@ -467,7 +438,6 @@ export default function DesignerPage() {
     }
   };
 
-  // -------- FETCH PRODUCT --------
   useEffect(() => {
     if (slug) {
       console.log("Fetching product for slug:", slug);
@@ -475,7 +445,6 @@ export default function DesignerPage() {
     }
   }, [slug, dispatch]);
 
-  // -------- LOAD DESIGN FOR EDIT --------
   useEffect(() => {
     if (!editDesignId || !product) {
       console.log("Not in edit mode or product not loaded yet");
@@ -512,11 +481,9 @@ export default function DesignerPage() {
             })) || [],
             activeTextId: view.textLayers?.[0]?.id || null,
             designLayers: view.designLayers?.map(d => {
-              // Reconstruct the design layer with proper dimensions
               const widthPx = d.originalWidthPx || d.renderedWidthPx / (d.scale || 0.35);
               const heightPx = d.originalHeightPx || d.renderedHeightPx / (d.scale || 0.35);
               
-              // Calculate dimensions in inches
               const displayWidthInches = widthPx / DISPLAY_DPI;
               const displayHeightInches = heightPx / DISPLAY_DPI;
               const displayAreaInches = displayWidthInches * displayHeightInches;
@@ -567,7 +534,6 @@ export default function DesignerPage() {
           setViewCode(design.views[0].code);
         }
         
-        // Calculate price for loaded design
         setTimeout(() => calculatePrice(), 500);
         
       } catch (err) {
@@ -582,7 +548,6 @@ export default function DesignerPage() {
     loadDesignForEdit();
   }, [editDesignId, product, editModeInitialized]);
 
-  // -------- INIT VIEW STATES WHEN PRODUCT LOADS (FOR NEW DESIGNS) --------
   useEffect(() => {
     if (!product?.views?.length) {
       console.log("No product views found");
@@ -613,7 +578,6 @@ export default function DesignerPage() {
     
   }, [product, isEditMode, editModeInitialized]);
 
-  // -------- CLEANUP BLOB URLs --------
   useEffect(() => {
     return () => {
       Object.values(viewStates).forEach(viewState => {
@@ -658,7 +622,6 @@ export default function DesignerPage() {
   const activeTextLayer = textLayers.find((l) => l.id === activeTextId) || textLayers[0];
   const activeDesign = designLayers.find((d) => d.id === activeDesignId) || null;
 
-  // -------- TEXT HELPERS --------
   const updateActiveTextLayer = (patch) => {
     if (!activeTextLayer) return;
     const newLayers = textLayers.map((layer) =>
@@ -686,7 +649,6 @@ export default function DesignerPage() {
     });
   };
 
-  // -------- DESIGN HELPERS --------
   const handleDesignUpload = async (e) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -700,7 +662,6 @@ export default function DesignerPage() {
         const id = `design-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const { width, height } = await getImageNaturalSize(serverUrl);
         
-        // Create design layer with proper dimensions
         newLayers.push(createDesignLayer(id, serverUrl, file, width, height, BASE_PRICE));
       }
 
@@ -788,7 +749,6 @@ export default function DesignerPage() {
     if (!activeDesign) return;
     const v = parseFloat(value);
     
-    // Update the specific design layer with new dimensions
     const updated = designLayers.map((d) => {
       if (d.id === activeDesign.id) {
         return updateDesignLayerDimensions(d, v);
@@ -797,10 +757,9 @@ export default function DesignerPage() {
     });
     
     updateCurrentViewState({ designLayers: updated });
-    calculatePrice(); // Recalculate price immediately when scale changes
+    calculatePrice();
   };
 
-  // -------- WRAPPERS FOR RecolorEditor --------
   const handleSetTextLayers = (updater) => {
     setViewStates((prev) => {
       const existing = prev[viewCode];
@@ -861,7 +820,6 @@ export default function DesignerPage() {
     });
   };
 
-  // -------- CAPTURE PREVIEWS --------
   const captureAllViewPreviews = async () => {
     if (!product?.views || product.views.length === 0 || !editorRef.current) {
       return {};
@@ -884,7 +842,6 @@ export default function DesignerPage() {
     return previewsByCode;
   };
 
-  // -------- SAVE DESIGN --------
   const handleSaveDesign = async () => {
     if (!product) return;
 
@@ -902,7 +859,6 @@ export default function DesignerPage() {
       const { totalPrice } = await calculatePrice(false);
       const previewsByCode = await captureAllViewPreviews();
 
-      // Process each design layer
       const processedViewStates = { ...viewStates };
       for (const [viewCode, viewState] of Object.entries(processedViewStates)) {
         if (viewState.designLayers?.length > 0) {
@@ -927,7 +883,6 @@ export default function DesignerPage() {
         }
       }
 
-      // Prepare views payload with dimensions
       const viewsPayload = product.views?.map((v) => {
         const vs = processedViewStates[v.code] ? { ...baseViewState, ...processedViewStates[v.code] } : baseViewState;
 
@@ -973,7 +928,7 @@ export default function DesignerPage() {
         productColor,
         previewImage: mainPreview,
         views: viewsPayload,
-        basePrice: BASE_PRICE, // Use product's base price
+        basePrice: BASE_PRICE,
         calculatedPrice: totalPrice,
         priceBreakdown: priceBreakdown,
       };
@@ -1007,7 +962,6 @@ export default function DesignerPage() {
     }
   };
 
-  // -------- RESET TO ORIGINAL --------
   const handleResetToOriginal = () => {
     if (!originalDesign || !window.confirm("Reset all changes to original design?")) {
       return;
@@ -1022,11 +976,9 @@ export default function DesignerPage() {
         })) || [],
         activeTextId: view.textLayers?.[0]?.id || null,
         designLayers: view.designLayers?.map(d => {
-          // Reconstruct the design layer with proper dimensions
           const widthPx = d.originalWidthPx || d.renderedWidthPx / (d.scale || 0.35);
           const heightPx = d.originalHeightPx || d.renderedHeightPx / (d.scale || 0.35);
           
-          // Calculate dimensions in inches
           const displayWidthInches = widthPx / DISPLAY_DPI;
           const displayHeightInches = heightPx / DISPLAY_DPI;
           const displayAreaInches = displayWidthInches * displayHeightInches;
@@ -1075,42 +1027,10 @@ export default function DesignerPage() {
     alert("Design reset to original!");
   };
 
-  // -------- HANDLE BACK TO ADMIN --------
   const handleBackToAdmin = () => {
     navigate('/admin/designs');
   };
 
-  const debugPriceCalculation = () => {
-    console.log("=== PRICE CALCULATION DEBUG ===");
-    console.log("Product Base Price:", BASE_PRICE);
-    console.log("Design Layers:", designLayers.map(l => ({
-      id: l.id,
-      displaySize: `${l.currentDisplayWidthInches?.toFixed(2)}" × ${l.currentDisplayHeightInches?.toFixed(2)}"`,
-      printSize: `${l.currentPrintWidthInches?.toFixed(2)}" × ${l.currentPrintHeightInches?.toFixed(2)}"`,
-      printArea: l.currentPrintAreaInches?.toFixed(2),
-      scale: l.scale,
-      additionalArea: l.currentAdditionalArea?.toFixed(2),
-      layerPrice: l.layerPrice,
-      minimumChargeApplied: l.minimumChargeApplied
-    })));
-    
-    console.log("Text Layers:", textLayers.map(t => ({
-      id: t.id,
-      text: t.text,
-      fontSize: t.fontSize
-    })));
-    
-    console.log("Current Price Breakdown:", priceBreakdown);
-    console.log("=== END DEBUG ===");
-  };
-
-  // Call this in your component to debug
-  useEffect(() => {
-    console.log("Price updated:", price, priceBreakdown);
-    debugPriceCalculation();
-  }, [price, priceBreakdown]);
-
-  // -------- RENDER LOADING STATES --------
   if (currentStatus === "loading" || loadingEditData) {
     return (
       <div className="flex h-screen items-center justify-center bg-neutral-100">
@@ -1202,7 +1122,7 @@ export default function DesignerPage() {
 
       {/* Main area */}
       <div className="flex flex-1 min-h-0 p-6 gap-6">
-        {/* Sidebar */}
+        {/* Left sidebar - Controls */}
         <aside className="w-80 rounded-lg border border-slate-200 bg-white p-4 shadow-sm flex flex-col gap-6">
           {/* Edit mode indicator */}
           {isEditMode && (
@@ -1219,288 +1139,274 @@ export default function DesignerPage() {
             </div>
           )}
 
-          {/* Price Breakdown */}
-          <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="font-semibold text-green-800">Price Breakdown</h3>
-              <button onClick={() => calculatePrice()} disabled={calculatingPrice} className="text-xs text-green-600 hover:text-green-800">
-                {calculatingPrice ? "Calculating..." : "Recalculate"}
-              </button>
-            </div>
-            
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between">
-                <span>Base Price ({product?.name || "Product"}):</span>
-                <span className="font-medium">₹{BASE_PRICE.toFixed(2)}</span>
-              </div>
-              
-              {priceBreakdown.sleeves.total > 0 && (
-                <div className="flex justify-between">
-                  <span>Sleeves ({priceBreakdown.sleeves.count} × ₹{SLEEVE_PRICE}):</span>
-                  <span>₹{priceBreakdown.sleeves.total.toFixed(2)}</span>
-                </div>
-              )}
-              
-              {priceBreakdown.images.total > 0 && priceBreakdown.images.items.map((item, index) => (
-                <div key={index} className="flex justify-between text-xs">
-                  <div>
-                    <span>Image {index + 1}:</span>
-                    <div className="text-[10px] text-slate-500 ml-2">
-                      {item.type === 'sleeve' ? 'Sleeve' : `Display: ${item.displaySize}`}
-                      {item.type !== 'sleeve' && <div className="text-[9px]">Print: {item.printSize}</div>}
-                      {item.note && <div className="text-[9px] text-amber-600">{item.note}</div>}
-                    </div>
-                  </div>
-                  <span>₹{item.price.toFixed(2)}</span>
-                </div>
-              ))}
-              
-              {priceBreakdown.text.total > 0 && priceBreakdown.text.items.map((item, index) => (
-                <div key={index} className="flex justify-between text-xs">
-                  <div>
-                    <span>Text {index + 1}:</span>
-                    <div className="text-[10px] text-slate-500 ml-2">
-                      {item.text} (Print: {item.printSize})
-                    </div>
-                  </div>
-                  <span>₹{item.price.toFixed(2)}</span>
-                </div>
-              ))}
-              
-              {priceBreakdown.minimumCharges > 0 && (
-                <div className="flex justify-between text-amber-700">
-                  <span>Minimum Design Charges:</span>
-                  <span>₹{priceBreakdown.minimumCharges.toFixed(2)}</span>
-                </div>
-              )}
-              
-              {priceBreakdown.additionalArea > 0 && (
-                <div className="flex justify-between text-green-700">
-                  <span>Additional Area ({priceBreakdown.additionalArea.toFixed(2)} sq.in):</span>
-                  <span>₹{(priceBreakdown.additionalArea * PRICE_PER_SQ_INCH).toFixed(2)}</span>
-                </div>
-              )}
-              
-              <div className="border-t pt-2 mt-2">
-                <div className="flex justify-between font-bold text-sm">
-                  <span>Total:</span>
-                  <span className="text-green-600">₹{price.toFixed(2)}</span>
-                </div>
-              </div>
-              
-              <div className="text-[10px] text-green-600 mt-2">
-                <p>• Base price for {product?.name || "product"}: ₹{BASE_PRICE.toFixed(2)}</p>
-                <p>• Base includes {FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}" area</p>
-                <p>• Minimum design charge: ₹{MINIMUM_DESIGN_CHARGE} (up to {FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}")</p>
-                <p>• Additional: ₹{PRICE_PER_SQ_INCH} per sq.inch beyond {FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}"</p>
-                <p>• Sleeves: Fixed ₹{SLEEVE_PRICE} each</p>
-                <p>• Display size uses 72 DPI (screen)</p>
-                <p>• Print size uses 300 DPI (actual production)</p>
-              </div>
-            </div>
+          {/* Tab navigation */}
+          <div className="flex border-b border-slate-200">
+            <button
+              onClick={() => setActiveTab(TABS.PRODUCT_COLORS)}
+              className={`px-3 py-2 text-xs font-medium ${activeTab === TABS.PRODUCT_COLORS ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Product Colors
+            </button>
+            <button
+              onClick={() => setActiveTab(TABS.DESIGNS)}
+              className={`px-3 py-2 text-xs font-medium ${activeTab === TABS.DESIGNS ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Designs
+            </button>
+            <button
+              onClick={() => setActiveTab(TABS.TEXT)}
+              className={`px-3 py-2 text-xs font-medium ${activeTab === TABS.TEXT ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Text
+            </button>
+            <button
+              onClick={() => setActiveTab(TABS.VIEWS)}
+              className={`px-3 py-2 text-xs font-medium ${activeTab === TABS.VIEWS ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Views
+            </button>
           </div>
 
-          {/* Product colors */}
-          <div>
-            <h3 className="mb-3 font-semibold">Product Colors</h3>
-            <div className="mb-4">
-              <label className="mb-2 block text-xs font-medium">Current Color</label>
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded border border-slate-300" style={{ backgroundColor: productColor }} />
-                <input type="color" className="h-10 w-full cursor-pointer" value={productColor} onChange={(e) => handleColorChange(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="mb-2">
-              <label className="mb-2 block text-xs font-medium">Quick Select</label>
-              <div className="grid grid-cols-6 gap-2">
-                {colorOptions.map((color) => (
-                  <button key={color} className={`h-8 w-8 rounded-full border-2 ${color === productColor ? "border-sky-500" : "border-slate-300"}`} style={{ backgroundColor: color }} onClick={() => handleColorChange(color)} type="button" />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <hr className="border-slate-200" />
-
-          {/* View selector */}
-          {product.views && product.views.length > 1 && (
-            <div>
-              <h3 className="mb-2 font-semibold">View</h3>
-              <div className="flex flex-wrap gap-2 text-xs">
-                {product.views.map((v) => {
-                  const viewState = viewStates[v.code];
-                  const hasLayers = viewState && (viewState.textLayers?.length > 0 || viewState.designLayers?.length > 0);
-                  
-                  return (
-                    <button key={v.code} type="button" onClick={() => setViewCode(v.code)} className={`relative rounded px-2 py-1 border ${v.code === viewCode ? "bg-sky-600 text-white border-sky-600" : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"}`}>
-                      {v.label}
-                      {hasLayers && <span className="absolute -top-1 -right-1 h-2 w-2 bg-emerald-500 rounded-full"></span>}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <hr className="border-slate-200" />
-
-          {/* Upload / BG removal for designs */}
-          <div>
-            <h3 className="mb-2 font-semibold">Upload Designs</h3>
-            <p className="mb-2 text-xs text-slate-600">Upload one or more images. They will be saved to the server automatically.</p>
-
-            <div className="mb-3 text-xs">
-              <input type="file" accept="image/*" multiple onChange={handleDesignUpload} className="w-full text-xs" />
-            </div>
-
-            {activeDesign && (
-              <>
-                <div className="mb-2 text-xs">
-                  <div className="mb-1 flex items-center justify-between">
-                    <span className="font-medium text-slate-700">Selected design</span>
-                    <span className="text-[10px] text-slate-500">ID: {activeDesign.id.slice(0, 6)}…</span>
-                  </div>
-                  
-                  {/* Display current dimensions */}
-                  <div className="mb-2 rounded bg-slate-50 p-2 text-[10px]">
-                    <div className="grid grid-cols-2 gap-1">
-                      <div>
-                        <span className="text-slate-500">Display:</span>
-                        <div className="font-medium">{activeDesign.currentDisplayWidthInches?.toFixed(2)}" × {activeDesign.currentDisplayHeightInches?.toFixed(2)}"</div>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">Print:</span>
-                        <div className="font-medium">{activeDesign.currentPrintWidthInches?.toFixed(2)}" × {activeDesign.currentPrintHeightInches?.toFixed(2)}"</div>
-                      </div>
-                    </div>
-                    <div className="mt-1 text-center">
-                      <span className="text-slate-500">Print Area:</span>
-                      <span className="font-medium ml-1">{activeDesign.currentPrintAreaInches?.toFixed(2)} sq.in</span>
-                      {activeDesign.currentAdditionalArea > 0 ? (
-                        <span className="ml-2 text-green-600">
-                          (+{activeDesign.currentAdditionalArea?.toFixed(2)} sq.in extra)
-                        </span>
-                      ) : activeDesign.minimumChargeApplied && (
-                        <span className="ml-2 text-amber-600">
-                          (Minimum ₹{MINIMUM_DESIGN_CHARGE} charge)
-                        </span>
-                      )}
+          {/* Tab content */}
+          <div className="flex-1 overflow-auto">
+            {/* Product Colors Tab */}
+            {activeTab === TABS.PRODUCT_COLORS && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="mb-3 font-semibold text-sm">Product Colors</h3>
+                  <div className="mb-4">
+                    <label className="mb-2 block text-xs font-medium">Current Color</label>
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded border border-slate-300" style={{ backgroundColor: productColor }} />
+                      <input type="color" className="h-10 w-full cursor-pointer" value={productColor} onChange={(e) => handleColorChange(e.target.value)} />
                     </div>
                   </div>
-                  
-                  <div className="flex gap-2">
-                    <button type="button" onClick={handleRemoveBackground} disabled={bgRemovalLoading} className={`flex-1 rounded border px-2 py-1 text-xs font-medium ${bgRemovalLoading ? "border-slate-300 text-slate-400" : "border-sky-500 text-sky-700 hover:bg-sky-50"}`}>
-                      {bgRemovalLoading ? "Removing…" : "Remove background"}
-                    </button>
-                    <button type="button" onClick={clearActiveDesign} className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">
-                      Clear
-                    </button>
+
+                  <div className="mb-2">
+                    <label className="mb-2 block text-xs font-medium">Quick Select</label>
+                    <div className="grid grid-cols-6 gap-2">
+                      {colorOptions.map((color) => (
+                        <button key={color} className={`h-8 w-8 rounded-full border-2 ${color === productColor ? "border-sky-500" : "border-slate-300"}`} style={{ backgroundColor: color }} onClick={() => handleColorChange(color)} type="button" />
+                      ))}
+                    </div>
                   </div>
                 </div>
 
-                <div className="mb-3 text-xs">
-                  <label className="mb-1 block text-[10px] font-medium text-slate-500">Design size (relative)</label>
-                  <div className="flex items-center gap-2">
-                    <input type="range" min={0.1} max={1.2} step={0.02} value={activeDesign.scale} onChange={(e) => handleDesignScaleChange(e.target.value)} className="flex-1" />
-                    <span className="w-10 text-right text-[11px] text-slate-600">{Math.round(activeDesign.scale * 100)}%</span>
+                <div className="text-xs text-slate-600 space-y-2">
+                  <p className="font-medium">How to use:</p>
+                  <p>• Select a color to change the product color</p>
+                  <p>• Use the color picker for custom colors</p>
+                  <p>• Quick select colors are commonly used options</p>
+                </div>
+              </div>
+            )}
+
+            {/* Designs Tab */}
+            {activeTab === TABS.DESIGNS && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="mb-3 font-semibold text-sm">Upload Designs</h3>
+                  <p className="mb-2 text-xs text-slate-600">Upload one or more images. They will be saved to the server automatically.</p>
+
+                  <div className="mb-3 text-xs">
+                    <input type="file" accept="image/*" multiple onChange={handleDesignUpload} className="w-full text-xs border border-slate-300 rounded px-3 py-2" />
                   </div>
-                  <p className="mt-1 text-[10px] text-slate-500">
-                    Display: {activeDesign.currentDisplayWidthInches?.toFixed(2)}" × {activeDesign.currentDisplayHeightInches?.toFixed(2)}"
-                  </p>
-                  <p className="text-[10px] text-slate-500">
-                    Print: {activeDesign.currentPrintWidthInches?.toFixed(2)}" × {activeDesign.currentPrintHeightInches?.toFixed(2)}"
-                  </p>
-                  {designRenderWidth && (
-                    <p className="mt-1 text-[10px] text-slate-500">
-                      Approx width on shirt: <span className="font-semibold">{Math.round(designRenderWidth)} px</span>
-                    </p>
+
+                  {activeDesign && (
+                    <>
+                      <div className="mb-4 p-3 bg-slate-50 rounded border border-slate-200">
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="font-medium text-slate-700 text-xs">Selected Design</span>
+                          <span className="text-[10px] text-slate-500">ID: {activeDesign.id.slice(0, 6)}…</span>
+                        </div>
+                        
+                        <div className="mb-3 text-xs">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="text-center">
+                              <div className="text-[10px] text-slate-500">Display</div>
+                              <div className="font-medium">{activeDesign.currentDisplayWidthInches?.toFixed(2)}" × {activeDesign.currentDisplayHeightInches?.toFixed(2)}"</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-[10px] text-slate-500">Print</div>
+                              <div className="font-medium">{activeDesign.currentPrintWidthInches?.toFixed(2)}" × {activeDesign.currentPrintHeightInches?.toFixed(2)}"</div>
+                            </div>
+                          </div>
+                          <div className="mt-2 text-center">
+                            <div className="text-[10px] text-slate-500">Print Area</div>
+                            <div className="font-medium">{activeDesign.currentPrintAreaInches?.toFixed(2)} sq.in</div>
+                            {activeDesign.currentAdditionalArea > 0 ? (
+                              <div className="text-[10px] text-green-600">
+                                +{activeDesign.currentAdditionalArea?.toFixed(2)} sq.in extra
+                              </div>
+                            ) : activeDesign.minimumChargeApplied && (
+                              <div className="text-[10px] text-amber-600">
+                                Minimum ₹{MINIMUM_DESIGN_CHARGE} charge
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button type="button" onClick={handleRemoveBackground} disabled={bgRemovalLoading} className={`flex-1 rounded border px-2 py-1 text-xs font-medium ${bgRemovalLoading ? "border-slate-300 text-slate-400" : "border-sky-500 text-sky-700 hover:bg-sky-50"}`}>
+                            {bgRemovalLoading ? "Removing…" : "Remove BG"}
+                          </button>
+                          <button type="button" onClick={clearActiveDesign} className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="mb-4">
+                        <label className="mb-2 block text-xs font-medium">Design Size</label>
+                        <div className="flex items-center gap-2">
+                          <input type="range" min={0.1} max={1.2} step={0.02} value={activeDesign.scale} onChange={(e) => handleDesignScaleChange(e.target.value)} className="flex-1" />
+                          <span className="w-10 text-right text-xs text-slate-600">{Math.round(activeDesign.scale * 100)}%</span>
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-slate-500">
+                          <div>Display: {activeDesign.currentDisplayWidthInches?.toFixed(2)}" × {activeDesign.currentDisplayHeightInches?.toFixed(2)}"</div>
+                          <div>Print: {activeDesign.currentPrintWidthInches?.toFixed(2)}" × {activeDesign.currentPrintHeightInches?.toFixed(2)}"</div>
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-slate-600 space-y-1">
+                        <p>• Click on a design in the editor to select it</p>
+                        <p>• Drag to reposition, or use the resize handle</p>
+                        <p>• Click "Remove BG" for transparent background</p>
+                        <p>• Sleeves have fixed pricing of ₹{SLEEVE_PRICE} each</p>
+                      </div>
+                    </>
+                  )}
+
+                  {!activeDesign && designLayers.length > 0 && (
+                    <div className="p-3 bg-slate-50 rounded border border-slate-200">
+                      <p className="text-xs text-slate-600 text-center">
+                        {designLayers.length} design{designLayers.length !== 1 ? 's' : ''} uploaded
+                      </p>
+                      <p className="text-[10px] text-slate-500 text-center mt-1">
+                        Click any design on the shirt to select it and edit.
+                      </p>
+                    </div>
                   )}
                 </div>
-
-                <div className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[10px]">
-                  <div className="flex items-center justify-between">
-                    <span>Status:</span>
-                    <span className={activeDesign.hasBgRemoved ? "font-semibold text-emerald-600" : "font-medium text-slate-600"}>
-                      {activeDesign.hasBgRemoved ? "Background removed" : "Original (saved on server)"}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between mt-1">
-                    <span>Pricing:</span>
-                    <span className={activeDesign.minimumChargeApplied ? "font-semibold text-amber-600" : "font-medium text-green-600"}>
-                      {activeDesign.minimumChargeApplied ? `₹${MINIMUM_DESIGN_CHARGE} minimum charge` : `₹${activeDesign.layerPrice?.toFixed(2)} area-based`}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[10px] text-slate-500">
-                    Tip: click a design on the shirt to select it. Click empty area or text to hide its border.
-                  </p>
-                </div>
-              </>
+              </div>
             )}
 
-            {!activeDesign && designLayers.length > 0 && (
-              <p className="mt-2 text-[11px] text-slate-500">Click any design on the shirt to select it and edit.</p>
+            {/* Text Tab */}
+            {activeTab === TABS.TEXT && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-sm">Text Customization</h3>
+                  <div className="flex gap-2">
+                    <button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={addNewText}>+ Add Text</button>
+                    <button className="rounded border border-rose-300 px-2 py-1 text-xs text-rose-600 hover:bg-rose-50 disabled:opacity-40" type="button" onClick={removeActiveText} disabled={!activeTextLayer}>Remove</button>
+                  </div>
+                </div>
+
+                {activeTextLayer ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-500">Text Content</label>
+                      <input type="text" className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-sky-500" value={activeTextLayer.text} onChange={(e) => updateActiveTextLayer({ text: e.target.value })} placeholder="Enter text here" />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-500">Font</label>
+                        <select className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-sky-500" value={activeTextLayer.fontFamily} onChange={(e) => updateActiveTextLayer({ fontFamily: e.target.value })}>
+                          {FONT_OPTIONS.map((f) => <option key={f} value={f}>{f.replace(/,.*$/, "")}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-500">Color</label>
+                        <input type="color" className="h-8 w-full cursor-pointer rounded border border-slate-300" value={activeTextLayer.color} onChange={(e) => updateActiveTextLayer({ color: e.target.value })} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-500">Font Size</label>
+                      <div className="flex items-center gap-2">
+                        <input type="range" min={14} max={120} value={activeTextLayer.fontSize} onChange={(e) => updateActiveTextLayer({ fontSize: parseInt(e.target.value, 10) })} className="flex-1" />
+                        <span className="w-10 text-right text-xs text-slate-600">{activeTextLayer.fontSize}px</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-500">Rotation</label>
+                      <div className="flex items-center gap-2">
+                        <input type="range" min={-45} max={45} value={activeTextLayer.rotation} onChange={(e) => updateActiveTextLayer({ rotation: parseInt(e.target.value, 10) })} className="flex-1" />
+                        <span className="w-10 text-right text-xs text-slate-600">{activeTextLayer.rotation}°</span>
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-slate-600 space-y-1">
+                      <p>• Drag the text on the shirt to reposition</p>
+                      <p>• Use the corner handle to resize</p>
+                      <p>• Click "Remove" to delete selected text</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-slate-50 rounded border border-slate-200 text-center">
+                    <p className="text-xs text-slate-600">No text added yet.</p>
+                    <p className="text-[10px] text-slate-500 mt-1">Click "+ Add Text" to start customizing.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Views Tab */}
+            {activeTab === TABS.VIEWS && product.views && product.views.length > 1 && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="mb-3 font-semibold text-sm">Product Views</h3>
+                  <p className="mb-3 text-xs text-slate-600">Switch between different views of the product to add designs/text on different areas.</p>
+
+                  <div className="space-y-2">
+                    {product.views.map((v) => {
+                      const viewState = viewStates[v.code];
+                      const hasLayers = viewState && (viewState.textLayers?.length > 0 || viewState.designLayers?.length > 0);
+                      const isCurrent = v.code === viewCode;
+                      
+                      return (
+                        <button
+                          key={v.code}
+                          type="button"
+                          onClick={() => setViewCode(v.code)}
+                          className={`w-full flex items-center justify-between rounded px-3 py-2 text-xs border ${isCurrent ? 'bg-sky-50 border-sky-200 text-sky-700' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                        >
+                          <span>{v.label}</span>
+                          <div className="flex items-center gap-2">
+                            {hasLayers && <span className="h-2 w-2 bg-emerald-500 rounded-full"></span>}
+                            {isCurrent && (
+                              <svg className="w-3 h-3 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="text-xs text-slate-600 space-y-2">
+                  <p className="font-medium">Current View: {product.views.find(v => v.code === viewCode)?.label}</p>
+                  <p>• Front: Main design area</p>
+                  <p>• Back: Back of the product</p>
+                  <p>• Left/Right Sleeves: Sleeve designs</p>
+                  <p>• Each view has separate text and design layers</p>
+                </div>
+              </div>
             )}
           </div>
 
-          <hr className="border-slate-200" />
-
-          {/* Text tools */}
-          <div>
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="font-semibold">Text</h3>
-              <div className="flex gap-2">
-                <button className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-50" type="button" onClick={addNewText}>+ Add text</button>
-                <button className="rounded border border-rose-300 px-2 py-0.5 text-xs text-rose-600 hover:bg-rose-50 disabled:opacity-40" type="button" onClick={removeActiveText} disabled={!activeTextLayer}>Remove</button>
-              </div>
+          {/* Error messages */}
+          {(error || saveError || saveSuccess) && (
+            <div className="mt-4">
+              {error && <div className="rounded border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</div>}
+              {saveError && <div className="rounded border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{saveError}</div>}
+              {saveSuccess && <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{isEditMode ? "Design updated successfully!" : "Design saved successfully!"}</div>}
             </div>
-
-            {activeTextLayer ? (
-              <div className="space-y-3 text-xs">
-                <div>
-                  <label className="mb-1 block text-[10px] font-medium text-slate-500">Text</label>
-                  <input type="text" className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-sky-500" value={activeTextLayer.text} onChange={(e) => updateActiveTextLayer({ text: e.target.value })} />
-                </div>
-
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <label className="mb-1 block text-[10px] font-medium text-slate-500">Font</label>
-                    <select className="w-full rounded border border-slate-300 px-2 py-1 text-[11px] outline-none focus:border-sky-500" value={activeTextLayer.fontFamily} onChange={(e) => updateActiveTextLayer({ fontFamily: e.target.value })}>
-                      {FONT_OPTIONS.map((f) => <option key={f} value={f}>{f.replace(/,.*$/, "")}</option>)}
-                    </select>
-                  </div>
-                  <div className="w-16">
-                    <label className="mb-1 block text-[10px] font-medium text-slate-500">Color</label>
-                    <input type="color" className="h-7 w-full cursor-pointer rounded border border-slate-300" value={activeTextLayer.color} onChange={(e) => updateActiveTextLayer({ color: e.target.value })} />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-[10px] font-medium text-slate-500">Size</label>
-                  <div className="flex items-center gap-2">
-                    <input type="range" min={14} max={120} value={activeTextLayer.fontSize} onChange={(e) => updateActiveTextLayer({ fontSize: parseInt(e.target.value, 10) })} className="flex-1" />
-                    <span className="w-10 text-right text-[11px] text-slate-600">{activeTextLayer.fontSize}</span>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-[10px] font-medium text-slate-500">Rotation</label>
-                  <div className="flex items-center gap-2">
-                    <input type="range" min={-45} max={45} value={activeTextLayer.rotation} onChange={(e) => updateActiveTextLayer({ rotation: parseInt(e.target.value, 10) })} className="flex-1" />
-                    <span className="w-10 text-right text-[11px] text-slate-600">{activeTextLayer.rotation}°</span>
-                  </div>
-                </div>
-
-                <p className="text-[10px] text-slate-500">Drag the text on the shirt, or use the corner handle to resize.</p>
-              </div>
-            ) : (
-              <p className="text-[11px] text-slate-500">No text added yet. Click <span className="font-semibold">"+ Add text"</span> to start.</p>
-            )}
-          </div>
-
-          {error && <div className="rounded border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] text-rose-700">{error}</div>}
-          {saveError && <div className="rounded border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] text-rose-700">{saveError}</div>}
-          {saveSuccess && <div className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] text-emerald-700">{isEditMode ? "Design updated successfully!" : "Design saved successfully!"}</div>}
+          )}
         </aside>
 
         {/* Center workspace */}
@@ -1533,6 +1439,148 @@ export default function DesignerPage() {
             </div>
           </div>
         </main>
+
+        {/* Right sidebar - Price Breakdown */}
+        <aside className="w-80 rounded-lg border border-slate-200 bg-white p-4 shadow-sm flex flex-col">
+          <div className="mb-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-green-800">Price Breakdown</h3>
+              <button onClick={() => calculatePrice()} disabled={calculatingPrice} className="text-xs text-green-600 hover:text-green-800">
+                {calculatingPrice ? "Calculating..." : "↻"}
+              </button>
+            </div>
+            <div className="text-xs text-slate-500 mt-1">Real-time price calculation</div>
+          </div>
+          
+          <div className="flex-1 overflow-auto">
+            <div className="space-y-4">
+              {/* Base Price */}
+              <div className="pb-3 border-b border-slate-100">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs font-medium text-slate-700">Base Product</span>
+                  <span className="text-sm font-semibold">₹{BASE_PRICE.toFixed(2)}</span>
+                </div>
+                <div className="text-[10px] text-slate-500">
+                  {product?.name || "Product"} base price
+                </div>
+              </div>
+              
+              {/* Sleeves */}
+              {priceBreakdown.sleeves.total > 0 && (
+                <div className="pb-3 border-b border-slate-100">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs font-medium text-slate-700">Sleeves</span>
+                    <span className="text-sm font-semibold text-green-600">+₹{priceBreakdown.sleeves.total.toFixed(2)}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    {priceBreakdown.sleeves.count} sleeve{priceBreakdown.sleeves.count !== 1 ? 's' : ''} × ₹{SLEEVE_PRICE} each
+                  </div>
+                </div>
+              )}
+              
+              {/* Images/Designs */}
+              {priceBreakdown.images.total > 0 && (
+                <div className="pb-3 border-b border-slate-100">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-medium text-slate-700">Designs</span>
+                    <span className="text-sm font-semibold text-green-600">+₹{priceBreakdown.images.total.toFixed(2)}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {priceBreakdown.images.items.map((item, index) => (
+                      <div key={index} className="text-[10px] bg-slate-50 p-2 rounded">
+                        <div className="flex justify-between">
+                          <span className="font-medium">Design {index + 1}</span>
+                          <span>₹{item.price.toFixed(2)}</span>
+                        </div>
+                        {item.type === 'sleeve' ? (
+                          <div className="text-slate-500 mt-1">Sleeve ({item.zone}) - Fixed price</div>
+                        ) : (
+                          <>
+                            <div className="text-slate-500 mt-1">Size: {item.displaySize}</div>
+                            <div className="text-slate-500">Print: {item.printSize}</div>
+                            <div className="text-amber-600 text-[9px] mt-1">{item.note}</div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Text */}
+              {priceBreakdown.text.total > 0 && (
+                <div className="pb-3 border-b border-slate-100">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-medium text-slate-700">Text</span>
+                    <span className="text-sm font-semibold text-green-600">+₹{priceBreakdown.text.total.toFixed(2)}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {priceBreakdown.text.items.map((item, index) => (
+                      <div key={index} className="text-[10px] bg-slate-50 p-2 rounded">
+                        <div className="flex justify-between">
+                          <span className="font-medium">"{item.text}"</span>
+                          <span>₹{item.price.toFixed(2)}</span>
+                        </div>
+                        <div className="text-slate-500 mt-1">Size: {item.displaySize} (Display)</div>
+                        <div className="text-slate-500">Print: {item.printSize}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Minimum Charges */}
+              {priceBreakdown.minimumCharges > 0 && (
+                <div className="pb-3 border-b border-slate-100">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs font-medium text-amber-700">Minimum Charges</span>
+                    <span className="text-sm font-semibold text-amber-700">+₹{priceBreakdown.minimumCharges.toFixed(2)}</span>
+                  </div>
+                  <div className="text-[10px] text-amber-600">
+                    Applied to designs/text smaller than {FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}"
+                  </div>
+                </div>
+              )}
+              
+              {/* Additional Area */}
+              {priceBreakdown.additionalArea > 0 && (
+                <div className="pb-3 border-b border-slate-100">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs font-medium text-green-700">Additional Area</span>
+                    <span className="text-sm font-semibold text-green-700">+₹{(priceBreakdown.additionalArea * PRICE_PER_SQ_INCH).toFixed(2)}</span>
+                  </div>
+                  <div className="text-[10px] text-green-600">
+                    {priceBreakdown.additionalArea.toFixed(2)} sq.in × ₹{PRICE_PER_SQ_INCH}/sq.in
+                  </div>
+                </div>
+              )}
+              
+              {/* Total */}
+              <div className="pt-3">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-bold text-slate-800">Total Price</span>
+                  <span className="text-xl font-bold text-green-600">₹{price.toFixed(2)}</span>
+                </div>
+                <div className="text-[10px] text-slate-500">
+                  Including all designs, text, and additional charges
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Pricing Info */}
+          <div className="mt-6 pt-4 border-t border-slate-200">
+            <div className="text-xs text-slate-600 space-y-1">
+              <p className="font-medium mb-1">Pricing Information:</p>
+              <p>• Base includes {FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}" design area</p>
+              <p>• Minimum charge: ₹{MINIMUM_DESIGN_CHARGE} (≤{FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}")</p>
+              <p>• Additional: ₹{PRICE_PER_SQ_INCH} per sq.inch beyond {FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}"</p>
+              <p>• Sleeves: Fixed ₹{SLEEVE_PRICE} each</p>
+              <p>• Display: 72 DPI (screen preview)</p>
+              <p>• Print: 300 DPI (production)</p>
+            </div>
+          </div>
+        </aside>
       </div>
 
       {/* Bottom bar */}
@@ -1545,7 +1593,7 @@ export default function DesignerPage() {
           </span>
         </div>
         <span className="text-slate-400">
-          {isEditMode ? "Editing existing design. Changes will update the original when you click 'Update Design'." : "Product color, text & design preview – drag, resize, and customize on the left. All sides are captured when you save."}
+          {isEditMode ? "Editing existing design. Changes will update the original when you click 'Update Design'." : "Drag, resize, and customize elements. Click tabs on the left to switch between tools."}
         </span>
       </footer>
     </div>

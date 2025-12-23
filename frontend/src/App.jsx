@@ -12,6 +12,13 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import Usersaveddesigns from "./components/usersavedesign.jsx";
 import CataloguePage from "./pages/CataloguePage.jsx";
 import CatalogueDetailPage from "./pages/CatalogueDetailPage.jsx";
+import ReadymadeProductsManager from "./components/productmanager.jsx";
+import ReadymadeProductList from "./components/ReadymadeProductList.jsx";
+import ProductDetail from "./components/readymadeproductdetailspage.jsx";
+import CartPage from "./pages/CartPage.jsx";
+import ProductDetailPage from "./components/readymadeproductdetailspage.jsx";
+import UnifiedDashboard from "./pages/unifieddashboard.jsx";
+// import ProductManager from "./components/productmanager.jsx";
 
 function App() {
   return (
@@ -31,11 +38,17 @@ function App() {
         {/* OR use this route: */}
         {/* <Route path="/designer/:slug" element={<DesignerPage />} /> */}
         <Route path="/usersaved_designs" element={<Usersaveddesigns/>} />
+        <Route path="/dashboard" element={<UnifiedDashboard />} />
         <Route path="/admin/designs" element={<AdminDesignsPage />} />
         <Route path="/login" element={<LoginPage/>}></Route>
         <Route path="/register" element={<SignupPage/>}></Route>
         <Route path="/catalogue" element={<CataloguePage />} />
         <Route path="/catalogue/:id" element={<CatalogueDetailPage />} />
+        <Route path="/productmanager" element={<ReadymadeProductsManager/>}/>
+        <Route path="/readymade/products/" element={<ReadymadeProductList/>}/>
+        <Route path="/products/:id" element={<ProductDetailPage />} />
+        <Route path="/designs/:id" element={<ProductDetailPage />} />
+        <Route path="/cart" element={<CartPage/>}/>
         {/* Fallback 404 */}
         <Route
           path="*"

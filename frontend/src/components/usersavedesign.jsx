@@ -1,8 +1,19 @@
 // src/pages/AdminDesignsPage.jsx
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {selectCurrentToken} from "../redux/slices/Userslice.js"
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
+import { selectCurrentToken } from "../redux/slices/userSlice.js";
+import {
+  addToCart,
+  selectCartItems,
+  selectCartLoading,
+  selectCartSuccess,
+  selectCartError,
+  clearError,
+  clearSuccess,
+  getCart,
+} from "../redux/slices/Cartslice.js";
+
 const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
 
 export default function Usersaveddesigns() {
@@ -18,12 +29,55 @@ export default function Usersaveddesigns() {
     altText: "",
     title: ""
   });
+  
+  // Redux state
   const token = useSelector(selectCurrentToken);
+  const cartItems = useSelector(selectCartItems);
+  const cartLoading = useSelector(selectCartLoading);
+  const cartSuccess = useSelector(selectCartSuccess);
+  const cartError = useSelector(selectCartError);
+  const dispatch = useDispatch();
+  
   // Delete state
   const [deletingId, setDeletingId] = useState(null);
   const [deleteError, setDeleteError] = useState("");
+  
+  // Cart operation state
+  const [addingToCartId, setAddingToCartId] = useState(null);
+  const [notification, setNotification] = useState({ show: false, message: '', type: '' });
 
   const navigate = useNavigate();
+
+  // Handle notifications
+  useEffect(() => {
+    if (cartSuccess) {
+      setNotification({
+        show: true,
+        message: 'Design added to cart successfully!',
+        type: 'success'
+      });
+      dispatch(clearSuccess());
+    }
+    
+    if (cartError) {
+      setNotification({
+        show: true,
+        message: cartError,
+        type: 'error'
+      });
+      dispatch(clearError());
+    }
+  }, [cartSuccess, cartError, dispatch]);
+
+  // Clear notifications after 3 seconds
+  useEffect(() => {
+    if (notification.show) {
+      const timer = setTimeout(() => {
+        setNotification({ show: false, message: '', type: '' });
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   // ---------- FETCH ALL DESIGNS ----------
   useEffect(() => {
@@ -32,15 +86,12 @@ export default function Usersaveddesigns() {
         setLoadingList(true);
         setError("");
 
-        
-
         const res = await fetch(`${API_URL}/savedata`, {
-        headers: {
+          headers: {
             Authorization: `Bearer ${token}`,
-        },
+          },
         });
         const data = await res.json();
-
 
         if (!res.ok) {
           throw new Error(data.error || "Failed to fetch designs");
@@ -58,8 +109,10 @@ export default function Usersaveddesigns() {
       }
     };
 
-    fetchDesigns();
-  }, []);
+    if (token) {
+      fetchDesigns();
+    }
+  }, [token]);
 
   // ---------- FETCH SINGLE DESIGN DETAIL WHEN SELECTED ----------
   useEffect(() => {
@@ -73,7 +126,11 @@ export default function Usersaveddesigns() {
         setLoadingDetail(true);
         setError("");
 
-        const res = await fetch(`${API_URL}/savedata/${selectedDesignId}`);
+        const res = await fetch(`${API_URL}/savedata/${selectedDesignId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
         const data = await res.json();
 
         if (!res.ok) {
@@ -89,21 +146,81 @@ export default function Usersaveddesigns() {
       }
     };
 
-    fetchDesign();
-  }, [selectedDesignId]);
+    if (token) {
+      fetchDesign();
+    }
+  }, [selectedDesignId, token]);
+
+  // ---------- ADD TO CART FUNCTION ----------
+  const handleAddToCart = async (design) => {
+    if (!token) {
+      setNotification({
+        show: true,
+        message: 'Please login to add designs to cart',
+        type: 'warning'
+      });
+      setTimeout(() => {
+        navigate('/login', { state: { from: '/admin/designs' } });
+      }, 1500);
+      return;
+    }
+
+    // Check if design is published or owned by user
+    const isOwner = design.user?.toString() === "user_id_here"; // You need to get current user ID
+    const isPublic = design.isPublished === true;
+    
+    if (!isOwner && !isPublic) {
+      setNotification({
+        show: true,
+        message: 'This design is not available for purchase',
+        type: 'error'
+      });
+      return;
+    }
+
+    try {
+      setAddingToCartId(design._id);
+      
+      const cartData = {
+        kind: "DESIGN",
+        qty: 1,
+        designId: design._id
+      };
+
+      console.log('Adding design to cart:', cartData);
+      await dispatch(addToCart(cartData)).unwrap();
+      
+      // Refresh cart to get updated data
+      await dispatch(getCart());
+      
+    } catch (error) {
+      console.error('Add design to cart failed:', error);
+      
+      // Handle 401 errors (unauthorized) specifically
+      if (error.status === 401) {
+        setNotification({
+          show: true,
+          message: 'Session expired. Please login again.',
+          type: 'error'
+        });
+        setTimeout(() => {
+          navigate('/login');
+        }, 1500);
+      } else {
+        setNotification({
+          show: true,
+          message: error.message || 'Failed to add design to cart',
+          type: 'error'
+        });
+      }
+    } finally {
+      setAddingToCartId(null);
+    }
+  };
 
   // ---------- EDIT FUNCTION ----------
   const handleEditDesign = (design) => {
-    // Navigate to designer page with design data
-    // You might want to store the design data in localStorage or context
-    // For now, we'll pass it via URL or redirect to designer with query params
-    
-    // Option 1: Navigate to designer with design ID
     navigate(`/products/${design.productSlug}/customize?edit=${design._id}`);
-    
-    // Option 2: Store in localStorage and navigate
-    // localStorage.setItem('editDesign', JSON.stringify(design));
-    // navigate(`/designer/${design.productSlug}`);
   };
 
   // ---------- DELETE FUNCTION ----------
@@ -118,6 +235,9 @@ export default function Usersaveddesigns() {
 
       const res = await fetch(`${API_URL}/savedata/${designId}`, {
         method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       if (!res.ok) {
@@ -135,10 +255,19 @@ export default function Usersaveddesigns() {
       }
 
       // Show success message
-      alert("Design deleted successfully!");
+      setNotification({
+        show: true,
+        message: 'Design deleted successfully!',
+        type: 'success'
+      });
     } catch (err) {
       console.error("Delete design error:", err);
       setDeleteError(err.message || "Failed to delete design");
+      setNotification({
+        show: true,
+        message: err.message || 'Failed to delete design',
+        type: 'error'
+      });
     } finally {
       setDeletingId(null);
     }
@@ -182,6 +311,23 @@ export default function Usersaveddesigns() {
     return () => document.removeEventListener("keydown", handleEscapeKey);
   }, [imageModal.isOpen]);
 
+  // Check if design is in cart
+  const isDesignInCart = (designId) => {
+    return cartItems.some(item => 
+      item.kind === "DESIGN" && 
+      item.design?._id === designId
+    );
+  };
+
+  // Get design quantity in cart
+  const getDesignCartQuantity = (designId) => {
+    const item = cartItems.find(item => 
+      item.kind === "DESIGN" && 
+      item.design?._id === designId
+    );
+    return item ? item.qty : 0;
+  };
+
   // ---------- RENDER HELPERS ----------
   const formatDateTime = (ts) => {
     if (!ts) return "-";
@@ -195,24 +341,68 @@ export default function Usersaveddesigns() {
 
   return (
     <div className="flex h-screen flex-col bg-neutral-100 text-slate-900">
+      {/* Notification Toast */}
+      {notification.show && (
+        <div className="fixed top-4 right-4 z-50 animate-fade-in-down">
+          <div className={`rounded-lg shadow-lg p-4 max-w-sm ${
+            notification.type === 'success' ? 'bg-green-50 border border-green-200' :
+            notification.type === 'error' ? 'bg-red-50 border border-red-200' :
+            notification.type === 'warning' ? 'bg-yellow-50 border border-yellow-200' :
+            'bg-blue-50 border border-blue-200'
+          }`}>
+            <div className="flex items-center">
+              <div className={`flex-shrink-0 ${
+                notification.type === 'success' ? 'text-green-400' :
+                notification.type === 'error' ? 'text-red-400' :
+                notification.type === 'warning' ? 'text-yellow-400' :
+                'text-blue-400'
+              }`}>
+                {notification.type === 'success' ? (
+                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                ) : notification.type === 'error' ? (
+                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                ) : (
+                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </div>
+              <div className="ml-3">
+                <p className={`text-sm font-medium ${
+                  notification.type === 'success' ? 'text-green-800' :
+                  notification.type === 'error' ? 'text-red-800' :
+                  notification.type === 'warning' ? 'text-yellow-800' :
+                  'text-blue-800'
+                }`}>
+                  {notification.message}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top bar */}
       <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-6">
         <div className="flex items-center gap-4">
           <div className="text-lg font-extrabold tracking-wide text-orange-500">
             MYPRINT
           </div>
-          {/* <div className="text-xs text-slate-500">
-            Admin <span className="mx-1">›</span>{" "}
-            <span className="font-medium text-slate-700">Saved Designs</span>
-          </div> */}
         </div>
 
         <div className="flex items-center gap-4 text-xs">
-          <Link
-            to="/"
-            className="text-sky-700 hover:underline"
-          >
+          <Link to="/" className="text-sky-700 hover:underline">
             Back to Designer
+          </Link>
+          <Link to="/cart" className="text-sky-700 hover:underline flex items-center gap-1">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+            </svg>
+            View Cart
           </Link>
         </div>
       </header>
@@ -242,6 +432,9 @@ export default function Usersaveddesigns() {
               <ul className="divide-y divide-slate-100">
                 {designs.map((d) => {
                   const isActive = d._id === selectedDesignId;
+                  const isInCart = isDesignInCart(d._id);
+                  const cartQuantity = getDesignCartQuantity(d._id);
+                  
                   return (
                     <li
                       key={d._id}
@@ -272,7 +465,34 @@ export default function Usersaveddesigns() {
                           {formatDateTime(d.createdAt)}
                         </div>
                         
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
+                          {/* Add to Cart Button */}
+                          <button
+                            onClick={() => handleAddToCart(d)}
+                            disabled={addingToCartId === d._id || cartLoading}
+                            className={`px-2 py-1 text-[10px] rounded transition-colors ${
+                              isInCart
+                                ? 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
+                                : 'bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100'
+                            }`}
+                            title={isInCart ? "Already in cart" : "Add to cart"}
+                          >
+                            {addingToCartId === d._id ? (
+                              <span className="flex items-center">
+                                <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                                Adding...
+                              </span>
+                            ) : isInCart ? (
+                              `In Cart (${cartQuantity})`
+                            ) : (
+                              'Add to Cart'
+                            )}
+                          </button>
+                          
+                          {/* Edit Button */}
                           <button
                             onClick={() => handleEditDesign(d)}
                             className="px-2 py-1 text-[10px] bg-sky-50 text-sky-700 border border-sky-200 rounded hover:bg-sky-100 transition-colors"
@@ -281,6 +501,7 @@ export default function Usersaveddesigns() {
                             Edit
                           </button>
                           
+                          {/* Delete Button */}
                           <button
                             onClick={() => handleDeleteDesign(d._id, d.productName || "Untitled")}
                             disabled={deletingId === d._id}
@@ -319,7 +540,7 @@ export default function Usersaveddesigns() {
             </div>
           ) : (
             <div className="mx-auto max-w-5xl space-y-4">
-              {/* Header with Edit button */}
+              {/* Header with Action buttons */}
               <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
@@ -328,6 +549,31 @@ export default function Usersaveddesigns() {
                         {selectedDesign.productName || "Untitled design"}
                       </h1>
                       <div className="flex gap-2">
+                        {/* Add to Cart Button */}
+                        <button
+                          onClick={() => handleAddToCart(selectedDesign)}
+                          disabled={addingToCartId === selectedDesign._id || cartLoading}
+                          className={`px-3 py-1 text-xs rounded transition-colors ${
+                            isDesignInCart(selectedDesign._id)
+                              ? 'bg-green-600 text-white border border-green-600 hover:bg-green-700'
+                              : 'bg-blue-600 text-white border border-blue-600 hover:bg-blue-700'
+                          }`}
+                        >
+                          {addingToCartId === selectedDesign._id ? (
+                            <span className="flex items-center">
+                              <svg className="animate-spin h-3 w-3 mr-1" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg>
+                              Adding...
+                            </span>
+                          ) : isDesignInCart(selectedDesign._id) ? (
+                            `Already in Cart (${getDesignCartQuantity(selectedDesign._id)})`
+                          ) : (
+                            'Add to Cart'
+                          )}
+                        </button>
+                        
                         <button
                           onClick={() => handleEditDesign(selectedDesign)}
                           className="px-3 py-1 text-xs bg-sky-600 text-white border border-sky-600 rounded hover:bg-sky-700 transition-colors"
@@ -360,6 +606,22 @@ export default function Usersaveddesigns() {
                       Created: {formatDateTime(selectedDesign.createdAt)} | Updated:{" "}
                       {formatDateTime(selectedDesign.updatedAt)}
                     </p>
+                    
+                    {/* Design Status */}
+                    {/* <div className="mt-2 flex items-center gap-2">
+                      <span className={`px-2 py-1 text-xs rounded-full ${
+                        selectedDesign.isPublished 
+                          ? 'bg-green-100 text-green-800 border border-green-200'
+                          : 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                      }`}>
+                        {selectedDesign.isPublished ? 'Published' : 'Draft'}
+                      </span>
+                      {isDesignInCart(selectedDesign._id) && (
+                        <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 border border-blue-200 rounded-full">
+                          In Cart ({getDesignCartQuantity(selectedDesign._id)})
+                        </span>
+                      )}
+                    </div> */}
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <div className="flex items-center gap-2 text-xs">
@@ -545,7 +807,7 @@ export default function Usersaveddesigns() {
                                       )}
                                     >
                                       <img
-                                        src={`http://localhost:5000${d.imageUrl}`}
+                                        src={d.imageUrl}
                                         alt="design layer"
                                         className="max-h-16 max-w-16 object-contain"
                                       />

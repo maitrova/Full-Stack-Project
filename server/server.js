@@ -11,9 +11,10 @@ import removebgrouter from './routes/removeBg.route.js';
 import designrouter from './routes/designRoutes.js';
 import designsrouters from './routes/uploadDesignRoutes.js';
 import authrouter from './routes/auth.js';
-import cartrouter from './routes/addtocartroutes.js';
+
 import adminrouter from './routes/admincontrols.js';
 import readymadeproducts from './routes/readymadeProduct.routes.js';
+import cartrouter from './routes/cartRoutes.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
