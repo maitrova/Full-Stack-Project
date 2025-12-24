@@ -16,6 +16,11 @@ cd Full-Stack-Project
 cd server
 npm install
 
+# Set up Python virtual environment for background removal
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
 to run the server : npm run dev
 
 ### front end setup

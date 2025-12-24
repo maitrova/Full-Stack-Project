@@ -35,7 +35,9 @@ export const removeBgController = async (req, res) => {
     console.log("Output path:", outputPath);
     console.log("Script path:", scriptPath);
 
-    const python = spawn("python", [scriptPath, inputPath, outputPath]);
+    // Use virtual environment Python
+    const pythonPath = path.join(rootDir, "venv", "bin", "python3");
+    const python = spawn(pythonPath, [scriptPath, inputPath, outputPath]);
 
     let stdout = "";
     let stderr = "";
