@@ -422,11 +422,12 @@ export default function DesignerPage() {
         body: formData,
       });
 
-      const data = await res.json();
       if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: "Failed to upload image" }));
         throw new Error(data.error || "Failed to upload image");
       }
 
+      const data = await res.json();
       return `${API_URL}${data.imageUrl}`;
     } catch (err) {
       console.error("Upload design image error:", err);
