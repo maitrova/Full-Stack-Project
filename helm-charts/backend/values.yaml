@@ -33,14 +33,14 @@ envSecrets:
   API_URL: "http://localhost:5000"
 
 
-# Resource Limits
+# Resource Limits (Optimized for Node.js + Python AI processing)
 resources:
   limits:
-    cpu: "1"
-    memory: 1Gi
+    cpu: "2"         # High CPU for rembg/onnxruntime AI processing
+    memory: 2Gi      # AI models + image processing need memory
   requests:
-    cpu: "250m"
-    memory: 512Mi
+    cpu: "500m"      # Higher baseline for Python + Node.js dual runtime
+    memory: 1Gi      # Sufficient for model loading and image buffers
 
 # Health Checks
 livenessProbe:

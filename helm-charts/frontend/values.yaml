@@ -30,14 +30,14 @@ envSecrets:
   # Add any frontend secrets here
   # EXAMPLE: API_KEY: "your-api-key"
 
-# Resource Limits
+# Resource Limits (Optimized for static file serving)
 resources:
   limits:
-    cpu: "500m"
-    memory: 512Mi
+    cpu: "200m"      # Sufficient for serving static files
+    memory: 128Mi    # Frontend is lightweight
   requests:
-    cpu: "100m"
-    memory: 256Mi
+    cpu: "50m"       # Minimal baseline, can burst to limit
+    memory: 64Mi     # Typical usage ~40-50Mi
 
 # Health Checks
 livenessProbe:
