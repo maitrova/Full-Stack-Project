@@ -15,6 +15,7 @@ export const fetchReadymadeProductById = createAsyncThunk(
   'readymade/fetchProductById',
   async (productId) => {
     const response = await axios.get(`http://localhost:5000/api/readymadeproducts/${productId}`);
+    console.log("Fetched Product:", response.data.product);
     return response.data.product;
   }
 );

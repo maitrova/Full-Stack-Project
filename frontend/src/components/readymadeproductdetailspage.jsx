@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { fetchReadymadeProductById } from '../redux/slices/predesignedslice.js';
+import { getProductById as fetchReadymadeProductById } from '../redux/slices/productList.js';
 import { 
   addToCart, 
   getCart,
@@ -74,7 +74,7 @@ export default function ProductDetailPage() {
   const cartError = useSelector(selectCartError);
   
   // For readymade products
-  const { currentProduct: product } = useSelector((state) => state.readymadeproducts);
+  const { currentProduct: product } = useSelector((state) => state.productList);
   const isReadymade = type === 'product';
 
   // Fetch data based on type

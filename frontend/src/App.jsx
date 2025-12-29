@@ -1,7 +1,7 @@
 // src/App.jsx
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
- // Changed from ./components/productcustomization.jsx
+import Header from "./components/Header.jsx";
 import ProductList from "./pages/ProductList.jsx";
 import Homepage from "./pages/Homepage.jsx";
 import AdminDesignsPage from "./pages/AdminDesignsPage.jsx";
@@ -14,52 +14,170 @@ import CataloguePage from "./pages/CataloguePage.jsx";
 import CatalogueDetailPage from "./pages/CatalogueDetailPage.jsx";
 import ReadymadeProductsManager from "./components/productmanager.jsx";
 import ReadymadeProductList from "./components/ReadymadeProductList.jsx";
-import ProductDetail from "./components/readymadeproductdetailspage.jsx";
 import CartPage from "./pages/CartPage.jsx";
-import ProductDetailPage from "./components/readymadeproductdetailspage.jsx";
 import UnifiedDashboard from "./pages/unifieddashboard.jsx";
-// import ProductManager from "./components/productmanager.jsx";
+import Designdetailspage from "./components/designsdetailspage.jsx";
+
+// Import separate detail pages for readymade products and designs
+import ReadymadeProductDetailPage from "./components/readymadeproductdetailspage.jsx";
+import AdminDashboard from "./pages/AdminDashboard.jsx";
+
+// You'll need to create this
+
+// Layout component with header for all pages except auth
+const MainLayout = ({ children }) => {
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Header />
+      <main>{children}</main>
+    </div>
+  );
+};
+
+// Layout without header for auth pages
+const AuthLayout = ({ children }) => {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {children}
+    </div>
+  );
+};
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Default redirect to products listing */}
-        <Route path="/" element={<Homepage/>} />
+        {/* Auth pages without header */}
+        <Route path="/login" element={
+          <AuthLayout>
+            <LoginPage />
+          </AuthLayout>
+        } />
+        
+        <Route path="/register" element={
+          <AuthLayout>
+            <SignupPage />
+          </AuthLayout>
+        } />
 
-        {/* Product grid (hoodie, sweatshirt, tees, etc.) */}
-        <Route path="/products" element={<ProductList />} />
+        {/* All other pages with header */}
+        <Route path="/" element={
+          <MainLayout>
+            <Homepage />
+          </MainLayout>
+        } />
 
-        {/* Customization page for a specific product */}
-        {/* You can choose one of these routes, not both */}
-        <Route path="/products/:slug/customize" element={<ProtectedRoute>
-      <DesignerPage />
-    </ProtectedRoute>} />
-        {/* OR use this route: */}
-        {/* <Route path="/designer/:slug" element={<DesignerPage />} /> */}
-        <Route path="/usersaved_designs" element={<Usersaveddesigns/>} />
-        <Route path="/dashboard" element={<UnifiedDashboard />} />
-        <Route path="/admin/designs" element={<AdminDesignsPage />} />
-        <Route path="/login" element={<LoginPage/>}></Route>
-        <Route path="/register" element={<SignupPage/>}></Route>
-        <Route path="/catalogue" element={<CataloguePage />} />
-        <Route path="/catalogue/:id" element={<CatalogueDetailPage />} />
-        <Route path="/productmanager" element={<ReadymadeProductsManager/>}/>
-        <Route path="/readymade/products/" element={<ReadymadeProductList/>}/>
-        <Route path="/products/:id" element={<ProductDetailPage />} />
-        <Route path="/designs/:id" element={<ProductDetailPage />} />
-        <Route path="/cart" element={<CartPage/>}/>
-        {/* Fallback 404 */}
-        <Route
-          path="*"
-          element={
+        <Route path="/products" element={
+          <MainLayout>
+            <ProductList />
+          </MainLayout>
+        } />
+
+        <Route path="/products/:slug/customize" element={
+          <MainLayout>
+            <ProtectedRoute>
+              <DesignerPage />
+            </ProtectedRoute>
+          </MainLayout>
+        } />
+
+        <Route path="/adminpage" element={
+          <MainLayout>
+            <ProtectedRoute>
+              <AdminDashboard />
+            </ProtectedRoute>
+          </MainLayout>
+        } />
+
+        <Route path="/usersaved_designs" element={
+          <MainLayout>
+            <Usersaveddesigns />
+          </MainLayout>
+        } />
+
+        <Route path="/dashboard" element={
+          <MainLayout>
+            <UnifiedDashboard />
+          </MainLayout>
+        } />
+
+        <Route path="/admin/designs" element={
+          <MainLayout>
+            <AdminDesignsPage />
+          </MainLayout>
+        } />
+
+        <Route path="/catalogue" element={
+          <MainLayout>
+            <CataloguePage />
+          </MainLayout>
+        } />
+
+        <Route path="/catalogue/:id" element={
+          <MainLayout>
+            <CatalogueDetailPage />
+          </MainLayout>
+        } />
+
+        <Route path="/productmanager" element={
+          <MainLayout>
+            <ReadymadeProductsManager />
+          </MainLayout>
+        } />
+
+        <Route path="/readymade/products" element={
+          <MainLayout>
+            <ReadymadeProductList />
+          </MainLayout>
+        } />
+
+        {/* Readymade Product Details */}
+        <Route path="/products/:id" element={
+          <MainLayout>
+            <ReadymadeProductDetailPage />
+          </MainLayout>
+        } />
+
+        
+
+        {/* Design Details */}
+        <Route path="/designs/:id" element={
+          <MainLayout>
+            <Designdetailspage />
+          </MainLayout>
+        } />
+
+        {/* User Saved Design Details */}
+        <Route path="/usersaveddesigns/:id" element={
+          <MainLayout>
+            <Designdetailspage />
+          </MainLayout>
+        } />
+
+        {/* Cart Page */}
+        <Route path="/cart" element={
+          <MainLayout>
+            <CartPage />
+          </MainLayout>
+        } />
+
+        {/* Fallback 404 with header */}
+        <Route path="*" element={
+          <MainLayout>
             <div className="flex h-screen items-center justify-center bg-neutral-100">
-              <div className="rounded-md bg-white px-4 py-3 shadow text-sm">
-                404 – Page not found
+              <div className="rounded-md bg-white px-8 py-6 shadow-lg text-center">
+                <h1 className="text-2xl font-bold text-gray-800 mb-2">404</h1>
+                <p className="text-gray-600 mb-4">Page not found</p>
+                <a 
+                  href="/" 
+                  className="inline-block px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  Go Home
+                </a>
               </div>
             </div>
-          }
-        />
+          </MainLayout>
+        } />
       </Routes>
     </BrowserRouter>
   );

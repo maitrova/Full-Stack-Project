@@ -1,12 +1,11 @@
 // client/src/pages/UnifiedProductHub.jsx
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { 
   Grid, 
   List, 
   Search, 
-  Filter, 
   X, 
   ChevronRight,
   ChevronLeft,
@@ -20,30 +19,41 @@ import {
   Zap,
   Shield,
   Truck,
-  RefreshCw,
   Eye,
   Heart,
   ShoppingCart,
-  Plus,
-  Minus,
   Loader2,
   SlidersHorizontal,
-  CheckCircle
+  CheckCircle,
+  Clock,
+  Trophy,
+  Flame,
+  TrendingDown,
+  Layers,
+  Filter
 } from "lucide-react";
 
 // Import actions from different slices
-import { fetchProducts } from "../redux/slices/productsSlice.js";
-import { fetchReadymadeProducts } from "../redux/slices/predesignedslice.js";
+import { fetchProducts, fetchProductCategories } from "../redux/slices/productsSlice.js";
+
+// Import readymade product actions and selectors
+import { 
+  fetchAllProducts,
+  fetchFilters,
+  selectReadymadeProducts,
+  selectAllReadymadeProducts,
+  selectProductFilters,
+  selectProductLoading,
+  selectProductError
+} from "../redux/slices/productList.js";
+
 // Import cart actions
 import { 
   addToCart, 
-  updateCartItemQty,
-  removeCartItem,
   selectCartItems,
   selectCartLoading,
   selectCartError,
   selectCartSuccess,
-  resetCartState,
   clearError,
   clearSuccess 
 } from "../redux/slices/Cartslice.js";
@@ -108,25 +118,23 @@ const PRODUCT_TYPES = [
   }
 ];
 
-// Common filter categories for custom products
-const FILTER_CATEGORIES = [
-  { id: 'all', name: 'All Products', icon: Grid, color: MODERN_COLORS.primary.DEFAULT },
-  { id: 'hoodie', name: 'Hoodies', icon: ShoppingBag, color: MODERN_COLORS.accent.info },
-  { id: 'sweatshirt', name: 'Sweatshirts', icon: ShoppingBag, color: MODERN_COLORS.secondary.DEFAULT },
-  { id: 'womens', name: "Women's", icon: Sparkles, color: MODERN_COLORS.accent.success },
-  { id: 'tshirts', name: 'T-Shirts', icon: Tag, color: MODERN_COLORS.accent.warning },
-  { id: 'polos', name: 'Polos', icon: TrendingUp, color: MODERN_COLORS.accent.error },
-  { id: 'oversized', name: 'Oversized', icon: Zap, color: MODERN_COLORS.secondary.light },
-  { id: 'classic', name: 'Classic', icon: Shield, color: MODERN_COLORS.neutral[600] }
-];
-
 // Sort options
 const SORT_OPTIONS = [
   { id: 'featured', name: 'Featured', icon: Sparkles },
-  { id: 'price-low', name: 'Price: Low to High', icon: TrendingUp },
+  { id: 'price-low', name: 'Price: Low to High', icon: TrendingDown },
   { id: 'price-high', name: 'Price: High to Low', icon: TrendingUp },
-  { id: 'avg-customer-review', name: 'Best Rated', icon: Star },
-  { id: 'newest', name: 'Newest Arrivals', icon: TrendingUp }
+  { id: 'best-rated', name: 'Best Rated', icon: Star },
+  { id: 'newest', name: 'Newest Arrivals', icon: Clock },
+  { id: 'best-sellers', name: 'Best Sellers', icon: Trophy }
+];
+
+// Readymade specific filters
+const READYMADE_FILTERS = [
+  { id: 'all', name: 'All Products', icon: Grid },
+  { id: 'new-arrival', name: 'New Arrivals', icon: Clock, color: MODERN_COLORS.accent.success },
+  { id: 'best-seller', name: 'Best Sellers', icon: Trophy, color: MODERN_COLORS.accent.warning },
+  { id: 'featured', name: 'Featured', icon: Sparkles, color: MODERN_COLORS.primary.DEFAULT },
+  { id: 'trending', name: 'Trending', icon: Flame, color: MODERN_COLORS.accent.error }
 ];
 
 // Default placeholder image
@@ -134,7 +142,6 @@ const DEFAULT_PRODUCT_IMAGE = "https://images.unsplash.com/photo-1505740420928-5
 
 export default function UnifiedProductHub() {
   const dispatch = useDispatch();
-  const navigate = useNavigate();
   
   // Product type state
   const [activeProductType, setActiveProductType] = useState('custom');
@@ -151,19 +158,27 @@ export default function UnifiedProductHub() {
   const [addedProductName, setAddedProductName] = useState('');
   const [addingToCartId, setAddingToCartId] = useState(null);
   
-  // Image slideshow states for each product
+  // Image slideshow states
   const [imageIndices, setImageIndices] = useState({});
   const [autoSlideIntervals, setAutoSlideIntervals] = useState({});
   
-  // Custom products state
-  const { items: customProducts, itemsStatus: customStatus, itemsError: customError } = useSelector(
-    (state) => state.products
-  );
+  // Custom products state - updated to include categories
+  const { 
+    items: customProducts, 
+    itemsStatus: customStatus, 
+    itemsError: customError,
+    categories: backendCategories,
+    allSubCategories: backendAllSubCategories,
+    categoriesStatus: categoriesStatus,
+    categoriesError: categoriesError
+  } = useSelector((state) => state.products);
   
   // Readymade products state
-  const { products: readymadeProducts, loading: readymadeLoading, error: readymadeError } = useSelector(
-    (state) => state.readymadeproducts
-  );
+  const readymadeProducts = useSelector(selectReadymadeProducts);
+  const allReadymadeProducts = useSelector(selectAllReadymadeProducts);
+  const readymadeFilters = useSelector(selectProductFilters);
+  const readymadeLoading = useSelector(selectProductLoading);
+  const readymadeError = useSelector(selectProductError);
   
   // Catalogue designs state
   const [designs, setDesigns] = useState([]);
@@ -177,23 +192,41 @@ export default function UnifiedProductHub() {
   const cartSuccess = useSelector(selectCartSuccess);
   const token = useSelector(selectCurrentToken);
   
-  // Additional filter states
+  // Filter states - updated
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedSizes, setSelectedSizes] = useState([]);
-  const [selectedColors, setSelectedColors] = useState([]);
-  const [categoryFilter, setCategoryFilter] = useState('');
+  const [selectedSubCategory, setSelectedSubCategory] = useState('all');
+  const [readymadeCategoryFilter, setReadymadeCategoryFilter] = useState('');
+  const [readymadeSortFilter, setReadymadeSortFilter] = useState('all');
+  const [ratingFilter, setRatingFilter] = useState(0);
+  const [filteredReadymadeProducts, setFilteredReadymadeProducts] = useState([]);
+
+  // State for subcategories of selected category
+  const [currentSubcategories, setCurrentSubcategories] = useState([]);
 
   // Fetch data based on active product type
   useEffect(() => {
+    console.log("Active product type changed to:", activeProductType);
+    
     if (activeProductType === 'custom') {
-      dispatch(fetchProducts());
+      // Fetch categories from backend
+      dispatch(fetchProductCategories());
+      
+      // Fetch products with current filters
+      const filters = {};
+      if (selectedCategory !== 'all') filters.category = selectedCategory;
+      if (selectedSubCategory !== 'all') filters.subCategory = selectedSubCategory;
+      
+      dispatch(fetchProducts(filters));
     } else if (activeProductType === 'readymade') {
-      dispatch(fetchReadymadeProducts());
+      // Fetch initial readymade data
+      console.log("Fetching readymade products...");
+      dispatch(fetchAllProducts({ limit: 100 }));
+      dispatch(fetchFilters());
     } else if (activeProductType === 'design') {
       fetchCatalogueDesigns();
     }
     
-    // Clean up auto slide intervals when product type changes
+    // Clean up auto slide intervals
     return () => {
       Object.values(autoSlideIntervals).forEach(interval => {
         if (interval) clearInterval(interval);
@@ -201,14 +234,145 @@ export default function UnifiedProductHub() {
     };
   }, [activeProductType, dispatch]);
 
+  // Update subcategories when category changes
+  useEffect(() => {
+    if (activeProductType === 'custom' && selectedCategory !== 'all') {
+      const categoryData = backendCategories.find(cat => cat.category === selectedCategory);
+      if (categoryData) {
+        setCurrentSubcategories(categoryData.subCategories || []);
+      } else {
+        setCurrentSubcategories([]);
+      }
+    } else {
+      setCurrentSubcategories([]);
+    }
+  }, [selectedCategory, backendCategories, activeProductType]);
+
+  // Handle readymade filter changes - Client-side filtering
+  useEffect(() => {
+    if (activeProductType === 'readymade') {
+      // Use allReadymadeProducts as base for filtering
+      let productsToFilter = Array.isArray(readymadeProducts) && readymadeProducts.length > 0 
+        ? [...readymadeProducts] 
+        : Array.isArray(allReadymadeProducts) 
+          ? [...allReadymadeProducts] 
+          : [];
+      
+      if (productsToFilter.length === 0) {
+        setFilteredReadymadeProducts([]);
+        return;
+      }
+
+      let filtered = [...productsToFilter];
+
+      // Apply sort filter
+      switch(readymadeSortFilter) {
+        case 'new-arrival':
+          filtered = filtered.filter(product => product.newArrival === true);
+          break;
+        case 'best-seller':
+          filtered = filtered.filter(product => product.bestSeller === true);
+          break;
+        case 'featured':
+          filtered = filtered.filter(product => product.featured === true);
+          break;
+        case 'trending':
+          filtered = filtered.filter(product => product.views > 50 || product.sales > 10);
+          break;
+        default:
+          break;
+      }
+
+      // Apply category filter
+      if (readymadeCategoryFilter) {
+        filtered = filtered.filter(product => product.category === readymadeCategoryFilter);
+      }
+
+      // Apply search filter
+      if (searchQuery.trim()) {
+        filtered = filtered.filter(product => {
+          const name = product.title || product.name || '';
+          const description = product.description || '';
+          const category = product.category || '';
+          const brand = product.brand || '';
+          
+          const searchLower = searchQuery.toLowerCase();
+          return name.toLowerCase().includes(searchLower) ||
+                 description.toLowerCase().includes(searchLower) ||
+                 category.toLowerCase().includes(searchLower) ||
+                 brand.toLowerCase().includes(searchLower);
+        });
+      }
+
+      // Apply price range filter
+      filtered = filtered.filter(product => {
+        const price = product.price || product.basePrice || 0;
+        return price >= priceRange[0] && price <= priceRange[1];
+      });
+
+      // Apply rating filter
+      if (ratingFilter > 0) {
+        filtered = filtered.filter(product => {
+          const rating = product.rating || product.averageRating || 0;
+          return rating >= ratingFilter;
+        });
+      }
+
+      // Apply sorting
+      filtered.sort((a, b) => {
+        const priceA = a.price || a.basePrice || 0;
+        const priceB = b.price || b.basePrice || 0;
+        const ratingA = a.rating || a.averageRating || 0;
+        const ratingB = b.rating || b.averageRating || 0;
+        const dateA = new Date(a.createdAt || a.createdDate || 0);
+        const dateB = new Date(b.createdAt || b.createdDate || 0);
+        const bestSellerA = a.bestSeller || false;
+        const bestSellerB = b.bestSeller || false;
+        const newArrivalA = a.newArrival || false;
+        const newArrivalB = b.newArrival || false;
+
+        switch (sortOption) {
+          case 'price-low':
+            return priceA - priceB;
+          case 'price-high':
+            return priceB - priceA;
+          case 'best-rated':
+            return ratingB - ratingA;
+          case 'newest':
+            return dateB - dateA;
+          case 'best-sellers':
+            return (bestSellerB ? 1 : 0) - (bestSellerA ? 1 : 0);
+          case 'featured':
+          default:
+            const featuredA = newArrivalA || bestSellerA || a.featured;
+            const featuredB = newArrivalB || bestSellerB || b.featured;
+            return (featuredB ? 1 : 0) - (featuredA ? 1 : 0);
+        }
+      });
+
+      setFilteredReadymadeProducts(filtered);
+    }
+  }, [
+    activeProductType,
+    readymadeProducts,
+    allReadymadeProducts,
+    readymadeSortFilter,
+    readymadeCategoryFilter,
+    searchQuery,
+    priceRange,
+    ratingFilter,
+    sortOption
+  ]);
+
   // Show cart success message
   useEffect(() => {
     if (cartSuccess) {
       setShowCartSuccess(true);
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         setShowCartSuccess(false);
         dispatch(clearSuccess());
       }, 3000);
+      return () => clearTimeout(timer);
     }
   }, [cartSuccess, dispatch]);
 
@@ -226,16 +390,20 @@ export default function UnifiedProductHub() {
       const res = await fetch(`${API_URL}/savedata/catalogue`);
       const data = await res.json();
       
-      console.log("Catalogue API Response:", data); // Debug log
-      
-      if (!res.ok) throw new Error(data.error || "Failed to load catalogue");
-      
-      // DON'T filter - show all designs for now
-      setDesigns(data);
-      
-      console.log("Designs set:", data.length, "items"); // Debug log
+      const designs = Array.isArray(data) ? data : data.data || [];
+
+      if (designs.length === 0) {
+        throw new Error("No designs found in the response");
+      }
+
+      const designsWithCategory = designs.map(design => ({
+        ...design,
+        category: design.category || 'Design Catalogue'
+      }));
+
+      setDesigns(designsWithCategory);
     } catch (err) {
-      console.error("Error fetching designs:", err); // Debug log
+      console.error("Error fetching designs:", err);
       setDesignsError(err.message);
     } finally {
       setDesignsLoading(false);
@@ -260,39 +428,45 @@ export default function UnifiedProductHub() {
     return item ? item.qty : 0;
   };
 
-  // Get image URL helper function - FIXED
+  // Get image URL helper function
   const getImageUrl = (imagePath) => {
     if (!imagePath) return DEFAULT_PRODUCT_IMAGE;
-    
-    // If it's already a full URL, return as is
-    if (imagePath.startsWith('http')) {
+
+    if (imagePath.startsWith('http') || imagePath.startsWith('data:')) {
       return imagePath;
     }
-    
-    // For relative paths, use your API_URL
+
     const baseUrl = API_URL.replace('/backend', '');
     return `${baseUrl}${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
   };
 
-  // Get product price - NEW HELPER FUNCTION
+  // Get product price
   const getProductPrice = (product, type) => {
     if (type === 'design') {
-      // For designs, use salePrice first, then product.basePrice
       return product.salePrice || product.product?.basePrice || 0;
     } else if (type === 'readymade') {
-      // For readymade products
       return product.price || product.basePrice || 0;
     } else {
-      // For custom products
       return product.basePrice || product.price || 0;
     }
+  };
+
+  // Calculate discount percentage
+  const getDiscountPercentage = (product, type) => {
+    if (type === 'readymade') {
+      const price = product.price || product.basePrice || 0;
+      const originalPrice = product.originalPrice || product.mrp || 0;
+      if (originalPrice > price) {
+        return Math.round(((originalPrice - price) / originalPrice) * 100);
+      }
+    }
+    return 0;
   };
 
   // Start auto slideshow for a product
   const startAutoSlideshow = (productId, images) => {
     if (images.length <= 1) return;
     
-    // Clear existing interval
     if (autoSlideIntervals[productId]) {
       clearInterval(autoSlideIntervals[productId]);
     }
@@ -302,7 +476,7 @@ export default function UnifiedProductHub() {
         ...prev,
         [productId]: ((prev[productId] || 0) + 1) % images.length
       }));
-    }, 1000); // Change image every 1 second
+    }, 3000);
     
     setAutoSlideIntervals(prev => ({
       ...prev,
@@ -322,30 +496,7 @@ export default function UnifiedProductHub() {
     }
   };
 
-  // Manual navigation for images
-  const handleImageNav = (productId, direction, images) => {
-    stopAutoSlideshow(productId);
-    
-    setImageIndices(prev => {
-      const currentIndex = prev[productId] || 0;
-      let newIndex;
-      
-      if (direction === 'next') {
-        newIndex = (currentIndex + 1) % images.length;
-      } else {
-        newIndex = (currentIndex - 1 + images.length) % images.length;
-      }
-      
-      return { ...prev, [productId]: newIndex };
-    });
-    
-    // Restart auto slideshow after 3 seconds of inactivity
-    setTimeout(() => {
-      startAutoSlideshow(productId, images);
-    }, 3000);
-  };
-
-  // Cart handlers
+  // Cart handler
   const handleAddToCart = async (product, type) => {
     if (!token) {
       alert("Please login to add items to cart");
@@ -358,7 +509,6 @@ export default function UnifiedProductHub() {
       
       switch (type) {
         case 'design':
-          // Ensure kind is properly set
           const designKind = product.kind || "DESIGN";
           const normalizedKind = designKind.toUpperCase() === "READYMADE" ? "READYMADE" : "DESIGN";
           
@@ -372,7 +522,7 @@ export default function UnifiedProductHub() {
             previewImage: product.previewImage || product.views?.[0]?.previewImage || null,
             signature: `${product._id}-${product.product?._id || product.productId}`,
             views: product.views || [],
-            kind: normalizedKind  // This should match CataloguePage
+            kind: normalizedKind
           };
           setLocalCartItems(prev => ({ ...prev, [product._id]: 1 }));
           break;
@@ -381,21 +531,24 @@ export default function UnifiedProductHub() {
           cartData = {
             kind: "READYMADE",
             qty: 1,
-            readymadeProductId: product._id
+            readymadeProductId: product._id,
+            title: product.title || product.name,
+            unitPrice: product.price || product.basePrice || 0,
+            basePrice: product.originalPrice || product.mrp || product.price || 0,
+            previewImage: product.images?.[0] || null,
+            size: product.sizes?.[0] || 'M',
+            color: product.colors?.[0] || 'Black'
           };
           break;
           
         case 'custom':
-          // Custom product add to cart logic
           return;
       }
 
       await dispatch(addToCart(cartData)).unwrap();
       
-      // Set success message
-      setAddedProductName(product.name || product.title || product.productName);
+      setAddedProductName(product.title || product.name || product.productName);
       
-      // Clear local state after successful update
       if (type === 'design') {
         setTimeout(() => {
           setLocalCartItems(prev => {
@@ -427,30 +580,68 @@ export default function UnifiedProductHub() {
     setSortOption('featured');
     setPriceRange([0, 10000]);
     setSelectedCategory('all');
-    setSelectedSizes([]);
-    setSelectedColors([]);
-    setCategoryFilter('');
+    setSelectedSubCategory('all');
+    setReadymadeCategoryFilter('');
+    setReadymadeSortFilter('all');
+    setRatingFilter(0);
   };
+
+  // Get unique categories for custom products from backend
+  const getCustomCategories = () => {
+    return Array.isArray(backendCategories) ? backendCategories : [];
+  };
+
+  // Handle category change for custom products
+  const handleCategoryChange = (category) => {
+    setSelectedCategory(category);
+    setSelectedSubCategory('all'); // Reset subcategory when main category changes
+  };
+
+  // Handle subcategory change for custom products
+  const handleSubCategoryChange = (subCategory) => {
+    setSelectedSubCategory(subCategory);
+  };
+
+  // Refresh products when filters change
+  useEffect(() => {
+    if (activeProductType === 'custom') {
+      const filters = {};
+      if (selectedCategory !== 'all') filters.category = selectedCategory;
+      if (selectedSubCategory !== 'all') filters.subCategory = selectedSubCategory;
+      
+      dispatch(fetchProducts(filters));
+    }
+  }, [selectedCategory, selectedSubCategory, activeProductType, dispatch]);
 
   // Get active products based on product type
   const getActiveProducts = () => {
     switch (activeProductType) {
       case 'custom':
-        return customProducts || [];
+        return Array.isArray(customProducts) ? customProducts : [];
       case 'design':
-        return designs || [];
+        return Array.isArray(designs) ? designs : [];
       case 'readymade':
-        return readymadeProducts || [];
+        return filteredReadymadeProducts.length > 0 
+          ? filteredReadymadeProducts 
+          : Array.isArray(readymadeProducts) && readymadeProducts.length > 0 
+            ? readymadeProducts 
+            : Array.isArray(allReadymadeProducts) 
+              ? allReadymadeProducts 
+              : [];
       default:
         return [];
     }
   };
 
-  // Filter products based on active filters
+  // Filter products based on active filters (for custom and design)
   const filteredProducts = useMemo(() => {
+    if (activeProductType === 'readymade') {
+      return getActiveProducts();
+    }
+
     let products = [...getActiveProducts()];
     
-    // Apply search filter
+    // Apply search filter for custom and design
     if (searchQuery) {
       products = products.filter(product => {
         const name = product.name || product.title || product.productName || '';
@@ -469,39 +660,6 @@ export default function UnifiedProductHub() {
       return price >= priceRange[0] && price <= priceRange[1];
     });
     
-    // Apply category filter for custom products
-    if (activeProductType === 'custom' && selectedCategory !== 'all') {
-      products = products.filter(product => {
-        const name = product.name?.toLowerCase() || '';
-        const category = product.category?.toLowerCase() || '';
-        
-        switch (selectedCategory) {
-          case 'hoodie':
-            return name.includes('hoodie') || category.includes('hoodie');
-          case 'sweatshirt':
-            return name.includes('sweat') || category.includes('sweat');
-          case 'womens':
-            return name.includes('women') || name.includes('womens') || 
-                   category.includes('women') || category.includes('womens');
-          case 'tshirts':
-            return name.includes('t-shirt') || name.includes('tshirt');
-          case 'polos':
-            return name.includes('polo') || category.includes('polo');
-          case 'oversized':
-            return name.includes('oversized') || category.includes('oversized');
-          case 'classic':
-            return name.includes('classic') || category.includes('classic');
-          default:
-            return true;
-        }
-      });
-    }
-    
-    // Apply category filter for readymade
-    if (activeProductType === 'readymade' && categoryFilter) {
-      products = products.filter(product => product.category === categoryFilter);
-    }
-    
     // Apply sorting
     products.sort((a, b) => {
       const priceA = getProductPrice(a, activeProductType);
@@ -516,42 +674,46 @@ export default function UnifiedProductHub() {
           return priceA - priceB;
         case 'price-high':
           return priceB - priceA;
-        case 'avg-customer-review':
+        case 'best-rated':
           return ratingB - ratingA;
         case 'newest':
           return dateB - dateA;
+        case 'best-sellers':
+          return (b.bestSeller ? 1 : 0) - (a.bestSeller ? 1 : 0);
         case 'featured':
         default:
           return (b.featured ? 1 : 0) - (a.featured ? 1 : 0);
       }
     });
     
-    console.log("Filtered products:", products.length); // Debug log
+    // Apply rating filter
+    if (ratingFilter > 0) {
+      products = products.filter(product => {
+        const rating = product.rating || 0;
+        return rating >= ratingFilter;
+      });
+    }
+    
     return products;
   }, [
     activeProductType, 
     getActiveProducts(), 
     searchQuery, 
     sortOption, 
-    priceRange, 
-    selectedCategory, 
-    categoryFilter
+    priceRange,
+    ratingFilter,
+    filteredReadymadeProducts
   ]);
 
   // Get unique categories for readymade products
   const getReadymadeCategories = () => {
-    if (!Array.isArray(readymadeProducts)) return [];
-    const categories = new Set();
-    readymadeProducts.forEach(product => {
-      if (product?.category) categories.add(product.category);
-    });
-    return Array.from(categories);
+    return Array.isArray(readymadeFilters?.categories) ? readymadeFilters.categories : [];
   };
 
   // Loading state
   const isLoading = () => {
     switch (activeProductType) {
-      case 'custom': return customStatus === 'loading';
+      case 'custom': return customStatus === 'loading' || categoriesStatus === 'loading';
       case 'design': return designsLoading;
       case 'readymade': return readymadeLoading;
       default: return false;
@@ -561,30 +723,33 @@ export default function UnifiedProductHub() {
   // Error state
   const getError = () => {
     switch (activeProductType) {
-      case 'custom': return customError;
+      case 'custom': return customError || categoriesError;
       case 'design': return designsError;
       case 'readymade': return readymadeError;
       default: return null;
     }
   };
 
-  // Render product card based on type - FIXED VERSION
+  // Render product card based on type
   const renderProductCard = (product) => {
     const isDesign = activeProductType === 'design';
     const isReadymade = activeProductType === 'readymade';
     const isCustom = activeProductType === 'custom';
     
-    console.log("Rendering product:", product._id, product.title || product.name); // Debug log
-    
-    // Get correct price using helper function
+    // Get correct price
     const basePrice = getProductPrice(product, activeProductType);
-    const originalPrice = isDesign 
+    const originalPrice = isReadymade 
+      ? product.originalPrice || product.mrp
+      : isDesign 
       ? product.product?.basePrice 
       : product.originalPrice;
     
-    const name = product.name || product.title || product.productName || 'Unnamed Product';
+    const discountPercent = isReadymade ? getDiscountPercentage(product, 'readymade') : 0;
+    
+    const name = product.title || product.name || product.productName || 'Unnamed Product';
     const description = product.description || '';
     const category = product.category || '';
+    const subCategory = product.subCategory || '';
     
     const isInWishlist = wishlist.includes(product._id || product.slug);
     
@@ -598,38 +763,23 @@ export default function UnifiedProductHub() {
     const isInCart = cartQuantity > 0;
     const isAdding = addingToCartId === product._id;
     
-    // Get images based on product type - FIXED
+    // Get images
     const getProductImages = () => {
       if (isDesign) {
-        // For designs: Use previewImage and views
         const images = [];
-        
-        // Add main preview image
-        if (product.previewImage) {
-          const mainImageUrl = getImageUrl(product.previewImage);
-          images.push(mainImageUrl);
-        }
-        
-        // Add views images
+        if (product.previewImage) images.push(product.previewImage);
         if (product.views && Array.isArray(product.views)) {
           product.views.forEach(view => {
-            if (view.previewImage) {
-              const viewImageUrl = getImageUrl(view.previewImage);
-              images.push(viewImageUrl);
-            }
+            if (view.previewImage) images.push(view.previewImage);
           });
         }
-        
-        // If no images found, use default
         return images.length > 0 ? images : [DEFAULT_PRODUCT_IMAGE];
       } else if (isReadymade) {
-        // For readymade products: Use images array
         if (product.images && Array.isArray(product.images)) {
           return product.images.map(img => getImageUrl(img));
         }
         return [DEFAULT_PRODUCT_IMAGE];
       } else {
-        // For custom products
         const image = product.imageUrl || product.image;
         return image ? [getImageUrl(image)] : [DEFAULT_PRODUCT_IMAGE];
       }
@@ -639,7 +789,11 @@ export default function UnifiedProductHub() {
     const currentImageIndex = imageIndices[product._id] || 0;
     const currentImage = images[currentImageIndex];
     const hasMultipleImages = images.length > 1;
-    const hasViews = isDesign && product.views && product.views.length > 0;
+    
+    // Check if product is new arrival or best seller
+    const isNewArrival = product.newArrival;
+    const isBestSeller = product.bestSeller;
+    const rating = product.rating || product.averageRating || 0;
     
     return (
       <div 
@@ -656,8 +810,27 @@ export default function UnifiedProductHub() {
           }
         }}
       >
-        {/* Image Container with Slideshow */}
+        {/* Image Container */}
         <div className="relative h-64 bg-gradient-to-br from-neutral-50 to-white overflow-hidden">
+          {/* Badges */}
+          <div className="absolute top-3 left-3 z-10 flex flex-col gap-2">
+            {isReadymade && discountPercent > 0 && (
+              <span className="bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold px-2 py-1 rounded">
+                {discountPercent}% OFF
+              </span>
+            )}
+            {isReadymade && isNewArrival && (
+              <span className="bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold px-2 py-1 rounded">
+                NEW
+              </span>
+            )}
+            {isReadymade && isBestSeller && (
+              <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold px-2 py-1 rounded">
+                BEST SELLER
+              </span>
+            )}
+          </div>
+          
           {/* Main Image */}
           {currentImage ? (
             <>
@@ -666,18 +839,9 @@ export default function UnifiedProductHub() {
                 alt={name}
                 className="w-full h-full object-contain p-4 transition-all duration-500 group-hover:scale-105"
                 onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.parentElement.innerHTML = `
-                    <div class="flex items-center justify-center h-full">
-                      <div class="text-center">
-                        <Sparkles class="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                        <p class="text-sm text-gray-400">Preview unavailable</p>
-                      </div>
-                    </div>
-                  `;
+                  e.target.src = DEFAULT_PRODUCT_IMAGE;
                 }}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             </>
           ) : (
             <div className="flex items-center justify-center h-full">
@@ -687,162 +851,75 @@ export default function UnifiedProductHub() {
               </div>
             </div>
           )}
-          
-          {/* Kind Badge - Similar to CataloguePage */}
-          {isDesign && product.kind && (
-            <div className="absolute top-4 left-4 z-10">
-              <span className={`px-3 py-1 text-xs font-semibold rounded-full flex items-center gap-1 ${
-                product.kind.toUpperCase() === "DESIGN" 
-                  ? 'bg-indigo-100 text-indigo-700'
-                  : 'bg-emerald-100 text-emerald-700'
-              }`}>
-                {product.kind.toUpperCase() === "DESIGN" ? (
-                  <>
-                    <Palette className="w-3 h-3" />
-                    DESIGN
-                  </>
-                ) : (
-                  <>
-                    <Package className="w-3 h-3" />
-                    READYMADE
-                  </>
-                )}
-              </span>
-            </div>
-          )}
-          
-          {/* Navigation Arrows (only for multiple images) */}
-          {hasMultipleImages && (isDesign || isReadymade) && (
+
+          {/* Image Navigation */}
+          {hasMultipleImages && (
             <>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleImageNav(product._id, 'prev', images);
+                  stopAutoSlideshow(product._id);
+                  setImageIndices(prev => ({
+                    ...prev,
+                    [product._id]: ((prev[product._id] || 0) - 1 + images.length) % images.length
+                  }));
                 }}
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 hover:bg-white"
+                className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
               >
-                <ChevronLeft className="w-4 h-4 text-neutral-700" />
+                <ChevronLeft className="w-4 h-4" />
               </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleImageNav(product._id, 'next', images);
+                  stopAutoSlideshow(product._id);
+                  setImageIndices(prev => ({
+                    ...prev,
+                    [product._id]: ((prev[product._id] || 0) + 1) % images.length
+                  }));
                 }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 hover:bg-white"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
               >
-                <ChevronRight className="w-4 h-4 text-neutral-700" />
+                <ChevronRight className="w-4 h-4" />
               </button>
             </>
           )}
-          
-          {/* Image Dots Indicator */}
+
+          {/* Image Dots */}
           {hasMultipleImages && images.length > 1 && (
-            <div className="absolute bottom-3 left-0 right-0 flex justify-center space-x-1.5">
-              {images.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    stopAutoSlideshow(product._id);
-                    setImageIndices(prev => ({ ...prev, [product._id]: index }));
-                  }}
-                  className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
-                    index === currentImageIndex 
-                      ? 'bg-white w-4' 
-                      : 'bg-white/60 hover:bg-white/80'
+            <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 flex gap-1">
+              {images.map((_, idx) => (
+                <div
+                  key={idx}
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    idx === currentImageIndex ? 'bg-indigo-600' : 'bg-white/60'
                   }`}
                 />
               ))}
             </div>
           )}
-          
-          {/* Product Type Badge (for non-design products) */}
-          {!isDesign && (
-            <div className="absolute top-4 left-4 z-10">
-              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                isCustom 
-                  ? 'bg-indigo-100 text-indigo-700'
-                  : 'bg-green-100 text-green-700'
-              }`}>
-                {isCustom ? 'CUSTOM' : 'READYMADE'}
-              </span>
-            </div>
-          )}
-          
-          {/* Wishlist Button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setWishlist(prev => 
-                prev.includes(product._id || product.slug)
-                  ? prev.filter(id => id !== (product._id || product.slug))
-                  : [...prev, product._id || product.slug]
-              );
-            }}
-            className="absolute top-4 right-4 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all hover:scale-110 z-10"
-          >
-            <Heart className={`w-5 h-5 ${isInWishlist ? 'fill-red-500 text-red-500' : 'text-neutral-400 hover:text-red-500'}`} />
-          </button>
-          
-          {/* Popular Badge for designs */}
-          {isDesign && basePrice > 5000 && (
-            <div className="absolute top-4 right-16 z-10">
-              <span className="px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-semibold rounded-full flex items-center gap-1">
-                <TrendingUp className="w-3 h-3" />
-                Popular
-              </span>
-            </div>
-          )}
-          
-          {/* In Cart Badge */}
-          {(isDesign || isReadymade) && isInCart && (
-            <div className="absolute bottom-4 left-4 z-10">
-              <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-700">
-                In Cart ({cartQuantity})
-              </span>
-            </div>
-          )}
         </div>
-
-        {/* Side Previews for Designs (similar to CataloguePage) */}
-        {isDesign && hasViews && product.views.some(v => v.previewImage) && (
-          <div className="px-4 py-3 bg-gray-50/50 border-t border-gray-100">
-            <p className="text-xs text-gray-500 font-medium mb-2">Views</p>
-            <div className="grid grid-cols-4 gap-2">
-              {product.views.slice(0, 4).map((v) =>
-                v.previewImage ? (
-                  <div key={v.code} className="relative aspect-square bg-white rounded-lg border border-gray-200 overflow-hidden group-hover:border-gray-300 transition-colors">
-                    <img
-                      src={getImageUrl(v.previewImage)}
-                      alt={v.code}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                        e.target.parentElement.innerHTML = `
-                          <div class="w-full h-full flex items-center justify-center">
-                            <Eye className="w-4 h-4 text-gray-300" />
-                          </div>
-                        `;
-                      }}
-                    />
-                  </div>
-                ) : null
-              )}
-            </div>
-          </div>
-        )}
 
         {/* Product Info */}
         <div className="p-5">
-          {/* Category */}
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-xs font-medium px-2 py-1 bg-neutral-100 text-neutral-600 rounded">
-              {category || 'Uncategorized'}
-            </span>
-            {product.isNew && (
-              <span className="text-xs font-medium px-2 py-1 bg-green-100 text-green-700 rounded">
-                NEW
+          {/* Category and Rating */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium px-2 py-1 bg-neutral-100 text-neutral-600 rounded">
+                {category || 'Uncategorized'}
               </span>
+              {(isReadymade || isCustom) && subCategory && (
+                <span className="text-xs font-medium px-2 py-1 bg-purple-100 text-purple-700 rounded">
+                  {subCategory}
+                </span>
+              )}
+            </div>
+            
+            {/* Rating */}
+            {rating > 0 && (
+              <div className="flex items-center gap-1">
+                <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                <span className="text-xs font-medium">{rating.toFixed(1)}</span>
+              </div>
             )}
           </div>
           
@@ -864,9 +941,16 @@ export default function UnifiedProductHub() {
                   ₹{basePrice.toLocaleString()}
                 </span>
                 {originalPrice && originalPrice > basePrice && (
-                  <span className="text-sm text-neutral-400 line-through">
-                    ₹{originalPrice.toLocaleString()}
-                  </span>
+                  <>
+                    <span className="text-sm text-neutral-400 line-through">
+                      ₹{originalPrice.toLocaleString()}
+                    </span>
+                    {discountPercent > 0 && (
+                      <span className="text-xs font-bold text-green-600">
+                        Save ₹{(originalPrice - basePrice).toLocaleString()}
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -874,7 +958,6 @@ export default function UnifiedProductHub() {
             {/* Actions */}
             <div className="flex items-center gap-2">
               {isCustom ? (
-                // Custom product: Only Customize button
                 <Link
                   to={`/products/${product.slug}/customize`}
                   className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:opacity-90 transition-all font-medium text-sm"
@@ -882,9 +965,7 @@ export default function UnifiedProductHub() {
                   Customize
                 </Link>
               ) : (
-                // Design & Readymade products: Two buttons
                 <div className="flex items-center gap-2">
-                  {/* View Details Button */}
                   <Link
                     to={isDesign 
                       ? `/catalogue/${product._id}`
@@ -896,7 +977,6 @@ export default function UnifiedProductHub() {
                     Details
                   </Link>
                   
-                  {/* Add to Cart Button */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -947,10 +1027,6 @@ export default function UnifiedProductHub() {
     </div>
   );
 
-  console.log("Active product type:", activeProductType); // Debug log
-  console.log("Designs:", designs); // Debug log
-  console.log("Filtered products:", filteredProducts); // Debug log
-
   if (isLoading()) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-white">
@@ -971,7 +1047,7 @@ export default function UnifiedProductHub() {
   const error = getError();
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-white flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-b from-neutral-50 to white flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-neutral-100 p-8 text-center">
           <div className="w-20 h-20 bg-gradient-to-br from-red-50 to-pink-50 rounded-full flex items-center justify-center mx-auto mb-6">
             <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-pink-500 rounded-full flex items-center justify-center">
@@ -979,7 +1055,7 @@ export default function UnifiedProductHub() {
             </div>
           </div>
           <h3 className="text-xl font-bold text-neutral-800 mb-2">Error Loading Products</h3>
-          <p className="text-neutral-600 mb-6">{error}</p>
+          <p className="text-neutral-600 mb-6">{error.message || error}</p>
           <button
             onClick={() => window.location.reload()}
             className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:opacity-90 transition-all font-medium"
@@ -990,6 +1066,9 @@ export default function UnifiedProductHub() {
       </div>
     );
   }
+
+  const activeProducts = getActiveProducts();
+  const productsToDisplay = activeProductType === 'readymade' ? filteredReadymadeProducts : filteredProducts;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-white">
@@ -1026,7 +1105,10 @@ export default function UnifiedProductHub() {
               {PRODUCT_TYPES.map((type) => (
                 <button
                   key={type.id}
-                  onClick={() => setActiveProductType(type.id)}
+                  onClick={() => {
+                    setActiveProductType(type.id);
+                    handleClearFilters();
+                  }}
                   className={`flex flex-col items-center gap-3 px-6 py-4 rounded-2xl transition-all duration-300 ${
                     activeProductType === type.id
                       ? 'bg-white/20 backdrop-blur-sm border-2 border-white'
@@ -1042,7 +1124,7 @@ export default function UnifiedProductHub() {
             
             {/* Search Bar */}
             <div className="max-w-2xl mx-auto relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-neutral-400 w-5 h-5" />
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/70 w-5 h-5" />
               <input
                 type="text"
                 placeholder={`Search ${PRODUCT_TYPES.find(t => t.id === activeProductType)?.name.toLowerCase()}...`}
@@ -1069,14 +1151,25 @@ export default function UnifiedProductHub() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-6">
               <div className="text-center">
-                <div className="text-2xl font-bold text-neutral-900">{filteredProducts.length}</div>
+                <div className="text-2xl font-bold text-neutral-900">{productsToDisplay.length}</div>
                 <div className="text-sm text-neutral-500">Products Found</div>
               </div>
               <div className="hidden md:block w-px h-8 bg-neutral-200"></div>
               <div className="hidden md:block text-center">
-                <div className="text-2xl font-bold text-neutral-900">{getActiveProducts().length}</div>
+                <div className="text-2xl font-bold text-neutral-900">{activeProducts.length}</div>
                 <div className="text-sm text-neutral-500">Total in Category</div>
               </div>
+              {activeProductType === 'readymade' && (
+                <>
+                  <div className="hidden md:block w-px h-8 bg-neutral-200"></div>
+                  <div className="hidden md:block text-center">
+                    <div className="text-2xl font-bold text-neutral-900">
+                      {activeProducts.filter(p => p.newArrival).length}
+                    </div>
+                    <div className="text-sm text-neutral-500">New Arrivals</div>
+                  </div>
+                </>
+              )}
             </div>
             
             <div className="flex items-center gap-4">
@@ -1143,9 +1236,129 @@ export default function UnifiedProductHub() {
                   </div>
                 </div>
 
-                {/* Price Range - Common for all */}
-                <div className="mb-8">
-                  <div className="flex justify-between items-center mb-4">
+                {/* Readymade Specific Filters */}
+                {activeProductType === 'readymade' && (
+                  <>
+                    <div className="mb-6">
+                      <h3 className="text-sm font-semibold text-neutral-700 mb-3">Collections</h3>
+                      <div className="space-y-2">
+                        {READYMADE_FILTERS.map((filter) => {
+                          const Icon = filter.icon;
+                          return (
+                            <button
+                              key={filter.id}
+                              onClick={() => setReadymadeSortFilter(filter.id)}
+                              className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all ${readymadeSortFilter === filter.id ? 'bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100' : 'hover:bg-neutral-50'}`}
+                            >
+                              <Icon className={`w-4 h-4 ${readymadeSortFilter === filter.id ? 'text-indigo-600' : 'text-neutral-400'}`} />
+                              <span className={`font-medium ${readymadeSortFilter === filter.id ? 'text-indigo-700' : 'text-neutral-700'}`}>
+                                {filter.name}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {getReadymadeCategories().length > 0 && (
+                      <div className="mb-6">
+                        <h3 className="text-sm font-semibold text-neutral-700 mb-3">Categories</h3>
+                        <div className="space-y-2">
+                          <button
+                            onClick={() => setReadymadeCategoryFilter('')}
+                            className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all ${!readymadeCategoryFilter ? 'bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100' : 'hover:bg-neutral-50'}`}
+                          >
+                            <Package className={`w-4 h-4 ${!readymadeCategoryFilter ? 'text-indigo-600' : 'text-neutral-400'}`} />
+                            <span className={`font-medium ${!readymadeCategoryFilter ? 'text-indigo-700' : 'text-neutral-700'}`}>
+                              All Categories
+                            </span>
+                          </button>
+                          {getReadymadeCategories().map((category) => (
+                            <button
+                              key={category}
+                              onClick={() => setReadymadeCategoryFilter(category)}
+                              className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all ${readymadeCategoryFilter === category ? 'bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100' : 'hover:bg-neutral-50'}`}
+                            >
+                              <Tag className={`w-4 h-4 ${readymadeCategoryFilter === category ? 'text-indigo-600' : 'text-neutral-400'}`} />
+                              <span className={`font-medium ${readymadeCategoryFilter === category ? 'text-indigo-700' : 'text-neutral-700'}`}>
+                                {category}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Custom Product Categories */}
+                {activeProductType === 'custom' && getCustomCategories().length > 0 && (
+                  <>
+                    <div className="mb-6">
+                      <h3 className="text-sm font-semibold text-neutral-700 mb-3">Categories</h3>
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => handleCategoryChange('all')}
+                          className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all ${selectedCategory === 'all' ? 'bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100' : 'hover:bg-neutral-50'}`}
+                        >
+                          <Grid className={`w-4 h-4 ${selectedCategory === 'all' ? 'text-indigo-600' : 'text-neutral-400'}`} />
+                          <span className={`font-medium ${selectedCategory === 'all' ? 'text-indigo-700' : 'text-neutral-700'}`}>
+                            All Categories
+                          </span>
+                        </button>
+                        {getCustomCategories().map((categoryData) => (
+                          <button
+                            key={categoryData.category}
+                            onClick={() => handleCategoryChange(categoryData.category)}
+                            className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all ${selectedCategory === categoryData.category ? 'bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100' : 'hover:bg-neutral-50'}`}
+                          >
+                            <ShoppingBag className={`w-4 h-4 ${selectedCategory === categoryData.category ? 'text-indigo-600' : 'text-neutral-400'}`} />
+                            <span className={`font-medium ${selectedCategory === categoryData.category ? 'text-indigo-700' : 'text-neutral-700'}`}>
+                              {categoryData.category}
+                            </span>
+                            {selectedCategory === categoryData.category && (
+                              <ChevronRight className="w-4 h-4 text-indigo-600 ml-auto" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Subcategories for selected category */}
+                    {selectedCategory !== 'all' && currentSubcategories.length > 0 && (
+                      <div className="mb-6">
+                        <h3 className="text-sm font-semibold text-neutral-700 mb-3">Subcategories</h3>
+                        <div className="space-y-2">
+                          <button
+                            onClick={() => handleSubCategoryChange('all')}
+                            className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all ${selectedSubCategory === 'all' ? 'bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100' : 'hover:bg-neutral-50'}`}
+                          >
+                            <Layers className={`w-4 h-4 ${selectedSubCategory === 'all' ? 'text-indigo-600' : 'text-neutral-400'}`} />
+                            <span className={`font-medium ${selectedSubCategory === 'all' ? 'text-indigo-700' : 'text-neutral-700'}`}>
+                              All Subcategories
+                            </span>
+                          </button>
+                          {currentSubcategories.map((subCategory) => (
+                            <button
+                              key={subCategory}
+                              onClick={() => handleSubCategoryChange(subCategory)}
+                              className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all ${selectedSubCategory === subCategory ? 'bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100' : 'hover:bg-neutral-50'}`}
+                            >
+                              <Filter className={`w-4 h-4 ${selectedSubCategory === subCategory ? 'text-indigo-600' : 'text-neutral-400'}`} />
+                              <span className={`font-medium ${selectedSubCategory === subCategory ? 'text-indigo-700' : 'text-neutral-700'}`}>
+                                {subCategory}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Price Range */}
+                <div className="mb-6">
+                  <div className="flex justify-between items-center mb-3">
                     <h3 className="text-sm font-semibold text-neutral-700">Price Range</h3>
                     <span className="text-sm text-neutral-600">
                       ₹{priceRange[0].toLocaleString()} - ₹{priceRange[1].toLocaleString()}
@@ -1169,9 +1382,28 @@ export default function UnifiedProductHub() {
                   </div>
                 </div>
 
-                {/* Sort Options - Common for all */}
-                <div className="mb-8">
-                  <h3 className="text-sm font-semibold text-neutral-700 mb-4">Sort By</h3>
+                {/* Rating Filter */}
+                <div className="mb-6">
+                  <h3 className="text-sm font-semibold text-neutral-700 mb-3">Minimum Rating</h3>
+                  <div className="flex items-center gap-2">
+                    {[4, 3, 2, 1].map((rating) => (
+                      <button
+                        key={rating}
+                        onClick={() => setRatingFilter(rating === ratingFilter ? 0 : rating)}
+                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg ${ratingFilter === rating ? 'bg-amber-50 border border-amber-200' : 'bg-neutral-50 hover:bg-neutral-100'}`}
+                      >
+                        <Star className={`w-4 h-4 ${ratingFilter >= rating ? 'fill-yellow-400 text-yellow-400' : 'text-neutral-300'}`} />
+                        <span className={`text-sm font-medium ${ratingFilter === rating ? 'text-amber-700' : 'text-neutral-600'}`}>
+                          {rating}+
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sort Options */}
+                <div className="mb-6">
+                  <h3 className="text-sm font-semibold text-neutral-700 mb-3">Sort By</h3>
                   <div className="space-y-2">
                     {SORT_OPTIONS.map((option) => {
                       const Icon = option.icon;
@@ -1190,63 +1422,6 @@ export default function UnifiedProductHub() {
                     })}
                   </div>
                 </div>
-
-                {/* Type-specific filters */}
-                {activeProductType === 'custom' && (
-                  <div className="mb-8">
-                    <h3 className="text-sm font-semibold text-neutral-700 mb-4">Categories</h3>
-                    <div className="space-y-2">
-                      {FILTER_CATEGORIES.map((category) => {
-                        const Icon = category.icon;
-                        return (
-                          <button
-                            key={category.id}
-                            onClick={() => setSelectedCategory(category.id)}
-                            className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all ${selectedCategory === category.id ? 'bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100' : 'hover:bg-neutral-50'}`}
-                          >
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center`} style={{ backgroundColor: category.color + '20' }}>
-                              <Icon className="w-4 h-4" style={{ color: category.color }} />
-                            </div>
-                            <span className={`font-medium ${selectedCategory === category.id ? 'text-indigo-700' : 'text-neutral-700'}`}>
-                              {category.name}
-                            </span>
-                            {selectedCategory === category.id && (
-                              <ChevronRight className="w-4 h-4 text-indigo-600 ml-auto" />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {activeProductType === 'readymade' && getReadymadeCategories().length > 0 && (
-                  <div className="mb-8">
-                    <h3 className="text-sm font-semibold text-neutral-700 mb-4">Categories</h3>
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => setCategoryFilter('')}
-                        className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all ${!categoryFilter ? 'bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100' : 'hover:bg-neutral-50'}`}
-                      >
-                        <span className={`font-medium ${!categoryFilter ? 'text-indigo-700' : 'text-neutral-700'}`}>
-                          All Categories
-                        </span>
-                      </button>
-                      {getReadymadeCategories().map((category) => (
-                        <button
-                          key={category}
-                          onClick={() => setCategoryFilter(category)}
-                          className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all ${categoryFilter === category ? 'bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100' : 'hover:bg-neutral-50'}`}
-                        >
-                          <Tag className={`w-4 h-4 ${categoryFilter === category ? 'text-indigo-600' : 'text-neutral-400'}`} />
-                          <span className={`font-medium ${categoryFilter === category ? 'text-indigo-700' : 'text-neutral-700'}`}>
-                            {category}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* Trust Badges */}
                 <div className="p-4 bg-gradient-to-br from-neutral-50 to-white rounded-xl border border-neutral-100">
@@ -1271,6 +1446,43 @@ export default function UnifiedProductHub() {
                 <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-sm font-medium">
                   {PRODUCT_TYPES.find(t => t.id === activeProductType)?.name}
                 </span>
+                
+                {activeProductType === 'readymade' && readymadeSortFilter !== 'all' && (
+                  <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 rounded-full text-sm font-medium">
+                    {READYMADE_FILTERS.find(f => f.id === readymadeSortFilter)?.name}
+                    <button onClick={() => setReadymadeSortFilter('all')}>
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                
+                {activeProductType === 'readymade' && readymadeCategoryFilter && (
+                  <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-neutral-100 text-neutral-700 rounded-full text-sm font-medium">
+                    Category: {readymadeCategoryFilter}
+                    <button onClick={() => setReadymadeCategoryFilter('')}>
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                
+                {activeProductType === 'custom' && selectedCategory !== 'all' && (
+                  <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 rounded-full text-sm font-medium">
+                    Category: {selectedCategory}
+                    <button onClick={() => handleCategoryChange('all')}>
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                
+                {activeProductType === 'custom' && selectedSubCategory !== 'all' && (
+                  <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-50 text-purple-700 rounded-full text-sm font-medium">
+                    Subcategory: {selectedSubCategory}
+                    <button onClick={() => handleSubCategoryChange('all')}>
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                
                 {searchQuery && (
                   <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-neutral-100 text-neutral-700 rounded-full text-sm font-medium">
                     Search: "{searchQuery}"
@@ -1279,6 +1491,7 @@ export default function UnifiedProductHub() {
                     </button>
                   </span>
                 )}
+                
                 {priceRange[1] < 10000 && (
                   <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-neutral-100 text-neutral-700 rounded-full text-sm font-medium">
                     Price: Up to ₹{priceRange[1].toLocaleString()}
@@ -1287,18 +1500,11 @@ export default function UnifiedProductHub() {
                     </button>
                   </span>
                 )}
-                {activeProductType === 'custom' && selectedCategory !== 'all' && (
-                  <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 rounded-full text-sm font-medium">
-                    {FILTER_CATEGORIES.find(c => c.id === selectedCategory)?.name}
-                    <button onClick={() => setSelectedCategory('all')}>
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-                {activeProductType === 'readymade' && categoryFilter && (
-                  <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-neutral-100 text-neutral-700 rounded-full text-sm font-medium">
-                    Category: {categoryFilter}
-                    <button onClick={() => setCategoryFilter('')}>
+                
+                {ratingFilter > 0 && (
+                  <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full text-sm font-medium">
+                    Rating: {ratingFilter}+
+                    <button onClick={() => setRatingFilter(0)}>
                       <X className="w-3 h-3" />
                     </button>
                   </span>
@@ -1307,30 +1513,36 @@ export default function UnifiedProductHub() {
             </div>
 
             {/* Results Grid/List */}
-            {filteredProducts.length === 0 ? (
+            {!Array.isArray(productsToDisplay) || productsToDisplay.length === 0 ? (
               <div className="bg-white rounded-2xl border border-neutral-100 p-12 text-center">
                 <div className="w-20 h-20 bg-gradient-to-br from-neutral-50 to-neutral-100 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Search className="w-10 h-10 text-neutral-400" />
                 </div>
-                <h3 className="text-xl font-bold text-neutral-800 mb-3">No products found</h3>
+                <h3 className="text-xl font-bold text-neutral-800 mb-3">
+                  {isLoading() ? 'Loading products...' : 'No products found'}
+                </h3>
                 <p className="text-neutral-600 mb-8 max-w-md mx-auto">
-                  Try adjusting your search or filter criteria to find what you're looking for.
+                  {isLoading() 
+                    ? 'Please wait while we load the products...' 
+                    : 'Try adjusting your search or filter criteria to find what you\'re looking for.'}
                 </p>
-                <button
-                  onClick={handleClearFilters}
-                  className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:opacity-90 transition-all font-medium"
-                >
-                  Reset All Filters
-                </button>
+                {!isLoading() && (
+                  <button
+                    onClick={handleClearFilters}
+                    className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:opacity-90 transition-all font-medium"
+                  >
+                    Reset All Filters
+                  </button>
+                )}
               </div>
             ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredProducts.map((product) => renderProductCard(product))}
+                {productsToDisplay.map((product) => renderProductCard(product))}
               </div>
             ) : (
               /* List View */
               <div className="space-y-4">
-                {filteredProducts.map((product) => (
+                {productsToDisplay.map((product) => (
                   <div 
                     key={product._id || product.slug} 
                     className="group bg-white rounded-xl border border-neutral-100 hover:shadow-lg hover:border-indigo-100 transition-all duration-300 p-4"
@@ -1340,8 +1552,11 @@ export default function UnifiedProductHub() {
                       <div className="relative w-32 h-32 bg-gradient-to-br from-neutral-50 to-white rounded-lg overflow-hidden flex-shrink-0">
                         <img
                           src={getImageUrl(product.previewImage || product.imageUrl || product.image || product.images?.[0])}
-                          alt={product.name || product.title}
+                          alt={product.title || product.name}
                           className="w-full h-full object-contain p-2"
+                          onError={(e) => {
+                            e.target.src = DEFAULT_PRODUCT_IMAGE;
+                          }}
                         />
                       </div>
                       
@@ -1353,15 +1568,25 @@ export default function UnifiedProductHub() {
                               <span className="text-xs font-medium px-2 py-1 bg-neutral-100 text-neutral-600 rounded">
                                 {product.category || 'Uncategorized'}
                               </span>
-                              {product.featured && (
+                              {product.subCategory && (
+                                <span className="text-xs font-medium px-2 py-1 bg-purple-100 text-purple-700 rounded">
+                                  {product.subCategory}
+                                </span>
+                              )}
+                              {activeProductType === 'readymade' && product.newArrival && (
+                                <span className="text-xs font-medium px-2 py-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded">
+                                  NEW ARRIVAL
+                                </span>
+                              )}
+                              {activeProductType === 'readymade' && product.bestSeller && (
                                 <span className="text-xs font-medium px-2 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded">
-                                  FEATURED
+                                  BEST SELLER
                                 </span>
                               )}
                             </div>
                             
                             <h3 className="font-bold text-neutral-900 mb-1">
-                              {product.name || product.title || product.productName}
+                              {product.title || product.name || product.productName}
                             </h3>
                             
                             <p className="text-sm text-neutral-600 mb-3 line-clamp-2">
@@ -1370,8 +1595,20 @@ export default function UnifiedProductHub() {
                             
                             {/* Price */}
                             <div className="mb-4">
-                              <div className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                                ₹{getProductPrice(product, activeProductType).toLocaleString()}
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                                  ₹{getProductPrice(product, activeProductType).toLocaleString()}
+                                </span>
+                                {activeProductType === 'readymade' && product.originalPrice && product.originalPrice > (product.price || product.basePrice) && (
+                                  <>
+                                    <span className="text-sm text-neutral-400 line-through">
+                                      ₹{product.originalPrice.toLocaleString()}
+                                    </span>
+                                    <span className="text-xs font-bold text-green-600">
+                                      Save ₹{(product.originalPrice - (product.price || product.basePrice)).toLocaleString()}
+                                    </span>
+                                  </>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1395,7 +1632,7 @@ export default function UnifiedProductHub() {
                             to={activeProductType === 'custom' 
                               ? `/products/${product.slug}`
                               : activeProductType === 'readymade'
-                              ? `/products/${product._id}`
+                              ? `/readymade/${product._id}`
                               : `/catalogue/${product._id}`
                             }
                             className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
@@ -1427,37 +1664,6 @@ export default function UnifiedProductHub() {
                     </div>
                   </div>
                 ))}
-              </div>
-            )}
-
-            {/* Pagination */}
-            {filteredProducts.length > 0 && (
-              <div className="mt-12">
-                <div className="flex items-center justify-between">
-                  <button
-                    className="px-4 py-2 border border-neutral-200 rounded-lg text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
-                    disabled
-                  >
-                    Previous
-                  </button>
-                  <div className="flex items-center gap-2">
-                    {[1, 2, 3, 4, 5].map(page => (
-                      <button
-                        key={page}
-                        className={`w-10 h-10 rounded-lg font-medium ${page === 1 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'text-neutral-700 hover:bg-neutral-100'}`}
-                      >
-                        {page}
-                      </button>
-                    ))}
-                    <span className="mx-2 text-neutral-400">...</span>
-                    <button className="w-10 h-10 rounded-lg text-neutral-700 hover:bg-neutral-100">
-                      10
-                    </button>
-                  </div>
-                  <button className="px-4 py-2 border border-neutral-200 rounded-lg text-neutral-700 hover:bg-neutral-50">
-                    Next
-                  </button>
-                </div>
               </div>
             )}
           </div>

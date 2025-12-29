@@ -1,5 +1,5 @@
 import express from "express";
-import { saveDesign, getDesign, listDesigns, updateDesign, deleteDesign, listCatalogueDesigns, publishDesign } from "../controllers/designController.js";
+import { saveDesign, getDesign, listDesigns, updateDesign, deleteDesign, listCatalogueDesigns, publishDesign, updatedesigndetails } from "../controllers/designController.js";
 import { protect } from "../middleware/authMiddleware.js";
 
 const designrouter = express.Router();
@@ -15,6 +15,6 @@ designrouter.get("/:id", getDesign);
 designrouter.put("/:id", updateDesign); 
 designrouter.delete("/:id", deleteDesign);
 
-
+designrouter.put("/designdetails/:id", protect, updatedesigndetails);
 // designrouter.put("/products/:id/pricing", protect,updateProductPricingControls);
 export default designrouter;

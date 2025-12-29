@@ -38,25 +38,23 @@ const productSchema = new mongoose.Schema(
       type: String,
       default: "apparel",
     },
+    subCategory: { 
+      type: String, 
+      default: "" 
+    },
     views: {
       type: [productViewSchema],
       default: [],
     },
-    
-    // Base price for the product
     basePrice: {
       type: Number,
       default: 600,
     },
-    
-    // PRICING MODE: 'normal' or 'unlimited'
     pricingMode: {
       type: String,
       enum: ['normal', 'unlimited'],
       default: 'normal'
     },
-    
-    // UNLIMITED MODE CONFIGURATION
     unlimitedPricing: {
       enabled: {
         type: Boolean,
@@ -75,8 +73,6 @@ const productSchema = new mongoose.Schema(
         default: "Design as much as you want at a fixed price"
       }
     },
-    
-    // NORMAL MODE CONFIGURATION (Size-based pricing)
     normalPricing: {
       fixedSizeInches: {
         type: Number,
@@ -91,7 +87,6 @@ const productSchema = new mongoose.Schema(
         default: 30
       }
     },
-    
     currency: {
       type: String,
       default: "INR",
@@ -99,5 +94,6 @@ const productSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
 
 export const Product = mongoose.model("Product", productSchema);

@@ -1,20 +1,20 @@
-// server/scripts/seedProducts.js
 import mongoose from "mongoose";
-import { Product } from "../models/Product.js";
 
+
+import { Product } from "../models/Product.js";
 import dotenv from "dotenv";
+dotenv.config();
 import connectDB from "../config/db.js";
 
-dotenv.config();
 connectDB();
 
 async function run() {
-  
   const products = [
     {
       name: "Hoodie",
       slug: "hoodie",
       category: "hoodie",
+      subCategory: "outerwear", // Added subCategory
       basePrice: 999,
       views: [
         {
@@ -47,6 +47,7 @@ async function run() {
       name: "Sweatshirt",
       slug: "sweatshirt",
       category: "sweatshirt",
+      subCategory: "outerwear", // Added subCategory
       basePrice: 899,
       views: [
         {
@@ -67,6 +68,7 @@ async function run() {
       name: "Oversized Comfort T-Shirt",
       slug: "oversized-comfort-tee",
       category: "tshirt",
+      subCategory: "casual", // Added subCategory
       basePrice: 799,
       views: [
         {
@@ -87,6 +89,7 @@ async function run() {
       name: "Premium Polo Shirt",
       slug: "premium-polo",
       category: "polo",
+      subCategory: "formal", // Added subCategory
       basePrice: 899,
       views: [
         {
@@ -107,6 +110,7 @@ async function run() {
       name: "Classic Round Neck T-Shirt",
       slug: "classic-round-tee",
       category: "tshirt",
+      subCategory: "casual", // Added subCategory
       basePrice: 699,
       views: [
         {
@@ -127,6 +131,7 @@ async function run() {
       name: "Women's Crop Top",
       slug: "womens-crop-top",
       category: "womens",
+      subCategory: "casual", // Added subCategory
       basePrice: 749,
       views: [
         {
@@ -147,6 +152,7 @@ async function run() {
       name: "Women's Round Neck T-Shirt",
       slug: "womens-round-tee",
       category: "womens",
+      subCategory: "casual", // Added subCategory
       basePrice: 749,
       views: [
         {
@@ -165,10 +171,16 @@ async function run() {
     },
   ];
 
-  await Product.deleteMany({});
-  await Product.insertMany(products);
+  // Update or insert products based on their slug
+  for (const product of products) {
+    await Product.findOneAndUpdate(
+      { slug: product.slug }, // Match product by unique slug
+      { $set: product }, // Update fields
+      { upsert: true } // If product doesn't exist, insert a new one
+    );
+  }
 
-  console.log("✅ Seeded products");
+  console.log("✅ Seeded or updated products");
   await mongoose.disconnect();
 }
 

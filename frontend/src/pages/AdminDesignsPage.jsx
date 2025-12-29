@@ -2,7 +2,26 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { selectCurrentToken } from "../redux/slices/Userslice";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
+// Import product pricing slice actions and selectors
+import {
+  getProductPricing,
+  updateProductPricing,
+  toggleUnlimitedPricing,
+  updateNormalPricing,
+  updateBasePrice,
+  selectCurrentProductPricing,
+  selectPricingLoading,
+  selectPricingError,
+  selectPricingSuccess,
+  selectPricingMessage,
+  selectIsUnlimitedPricingEnabled,
+  selectCurrentPricingMode,
+  selectNormalPricing,
+  selectUnlimitedPricing,
+  resetPricingState,
+  clearCurrentProductPricing
+} from "../redux/slices/productpricing.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
 
@@ -20,11 +39,42 @@ export default function AdminDesignsPage() {
     title: ""
   });
   const token = useSelector(selectCurrentToken);
+  
   // Delete state
   const [deletingId, setDeletingId] = useState(null);
   const [deleteError, setDeleteError] = useState("");
+  
+  // Pricing states
+  const [showPricingModal, setShowPricingModal] = useState(false);
+  const [pricingMode, setPricingMode] = useState("normal"); // "normal" or "unlimited"
+  const [pricingData, setPricingData] = useState({
+    normal: {
+      fixedSizeInches: 12,
+      pricePerSqInch: 2.5,
+      sleevePrice: 5
+    },
+    unlimited: {
+      enabled: false,
+      flatCharge: 50,
+      label: "Premium",
+      description: "All-inclusive price for unlimited design"
+    },
+    basePrice: 0
+  });
 
+  const dispatch = useDispatch();
   const navigate = useNavigate();
+  
+  // Redux selectors for pricing
+  const currentProductPricing = useSelector(selectCurrentProductPricing);
+  const pricingLoading = useSelector(selectPricingLoading);
+  const pricingError = useSelector(selectPricingError);
+  const pricingSuccess = useSelector(selectPricingSuccess);
+  const pricingMessage = useSelector(selectPricingMessage);
+  const isUnlimitedEnabled = useSelector(selectIsUnlimitedPricingEnabled);
+  const currentPricingMode = useSelector(selectCurrentPricingMode);
+  const normalPricing = useSelector(selectNormalPricing);
+  const unlimitedPricing = useSelector(selectUnlimitedPricing);
   
   // ---------- FETCH ALL DESIGNS ----------
   useEffect(() => {
@@ -33,11 +83,11 @@ export default function AdminDesignsPage() {
         setLoadingList(true);
         setError("");
 
-            const res = await fetch(`${API_URL}/savedata`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
+        const res = await fetch(`${API_URL}/savedata`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
         const data = await res.json();
 
@@ -64,6 +114,7 @@ export default function AdminDesignsPage() {
   useEffect(() => {
     if (!selectedDesignId) {
       setSelectedDesign(null);
+      dispatch(clearCurrentProductPricing());
       return;
     }
 
@@ -80,6 +131,11 @@ export default function AdminDesignsPage() {
         }
 
         setSelectedDesign(data);
+        
+        // Fetch pricing data for this design
+        if (data.productSlug || data._id) {
+          dispatch(getProductPricing(selectedDesignId));
+        }
       } catch (err) {
         console.error("Admin fetch design detail error:", err);
         setError(err.message || "Failed to fetch design");
@@ -89,45 +145,56 @@ export default function AdminDesignsPage() {
     };
 
     fetchDesign();
-  }, [selectedDesignId]);
+  }, [selectedDesignId, dispatch]);
   
-  
+  // Update local pricing state when Redux state changes
+  useEffect(() => {
+    if (currentProductPricing) {
+      setPricingMode(currentProductPricing.pricingMode || "normal");
+      setPricingData({
+        normal: {
+          fixedSizeInches: currentProductPricing.normalPricing?.fixedSizeInches || 12,
+          pricePerSqInch: currentProductPricing.normalPricing?.pricePerSqInch || 2.5,
+          sleevePrice: currentProductPricing.normalPricing?.sleevePrice || 5
+        },
+        unlimited: {
+          enabled: currentProductPricing.unlimitedPricing?.enabled || false,
+          flatCharge: currentProductPricing.unlimitedPricing?.flatCharge || 50,
+          label: currentProductPricing.unlimitedPricing?.label || "Premium",
+          description: currentProductPricing.unlimitedPricing?.description || "All-inclusive price for unlimited design"
+        },
+        basePrice: currentProductPricing.basePrice || 0
+      });
+    }
+  }, [currentProductPricing]);
+
   const handlePublishToCatalogue = async (design) => {
-  try {
-    const res = await fetch(`${API_URL}/savedata/${design._id}/publish`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        title: design.productName || "Catalogue Design",
-        description: "",
-        salePrice: design.salePrice || 0, // or ask admin in a prompt/modal
-      }),
-    });
+    try {
+      const res = await fetch(`${API_URL}/savedata/${design._id}/publish`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: design.productName || "Catalogue Design",
+          description: "",
+          salePrice: design.salePrice || 0,
+        }),
+      });
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Publish failed");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Publish failed");
 
-    alert("✅ Published to catalogue!");
-  } catch (err) {
-    alert(err.message);
-  }
+      alert("✅ Published to catalogue!");
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   // ---------- EDIT FUNCTION ----------
   const handleEditDesign = (design) => {
-    // Navigate to designer page with design data
-    // You might want to store the design data in localStorage or context
-    // For now, we'll pass it via URL or redirect to designer with query params
-    
-    // Option 1: Navigate to designer with design ID
     navigate(`/products/${design.productSlug}/customize?edit=${design._id}`);
-    
-    // Option 2: Store in localStorage and navigate
-    // localStorage.setItem('editDesign', JSON.stringify(design));
-    // navigate(`/designer/${design.productSlug}`);
   };
 
   // ---------- DELETE FUNCTION ----------
@@ -149,22 +216,122 @@ export default function AdminDesignsPage() {
         throw new Error(data.error || "Failed to delete design");
       }
 
-      // Remove from local state
       setDesigns(prev => prev.filter(d => d._id !== designId));
       
-      // If the deleted design was selected, clear selection
       if (selectedDesignId === designId) {
         setSelectedDesignId(null);
         setSelectedDesign(null);
       }
 
-      // Show success message
       alert("Design deleted successfully!");
     } catch (err) {
       console.error("Delete design error:", err);
       setDeleteError(err.message || "Failed to delete design");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  // ---------- PRICING FUNCTIONS ----------
+  const handleOpenPricingModal = () => {
+    setShowPricingModal(true);
+  };
+
+  const handleClosePricingModal = () => {
+    setShowPricingModal(false);
+    dispatch(resetPricingState());
+  };
+
+  const handleUpdatePricing = async () => {
+    if (!selectedDesignId) return;
+    
+    const pricingDataToSend = {
+      pricingMode,
+      normalPricing: pricingData.normal,
+      unlimitedPricing: pricingData.unlimited,
+      basePrice: pricingData.basePrice
+    };
+    
+    try {
+      await dispatch(updateProductPricing({
+        id: selectedDesignId,
+        pricingData: pricingDataToSend
+      })).unwrap();
+      
+      setTimeout(() => {
+        handleClosePricingModal();
+      }, 1500);
+    } catch (error) {
+      console.error("Update pricing failed:", error);
+    }
+  };
+
+  const handleToggleUnlimitedPricing = async (enabled) => {
+    if (!selectedDesignId) return;
+    
+    try {
+      await dispatch(toggleUnlimitedPricing({
+        id: selectedDesignId,
+        enabled,
+        flatCharge: pricingData.unlimited.flatCharge,
+        label: pricingData.unlimited.label,
+        description: pricingData.unlimited.description
+      })).unwrap();
+    } catch (error) {
+      console.error("Toggle unlimited pricing failed:", error);
+    }
+  };
+
+  const handleUpdateNormalPricing = async () => {
+    if (!selectedDesignId) return;
+    
+    try {
+      await dispatch(updateNormalPricing({
+        id: selectedDesignId,
+        fixedSizeInches: pricingData.normal.fixedSizeInches,
+        pricePerSqInch: pricingData.normal.pricePerSqInch,
+        sleevePrice: pricingData.normal.sleevePrice
+      })).unwrap();
+    } catch (error) {
+      console.error("Update normal pricing failed:", error);
+    }
+  };
+
+  const handleUpdateBasePrice = async () => {
+    if (!selectedDesignId) return;
+    
+    try {
+      await dispatch(updateBasePrice({
+        id: selectedDesignId,
+        basePrice: pricingData.basePrice
+      })).unwrap();
+    } catch (error) {
+      console.error("Update base price failed:", error);
+    }
+  };
+
+  const handlePricingInputChange = (field, value, section = "normal") => {
+    if (section === "normal") {
+      setPricingData(prev => ({
+        ...prev,
+        normal: {
+          ...prev.normal,
+          [field]: value
+        }
+      }));
+    } else if (section === "unlimited") {
+      setPricingData(prev => ({
+        ...prev,
+        unlimited: {
+          ...prev.unlimited,
+          [field]: value
+        }
+      }));
+    } else if (section === "base") {
+      setPricingData(prev => ({
+        ...prev,
+        basePrice: value
+      }));
     }
   };
 
@@ -187,14 +354,12 @@ export default function AdminDesignsPage() {
     });
   };
 
-  // Handle clicking outside the modal to close
   const handleModalBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
       closeImageModal();
     }
   };
 
-  // Handle Escape key to close modal
   useEffect(() => {
     const handleEscapeKey = (e) => {
       if (e.key === "Escape" && imageModal.isOpen) {
@@ -215,6 +380,17 @@ export default function AdminDesignsPage() {
 
   const handleSelectDesign = (id) => {
     setSelectedDesignId(id);
+  };
+
+  // Calculate price example
+  const calculateExamplePrice = () => {
+    if (pricingMode === "normal") {
+      const area = pricingData.normal.fixedSizeInches * pricingData.normal.fixedSizeInches;
+      const areaPrice = area * pricingData.normal.pricePerSqInch;
+      return areaPrice + pricingData.normal.sleevePrice + pricingData.basePrice;
+    } else {
+      return pricingData.unlimited.flatCharge + pricingData.basePrice;
+    }
   };
 
   return (
@@ -304,13 +480,13 @@ export default function AdminDesignsPage() {
                           >
                             Edit
                           </button>
-                           <button
-                            onClick={() => handlePublishToCatalogue(selectedDesign)}
-                            className="px-3 py-1 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700"
+                          <button
+                            onClick={() => handlePublishToCatalogue(d)}
+                            className="px-2 py-1 text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 rounded hover:bg-emerald-100 transition-colors"
+                            title="Publish to catalogue"
                           >
-                            Push to Catalogue
+                            Publish
                           </button>
-
                           <button
                             onClick={() => handleDeleteDesign(d._id, d.productName || "Untitled")}
                             disabled={deletingId === d._id}
@@ -359,10 +535,22 @@ export default function AdminDesignsPage() {
                       </h1>
                       <div className="flex gap-2">
                         <button
+                          onClick={() => handleOpenPricingModal()}
+                          className="px-3 py-1 text-xs bg-purple-600 text-white border border-purple-600 rounded hover:bg-purple-700 transition-colors"
+                        >
+                          Manage Pricing
+                        </button>
+                        <button
                           onClick={() => handleEditDesign(selectedDesign)}
                           className="px-3 py-1 text-xs bg-sky-600 text-white border border-sky-600 rounded hover:bg-sky-700 transition-colors"
                         >
                           Edit This Design
+                        </button>
+                        <button
+                          onClick={() => handlePublishToCatalogue(selectedDesign)}
+                          className="px-3 py-1 text-xs bg-emerald-600 text-white border border-emerald-600 rounded hover:bg-emerald-700 transition-colors"
+                        >
+                          Publish to Catalogue
                         </button>
                         <button
                           onClick={() => handleDeleteDesign(selectedDesign._id, selectedDesign.productName || "Untitled")}
@@ -390,6 +578,37 @@ export default function AdminDesignsPage() {
                       Created: {formatDateTime(selectedDesign.createdAt)} | Updated:{" "}
                       {formatDateTime(selectedDesign.updatedAt)}
                     </p>
+                    
+                    {/* Current Pricing Summary */}
+                    {currentProductPricing && (
+                      <div className="mt-3 p-3 bg-slate-50 rounded border border-slate-200">
+                        <div className="text-xs font-semibold text-slate-700 mb-1">Current Pricing</div>
+                        <div className="flex items-center gap-4 text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-500">Mode:</span>
+                            <span className={`px-2 py-0.5 rounded-full ${currentPricingMode === 'normal' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-purple-100 text-purple-700 border border-purple-200'}`}>
+                              {currentPricingMode === 'normal' ? 'Normal Pricing' : 'Unlimited Pricing'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-500">Base Price:</span>
+                            <span className="font-semibold">${currentProductPricing.basePrice || 0}</span>
+                          </div>
+                          {currentPricingMode === 'normal' && normalPricing && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-500">Per Sq Inch:</span>
+                              <span className="font-semibold">${normalPricing.pricePerSqInch}</span>
+                            </div>
+                          )}
+                          {currentPricingMode === 'unlimited' && isUnlimitedEnabled && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-500">Flat Charge:</span>
+                              <span className="font-semibold">${unlimitedPricing.flatCharge}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <div className="flex items-center gap-2 text-xs">
@@ -639,6 +858,234 @@ export default function AdminDesignsPage() {
         </main>
       </div>
 
+      {/* PRICING MODAL */}
+      {showPricingModal && selectedDesign && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="relative max-w-4xl w-full bg-white rounded-lg shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">Manage Pricing</h3>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Configure pricing for: <span className="font-semibold">{selectedDesign.productName || "Untitled design"}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={handleClosePricingModal}
+                  className="text-slate-500 hover:text-slate-700 hover:bg-slate-200 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+                  aria-label="Close modal"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Pricing Mode Selection */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Pricing Mode</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="pricingMode"
+                      value="normal"
+                      checked={pricingMode === "normal"}
+                      onChange={(e) => setPricingMode(e.target.value)}
+                      className="h-4 w-4 text-blue-600"
+                    />
+                    <span className="ml-2 text-sm text-slate-700">Normal Pricing (per square inch)</span>
+                  </label>
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="radio"
+                      name="pricingMode"
+                      value="unlimited"
+                      checked={pricingMode === "unlimited"}
+                      onChange={(e) => setPricingMode(e.target.value)}
+                      className="h-4 w-4 text-purple-600"
+                    />
+                    <span className="ml-2 text-sm text-slate-700">Unlimited Pricing (flat rate)</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Base Price */}
+              <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Base Price</label>
+                <div className="flex items-center gap-4">
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500">$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={pricingData.basePrice}
+                      onChange={(e) => handlePricingInputChange("basePrice", parseFloat(e.target.value), "base")}
+                      className="pl-8 w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <button
+                    onClick={handleUpdateBasePrice}
+                    disabled={pricingLoading}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {pricingLoading ? "Updating..." : "Update Base Price"}
+                  </button>
+                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  This is the fixed base price added to all pricing calculations.
+                </p>
+              </div>
+
+              {/* Normal Pricing Section */}
+              {pricingMode === "normal" && (
+                <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h4 className="text-sm font-semibold text-blue-800 mb-3">Normal Pricing Settings</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Fixed Size (inches)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="0.5"
+                        value={pricingData.normal.fixedSizeInches}
+                        onChange={(e) => handlePricingInputChange("fixedSizeInches", parseFloat(e.target.value))}
+                        className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Price per Sq Inch ($)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={pricingData.normal.pricePerSqInch}
+                        onChange={(e) => handlePricingInputChange("pricePerSqInch", parseFloat(e.target.value))}
+                        className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">Sleeve Price ($)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={pricingData.normal.sleevePrice}
+                        onChange={(e) => handlePricingInputChange("sleevePrice", parseFloat(e.target.value))}
+                        className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-4 flex justify-between items-center">
+                    <div className="text-sm text-slate-600">
+                      Example: {pricingData.normal.fixedSizeInches}" × {pricingData.normal.fixedSizeInches}" = ${(pricingData.normal.fixedSizeInches * pricingData.normal.fixedSizeInches).toFixed(2)} sq in<br />
+                      Total: ${calculateExamplePrice().toFixed(2)}
+                    </div>
+                    <button
+                      onClick={handleUpdateNormalPricing}
+                      disabled={pricingLoading}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {pricingLoading ? "Updating..." : "Update Normal Pricing"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Unlimited Pricing Section */}
+              {pricingMode === "unlimited" && (
+                <div className="mb-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-semibold text-purple-800">Unlimited Pricing Settings</h4>
+                    <label className="flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={pricingData.unlimited.enabled}
+                        onChange={(e) => handleToggleUnlimitedPricing(e.target.checked)}
+                        className="h-4 w-4 text-purple-600 rounded"
+                      />
+                      <span className="ml-2 text-sm text-slate-700">Enable Unlimited Pricing</span>
+                    </label>
+                  </div>
+                  
+                  {pricingData.unlimited.enabled && (
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">Flat Charge ($)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={pricingData.unlimited.flatCharge}
+                            onChange={(e) => handlePricingInputChange("flatCharge", parseFloat(e.target.value), "unlimited")}
+                            className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">Label</label>
+                          <input
+                            type="text"
+                            value={pricingData.unlimited.label}
+                            onChange={(e) => handlePricingInputChange("label", e.target.value, "unlimited")}
+                            className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                            placeholder="e.g., Premium, All-inclusive"
+                          />
+                        </div>
+                      </div>
+                      <div className="mb-4">
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Description</label>
+                        <textarea
+                          value={pricingData.unlimited.description}
+                          onChange={(e) => handlePricingInputChange("description", e.target.value, "unlimited")}
+                          className="w-full px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                          rows="2"
+                          placeholder="Describe this pricing option..."
+                        />
+                      </div>
+                      <div className="text-sm text-slate-600">
+                        Total with base price: ${calculateExamplePrice().toFixed(2)}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Status Messages */}
+              {pricingError && (
+                <div className="mb-4 p-3 bg-rose-50 text-rose-700 rounded border border-rose-200 text-sm">
+                  {pricingError}
+                </div>
+              )}
+              
+              {pricingSuccess && (
+                <div className="mb-4 p-3 bg-emerald-50 text-emerald-700 rounded border border-emerald-200 text-sm">
+                  {pricingMessage || "Pricing updated successfully!"}
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-slate-200">
+                <button
+                  onClick={handleClosePricingModal}
+                  className="px-4 py-2 text-sm border border-slate-300 text-slate-700 rounded hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleUpdatePricing}
+                  disabled={pricingLoading}
+                  className="px-4 py-2 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {pricingLoading ? "Saving..." : "Save All Pricing Settings"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* IMAGE MODAL */}
       {imageModal.isOpen && (
         <div
@@ -646,7 +1093,6 @@ export default function AdminDesignsPage() {
           onClick={handleModalBackdropClick}
         >
           <div className="relative max-w-4xl max-h-[90vh] w-full bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col">
-            {/* Modal header */}
             <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50">
               <div>
                 <h3 className="text-sm font-semibold text-slate-800">
@@ -669,7 +1115,6 @@ export default function AdminDesignsPage() {
               </button>
             </div>
 
-            {/* Modal content - Image */}
             <div className="flex-1 flex items-center justify-center p-4 bg-slate-100 overflow-auto">
               <div className="relative max-w-full max-h-full">
                 <img
@@ -680,7 +1125,6 @@ export default function AdminDesignsPage() {
               </div>
             </div>
                 
-            {/* Modal footer */}
             <div className="p-3 border-t border-slate-200 bg-slate-50 text-center">
               <div className="text-xs text-slate-500">
                 Click outside or press ESC to close

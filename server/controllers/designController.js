@@ -526,12 +526,26 @@ export const listCatalogueDesigns = async (req, res) => {
   try {
     const apiUrl = process.env.API_URL || "https://narifighter.online/backend";
 
+    const { page = 1, limit = 10 } = req.query;
+
+    // Fetch designs with pagination
     const designs = await Design.find({ isPublished: true })
       .sort({ publishedAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit))
       .lean();
+    console.log("Fetched designs from DB:", designs);
+    // Check if designs is an array
+    if (!Array.isArray(designs)) {
+      return res.status(400).json({ success: false, message: "Invalid data structure for designs" });
+    }
 
-    designs.forEach((design) => {
-      if (design.views) {
+    // Process designs
+    const processedDesigns = designs.map((design) => {
+      // Ensure category field is part of the design object
+      const category = design.category || "Uncategorized"; // Default to 'Uncategorized' if no category
+
+      if (design.views && Array.isArray(design.views)) {
         design.views = design.views.map((view) => ({
           ...view,
           designLayers:
@@ -543,14 +557,75 @@ export const listCatalogueDesigns = async (req, res) => {
             })) || [],
         }));
       }
+
+      // Add category to the design object
+      return { ...design, category };
     });
 
-    return res.json(designs);
+    // Count the total number of designs
+    const total = await Design.countDocuments({ isPublished: true });
+
+    return res.json({
+      success: true,
+      data: processedDesigns,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
   } catch (err) {
     console.error("List catalogue designs error:", err);
-    return res.status(500).json({ error: "Failed to list catalogue designs" });
+    return res.status(500).json({
+      success: false,
+      error: "Failed to list catalogue designs",
+    });
   }
 };
+
+
+
+export const updatedesigndetails = async (req, res) => {
+  const designId = req.params.id;
+
+  // Validate input data
+  // const errors = validationResult(req);
+  // if (!errors.isEmpty()) {
+  //   return res.status(400).json({ errors: errors.array() });
+  // }
+
+  try {
+    const { category, subCategory,calculatedPrice, stock, description, newArrivals, bestSellers } = req.body;
+
+    // Find the design by ID and update it
+    const design = await Design.findById(designId);
+
+    if (!design) {
+      return res.status(404).json({ message: "Design not found" });
+    }
+
+    // Update fields if provided
+    if (category) design.category = category;
+    if (subCategory) design.subCategory = subCategory;
+    if (calculatedPrice !== undefined) design.calculatedPrice = calculatedPrice;
+    if (stock !== undefined) design.stock = stock; // undefined check to allow stock=0
+    if (description) design.description = description;
+    if (newArrivals !== undefined) design.newArrivals = newArrivals; // handle new arrivals
+    if (bestSellers !== undefined) design.bestSellers = bestSellers; // handle best sellers
+
+    // Save the updated design
+    await design.save();
+
+    // Respond with the updated design
+    res.json(design);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
 
 export const getDesign = async (req, res) => {
   try {

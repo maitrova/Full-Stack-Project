@@ -6,6 +6,10 @@ import productsReducer from "./slices/productsSlice.js";
 import userReducer from "./slices/Userslice.js";
 import readymadeSliceReducer from "./slices/predesignedslice.js";
 import cartSliceReducer from "./slices/Cartslice.js";
+import productPricingSliceReducer from "./slices/productpricing.js";
+import productListSliceReducer from "./slices/productList.js";
+import adminSliceReducer from "./slices/adminSlice.js";
+import designsSliceReducer from "./slices/Designslice.js";
 // Persist configuration for user slice only
 const persistConfig = {
   key: 'user', // key for localStorage
@@ -23,7 +27,11 @@ export const store = configureStore({
     products: productsReducer,
     user: persistedUserReducer,
     readymadeproducts: readymadeSliceReducer,
-    cart: cartSliceReducer, // Use persisted reducer instead of regular one
+    cart: cartSliceReducer,
+    productPricing : productPricingSliceReducer,
+    productList : productListSliceReducer,
+    admin : adminSliceReducer,
+    designs : designsSliceReducer // Use persisted reducer instead of regular one
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

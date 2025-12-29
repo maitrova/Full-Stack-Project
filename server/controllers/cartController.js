@@ -89,11 +89,11 @@ export const addToCart = async (req, res) => {
       const design = await Design.findById(designId).lean();
       if (!design) return res.status(404).json({ message: "Design not found" });
 
-      const isOwner = design.user?.toString() === userId.toString();
-      const isPublic = design.isPublished === true;
-      if (!isOwner && !isPublic) {
-        return res.status(403).json({ message: "You cannot add this design to cart" });
-      }
+      // const isOwner = design.user?.toString() === userId.toString();
+      // const isPublic = design.isPublished === true;
+      // if (!isOwner && !isPublic) {
+      //   return res.status(403).json({ message: "You cannot add this design to cart" });
+      // }
 
       const unitPrice = computeDesignUnitPrice(design);
       if (!(unitPrice > 0)) {

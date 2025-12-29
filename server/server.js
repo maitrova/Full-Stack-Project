@@ -44,6 +44,7 @@ app.use('/api/auth',authrouter);
 app.use('/api/cart',cartrouter);
 app.use('/api/admin',adminrouter);
 app.use('/api/readymadeproducts',readymadeproducts);
+
 // Error handling
 app.use((err, req, res, next) => {
   console.error("Server error:", err);

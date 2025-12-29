@@ -123,6 +123,13 @@ const designSchema = new mongoose.Schema(
     description: { type: String, default: "" },
     salePrice: { type: Number, default: 0 },
 
+    // New fields
+    category: { type: String, default: "" },         // Category of the product
+    subCategory: { type: String, default: "" },      // Sub-category of the product
+    newArrivals: { type: Boolean, default: false },  // If the product is new arrival
+    bestSellers: { type: Boolean, default: false },  // If the product is a best seller
+    stock: { type: Number, default: 0 },             // Number of items in stock
+
     views: [designViewSchema],
   },
   { timestamps: true }

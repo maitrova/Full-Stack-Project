@@ -679,52 +679,72 @@ export default function DesignerPage() {
     }
   };
 
-  const handleRemoveBackground = async () => {
-    if (!activeDesign) {
-      setError("Select a design first");
-      return;
+ const handleRemoveBackground = async () => {
+  if (!activeDesign) {
+    setError("Select a design first");
+    console.log("No design selected");
+    return;
+  }
+  
+  const fileToUse = activeDesign.originalFile || activeDesign.file;
+  if (!fileToUse) {
+    setError("No original file available for background removal");
+    console.log("No file available for background removal");
+    return;
+  }
+
+  try {
+    setBgRemovalLoading(true);
+    setError("");
+    console.log("Starting background removal");
+
+    const formData = new FormData();
+    formData.append("image", fileToUse);
+    console.log("FormData prepared with image");
+
+    const res = await fetch(`${API_URL}/api/remove-bg`, {
+      method: "POST",
+      body: formData,
+    });
+
+    console.log("Remove BG response status:", res.status);
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.log("Error response body:", errorText);
+      throw new Error(errorText || "Background removal failed");
     }
-    
-    const fileToUse = activeDesign.originalFile || activeDesign.file;
-    if (!fileToUse) {
-      setError("No original file available for background removal");
-      return;
+
+    const data = await res.json();
+    console.log("Response data:", data);
+
+    if (!data.outputUrl) {
+      console.log("Output URL is missing in the response");
+      throw new Error("Background removal failed: no output URL");
     }
 
-    try {
-      setBgRemovalLoading(true);
-      setError("");
+    const updatedLayers = designLayers.map((d) =>
+      d.id === activeDesign.id
+        ? {
+            ...d,
+            imageUrl: `${API_URL}${data.outputUrl}?t=${Date.now()}`,
+            hasBgRemoved: true,
+            originalFile: fileToUse,
+          }
+        : d
+    );
 
-      const formData = new FormData();
-      formData.append("image", fileToUse);
+    console.log("Updated layers with background removed:", updatedLayers);
 
-      const res = await fetch(`${API_URL}/api/remove-bg`, {
-        method: "POST",
-        body: formData,
-      });
+    updateCurrentViewState({ designLayers: updatedLayers });
+  } catch (err) {
+    console.error("Remove BG error:", err);
+    setError(err.message || "Background removal failed");
+  } finally {
+    setBgRemovalLoading(false);
+    console.log("Background removal process completed");
+  }
+};
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Background removal failed");
-
-      const updatedLayers = designLayers.map((d) =>
-        d.id === activeDesign.id
-          ? {
-              ...d,
-              imageUrl: `${API_URL}${data.outputUrl}?t=${Date.now()}`,
-              hasBgRemoved: true,
-              originalFile: fileToUse,
-            }
-          : d
-      );
-
-      updateCurrentViewState({ designLayers: updatedLayers });
-    } catch (err) {
-      console.error("Remove BG error:", err);
-      setError(err.message || "Background removal failed");
-    } finally {
-      setBgRemovalLoading(false);
-    }
-  };
 
   const clearActiveDesign = () => {
     if (!activeDesign) return;
@@ -1599,3 +1619,4 @@ export default function DesignerPage() {
     </div>
   );
 }
+

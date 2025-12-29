@@ -169,14 +169,14 @@ export default function Usersaveddesigns() {
     const isOwner = design.user?.toString() === "user_id_here"; // You need to get current user ID
     const isPublic = design.isPublished === true;
     
-    if (!isOwner && !isPublic) {
-      setNotification({
-        show: true,
-        message: 'This design is not available for purchase',
-        type: 'error'
-      });
-      return;
-    }
+    // if (!isOwner && !isPublic) {
+    //   setNotification({
+    //     show: true,
+    //     message: 'This design is not available for purchase',
+    //     type: 'error'
+    //   });
+    //   return;
+    // }
 
     try {
       setAddingToCartId(design._id);
@@ -500,7 +500,13 @@ export default function Usersaveddesigns() {
                           >
                             Edit
                           </button>
-                          
+                          <Link to={`/usersaveddesigns/${d._id}`}>
+                            <button
+                              className="px-2 py-1 text-[10px] bg-sky-50 text-sky-700 border border-sky-200 rounded hover:bg-sky-100 transition-colors"
+                            >
+                            View Details
+                          </button>
+                          </Link>
                           {/* Delete Button */}
                           <button
                             onClick={() => handleDeleteDesign(d._id, d.productName || "Untitled")}
@@ -607,21 +613,7 @@ export default function Usersaveddesigns() {
                       {formatDateTime(selectedDesign.updatedAt)}
                     </p>
                     
-                    {/* Design Status */}
-                    {/* <div className="mt-2 flex items-center gap-2">
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        selectedDesign.isPublished 
-                          ? 'bg-green-100 text-green-800 border border-green-200'
-                          : 'bg-yellow-100 text-yellow-800 border border-yellow-200'
-                      }`}>
-                        {selectedDesign.isPublished ? 'Published' : 'Draft'}
-                      </span>
-                      {isDesignInCart(selectedDesign._id) && (
-                        <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 border border-blue-200 rounded-full">
-                          In Cart ({getDesignCartQuantity(selectedDesign._id)})
-                        </span>
-                      )}
-                    </div> */}
+                  
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <div className="flex items-center gap-2 text-xs">

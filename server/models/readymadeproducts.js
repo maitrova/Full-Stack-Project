@@ -9,10 +9,15 @@ const readymadeProductSchema = new mongoose.Schema(
     currency: { type: String, default: "INR" },
 
     category: { type: String, default: "" },
+    subCategory: { type: String, default: "" }, // Added subCategory field
     brand: { type: String, default: "" },
 
     stock: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true },
+    
+    // New fields for product highlights
+    bestSeller: { type: Boolean, default: false },
+    newArrival: { type: Boolean, default: false },
 
     images: {
       type: [String], // saved file paths
