@@ -37,7 +37,13 @@ export const addToCart = async (req, res) => {
     const userId = req.user?._id;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    const { kind, qty = 1, readymadeProductId, designId } = req.body;
+    const {
+      kind,
+      qty = 1,
+      readymadeProductId,
+      designId,
+      size, // ✅ added
+    } = req.body;
 
     const parsedQty = Number(qty);
     if (!Number.isInteger(parsedQty) || parsedQty < 1) {
@@ -47,25 +53,34 @@ export const addToCart = async (req, res) => {
       return res.status(400).json({ message: "kind must be READYMADE or DESIGN" });
     }
 
+    // ✅ normalize size (default M)
+    const normalizedSize =
+      size && String(size).trim() ? String(size).trim() : "M";
+
     let signature = "";
     let itemToInsert = null;
 
     // READYMADE
     if (kind === "READYMADE") {
       if (!readymadeProductId || !isValidObjectId(readymadeProductId)) {
-        return res.status(400).json({ message: "Valid readymadeProductId is required" });
+        return res
+          .status(400)
+          .json({ message: "Valid readymadeProductId is required" });
       }
 
       const product = await ReadymadeProduct.findById(readymadeProductId).lean();
       if (!product || product.isActive === false) {
-        return res.status(404).json({ message: "Readymade product not found or inactive" });
+        return res
+          .status(404)
+          .json({ message: "Readymade product not found or inactive" });
       }
 
       if (product.stock < parsedQty) {
         return res.status(400).json({ message: "Not enough stock" });
       }
 
-      signature = `READYMADE:${product._id.toString()}`;
+      // ✅ include size in signature so different sizes don't merge
+      signature = `READYMADE:${product._id.toString()}:SIZE:${normalizedSize}`;
 
       itemToInsert = {
         kind: "READYMADE",
@@ -73,6 +88,10 @@ export const addToCart = async (req, res) => {
         design: null,
         product: null,
         qty: parsedQty,
+
+        // ✅ store size in cart item
+        size: normalizedSize,
+
         unitPrice: product.price,
         currency: product.currency || "INR",
         previewImage: product.images?.[0] || null,
@@ -89,18 +108,13 @@ export const addToCart = async (req, res) => {
       const design = await Design.findById(designId).lean();
       if (!design) return res.status(404).json({ message: "Design not found" });
 
-      // const isOwner = design.user?.toString() === userId.toString();
-      // const isPublic = design.isPublished === true;
-      // if (!isOwner && !isPublic) {
-      //   return res.status(403).json({ message: "You cannot add this design to cart" });
-      // }
-
       const unitPrice = computeDesignUnitPrice(design);
       if (!(unitPrice > 0)) {
         return res.status(400).json({ message: "Design price is not valid" });
       }
 
-      signature = `DESIGN:${design._id.toString()}`;
+      // ✅ include size in signature here too (optional but consistent)
+      signature = `DESIGN:${design._id.toString()}:SIZE:${normalizedSize}`;
 
       itemToInsert = {
         kind: "DESIGN",
@@ -108,6 +122,10 @@ export const addToCart = async (req, res) => {
         design: design._id,
         product: design.product || null,
         qty: parsedQty,
+
+        // ✅ store size in cart item
+        size: normalizedSize,
+
         unitPrice,
         currency: "INR",
         previewImage: design.previewImage || null,
@@ -126,7 +144,9 @@ export const addToCart = async (req, res) => {
       if (kind === "READYMADE") {
         const p = await ReadymadeProduct.findById(readymadeProductId).lean();
         if (!p || p.isActive === false) {
-          return res.status(404).json({ message: "Readymade product not found or inactive" });
+          return res
+            .status(404)
+            .json({ message: "Readymade product not found or inactive" });
         }
         if (p.stock < nextQty) return res.status(400).json({ message: "Not enough stock" });
       }
@@ -137,6 +157,9 @@ export const addToCart = async (req, res) => {
       cart.items[idx].unitPrice = itemToInsert.unitPrice;
       cart.items[idx].currency = itemToInsert.currency;
       cart.items[idx].previewImage = itemToInsert.previewImage;
+
+      // ✅ ensure size is also set on existing merged item
+      cart.items[idx].size = normalizedSize;
 
       await cart.save();
       return res.status(200).json({ message: "Cart updated", cart });

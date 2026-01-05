@@ -1,4 +1,4 @@
-import Product from "../models/products.js";
+import Product from "../models/Product.js";
 import multer from 'multer';
 import path from 'path';
 
@@ -203,7 +203,7 @@ export const getProducts = async (req, res) => {
     // Get total count for pagination
     const totalProducts = await Product.countDocuments(filter);
     const totalPages = Math.ceil(totalProducts / limit);
-    
+   
     res.status(200).json({
       success: true,
       message: 'Products retrieved successfully',

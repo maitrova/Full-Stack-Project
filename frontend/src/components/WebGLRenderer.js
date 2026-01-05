@@ -1,9 +1,11 @@
+// src/WebGLRenderer.js
 export class WebGLRenderer {
   constructor() {
     this.gl = null;
     this.program = null;
     this.textures = {};
     this.canvas = null;
+    this.textures.designLoaded = false;
   }
 
   async initialize(container, mockupUrl, maskUrl, previewWidth) {
@@ -30,7 +32,6 @@ export class WebGLRenderer {
       this.textures.mock = this.createTexture();
       this.textures.mask = this.createTexture();
       this.textures.design = this.createTexture();
-      this.textures.designLoaded = false;
 
       const [mockBmp, maskBmp] = await Promise.all([
         this.loadImageBitmapEnhanced(mockupUrl),

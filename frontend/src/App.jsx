@@ -21,6 +21,8 @@ import Designdetailspage from "./components/designsdetailspage.jsx";
 // Import separate detail pages for readymade products and designs
 import ReadymadeProductDetailPage from "./components/readymadeproductdetailspage.jsx";
 import AdminDashboard from "./pages/AdminDashboard.jsx";
+import DesignUploadsManager from "./components/admindesignuploads.jsx";
+import HomepageAdmin from "./pages/setHomepage.jsx";
 
 // You'll need to create this
 
@@ -89,6 +91,23 @@ function App() {
           </MainLayout>
         } />
 
+
+        <Route path="/adminpagehome" element={
+          <MainLayout>
+            <ProtectedRoute>
+              <HomepageAdmin />
+            </ProtectedRoute>
+          </MainLayout>
+        } />
+
+        <Route path="/adminpage/design/uploads" element={
+          <MainLayout>
+            <ProtectedRoute>
+              <DesignUploadsManager />
+            </ProtectedRoute>
+          </MainLayout>
+        } />
+
         <Route path="/usersaved_designs" element={
           <MainLayout>
             <Usersaveddesigns />
@@ -132,6 +151,12 @@ function App() {
         } />
 
         {/* Readymade Product Details */}
+        <Route path="/readymade/:id" element={
+          <MainLayout>
+            <ReadymadeProductDetailPage />
+          </MainLayout>
+        } />
+
         <Route path="/products/:id" element={
           <MainLayout>
             <ReadymadeProductDetailPage />

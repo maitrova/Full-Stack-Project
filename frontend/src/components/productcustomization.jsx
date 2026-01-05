@@ -3,8 +3,14 @@ import React, { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams, useNavigate, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProductBySlug } from "../redux/slices/productsSlice.js";
+import { 
+  fetchFolders, 
+  fetchImages, 
+  setCurrentFolder,
+  clearCurrentFolder
+} from "../redux/slices/admindesignuploads.js";
 import RecolorEditor from "./RecolorEditor.jsx";
-import {selectCurrentToken} from "../redux/slices/Userslice.js"
+import { selectCurrentToken } from "../redux/slices/Userslice.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
 
@@ -30,7 +36,8 @@ const TABS = {
   PRODUCT_COLORS: 'productColors',
   DESIGNS: 'designs',
   TEXT: 'text',
-  VIEWS: 'views'
+  VIEWS: 'views',
+  DESIGN_LIBRARY: 'designLibrary' // New tab
 };
 
 const createDefaultTextLayer = () => ({
@@ -44,7 +51,7 @@ const createDefaultTextLayer = () => ({
   rotation: 0,
 });
 
-const createDesignLayer = (id, imageUrl, file, width, height) => {
+const createDesignLayer = (id, imageUrl, file, width, height, isFromLibrary = false) => {
   const displayWidthInches = width / DISPLAY_DPI;
   const displayHeightInches = height / DISPLAY_DPI;
   const displayAreaInches = displayWidthInches * displayHeightInches;
@@ -83,6 +90,7 @@ const createDesignLayer = (id, imageUrl, file, width, height) => {
     renderedWidthPx: width * 0.35,
     renderedHeightPx: height * 0.35,
     originalFile: file,
+    isFromLibrary, // Flag to identify library images
     displayWidthInches,
     displayHeightInches,
     displayAreaInches,
@@ -110,6 +118,14 @@ export default function DesignerPage() {
     (state) => state.products
   );
 
+  // Design uploads state
+  const { 
+    folders, 
+    images, 
+    currentFolder, 
+    loading: libraryLoading 
+  } = useSelector((state) => state.designUploads);
+
   const BASE_PRICE = product?.basePrice || 600;
   
   const [productColor, setProductColor] = useState("#FFFFFF");
@@ -122,6 +138,7 @@ export default function DesignerPage() {
   const [saveError, setSaveError] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [calculatingPrice, setCalculatingPrice] = useState(false);
+  const [selectedLibraryImage, setSelectedLibraryImage] = useState(null);
   
   const [price, setPrice] = useState(BASE_PRICE);
   const [priceBreakdown, setPriceBreakdown] = useState({
@@ -438,6 +455,18 @@ export default function DesignerPage() {
     }
   };
 
+  // Fetch design library folders on component mount
+  useEffect(() => {
+    dispatch(fetchFolders());
+  }, [dispatch]);
+
+  // Fetch images when folder changes
+  useEffect(() => {
+    if (activeTab === TABS.DESIGN_LIBRARY && currentFolder) {
+      dispatch(fetchImages(currentFolder));
+    }
+  }, [dispatch, currentFolder, activeTab]);
+
   useEffect(() => {
     if (slug) {
       console.log("Fetching product for slug:", slug);
@@ -504,6 +533,7 @@ export default function DesignerPage() {
                     : d.imageUrl,
                 file: null,
                 originalFile: null,
+                isFromLibrary: false,
                 originalWidthPx: widthPx,
                 originalHeightPx: heightPx,
                 displayWidthInches: displayWidthInches,
@@ -662,7 +692,7 @@ export default function DesignerPage() {
         const id = `design-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const { width, height } = await getImageNaturalSize(serverUrl);
         
-        newLayers.push(createDesignLayer(id, serverUrl, file, width, height, BASE_PRICE));
+        newLayers.push(createDesignLayer(id, serverUrl, file, width, height, false));
       }
 
       const all = [...designLayers, ...newLayers];
@@ -679,72 +709,146 @@ export default function DesignerPage() {
     }
   };
 
- const handleRemoveBackground = async () => {
-  if (!activeDesign) {
-    setError("Select a design first");
-    console.log("No design selected");
-    return;
-  }
-  
-  const fileToUse = activeDesign.originalFile || activeDesign.file;
-  if (!fileToUse) {
-    setError("No original file available for background removal");
-    console.log("No file available for background removal");
-    return;
-  }
+  // NEW: Handle selecting design from library
+  const handleSelectFromLibrary = async (image) => {
+    try {
+      setError("");
+      
+      // Construct full URL for the image from design library
+      const imageUrl = `http://localhost:5000/outputs/adminuploadeddesigns/${currentFolder}/${image.filename}`;
+      
+      // Fetch the image to create a file object for background removal
+      console.log("Fetching image from library...");
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.statusText}`);
+      }
+      
+      const blob = await response.blob();
+      const file = new File([blob], image.filename, { type: blob.type });
+      console.log("Created file object from library image:", image.filename);
+      
+      const id = `design-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const { width, height } = await getImageNaturalSize(imageUrl);
+      
+      const newLayer = createDesignLayer(id, imageUrl, file, width, height, true);
+      
+      const all = [...designLayers, newLayer];
+      updateCurrentViewState({
+        designLayers: all,
+        activeDesignId: id,
+      });
 
-  try {
-    setBgRemovalLoading(true);
-    setError("");
-    console.log("Starting background removal");
+      // Switch to designs tab to show the controls
+      setActiveTab(TABS.DESIGNS);
+      setSelectedLibraryImage(image.filename);
+      
+    } catch (err) {
+      console.error("Error loading design from library:", err);
+      setError("Failed to load design from library: " + err.message);
+    }
+  };
 
-    const formData = new FormData();
-    formData.append("image", fileToUse);
-    console.log("FormData prepared with image");
-
-    const res = await fetch(`${API_URL}/api/remove-bg`, {
-      method: "POST",
-      body: formData,
-    });
-
-    console.log("Remove BG response status:", res.status);
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.log("Error response body:", errorText);
-      throw new Error(errorText || "Background removal failed");
+  const handleRemoveBackground = async () => {
+    if (!activeDesign) {
+      setError("Select a design first");
+      console.log("No design selected");
+      return;
     }
 
-    const data = await res.json();
-    console.log("Response data:", data);
-
-    if (!data.outputUrl) {
-      console.log("Output URL is missing in the response");
-      throw new Error("Background removal failed: no output URL");
-    }
-
-    const updatedLayers = designLayers.map((d) =>
-      d.id === activeDesign.id
-        ? {
-            ...d,
-            imageUrl: `${API_URL}${data.outputUrl}?t=${Date.now()}`,
-            hasBgRemoved: true,
-            originalFile: fileToUse,
+    try {
+      setBgRemovalLoading(true);
+      setError("");
+      console.log("Starting background removal for:", activeDesign.id);
+      
+      let fileToUse = activeDesign.originalFile || activeDesign.file;
+      
+      // If no file object exists (design came from library or was previously loaded without file), fetch it
+      if (!fileToUse && activeDesign.imageUrl) {
+        console.log("No file object found, fetching image from URL...");
+        
+        try {
+          // Fetch the image from the URL
+          const response = await fetch(activeDesign.imageUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch image: ${response.statusText}`);
           }
-        : d
-    );
+          
+          // Convert response to blob
+          const blob = await response.blob();
+          
+          // Create a File object from the blob
+          const filename = activeDesign.imageUrl.split('/').pop() || 'design.png';
+          fileToUse = new File([blob], filename, { type: blob.type });
+          console.log("Created file from image URL:", filename);
+          
+        } catch (fetchErr) {
+          console.error("Error fetching image:", fetchErr);
+          setError("Failed to load design image for background removal");
+          setBgRemovalLoading(false);
+          return;
+        }
+      }
+      
+      if (!fileToUse) {
+        setError("No file available for background removal");
+        console.log("No file available for background removal");
+        setBgRemovalLoading(false);
+        return;
+      }
 
-    console.log("Updated layers with background removed:", updatedLayers);
+      console.log("Preparing FormData with image");
+      const formData = new FormData();
+      formData.append("image", fileToUse);
+      
+      console.log("Sending to remove-bg API...");
+      const res = await fetch(`${API_URL}/api/remove-bg`, {
+        method: "POST",
+        body: formData,
+      });
 
-    updateCurrentViewState({ designLayers: updatedLayers });
-  } catch (err) {
-    console.error("Remove BG error:", err);
-    setError(err.message || "Background removal failed");
-  } finally {
-    setBgRemovalLoading(false);
-    console.log("Background removal process completed");
-  }
-};
+      console.log("Remove BG response status:", res.status);
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.log("Error response body:", errorText);
+        throw new Error(errorText || "Background removal failed");
+      }
 
+      const data = await res.json();
+      console.log("Response data:", data);
+
+      if (!data.outputUrl) {
+        console.log("Output URL is missing in the response");
+        throw new Error("Background removal failed: no output URL");
+      }
+
+      const updatedLayers = designLayers.map((d) =>
+        d.id === activeDesign.id
+          ? {
+              ...d,
+              imageUrl: `${API_URL}${data.outputUrl}?t=${Date.now()}`,
+              hasBgRemoved: true,
+              originalFile: fileToUse, // Store the file for future use
+              isFromLibrary: false, // Once processed, it's no longer a library image
+            }
+          : d
+      );
+
+      console.log("Updated layers with background removed:", updatedLayers);
+
+      updateCurrentViewState({ designLayers: updatedLayers });
+      
+      // Clear the library image indicator since it's now a processed image
+      setSelectedLibraryImage(null);
+      
+    } catch (err) {
+      console.error("Remove BG error:", err);
+      setError(err.message || "Background removal failed");
+    } finally {
+      setBgRemovalLoading(false);
+      console.log("Background removal process completed");
+    }
+  };
 
   const clearActiveDesign = () => {
     if (!activeDesign) return;
@@ -763,6 +867,7 @@ export default function DesignerPage() {
     });
 
     setDesignRenderWidth(null);
+    setSelectedLibraryImage(null);
   };
 
   const handleDesignScaleChange = (value) => {
@@ -919,7 +1024,7 @@ export default function DesignerPage() {
              printWidthInches, printHeightInches, printAreaInches,
              currentDisplayWidthInches, currentDisplayHeightInches,
              currentPrintWidthInches, currentPrintHeightInches, currentPrintAreaInches,
-             currentAdditionalArea, layerPrice, minimumChargeApplied }) => ({
+             currentAdditionalArea, layerPrice, minimumChargeApplied, isFromLibrary }) => ({
             id, imageUrl, hasBgRemoved: !!hasBgRemoved, x, y, scale, rotation,
             zone: zone || null, insideSafeArea: typeof insideSafeArea === "boolean" ? insideSafeArea : true,
             originalWidthPx, originalHeightPx, 
@@ -928,7 +1033,8 @@ export default function DesignerPage() {
             printWidthInches, printHeightInches, printAreaInches,
             currentDisplayWidthInches, currentDisplayHeightInches,
             currentPrintWidthInches, currentPrintHeightInches, currentPrintAreaInches,
-            currentAdditionalArea, layerPrice, minimumChargeApplied
+            currentAdditionalArea, layerPrice, minimumChargeApplied,
+            isFromLibrary: isFromLibrary || false
           })
         );
 
@@ -1019,6 +1125,7 @@ export default function DesignerPage() {
                 : d.imageUrl,
             file: null,
             originalFile: null,
+            isFromLibrary: d.isFromLibrary || false,
             originalWidthPx: widthPx,
             originalHeightPx: heightPx,
             displayWidthInches: displayWidthInches,
@@ -1185,6 +1292,12 @@ export default function DesignerPage() {
             >
               Views
             </button>
+            <button
+              onClick={() => setActiveTab(TABS.DESIGN_LIBRARY)}
+              className={`px-3 py-2 text-xs font-medium ${activeTab === TABS.DESIGN_LIBRARY ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Design Library
+            </button>
           </div>
 
           {/* Tab content */}
@@ -1239,6 +1352,12 @@ export default function DesignerPage() {
                           <span className="font-medium text-slate-700 text-xs">Selected Design</span>
                           <span className="text-[10px] text-slate-500">ID: {activeDesign.id.slice(0, 6)}…</span>
                         </div>
+                        
+                        {selectedLibraryImage && (
+                          <div className="mb-2 px-2 py-1 bg-sky-50 border border-sky-200 rounded text-xs text-sky-700">
+                            <span className="font-medium">From Library:</span> {selectedLibraryImage}
+                          </div>
+                        )}
                         
                         <div className="mb-3 text-xs">
                           <div className="grid grid-cols-2 gap-2">
@@ -1414,6 +1533,81 @@ export default function DesignerPage() {
                   <p>• Back: Back of the product</p>
                   <p>• Left/Right Sleeves: Sleeve designs</p>
                   <p>• Each view has separate text and design layers</p>
+                </div>
+              </div>
+            )}
+
+            {/* Design Library Tab - NEW */}
+            {activeTab === TABS.DESIGN_LIBRARY && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="mb-3 font-semibold text-sm">Design Library</h3>
+                  <p className="mb-3 text-xs text-slate-600">Select designs from your library to use on your product.</p>
+
+                  {/* Folder selection */}
+                  <div className="mb-4">
+                    <label className="mb-2 block text-xs font-medium">Select Folder</label>
+                    <div className="flex flex-wrap gap-2">
+                      {folders.map((folder) => (
+                        <button
+                          key={folder}
+                          type="button"
+                          onClick={() => dispatch(setCurrentFolder(folder))}
+                          className={`px-3 py-1 rounded text-xs border ${currentFolder === folder ? 'bg-sky-100 border-sky-300 text-sky-700' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+                        >
+                          {folder}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Images grid */}
+                  {libraryLoading ? (
+                    <div className="flex justify-center py-8">
+                      <div className="text-xs text-slate-500">Loading designs...</div>
+                    </div>
+                  ) : currentFolder && images.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-2">
+                      {images.map((image) => (
+                        <div 
+                          key={image.filename} 
+                          className="relative group cursor-pointer"
+                          onClick={() => handleSelectFromLibrary(image)}
+                        >
+                          <div className="aspect-square overflow-hidden rounded border border-slate-200 bg-slate-50">
+                            <img 
+                              src={`http://localhost:5000/outputs/adminuploadeddesigns/${currentFolder}/${image.filename}`} 
+                              alt={image.filename}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                              loading="lazy"
+                            />
+                          </div>
+                          <div className="mt-1 text-[10px] text-slate-600 truncate">
+                            {image.filename}
+                          </div>
+                          <div className="absolute inset-0 bg-sky-500/0 group-hover:bg-sky-500/10 transition-colors rounded border-2 border-transparent group-hover:border-sky-400"></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : currentFolder ? (
+                    <div className="p-4 bg-slate-50 rounded border border-slate-200 text-center">
+                      <p className="text-xs text-slate-600">No designs in this folder</p>
+                      <p className="text-[10px] text-slate-500 mt-1">Upload designs to this folder in the admin panel</p>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-slate-50 rounded border border-slate-200 text-center">
+                      <p className="text-xs text-slate-600">Select a folder to view designs</p>
+                      <p className="text-[10px] text-slate-500 mt-1">Designs are organized in folders for easy access</p>
+                    </div>
+                  )}
+
+                  <div className="text-xs text-slate-600 space-y-2 mt-4">
+                    <p className="font-medium">How to use:</p>
+                    <p>• Select a folder to view available designs</p>
+                    <p>• Click on any design to add it to your product</p>
+                    <p>• Switch to "Designs" tab to edit the selected design</p>
+                    <p>• Background removal works for both uploaded and library designs</p>
+                  </div>
                 </div>
               </div>
             )}
@@ -1619,4 +1813,3 @@ export default function DesignerPage() {
     </div>
   );
 }
-

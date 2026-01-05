@@ -26,40 +26,50 @@ export const getMyCart = async (req, res) => {
 };
 
 // POST /api/cart/items  (product → cart)
+// POST /api/cart/items  (product → cart)
 export const addProductToCart = async (req, res) => {
   try {
-    const { productId, qty = 1, size = null, color = null } = req.body;
+    const { productId, qty = 1, size, color = null } = req.body;
+
     if (!productId) return res.status(400).json({ error: "productId is required" });
-    if (qty < 1) return res.status(400).json({ error: "qty must be >= 1" });
+
+    const parsedQty = Number(qty);
+    if (!Number.isFinite(parsedQty) || parsedQty < 1) {
+      return res.status(400).json({ error: "qty must be >= 1" });
+    }
+
+    // ✅ Normalize size to enforce default "M"
+    const normalizedSize = (size && String(size).trim()) ? String(size).trim() : "M";
 
     const product = await Product.findById(productId);
     if (!product) return res.status(404).json({ error: "Product not found" });
 
     const cart = await getOrCreateCart(req.user._id);
 
-    // same item key (product + size + color + no design)
+    // ✅ same item key (product + size + color + no design)
     const idx = cart.items.findIndex((it) =>
       it.product.toString() === productId &&
       !it.design &&
-      (it.size || null) === (size || null) &&
-      (it.color || null) === (color || null)
+      ((it.size && String(it.size).trim()) ? String(it.size).trim() : "M") === normalizedSize &&
+      (it.color ?? null) === (color ?? null)
     );
 
     if (idx !== -1) {
-      cart.items[idx].qty += qty;
+      cart.items[idx].qty += parsedQty;
     } else {
       cart.items.push({
         product: product._id,
         design: null,
-        qty,
-        size,
-        color,
+        qty: parsedQty,
+        size: normalizedSize,          // ✅ always saved (M if not sent)
+        color: color ?? null,
         unitPrice: product.basePrice,
         currency: product.currency || "INR",
       });
     }
 
     await cart.save();
+
     const populated = await Cart.findById(cart._id)
       .populate("items.product")
       .populate("items.design");
@@ -71,12 +81,22 @@ export const addProductToCart = async (req, res) => {
   }
 };
 
+
+// POST /api/cart/designs  (saved design → cart)
 // POST /api/cart/designs  (saved design → cart)
 export const addDesignToCart = async (req, res) => {
   try {
-    const { designId, qty = 1, size = null, color = null } = req.body;
+    const { designId, qty = 1, size, color = null } = req.body;
+
     if (!designId) return res.status(400).json({ error: "designId is required" });
-    if (qty < 1) return res.status(400).json({ error: "qty must be >= 1" });
+
+    const parsedQty = Number(qty);
+    if (!Number.isFinite(parsedQty) || parsedQty < 1) {
+      return res.status(400).json({ error: "qty must be >= 1" });
+    }
+
+    // ✅ Normalize size to enforce default "M"
+    const normalizedSize = (size && String(size).trim()) ? String(size).trim() : "M";
 
     // ✅ design must belong to this user
     const design = await Design.findOne({ _id: designId, user: req.user._id });
@@ -88,29 +108,30 @@ export const addDesignToCart = async (req, res) => {
 
     const cart = await getOrCreateCart(req.user._id);
 
-    // same item key (product + design + size + color)
+    // ✅ same item key (product + design + size + color)
     const idx = cart.items.findIndex((it) =>
       it.product.toString() === productId &&
       it.design?.toString() === designId &&
-      (it.size || null) === (size || null) &&
-      (it.color || null) === (color || null)
+      ((it.size && String(it.size).trim()) ? String(it.size).trim() : "M") === normalizedSize &&
+      (it.color ?? null) === (color ?? null)
     );
 
     if (idx !== -1) {
-      cart.items[idx].qty += qty;
+      cart.items[idx].qty += parsedQty;
     } else {
       cart.items.push({
         product: product._id,
         design: design._id,
-        qty,
-        size,
-        color: color || design.productColor || null, // optional: default from design
+        qty: parsedQty,
+        size: normalizedSize, // ✅ always saved (M if not sent)
+        color: (color ?? design.productColor ?? null),
         unitPrice: product.basePrice,
         currency: product.currency || "INR",
       });
     }
 
     await cart.save();
+
     const populated = await Cart.findById(cart._id)
       .populate("items.product")
       .populate("items.design");

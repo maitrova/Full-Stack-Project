@@ -19,6 +19,24 @@ import {
 } from '../redux/slices/Cartslice.js';
 import { selectCurrentToken } from '../redux/slices/Userslice.js';
 
+// Helper function to ensure image URLs have proper base URL
+const ensureImageUrl = (imagePath) => {
+  if (!imagePath) return null;
+  
+  // If already a full URL, return as is
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
+  }
+  
+  // Add localhost:5000 base URL if it's a relative path
+  if (imagePath.startsWith('/')) {
+    return `http://localhost:5000${imagePath}`;
+  } else {
+    // If it doesn't start with slash, add one
+    return `http://localhost:5000/${imagePath}`;
+  }
+};
+
 const CartPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -56,6 +74,82 @@ const CartPage = () => {
       return () => clearTimeout(timer);
     }
   }, [notification]);
+
+  // Get item name based on kind
+  const getItemName = (item) => {
+    if (item.kind === 'READYMADE') {
+      return item.readymadeProduct?.title || 'Readymade Product';
+    } else if (item.kind === 'DESIGN') {
+      // Check different possible name fields for design
+      return item.design?.name || 
+             item.design?.title || 
+             item.design?.designName || 
+             'Design';
+    } else if (item.product?.title) {
+      return item.product.title;
+    }
+    return 'Product';
+  };
+
+  // Get main image URL - handle both previewImage and nested images
+  const getImageUrl = (item) => {
+    // Try previewImage first (this might already have localhost:5000)
+    if (item.previewImage) {
+      return ensureImageUrl(item.previewImage);
+    }
+    
+    // If no previewImage, try to get from product images
+    let imagePath = null;
+    
+    if (item.kind === 'READYMADE' && item.readymadeProduct?.images?.length > 0) {
+      // Get first image from readymade product
+      imagePath = item.readymadeProduct.images[0];
+    } else if (item.kind === 'DESIGN' && item.design?.images?.length > 0) {
+      // Get first image from design
+      imagePath = item.design.images[0];
+    } else if (item.kind === 'DESIGN' && item.design?.previewImage) {
+      // Try previewImage from design
+      imagePath = item.design.previewImage;
+    } else if (item.product?.images?.length > 0) {
+      imagePath = item.product.images[0];
+    }
+    
+    if (!imagePath) return null;
+    
+    return ensureImageUrl(imagePath);
+  };
+
+  // Get product type for display
+  const getProductType = (item) => {
+    switch(item.kind) {
+      case 'READYMADE': return 'Readymade Product';
+      case 'DESIGN': return 'Custom Design';
+      default: return 'Product';
+    }
+  };
+
+  // Get additional product info
+  const getProductInfo = (item) => {
+    if (item.kind === 'READYMADE' && item.readymadeProduct) {
+      const product = item.readymadeProduct;
+      return {
+        description: product.description,
+        category: product.category,
+        brand: product.brand,
+        size: product.size,
+        color: product.color
+      };
+    } else if (item.kind === 'DESIGN' && item.design) {
+      const design = item.design;
+      return {
+        description: design.description || design.designDescription,
+        category: design.category,
+        style: design.style,
+        color: design.colorPalette || design.primaryColor
+      };
+    }
+    return {};
+  };
 
   // Handle quantity updates
   const handleQuantityChange = async (itemId, newQty) => {
@@ -163,33 +257,29 @@ const CartPage = () => {
     }, 1000);
   };
 
-  // Get image URL
-  const getImageUrl = (imagePath) => {
-    if (!imagePath) return null;
-    
-    if (imagePath.startsWith('http')) {
-      return imagePath;
-    } else if (imagePath.startsWith('/')) {
-      return `http://localhost:5000${imagePath}`;
-    } else {
-      return `http://localhost:5000/${imagePath}`;
-    }
-  };
-
   // Format price
   const formatPrice = (price, currency = 'INR') => {
-    const formatter = new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 2,
-    });
+    // If price is not a number, try to convert it
+    const numPrice = typeof price === 'number' ? price : parseFloat(price) || 0;
     
     // Handle INR specially
-    if (currency === 'INR') {
-      return `₹${price.toFixed(2)}`;
+    if (currency === 'INR' || currency === '₹') {
+      return `₹${numPrice.toFixed(2)}`;
+    } else if (currency === 'USD' || currency === '$') {
+      return `$${numPrice.toFixed(2)}`;
     }
     
-    return formatter.format(price);
+    // For other currencies, use Intl.NumberFormat
+    try {
+      const formatter = new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: currency,
+        minimumFractionDigits: 2,
+      });
+      return formatter.format(numPrice);
+    } catch (error) {
+      return `${currency} ${numPrice.toFixed(2)}`;
+    }
   };
 
   // Handle retry fetching cart
@@ -201,11 +291,11 @@ const CartPage = () => {
   // Handle image click to navigate to details page
   const handleImageClick = (item) => {
     if (item.kind === 'READYMADE' && item.readymadeProduct?._id) {
-      // Navigate to readymade product details page
       navigate(`/products/${item.readymadeProduct._id}`);
     } else if (item.kind === 'DESIGN' && item.design?._id) {
-      // Navigate to design details page
       navigate(`/designs/${item.design._id}`);
+    } else if (item.product?._id) {
+      navigate(`/products/${item.product._id}`);
     }
   };
 
@@ -377,13 +467,13 @@ const CartPage = () => {
               <div className="p-6 border-b border-gray-200">
                 <div className="flex justify-between items-center">
                   <h2 className="text-lg font-semibold text-gray-900">Cart Items</h2>
-                  {/* <button
+                  <button
                     onClick={handleClearCart}
                     disabled={cartItems.length === 0}
                     className="text-sm text-red-600 hover:text-red-800 disabled:text-gray-400 disabled:cursor-not-allowed"
                   >
                     Clear Cart
-                  </button> */}
+                  </button>
                 </div>
               </div>
 
@@ -391,8 +481,11 @@ const CartPage = () => {
                 {cartItems.map((item) => {
                   const isUpdating = updatingItem === item._id;
                   const isRemoving = removingItem === item._id;
-                  const imageUrl = getImageUrl(item.previewImage);
+                  const imageUrl = getImageUrl(item);
                   const itemTotal = (item.unitPrice || 0) * (item.qty || 0);
+                  const itemName = getItemName(item);
+                  const productType = getProductType(item);
+                  const productInfo = getProductInfo(item);
 
                   return (
                     <div key={item._id} className="p-6">
@@ -406,7 +499,7 @@ const CartPage = () => {
                             <div className="relative w-full h-full group">
                               <img
                                 src={imageUrl}
-                                alt={item.kind === 'READYMADE' ? 'Readymade Product' : 'Design'}
+                                alt={itemName}
                                 className="w-full h-full object-cover rounded-lg transition-transform duration-200 group-hover:scale-105"
                                 onError={(e) => {
                                   e.target.onerror = null;
@@ -439,13 +532,44 @@ const CartPage = () => {
                                 className="text-lg font-medium text-gray-900 cursor-pointer hover:text-blue-600 transition-colors duration-200"
                                 onClick={() => handleImageClick(item)}
                               >
-                                {item.kind === 'READYMADE' 
-                                  ? item.readymadeProduct?.title || 'Readymade Product'
-                                  : item.design?.name || 'Design'}
+                                {itemName}
                               </h3>
                               <p className="text-sm text-gray-500 mt-1">
-                                {item.kind === 'READYMADE' ? 'Readymade' : 'Design'} • {item.currency}
+                                {productType} • {item.currency}
                               </p>
+                              
+                              {/* Additional product info */}
+                              {productInfo.description && (
+                                <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                                  {productInfo.description}
+                                </p>
+                              )}
+                              
+                              {/* Display category if available */}
+                              {(productInfo.category || productInfo.brand || productInfo.style) && (
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                  {productInfo.category && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                      {productInfo.category}
+                                    </span>
+                                  )}
+                                  {productInfo.brand && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                      {productInfo.brand}
+                                    </span>
+                                  )}
+                                  {productInfo.style && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                      {productInfo.style}
+                                    </span>
+                                  )}
+                                  {productInfo.color && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                      {productInfo.color}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </div>
                             <div className="text-right">
                               <p className="text-lg font-semibold text-gray-900">

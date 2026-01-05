@@ -15,6 +15,9 @@ import authrouter from './routes/auth.js';
 import adminrouter from './routes/admincontrols.js';
 import readymadeproducts from './routes/readymadeProduct.routes.js';
 import cartrouter from './routes/cartRoutes.js';
+import homepagerouter from './routes/Homepagerouter.js';
+import designuploadsrouter from './routes/designuploadsrouter.js';
+import droprouter from './routes/dropproduct.routes.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -44,7 +47,9 @@ app.use('/api/auth',authrouter);
 app.use('/api/cart',cartrouter);
 app.use('/api/admin',adminrouter);
 app.use('/api/readymadeproducts',readymadeproducts);
-
+app.use('/api/homepage',homepagerouter);
+app.use('/api/designuploads', designuploadsrouter);
+app.use('/api/dropproducts', droprouter);
 // Error handling
 app.use((err, req, res, next) => {
   console.error("Server error:", err);

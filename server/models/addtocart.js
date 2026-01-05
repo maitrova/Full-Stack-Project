@@ -19,7 +19,7 @@ const cartItemSchema = new mongoose.Schema(
     // Variants (optional)
     size: {
       type: String,
-      default: null, // "S", "M", "L", etc.
+      default: "M", // "S", "M", "L", etc.
     },
 
     

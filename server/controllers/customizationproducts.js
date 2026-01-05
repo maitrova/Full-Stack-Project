@@ -17,8 +17,8 @@ export const getAllProducts = async (req, res) => {
     }
 
     // Find products based on the filter object
-    const products = await Product.find(filter, "name slug basePrice category subCategory").lean();
-
+    const products = await Product.find(filter, "name slug basePrice category subCategory image").lean();
+    console.log("Products fetched from DB:", products);
     if (!products.length) {
       return res.status(404).json({ error: "No products found" });
     }

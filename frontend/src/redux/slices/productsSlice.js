@@ -20,6 +20,7 @@ export const fetchProducts = createAsyncThunk(
       if (subCategory && subCategory !== 'all') params.subCategory = subCategory;
       
       const res = await productsAPI.get("/api/products", { params });
+      console.log("Fetched products:", res.data);
       return res.data;
     } catch (err) {
       return thunkAPI.rejectWithValue({
@@ -111,6 +112,7 @@ const productsSlice = createSlice({
       .addCase(fetchProducts.fulfilled, (state, action) => {
         state.itemsStatus = "succeeded";
         state.items = action.payload;
+        console.log("Products state updated:", state.items);  
       })
       .addCase(fetchProducts.rejected, (state, action) => {
         state.itemsStatus = "failed";

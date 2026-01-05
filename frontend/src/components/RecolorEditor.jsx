@@ -20,6 +20,100 @@ function loadImage(src) {
   });
 }
 
+// Define print area boundaries for different product zones/views
+// In the DESIGN_BOUNDARIES object, make them more restrictive:
+const DESIGN_BOUNDARIES = {
+  // Front of t-shirt/hoodie (main torso area only)
+  'front-full': {
+    minX: 0.3,   // 30% from left (away from shoulders)
+    maxX: 0.7,   // 70% from left (away from shoulders)
+    minY: 0.25,  // 25% from top (below neckline)
+    maxY: 0.65,  // 65% from top (above waist)
+  },
+  // Back of t-shirt/hoodie
+  'back-full': {
+    minX: 0.3,
+    maxX: 0.7,
+    minY: 0.25,
+    maxY: 0.65,
+  },
+  // Left sleeve (small area only)
+  'sleeve-left': {
+    minX: 0.15,
+    maxX: 0.3,
+    minY: 0.18,
+    maxY: 0.32,
+  },
+  // Right sleeve (small area only)
+  'sleeve-right': {
+    minX: 0.7,
+    maxX: 0.85,
+    minY: 0.18,
+    maxY: 0.32,
+  },
+  // Default (fallback)
+  'default': {
+    minX: 0.3,
+    maxX: 0.7,
+    minY: 0.25,
+    maxY: 0.65,
+  }
+};
+
+// Text boundaries (more restrictive)
+const TEXT_BOUNDARIES = {
+  minX: 0.15,
+  maxX: 0.85,
+  minY: 0.15,
+  maxY: 0.85,
+};
+
+// Helper function to get boundary for a design
+function getDesignBoundary(canvasSize, layer) {
+  // Use layer.zone or viewCode to determine boundary
+  const zone = layer.zone || 'default';
+  const viewCode = layer.viewCode || 'front';
+  
+  // Map view codes to boundaries
+  const boundaryKey = 
+    zone.includes('sleeve') ? zone : 
+    viewCode === 'left' ? 'sleeve-left' :
+    viewCode === 'right' ? 'sleeve-right' :
+    viewCode === 'back' ? 'back-full' :
+    'front-full';
+  
+  const boundary = DESIGN_BOUNDARIES[boundaryKey] || DESIGN_BOUNDARIES.default;
+  
+  // Adjust boundaries based on design size (so design doesn't overflow)
+  if (canvasSize && layer.scale && layer.originalWidthPx && layer.originalHeightPx) {
+    const aspectRatio = layer.originalHeightPx / layer.originalWidthPx;
+    const halfWidth = (layer.scale * 0.5) / 2; // Half of design width in normalized coordinates
+    const halfHeight = (layer.scale * aspectRatio * 0.5) / 2;
+    
+    return {
+      minX: Math.max(0.05, boundary.minX + halfWidth),
+      maxX: Math.min(0.95, boundary.maxX - halfWidth),
+      minY: Math.max(0.05, boundary.minY + halfHeight),
+      maxY: Math.min(0.95, boundary.maxY - halfHeight),
+    };
+  }
+  
+  return boundary;
+}
+
+// Snap to boundary edges
+function snapToBoundary(x, y, boundary, threshold = 0.02) {
+  let snappedX = x;
+  let snappedY = y;
+  
+  if (Math.abs(x - boundary.minX) < threshold) snappedX = boundary.minX;
+  if (Math.abs(x - boundary.maxX) < threshold) snappedX = boundary.maxX;
+  if (Math.abs(y - boundary.minY) < threshold) snappedY = boundary.minY;
+  if (Math.abs(y - boundary.maxY) < threshold) snappedY = boundary.maxY;
+  
+  return { x: snappedX, y: snappedY };
+}
+
 const RecolorEditor = forwardRef(function RecolorEditor(
   {
     mockupUrl,
@@ -41,6 +135,7 @@ const RecolorEditor = forwardRef(function RecolorEditor(
 ) {
   const [renderer, setRenderer] = useState(null);
   const [canvasSize, setCanvasSize] = useState(null);
+  const [showBoundaries, setShowBoundaries] = useState(false);
 
   const handleRendererReady = useCallback((instance) => {
     setRenderer(instance || null);
@@ -222,14 +317,9 @@ const RecolorEditor = forwardRef(function RecolorEditor(
     setActiveTextId(null);
   };
 
-  const handleDeleteDesign = (designId) => {
-    setDesignLayers(prev => prev.filter(layer => layer.id !== designId));
-    setActiveDesignId(null);
-  };
-
-  const handleDeleteText = (textId) => {
-    setTextLayers(prev => prev.filter(layer => layer.id !== textId));
-    setActiveTextId(null);
+  // Toggle boundary visualization (for debugging)
+  const toggleBoundaries = () => {
+    setShowBoundaries(!showBoundaries);
   };
 
   return (
@@ -243,7 +333,17 @@ const RecolorEditor = forwardRef(function RecolorEditor(
         previewWidth={previewWidth}
         productColor={productColor}
         onRendererReady={handleRendererReady}
+        showBoundaries={showBoundaries}
       />
+      
+      {/* Boundary toggle button (for debugging) */}
+      <button
+        onClick={toggleBoundaries}
+        className="absolute top-2 right-2 z-50 bg-white/80 hover:bg-white text-xs px-2 py-1 rounded border border-slate-300 shadow-sm"
+        title="Toggle boundary visualization"
+      >
+        {showBoundaries ? "Hide Boundaries" : "Show Boundaries"}
+      </button>
 
       {/* Text overlay (drag/resize) */}
       {renderer && (
@@ -253,7 +353,7 @@ const RecolorEditor = forwardRef(function RecolorEditor(
           activeTextId={activeTextId}
           setActiveTextId={setActiveTextId}
           onAnyTextClick={() => setActiveDesignId(null)}
-          onDeleteText={handleDeleteText}
+          canvasSize={canvasSize}
         />
       )}
 
@@ -269,12 +369,16 @@ const RecolorEditor = forwardRef(function RecolorEditor(
             isActive={layer.id === activeDesignId}
             setActiveDesignId={setActiveDesignId}
             disabled={bgRemovalLoading}
-            onDeleteDesign={handleDeleteDesign}
           />
         ))}
 
       {bgRemovalLoading && (
-        <div className="pointer-events-none absolute inset-0 bg-white/40" />
+        <div className="pointer-events-none absolute inset-0 bg-white/40 flex items-center justify-center">
+          <div className="bg-white px-4 py-2 rounded shadow-md">
+            <div className="text-sm text-slate-700">Removing background...</div>
+            <div className="text-xs text-slate-500 mt-1">Please wait</div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -288,7 +392,7 @@ function TextOverlay({
   activeTextId,
   setActiveTextId,
   onAnyTextClick,
-  onDeleteText,
+  canvasSize,
 }) {
   const overlayRef = useRef(null);
   const dragStateRef = useRef(null);
@@ -298,7 +402,7 @@ function TextOverlay({
       const dragState = dragStateRef.current;
       if (!dragState) return;
 
-      const { mode, id, startX, startY, rectWidth, rectHeight, initialLayer, startRotation, startSize } = dragState;
+      const { mode, id, startX, startY, rectWidth, rectHeight, initialLayer } = dragState;
 
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
@@ -307,38 +411,62 @@ function TextOverlay({
         const nx = initialLayer.x + dx / rectWidth;
         const ny = initialLayer.y + dy / rectHeight;
 
+        // Apply boundary constraints
+        let constrainedX = nx;
+        let constrainedY = ny;
+
+        // Get text size for boundary adjustment
+        const textLayer = textLayers.find(l => l.id === id);
+        if (textLayer && canvasSize) {
+          // Estimate text dimensions
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          ctx.font = `${textLayer.fontSize}px ${textLayer.fontFamily}`;
+          const textWidth = ctx.measureText(textLayer.text).width;
+          const textHeight = textLayer.fontSize * 1.2;
+          
+          // Convert to normalized coordinates
+          const halfWidth = (textWidth / canvasSize.width) / 2;
+          const halfHeight = (textHeight / canvasSize.height) / 2;
+          
+          // Adjust boundaries based on text size
+          const adjustedBoundaries = {
+            minX: TEXT_BOUNDARIES.minX + halfWidth,
+            maxX: TEXT_BOUNDARIES.maxX - halfWidth,
+            minY: TEXT_BOUNDARIES.minY + halfHeight,
+            maxY: TEXT_BOUNDARIES.maxY - halfHeight,
+          };
+
+          constrainedX = Math.max(adjustedBoundaries.minX, Math.min(adjustedBoundaries.maxX, nx));
+          constrainedY = Math.max(adjustedBoundaries.minY, Math.min(adjustedBoundaries.maxY, ny));
+          
+          // Apply snap to boundary
+          const snapped = snapToBoundary(constrainedX, constrainedY, TEXT_BOUNDARIES);
+          constrainedX = snapped.x;
+          constrainedY = snapped.y;
+        }
+
         setTextLayers((prev) =>
           prev.map((layer) =>
             layer.id === id
               ? {
                   ...layer,
-                  x: Math.min(0.98, Math.max(0.02, nx)),
-                  y: Math.min(0.98, Math.max(0.02, ny)),
+                  x: constrainedX,
+                  y: constrainedY,
                 }
               : layer
           )
         );
       } else if (mode === "resize") {
-        const newSize = Math.max(12, startSize + (dx + dy) * 0.3);
+        const newSize = Math.max(12, Math.min(200, initialLayer.fontSize + (dx + dy) * 0.3));
         setTextLayers((prev) =>
           prev.map((layer) =>
             layer.id === id ? { ...layer, fontSize: newSize } : layer
           )
         );
-      } else if (mode === "rotate") {
-        const centerX = startX;
-        const centerY = startY;
-        const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
-        const newRotation = ((angle * 180) / Math.PI) + startRotation;
-        
-        setTextLayers((prev) =>
-          prev.map((layer) =>
-            layer.id === id ? { ...layer, rotation: newRotation } : layer
-          )
-        );
       }
     },
-    [setTextLayers]
+    [setTextLayers, textLayers, canvasSize]
   );
 
   const onPointerUp = useCallback(() => {
@@ -357,9 +485,6 @@ function TextOverlay({
     const layer = textLayers.find((l) => l.id === id);
     if (!layer) return;
 
-    const startRotation = layer.rotation || 0;
-    const startSize = layer.fontSize || 40;
-
     dragStateRef.current = {
       id,
       mode,
@@ -368,37 +493,6 @@ function TextOverlay({
       rectWidth: rect.width,
       rectHeight: rect.height,
       initialLayer: { ...layer },
-      startRotation,
-      startSize,
-    };
-
-    setActiveTextId(id);
-    onAnyTextClick?.();
-
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-  };
-
-  const startRotation = (e, id) => {
-    const layer = textLayers.find((l) => l.id === id);
-    if (!layer) return;
-
-    const rect = overlayRef.current.getBoundingClientRect();
-    const left = layer.x * rect.width + rect.left;
-    const top = layer.y * rect.height + rect.top;
-    
-    const angle = Math.atan2(e.clientY - top, e.clientX - left);
-    const currentRotation = layer.rotation || 0;
-    
-    dragStateRef.current = {
-      id,
-      mode: "rotate",
-      startX: left,
-      startY: top,
-      rectWidth: rect.width,
-      rectHeight: rect.height,
-      initialLayer: { ...layer },
-      startRotation: currentRotation - (angle * 180 / Math.PI),
     };
 
     setActiveTextId(id);
@@ -415,12 +509,6 @@ function TextOverlay({
         const left = `${layer.x * 100}%`;
         const top = `${layer.y * 100}%`;
 
-        // Calculate approximate text dimensions for handles
-        const fontSize = layer.fontSize || 40;
-        const textLength = layer.text ? layer.text.length : 0;
-        const approximateWidth = fontSize * textLength * 0.5;
-        const approximateHeight = fontSize * 1.2;
-
         return (
           <div
             key={layer.id}
@@ -430,97 +518,31 @@ function TextOverlay({
               transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)`,
             }}
             className="pointer-events-auto absolute"
-            onPointerDown={(e) => {
-              if (e.target.classList.contains('handle')) return;
-              startDrag(e, layer.id, "drag");
-            }}
+            onPointerDown={(e) => startDrag(e, layer.id, "drag")}
           >
             <div
-              className={`relative inline-block border-2 ${
-                isActive ? "border-blue-500 border-dashed" : "border-transparent"
-              } bg-transparent px-4 py-2`}
+              className={`relative inline-block border ${
+                isActive ? "border-blue-500 bg-blue-50/30" : "border-transparent"
+              } bg-transparent px-2 py-1 rounded`}
               style={{
                 fontFamily: layer.fontFamily,
-                fontSize: fontSize,
+                fontSize: layer.fontSize,
                 color: layer.color,
                 whiteSpace: "nowrap",
                 cursor: "move",
+                userSelect: "none",
               }}
             >
               {layer.text || " "}
-              
-              {/* Active state handles */}
               {isActive && (
                 <>
-                  {/* Bottom-right resize handle */}
                   <div
-                    className="handle absolute -bottom-2 -right-2 h-4 w-4 rounded-full border-2 border-white bg-blue-500 cursor-se-resize"
                     onPointerDown={(e) => startDrag(e, layer.id, "resize")}
-                    style={{ zIndex: 30 }}
+                    className="absolute -bottom-2 -right-2 h-4 w-4 rounded-full border-2 border-blue-500 bg-white shadow-sm"
+                    style={{ cursor: "nwse-resize" }}
                   />
-                  
-                  {/* Top-left resize handle */}
-                  <div
-                    className="handle absolute -top-2 -left-2 h-4 w-4 rounded-full border-2 border-white bg-blue-500 cursor-nw-resize"
-                    onPointerDown={(e) => startDrag(e, layer.id, "resize")}
-                    style={{ zIndex: 30 }}
-                  />
-                  
-                  {/* Top-right resize handle */}
-                  <div
-                    className="handle absolute -top-2 -right-2 h-4 w-4 rounded-full border-2 border-white bg-blue-500 cursor-ne-resize"
-                    onPointerDown={(e) => startDrag(e, layer.id, "resize")}
-                    style={{ zIndex: 30 }}
-                  />
-                  
-                  {/* Bottom-left resize handle */}
-                  <div
-                    className="handle absolute -bottom-2 -left-2 h-4 w-4 rounded-full border-2 border-white bg-blue-500 cursor-sw-resize"
-                    onPointerDown={(e) => startDrag(e, layer.id, "resize")}
-                    style={{ zIndex: 30 }}
-                  />
-                  
-                  {/* Rotation handle */}
-                  <div
-                    className="handle absolute -top-10 left-1/2 transform -translate-x-1/2 h-6 w-6 rounded-full border-2 border-white bg-blue-500 cursor-grab flex items-center justify-center"
-                    onPointerDown={(e) => startRotation(e, layer.id)}
-                    style={{ zIndex: 30 }}
-                  >
-                    <svg
-                      className="w-4 h-4 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                      />
-                    </svg>
-                  </div>
-                  
-                  {/* Delete button */}
-                  <button
-                    className="handle absolute -top-2 -right-8 h-6 w-6 rounded-full border-2 border-white bg-red-500 cursor-pointer flex items-center justify-center"
-                    onClick={() => onDeleteText(layer.id)}
-                    style={{ zIndex: 30 }}
-                  >
-                    <svg
-                      className="w-4 h-4 text-white"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
+                  {/* Boundary indicator */}
+                  <div className="absolute -inset-3 border border-red-300 border-dashed pointer-events-none rounded opacity-50"></div>
                 </>
               )}
             </div>
@@ -531,7 +553,7 @@ function TextOverlay({
   );
 }
 
-/* -------- DESIGN OVERLAY (IMAGES) -------- */
+/* -------- DESIGN OVERLAY (IMAGES) WITH BOUNDARY CONSTRAINTS -------- */
 
 function DesignOverlay({
   layer,
@@ -540,7 +562,6 @@ function DesignOverlay({
   isActive,
   setActiveDesignId,
   disabled,
-  onDeleteDesign,
 }) {
   const overlayRef = useRef(null);
   const dragStateRef = useRef(null);
@@ -550,56 +571,40 @@ function DesignOverlay({
       const dragState = dragStateRef.current;
       if (!dragState) return;
 
-      const { mode, id, startX, startY, rectWidth, rectHeight, initialLayer, startRotation, startScale } = dragState;
+      const { id, startX, startY, rectWidth, rectHeight, initialLayer } = dragState;
 
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
 
-      if (mode === "drag") {
-        const nx = initialLayer.x + dx / rectWidth;
-        const ny = initialLayer.y + dy / rectHeight;
+      // Calculate new position
+      const nx = initialLayer.x + dx / rectWidth;
+      const ny = initialLayer.y + dy / rectHeight;
 
-        setDesignLayers((prev) =>
-          prev.map((d) =>
-            d.id === id
-              ? {
-                  ...d,
-                  x: Math.min(0.98, Math.max(0.02, nx)),
-                  y: Math.min(0.98, Math.max(0.02, ny)),
-                }
-              : d
-          )
-        );
-      } else if (mode === "scale") {
-        const scaleDelta = (dx + dy) * 0.001;
-        const newScale = Math.max(0.05, Math.min(1.5, startScale + scaleDelta));
-        
-        setDesignLayers((prev) =>
-          prev.map((d) =>
-            d.id === id
-              ? {
-                  ...d,
-                  scale: newScale,
-                  renderedWidthPx: canvasSize.width * newScale,
-                  renderedHeightPx: (canvasSize.width * newScale) * (layer.originalHeightPx / layer.originalWidthPx),
-                }
-              : d
-          )
-        );
-      } else if (mode === "rotate") {
-        const centerX = startX;
-        const centerY = startY;
-        const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
-        const newRotation = ((angle * 180) / Math.PI) + startRotation;
-        
-        setDesignLayers((prev) =>
-          prev.map((d) =>
-            d.id === id ? { ...d, rotation: newRotation } : d
-          )
-        );
-      }
+      // Get boundary constraints for this view/layer
+      const boundary = getDesignBoundary(canvasSize, layer);
+      
+      // Apply boundary constraints
+      let constrainedX = Math.max(boundary.minX, Math.min(boundary.maxX, nx));
+      let constrainedY = Math.max(boundary.minY, Math.min(boundary.maxY, ny));
+      
+      // Apply snap to boundary
+      const snapped = snapToBoundary(constrainedX, constrainedY, boundary);
+      constrainedX = snapped.x;
+      constrainedY = snapped.y;
+
+      setDesignLayers((prev) =>
+        prev.map((d) =>
+          d.id === id
+            ? {
+                ...d,
+                x: constrainedX,
+                y: constrainedY,
+              }
+            : d
+        )
+      );
     },
-    [setDesignLayers, canvasSize, layer.originalHeightPx, layer.originalWidthPx]
+    [setDesignLayers, canvasSize, layer]
   );
 
   const onPointerUp = useCallback(() => {
@@ -608,7 +613,7 @@ function DesignOverlay({
     window.removeEventListener("pointerup", onPointerUp);
   }, [onPointerMove]);
 
-  const startDrag = (e, mode = "drag") => {
+  const startDrag = (e) => {
     if (disabled) return;
     e.preventDefault();
     e.stopPropagation();
@@ -617,19 +622,14 @@ function DesignOverlay({
     if (!overlay) return;
 
     const rect = overlay.getBoundingClientRect();
-    const startRotation = layer.rotation || 0;
-    const startScale = layer.scale || 0.35;
 
     dragStateRef.current = {
       id: layer.id,
-      mode,
       startX: e.clientX,
       startY: e.clientY,
       rectWidth: rect.width,
       rectHeight: rect.height,
       initialLayer: { ...layer },
-      startRotation,
-      startScale,
     };
 
     setActiveDesignId(layer.id);
@@ -638,38 +638,7 @@ function DesignOverlay({
     window.addEventListener("pointerup", onPointerUp);
   };
 
-  const startRotation = (e) => {
-    if (disabled) return;
-    e.preventDefault();
-    e.stopPropagation();
-
-    const overlay = overlayRef.current;
-    if (!overlay) return;
-
-    const rect = overlay.getBoundingClientRect();
-    const left = layer.x * rect.width + rect.left;
-    const top = layer.y * rect.height + rect.top;
-    
-    const angle = Math.atan2(e.clientY - top, e.clientX - left);
-    const startRotation = layer.rotation || 0;
-    
-    dragStateRef.current = {
-      id: layer.id,
-      mode: "rotate",
-      startX: left,
-      startY: top,
-      rectWidth: rect.width,
-      rectHeight: rect.height,
-      initialLayer: { ...layer },
-      startRotation: startRotation - (angle * 180 / Math.PI),
-    };
-
-    setActiveDesignId(layer.id);
-
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-  };
-
+  const boundary = getDesignBoundary(canvasSize, layer);
   const left = `${layer.x * 100}%`;
   const top = `${layer.y * 100}%`;
   const widthPx = canvasSize.width * layer.scale;
@@ -685,14 +654,11 @@ function DesignOverlay({
           cursor: disabled ? "default" : "grab",
         }}
         className="pointer-events-auto absolute"
-        onPointerDown={(e) => {
-          if (e.target.classList.contains('handle')) return;
-          startDrag(e, "drag");
-        }}
+        onPointerDown={startDrag}
       >
         <div
-          className={`relative overflow-hidden ${
-            isActive ? "border-2 border-dashed border-blue-500" : "border-none"
+          className={`overflow-hidden rounded-sm ${
+            isActive ? 'border-2 border-blue-500 bg-blue-50/20' : 'border border-slate-300/50'
           }`}
           style={{
             width: `${widthPx}px`,
@@ -712,82 +678,32 @@ function DesignOverlay({
               }}
             />
           )}
-          
-          {/* Active state handles */}
-          {isActive && !disabled && (
-            <>
-              {/* Bottom-right scale handle */}
-              <div
-                className="handle absolute -bottom-2 -right-2 h-4 w-4 rounded-full border-2 border-white bg-blue-500 cursor-se-resize"
-                onPointerDown={(e) => startDrag(e, "scale")}
-                style={{ zIndex: 30 }}
-              />
-              
-              {/* Top-left scale handle */}
-              <div
-                className="handle absolute -top-2 -left-2 h-4 w-4 rounded-full border-2 border-white bg-blue-500 cursor-nw-resize"
-                onPointerDown={(e) => startDrag(e, "scale")}
-                style={{ zIndex: 30 }}
-              />
-              
-              {/* Top-right scale handle */}
-              <div
-                className="handle absolute -top-2 -right-2 h-4 w-4 rounded-full border-2 border-white bg-blue-500 cursor-ne-resize"
-                onPointerDown={(e) => startDrag(e, "scale")}
-                style={{ zIndex: 30 }}
-              />
-              
-              {/* Bottom-left scale handle */}
-              <div
-                className="handle absolute -bottom-2 -left-2 h-4 w-4 rounded-full border-2 border-white bg-blue-500 cursor-sw-resize"
-                onPointerDown={(e) => startDrag(e, "scale")}
-                style={{ zIndex: 30 }}
-              />
-              
-              {/* Rotation handle */}
-              <div
-                className="handle absolute -top-10 left-1/2 transform -translate-x-1/2 h-6 w-6 rounded-full border-2 border-white bg-blue-500 cursor-grab flex items-center justify-center"
-                onPointerDown={startRotation}
-                style={{ zIndex: 30 }}
-              >
-                <svg
-                  className="w-4 h-4 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-              </div>
-              
-              {/* Delete button */}
-              <button
-                className="handle absolute -top-2 -right-8 h-6 w-6 rounded-full border-2 border-white bg-red-500 cursor-pointer flex items-center justify-center"
-                onClick={() => onDeleteDesign(layer.id)}
-                style={{ zIndex: 30 }}
-              >
-                <svg
-                  className="w-4 h-4 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </>
-          )}
         </div>
+        
+        {/* Visual boundary indicator when active */}
+        {isActive && (
+          <>
+            <div className="absolute -inset-4 border-2 border-red-400 border-dashed pointer-events-none rounded-lg opacity-60"></div>
+            {/* Boundary position info */}
+            <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black/75 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap">
+              X: {(layer.x * 100).toFixed(1)}% Y: {(layer.y * 100).toFixed(1)}%
+            </div>
+          </>
+        )}
+        
+        {/* Boundary limits (always show for debugging) */}
+        <div 
+          className="absolute pointer-events-none opacity-30"
+          style={{
+            left: `${boundary.minX * 100}%`,
+            top: `${boundary.minY * 100}%`,
+            width: `${(boundary.maxX - boundary.minX) * 100}%`,
+            height: `${(boundary.maxY - boundary.minY) * 100}%`,
+            transform: 'translate(-50%, -50%)',
+            border: '1px dashed #666',
+            background: 'transparent',
+          }}
+        ></div>
       </div>
     </div>
   );

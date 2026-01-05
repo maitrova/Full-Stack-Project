@@ -27,6 +27,8 @@ const readymadeProductSchema = new mongoose.Schema(
       },
       default: [],
     },
+    
+
 
     video: { type: String, default: null },
 
