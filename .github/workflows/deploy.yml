@@ -2,7 +2,7 @@ name: Build → Push → Deploy (Compose, immutable tag)
 
 on:
   push:
-    branches: [ newmaitrova ]
+    branches: [ maitrova-bg ]
 
 jobs:
   build_and_push:

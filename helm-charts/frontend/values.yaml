@@ -12,8 +12,8 @@ image:
 # Service Configuration
 service:
   type: ClusterIP
-  port: 5173
-  targetPort: 5173
+  port: 80
+  targetPort: 80
 
 # Environment Configuration
 env: production
@@ -30,20 +30,20 @@ envSecrets:
   # Add any frontend secrets here
   # EXAMPLE: API_KEY: "your-api-key"
 
-# Resource Limits
+# Resource Limits (reduced for nginx - more efficient)
 resources:
   limits:
-    cpu: "500m"
-    memory: 512Mi
+    cpu: "200m"
+    memory: 128Mi
   requests:
-    cpu: "100m"
-    memory: 256Mi
+    cpu: "50m"
+    memory: 64Mi
 
 # Health Checks
 livenessProbe:
-  enabled: false
+  enabled: true
   httpGet:
-    path: /
+    path: /health
     port: 80
   initialDelaySeconds: 30
   periodSeconds: 10
@@ -51,9 +51,9 @@ livenessProbe:
   failureThreshold: 3
 
 readinessProbe:
-  enabled: false
+  enabled: true
   httpGet:
-    path: /
+    path: /health
     port: 80
   initialDelaySeconds: 10
   periodSeconds: 5
