@@ -14,12 +14,6 @@ export default defineConfig({
       '.narifighter.online'
     ]
   },
-  define: {
-    // Use placeholders for environment variables that will be replaced at runtime
-    'process.env.VITE_API_URL': process.env.NODE_ENV === 'production' 
-      ? '"VITE_API_URL_PLACEHOLDER"'
-      : `"${process.env.VITE_API_URL || 'http://localhost:5000'}"`
-  },
   build: {
     outDir: 'dist',
     rollupOptions: {

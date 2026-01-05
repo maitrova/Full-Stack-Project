@@ -4,7 +4,7 @@ import axios from 'axios';
 
 // Create axios instances with base configuration
 const homepageAPI = axios.create({
-  baseURL: 'http://localhost:5000/api/homepage',
+  baseURL: `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/homepage`,
   timeout: 10000,
 });
 

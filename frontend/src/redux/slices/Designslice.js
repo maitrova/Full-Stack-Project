@@ -3,7 +3,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
 // Base URL for API calls
-const API_URL = 'http://localhost:5000/savedata';
+const API_URL = `${import.meta.env.VITE_API_URL || "http://localhost:5000"}/savedata`;
 
 // Async Thunks (keep all your existing thunks...)
 export const publishDesign = createAsyncThunk(
