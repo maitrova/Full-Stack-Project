@@ -12,8 +12,8 @@ import {
   selectCartError,
   clearError,
   clearSuccess,
-} from '../redux/slices/cartSlice.js';
-import { selectCurrentToken } from '../redux/slices/userSlice.js';
+} from '../redux/slices/Cartslice.js';
+import { selectCurrentToken } from '../redux/slices/Userslice.js';
 
 // Lucide React icons
 import { 
