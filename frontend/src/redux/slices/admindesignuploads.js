@@ -2,7 +2,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
-const API_BASE = 'http://localhost:5000/api/designuploads';
+const API_BASE = `${import.meta.env.VITE_API_URL || "https://narifighter.online/backend"}/api/designuploads`;
 
 // Async thunks
 export const createFolder = createAsyncThunk(

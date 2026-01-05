@@ -3,7 +3,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
 // Base API URL
-const API_BASE = 'http://localhost:5000/api/readymadeproducts';
+const API_BASE = `${import.meta.env.VITE_API_URL || "https://narifighter.online/backend"}/api/readymadeproducts`;
 
 // Async Thunks
 export const fetchProducts = createAsyncThunk(
