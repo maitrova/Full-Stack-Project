@@ -1,12 +1,11 @@
 {{- if .Values.mongodb.enabled }}
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: {{ .Values.mongodb.name }}
   labels:
     {{- include "mongodb.labels" . | nindent 4 }}
 spec:
-  serviceName: {{ .Values.mongodb.name }}-service
   replicas: {{ .Values.mongodb.replicaCount }}
   selector:
     matchLabels:
@@ -31,10 +30,6 @@ spec:
               value: {{ $value | quote }}
             {{- end }}
           
-          volumeMounts:
-            - name: mongodb-data
-              mountPath: /data/db
-          
           {{- if .Values.mongodb.livenessProbe.enabled }}
           livenessProbe:
             exec:
@@ -55,23 +50,4 @@ spec:
           
           resources:
             {{- toYaml .Values.mongodb.resources | nindent 12 }}
-  
-  {{- if .Values.mongodb.persistence.enabled }}
-  volumeClaimTemplates:
-    - metadata:
-        name: mongodb-data
-      spec:
-        accessModes:
-          - {{ .Values.mongodb.persistence.accessMode }}
-        {{- if .Values.mongodb.persistence.storageClass }}
-        storageClassName: {{ .Values.mongodb.persistence.storageClass }}
-        {{- end }}
-        resources:
-          requests:
-            storage: {{ .Values.mongodb.persistence.size }}
-  {{- else }}
-  volumes:
-    - name: mongodb-data
-      emptyDir: {}
-  {{- end }}
 {{- end }}
