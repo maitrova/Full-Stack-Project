@@ -11,7 +11,7 @@ backend:
   
   image:
     repository: maitrova/crud-backend
-    tag: v1.0.0
+    tag: latest
     pullPolicy: Always
   
   service:
@@ -52,8 +52,8 @@ backend:
   
   autoscaling:
     enabled: true
-    minReplicas: 3
-    maxReplicas: 10
+    minReplicas: 1
+    maxReplicas: 1
     targetCPUUtilizationPercentage: 70
 
 # Frontend Configuration
@@ -64,7 +64,7 @@ frontend:
   
   image:
     repository: maitrova/crud-frontend
-    tag: v1.0.0
+    tag: latest
     pullPolicy: Always
   
   service:
@@ -102,7 +102,7 @@ frontend:
   autoscaling:
     enabled: true
     minReplicas: 1
-    maxReplicas: 10
+    maxReplicas: 1
     targetCPUUtilizationPercentage: 70
 
 # MongoDB Configuration
