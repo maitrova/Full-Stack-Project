@@ -49,7 +49,7 @@ jobs:
           file: ./frontend/Dockerfile
           push: true
           build-args: |
-            REACT_APP_API_URL=https://narifighter.online
+            REACT_APP_API_URL=https://narifighter.online/api
           tags: |
             ${{ env.FRONTEND_IMAGE }}:latest
             ${{ env.FRONTEND_IMAGE }}:${{ steps.version.outputs.tag }}
