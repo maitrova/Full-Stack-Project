@@ -63,3 +63,4 @@ jobs:
           echo "Backend: ${{ env.BACKEND_IMAGE }}:${{ steps.version.outputs.tag }}"
           echo "Frontend: ${{ env.FRONTEND_IMAGE }}:latest"
           echo "Frontend: ${{ env.FRONTEND_IMAGE }}:${{ steps.version.outputs.tag }}"
+
