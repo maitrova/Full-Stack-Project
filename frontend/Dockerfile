@@ -1,33 +1,35 @@
-# Multi-stage build for optimized production image
-# Stage 1: Build the application
-FROM node:20-alpine AS builder
+# Build stage
+FROM node:18-alpine as build
 
 WORKDIR /app
 
-# Copy package files and install dependencies
-COPY package*.json ./
-RUN npm ci
+# Accept build argument
+ARG REACT_APP_API_URL
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
 
-# Copy source code and build
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install --production
+
+# Copy source code
 COPY . .
+
+# Build the app
 RUN npm run build
 
-# Stage 2: Serve with nginx
+# Production stage
 FROM nginx:alpine
 
-# Copy built assets from builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Copy custom nginx configuration
+# Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Create a script to substitute environment variables
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+# Copy built app from build stage
+COPY --from=build /app/build /usr/share/nginx/html
 
 # Expose port 80
 EXPOSE 80
 
-# Use custom entrypoint to handle environment variables
-ENTRYPOINT ["/docker-entrypoint.sh"]
+# Start nginx
 CMD ["nginx", "-g", "daemon off;"]

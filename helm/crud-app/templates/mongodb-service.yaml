@@ -1,0 +1,18 @@
+{{- if .Values.mongodb.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.mongodb.name }}-service
+  labels:
+    {{- include "mongodb.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.mongodb.service.type }}
+  clusterIP: None  # Headless service for StatefulSet
+  ports:
+    - port: {{ .Values.mongodb.service.port }}
+      targetPort: {{ .Values.mongodb.service.targetPort }}
+      protocol: TCP
+      name: mongodb
+  selector:
+    {{- include "mongodb.selectorLabels" . | nindent 4 }}
+{{- end }}
