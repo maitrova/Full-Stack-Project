@@ -6,8 +6,20 @@ const bodyParser = require('body-parser');
 
 const app = express();
 
+// CORS Configuration
+const corsOptions = {
+  origin: [
+    'http://localhost:3000',
+    'http://localhost',
+    'https://narifighter.online',
+    'http://narifighter.online'
+  ],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
