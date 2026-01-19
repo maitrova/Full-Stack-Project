@@ -714,7 +714,8 @@ const RecolorEditor = forwardRef(function RecolorEditor(
 
     bgRemovalLoading,
     onDesignRenderWidthChange,
-
+    isAdmin,
+    
     // OPTIONAL: you can pass your tested front boundaries here if you want to force them
     // Example: { "front-full": {minX, minY, maxX, maxY} }
     calibrationOverride = null,
@@ -724,7 +725,7 @@ const RecolorEditor = forwardRef(function RecolorEditor(
   const [renderer, setRenderer] = useState(null);
   const [canvasSize, setCanvasSize] = useState(null);
 
-  const [showMeasurements, setShowMeasurements] = useState(false);
+  const [showMeasurements, setShowMeasurements] = useState(true);
   const [calibrationMode, setCalibrationMode] = useState(false);
 
   const specs = PRINT_SPECS[productKey] || PRINT_SPECS[DEFAULT_PRODUCT_KEY];
@@ -1029,7 +1030,7 @@ const zonesForActiveView = useMemo(() => {
         >
           {showMeasurements ? "Hide Measurements" : "Show Measurements"}
         </button>
-
+        {isAdmin && (
         <button
           onClick={() => setCalibrationMode(true)}
           className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded shadow-sm"
@@ -1037,7 +1038,9 @@ const zonesForActiveView = useMemo(() => {
         >
           Calibrate Zones
         </button>
+        )}
       </div>
+      
 
       {calibrationMode && canvasSize && (
   <CalibrationOverlay

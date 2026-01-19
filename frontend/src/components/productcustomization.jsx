@@ -10,7 +10,7 @@ import {
   clearCurrentFolder
 } from "../redux/slices/admindesignuploads.js";
 import RecolorEditor from "./RecolorEditor.jsx";
-import { selectCurrentToken } from "../redux/slices/Userslice.js";
+import { selectCurrentToken, selectCurrentUser } from "../redux/slices/Userslice.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
 const IMAGE_URL = import.meta.env.VITE_IMAGE_URL;
@@ -145,7 +145,9 @@ export default function DesignerPage() {
   const { current: product, currentStatus, currentError } = useSelector(
     (state) => state.products
   );
+  const user = useSelector(selectCurrentUser);
 
+  const isAdmin = user?.role === "admin" || user?.isAdmin === true || user?.role === "superuser";
   // Design uploads state
   const { 
     folders, 
@@ -622,14 +624,15 @@ export default function DesignerPage() {
     console.log("Initializing new design for product:", product.name);
     
     const initial = {};
-    product.views.forEach((v, index) => {
+    product.views.forEach((v) => {
       initial[v.code] = {
-        textLayers: index === 0 ? [createDefaultTextLayer()] : [],
-        activeTextId: index === 0 ? initial[v.code]?.textLayers?.[0]?.id || null : null,
+        textLayers: [],          // ✅ no default text on load
+        activeTextId: null,      // ✅ no active text selected
         designLayers: [],
         activeDesignId: null,
       };
     });
+
 
     setViewStates(initial);
     setViewCode(product.views[0].code);
@@ -1702,6 +1705,8 @@ export default function DesignerPage() {
                     setActiveDesignId={handleSetActiveDesignId}
                     bgRemovalLoading={bgRemovalLoading}
                     onDesignRenderWidthChange={setDesignRenderWidth}
+                    isAdmin={isAdmin}
+                    showMeasurements={true} 
                   />
                 ) : (
                   <div className="text-sm text-slate-500 text-center">{product?.name ? `No view configuration found for ${product.name}` : "Product not loaded"}</div>

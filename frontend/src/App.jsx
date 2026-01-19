@@ -27,6 +27,7 @@ import DropproductAdmin from "./components/dropproducts.jsx";
 import DropProductDetailsPage from "./components/Dropproductsdetailpage.jsx";
 import CustomProductsHub from "./components/CustomProductsHub.jsx";
 import AllProductsHub from "./components/AllproductsHub.jsx";
+import ProfilePage from "./pages/ProfilePage.jsx";
 
 
 // You'll need to create this
@@ -83,6 +84,12 @@ function App() {
         <Route path="/dropproducts/:id" element={
           <MainLayout>
             <DropProductDetailsPage />
+          </MainLayout>
+        } />
+
+        <Route path="/profile" element={
+          <MainLayout>
+            <ProfilePage />
           </MainLayout>
         } />
 
