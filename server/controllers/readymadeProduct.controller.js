@@ -392,7 +392,6 @@ export const getFilteredProducts = async (req, res) => {
 };
 
 // Get distinct categories and subcategories
-// Get distinct categories and subcategories (category-mapped)
 export const getProductFilters = async (req, res) => {
   try {
     const categories = await ReadymadeProduct.distinct("category");
@@ -437,96 +436,274 @@ export const getProductFilters = async (req, res) => {
 /* ==================== ADMIN CONTROLLERS ==================== */
 
 // Create product
+// controllers/readymadeProductController.js
 export const createReadymadeProduct = async (req, res) => {
   try {
-    const { 
-      title, description, price, currency, category, subCategory, 
-      brand, stock, isActive, bestSeller, newArrival 
+    const {
+      title,
+      description,
+      currency,
+      category,
+      subCategory,
+      brand,
+      isActive,
+      bestSeller,
+      newArrival,
+      variants, // <-- NEW (array or JSON string)
     } = req.body;
 
-    if (!title || !description || price === undefined) {
-      return res.status(400).json({ 
+    if (!title || !description) {
+      return res.status(400).json({
         success: false,
-        message: "Title, description, and price are required" 
+        message: "Title and description are required",
       });
     }
 
+    // images/video
     const images = req.files?.images?.map((f) => f.path.replace(/\\/g, "/")) || [];
     const video = req.files?.video?.[0]?.path.replace(/\\/g, "/") || null;
 
     if (images.length > 4) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Maximum 4 images allowed" 
+        message: "Maximum 4 images allowed",
       });
     }
+
+    // Parse variants (because multipart/form-data sends it as string usually)
+    let parsedVariants = variants;
+
+    if (!parsedVariants) {
+      return res.status(400).json({
+        success: false,
+        message: "Variants are required (size-wise price & stock).",
+      });
+    }
+
+    if (typeof parsedVariants === "string") {
+      try {
+        parsedVariants = JSON.parse(parsedVariants);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid variants JSON format",
+        });
+      }
+    }
+
+    if (!Array.isArray(parsedVariants) || parsedVariants.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one variant is required",
+      });
+    }
+
+    const ALLOWED_SIZES = new Set(["XS", "S", "M", "L", "XL", "XXL"]);
+
+    // Normalize + validate variants
+    const normalizedVariants = parsedVariants.map((v) => {
+      const size = String(v.size || "").toUpperCase().trim();
+      const price = Number(v.price);
+      const stock = Number(v.stock ?? 0);
+
+      if (!ALLOWED_SIZES.has(size)) {
+        throw new Error(`Invalid size: ${v.size}`);
+      }
+      if (!Number.isFinite(price) || price < 0) {
+        throw new Error(`Invalid price for size ${size}`);
+      }
+      if (!Number.isFinite(stock) || stock < 0) {
+        throw new Error(`Invalid stock for size ${size}`);
+      }
+
+      return {
+        size,
+        price,
+        stock,
+        sku: v.sku ? String(v.sku).trim() : "",
+      };
+    });
+
+    // No duplicate sizes
+    const sizeSet = new Set();
+    for (const v of normalizedVariants) {
+      if (sizeSet.has(v.size)) {
+        return res.status(400).json({
+          success: false,
+          message: `Duplicate size found: ${v.size}`,
+        });
+      }
+      sizeSet.add(v.size);
+    }
+
+    // Optional: calculate total stock / default price (use smallest size price as base)
+    const totalStock = normalizedVariants.reduce((sum, v) => sum + v.stock, 0);
+    const basePrice = Math.min(...normalizedVariants.map((v) => v.price));
 
     const product = await ReadymadeProduct.create({
       title,
       description,
-      price: Number(price),
+
+      // Keep these for compatibility (optional but useful)
+      price: basePrice,
+      stock: totalStock,
+
       currency: currency || "INR",
       category: category || "",
       subCategory: subCategory || "",
       brand: brand || "",
-      stock: Number(stock || 0),
-      isActive: isActive !== undefined ? String(isActive).toLowerCase() === 'true' : true,
-      bestSeller: bestSeller !== undefined ? String(bestSeller).toLowerCase() === 'true' : false,
-      newArrival: newArrival !== undefined ? String(newArrival).toLowerCase() === 'true' : false,
+
+      variants: normalizedVariants, // <-- saved here
+
+      isActive: isActive !== undefined ? String(isActive).toLowerCase() === "true" : true,
+      bestSeller: bestSeller !== undefined ? String(bestSeller).toLowerCase() === "true" : false,
+      newArrival: newArrival !== undefined ? String(newArrival).toLowerCase() === "true" : false,
+
       images,
       video,
     });
 
-    res.status(201).json({ 
+    return res.status(201).json({
       success: true,
       message: "Product created successfully",
-      data: product 
+      data: product,
     });
   } catch (err) {
-    res.status(500).json({ 
+    return res.status(500).json({
       success: false,
-      message: err.message 
+      message: err.message,
     });
   }
 };
+
 
 // Update product
 export const updateReadymadeProduct = async (req, res) => {
   try {
     const product = await ReadymadeProduct.findById(req.params.id);
-    if (!product) return res.status(404).json({ 
-      success: false,
-      message: "Product not found" 
-    });
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
 
-    // Update normal fields
+    // ---------- helpers ----------
+    const toBool = (v) => {
+      if (v === undefined || v === null) return undefined;
+      if (typeof v === "boolean") return v;
+      if (typeof v === "string") return v.toLowerCase() === "true";
+      return Boolean(v);
+    };
+
+    // ---------- update normal fields ----------
+    // NOTE: price/stock will be auto-calculated from variants if variants is provided
     const updatableFields = [
-      "title", "description", "price", "currency", "category", 
-      "subCategory", "brand", "stock", "isActive", "bestSeller", "newArrival"
+      "title",
+      "description",
+      "currency",
+      "category",
+      "subCategory",
+      "brand",
+      "isActive",
+      "bestSeller",
+      "newArrival",
     ];
 
     for (const key of updatableFields) {
       if (req.body[key] !== undefined) {
-        if (key === "price" || key === "stock") {
-          product[key] = Number(req.body[key]);
-        } else if (key === "isActive" || key === "bestSeller" || key === "newArrival") {
-          product[key] = String(req.body[key]).toLowerCase() === "true";
+        if (key === "isActive" || key === "bestSeller" || key === "newArrival") {
+          const b = toBool(req.body[key]);
+          if (b !== undefined) product[key] = b;
         } else {
           product[key] = req.body[key];
         }
       }
     }
 
-    // Remove selected images
+    // ---------- update variants (NEW) ----------
+    // Frontend can send variants as:
+    // 1) JSON array (application/json)
+    // 2) stringified JSON (multipart/form-data)
+    if (req.body.variants !== undefined) {
+      let parsedVariants = req.body.variants;
+
+      if (typeof parsedVariants === "string") {
+        try {
+          parsedVariants = JSON.parse(parsedVariants);
+        } catch {
+          return res.status(400).json({
+            success: false,
+            message: "variants must be valid JSON array",
+          });
+        }
+      }
+
+      if (!Array.isArray(parsedVariants) || parsedVariants.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "At least one variant is required",
+        });
+      }
+
+      const ALLOWED_SIZES = new Set(["XS", "S", "M", "L", "XL", "XXL"]);
+
+      const normalizedVariants = parsedVariants.map((v) => {
+        const size = String(v.size || "").toUpperCase().trim();
+        const price = Number(v.price);
+        const stock = Number(v.stock ?? 0);
+
+        if (!ALLOWED_SIZES.has(size)) {
+          throw new Error(`Invalid size: ${v.size}`);
+        }
+        if (!Number.isFinite(price) || price < 0) {
+          throw new Error(`Invalid price for size ${size}`);
+        }
+        if (!Number.isFinite(stock) || stock < 0) {
+          throw new Error(`Invalid stock for size ${size}`);
+        }
+
+        return {
+          size,
+          price,
+          stock,
+          sku: v.sku ? String(v.sku).trim() : "",
+        };
+      });
+
+      // prevent duplicate sizes
+      const sizeSet = new Set();
+      for (const v of normalizedVariants) {
+        if (sizeSet.has(v.size)) {
+          return res.status(400).json({
+            success: false,
+            message: `Duplicate size found: ${v.size}`,
+          });
+        }
+        sizeSet.add(v.size);
+      }
+
+      product.variants = normalizedVariants;
+
+      // keep compatibility fields updated automatically
+      product.stock = normalizedVariants.reduce((sum, v) => sum + v.stock, 0);
+      product.price = Math.min(...normalizedVariants.map((v) => v.price));
+    } else {
+      // If variants NOT provided, allow legacy updates for price/stock (optional)
+      if (req.body.price !== undefined) product.price = Number(req.body.price);
+      if (req.body.stock !== undefined) product.stock = Number(req.body.stock);
+    }
+
+    // ---------- Remove selected images ----------
     let removeImages = [];
     if (req.body.removeImages) {
       try {
         removeImages = JSON.parse(req.body.removeImages);
         if (!Array.isArray(removeImages)) removeImages = [];
       } catch {
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
-          message: "removeImages must be valid JSON array" 
+          message: "removeImages must be valid JSON array",
         });
       }
     }
@@ -536,14 +713,14 @@ export const updateReadymadeProduct = async (req, res) => {
       product.images = (product.images || []).filter((p) => !removeImages.includes(p));
     }
 
-    // Remove video if requested
+    // ---------- Remove video if requested ----------
     const removeVideo = String(req.body.removeVideo) === "true";
     if (removeVideo && product.video) {
       await safeDeleteFile(product.video);
       product.video = null;
     }
 
-    // Handle new uploads
+    // ---------- Handle new uploads ----------
     const newImages = (req.files?.images || []).map((f) => f.path.replace(/\\/g, "/"));
     const newVideo = req.files?.video?.[0]?.path
       ? req.files.video[0].path.replace(/\\/g, "/")
@@ -561,9 +738,9 @@ export const updateReadymadeProduct = async (req, res) => {
 
       if (merged.length > 4) {
         await Promise.all(newImages.map((p) => safeDeleteFile(p)));
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
-          message: "Maximum 4 images allowed total" 
+          message: "Maximum 4 images allowed total",
         });
       }
 
@@ -583,12 +760,13 @@ export const updateReadymadeProduct = async (req, res) => {
       data: product,
     });
   } catch (error) {
-    return res.status(500).json({ 
+    return res.status(500).json({
       success: false,
-      message: error.message 
+      message: error.message,
     });
   }
 };
+
 
 // Update multiple products for newArrival/bestSeller
 export const updateProductList = async (req, res) => {
@@ -697,6 +875,66 @@ export const toggleProductStatus = async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: error.message 
+    });
+  }
+};
+
+
+
+// Get home category tiles
+export const getHomeCategoryTiles = async (req, res) => {
+  try {
+    const onlyActive = (req.query.onlyActive ?? "true") === "true";
+    const limit = Math.min(parseInt(req.query.limit || "12", 10), 50);
+
+    const match = {};
+    if (onlyActive) match.isActive = true;
+
+    const categories = await ReadymadeProduct.aggregate([
+      { $match: match },
+      { $sort: { createdAt: -1 } }, // latest products first
+
+      // Group by category and take one product as representative
+      {
+        $group: {
+          _id: "$category",
+          count: { $sum: 1 },
+          sample: { $first: "$$ROOT" }, // first after sort = latest product
+        },
+      },
+
+      // Build thumbnail (first image if exists)
+      {
+        $project: {
+          _id: 0,
+          category: "$_id",
+          count: 1,
+          image: {
+            $cond: [
+              { $gt: [{ $size: "$sample.images" }, 0] },
+              { $arrayElemAt: ["$sample.images", 0] },
+              null,
+            ],
+          },
+        },
+      },
+
+      // Remove empty category names
+      { $match: { category: { $ne: null, $ne: "" } } },
+
+      { $sort: { category: 1 } },
+      { $limit: limit },
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: categories,
+    });
+  } catch (error) {
+    console.error("getHomeCategoryTiles error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load home categories",
     });
   }
 };

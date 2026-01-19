@@ -15,15 +15,12 @@ export class WebGLRenderer {
       this.canvas.style.maxWidth = "100%";
       container.appendChild(this.canvas);
 
-      this.gl = this.canvas.getContext("webgl", {
-        preserveDrawingBuffer: true,
-      });
+      this.gl = this.canvas.getContext("webgl", { preserveDrawingBuffer: true });
       if (!this.gl) {
         console.warn("WebGL not available");
         return false;
       }
 
-      // Flip ALL textures vertically on upload so they share one convention.
       this.gl.pixelStorei(this.gl.UNPACK_FLIP_Y_WEBGL, true);
 
       this.program = this.createProgram(VERTEX_SRC, FRAGMENT_SRC);
@@ -46,29 +43,12 @@ export class WebGLRenderer {
 
       const gl = this.gl;
 
-      // Load mockup texture
       gl.bindTexture(gl.TEXTURE_2D, this.textures.mock);
-      gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.RGBA,
-        gl.RGBA,
-        gl.UNSIGNED_BYTE,
-        mockBmp
-      );
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, mockBmp);
 
-      // Load mask texture
       gl.bindTexture(gl.TEXTURE_2D, this.textures.mask);
-      gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.RGBA,
-        gl.RGBA,
-        gl.UNSIGNED_BYTE,
-        maskBmp
-      );
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, maskBmp);
 
-      // Initialize design texture (transparent, also flipped like others)
       this.uploadTransparentPixel(this.textures.design);
 
       gl.useProgram(this.program);
@@ -109,17 +89,7 @@ export class WebGLRenderer {
       this.textures.designLoaded ? 1.0 : 0.0
     );
 
-    const transform = [
-      1,
-      0,
-      0,
-      0,
-      1,
-      0,
-      0,
-      0,
-      1, // identity for now
-    ];
+    const transform = [1, 0, 0, 0, 1, 0, 0, 0, 1];
     gl.uniformMatrix3fv(
       gl.getUniformLocation(this.program, "u_designMat"),
       false,
@@ -131,22 +101,10 @@ export class WebGLRenderer {
 
   updateDesignTexture(canvas) {
     if (!this.gl) return;
-
     const gl = this.gl;
-
-    // UNPACK_FLIP_Y_WEBGL is already set to true globally
     gl.activeTexture(gl.TEXTURE2);
     gl.bindTexture(gl.TEXTURE_2D, this.textures.design);
-
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      gl.RGBA,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-      canvas
-    );
-
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
     this.textures.designLoaded = true;
   }
 
@@ -205,17 +163,7 @@ export class WebGLRenderer {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     const data = new Uint8Array([0, 0, 0, 0]);
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      gl.RGBA,
-      1,
-      1,
-      0,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-      data
-    );
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
     return t;
   }
 
@@ -223,45 +171,27 @@ export class WebGLRenderer {
     const gl = this.gl;
     gl.bindTexture(gl.TEXTURE_2D, tex);
     const data = new Uint8Array([0, 0, 0, 0]);
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      gl.RGBA,
-      1,
-      1,
-      0,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-      data
-    );
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
   }
 
   async loadImageBitmapEnhanced(url) {
-    try {
-      const resp = await fetch(url, { mode: "same-origin" });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status} when fetching ${url}`);
-      const blob = await resp.blob();
-      if (typeof createImageBitmap === "function") {
-        return await createImageBitmap(blob);
-      } else {
-        return await new Promise((resolve, reject) => {
-          const img = new Image();
-          img.crossOrigin = "anonymous";
-          img.onload = () => resolve(img);
-          img.onerror = () => reject(new Error("Image load failed: " + url));
-          img.src = URL.createObjectURL(blob);
-        });
-      }
-    } catch (err) {
-      console.error("loadImageBitmapEnhanced error for", url, err);
-      throw err;
+    const resp = await fetch(url, { mode: "same-origin" });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status} when fetching ${url}`);
+    const blob = await resp.blob();
+    if (typeof createImageBitmap === "function") {
+      return await createImageBitmap(blob);
     }
+    return await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("Image load failed: " + url));
+      img.src = URL.createObjectURL(blob);
+    });
   }
 
   cleanup() {
-    if (this.gl && this.program) {
-      this.gl.deleteProgram(this.program);
-    }
+    if (this.gl && this.program) this.gl.deleteProgram(this.program);
   }
 }
 
@@ -292,9 +222,7 @@ const FRAGMENT_SRC = `
     vec3 tinted = mock.rgb * u_color;
     vec3 productRgb = mix(mock.rgb, tinted, mask);
 
-    // Design texture uses same UV orientation as mockup/mask
     vec4 designColor = texture2D(u_design, v_uv);
-
     vec3 finalRgb = mix(productRgb, designColor.rgb, designColor.a * u_hasDesign);
 
     gl_FragColor = vec4(finalRgb, 1.0);

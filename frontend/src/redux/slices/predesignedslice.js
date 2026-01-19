@@ -6,7 +6,7 @@ import axios from 'axios';
 export const fetchReadymadeProducts = createAsyncThunk(
   'readymade/fetchProducts',
   async () => {
-    const response = await axios.get('http://localhost:5000/api/readymadeproducts/');
+    const response = await axios.get(`${import.meta.env.VITE_API_URL}/readymadeproducts`);
     return response.data.products;
   }
 );
@@ -14,7 +14,7 @@ export const fetchReadymadeProducts = createAsyncThunk(
 export const fetchReadymadeProductById = createAsyncThunk(
   'readymade/fetchProductById',
   async (productId) => {
-    const response = await axios.get(`http://localhost:5000/api/readymadeproducts/${productId}`);
+    const response = await axios.get(`${import.meta.env.VITE_API_URL}/readymadeproducts/${productId}`);
     console.log("Fetched Product:", response.data.product);
     return response.data.product;
   }
@@ -44,7 +44,7 @@ export const createReadymadeProduct = createAsyncThunk(
       formData.append('video', productData.video);
     }
 
-    const response = await axios.post('http://localhost:5000/api/readymadeproducts/', formData, {
+    const response = await axios.post(`${import.meta.env.VITE_API_URL}/readymadeproducts`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data.product;
@@ -75,7 +75,7 @@ export const updateReadymadeProduct = createAsyncThunk(
       formData.append('video', updateData.video);
     }
 
-    const response = await axios.put(`http://localhost:5000/api/readymadeproducts/${id}`, formData, {
+    const response = await axios.put(`${import.meta.env.VITE_API_URL}/readymadeproducts/${id}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data.product;
@@ -85,7 +85,7 @@ export const updateReadymadeProduct = createAsyncThunk(
 export const deleteReadymadeProduct = createAsyncThunk(
   'readymade/deleteProduct',
   async (productId) => {
-    await axios.delete(`http://localhost:5000/api/readymadeproducts/${productId}`);
+    await axios.delete(`${import.meta.env.VITE_API_URL}/readymadeproducts/${productId}`);
     return productId;
   }
 );

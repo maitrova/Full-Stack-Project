@@ -73,6 +73,8 @@ export default function Designdetailspage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const SIZES = ["S", "M", "L", "XL", "XXL"];
+  const [selectedSize, setSelectedSize] = useState("");
 
   const [design, setDesign] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -97,6 +99,10 @@ export default function Designdetailspage() {
   const cartError = useSelector(selectCartError);
   const cartSuccess = useSelector(selectCartSuccess);
   const token = useSelector(selectCurrentToken);
+  useEffect(() => {
+  setLocalCartQuantity(0);
+  setSelectedSize("");
+}, [id]);
 
   useEffect(() => {
     const fetchDesign = async () => {
@@ -191,6 +197,14 @@ export default function Designdetailspage() {
       }, 1500);
       return;
     }
+    if (!selectedSize) {
+  setNotification({
+    show: true,
+    message: "Please select a size before adding to cart",
+    type: "warning",
+  });
+  return;
+}
 
     if (!design) return;
 
@@ -199,17 +213,19 @@ export default function Designdetailspage() {
       setLocalCartQuantity(1);
 
       const cartData = {
-        kind: "DESIGN",
-        qty: 1,
-        designId: design._id,
-        productId: design.product?._id || design.productId,
-        title: design.productName || "Custom Design",
-        unitPrice: design.salePrice || design.product?.basePrice || 0,
-        basePrice: design.product?.basePrice || design.salePrice || 0,
-        previewImage: design.previewImage || design.views?.[0]?.previewImage || null,
-        views: design.views || [],
-        productColor: design.productColor
-      };
+  kind: "DESIGN",
+  qty: 1,
+  size: selectedSize, // ✅ ADD THIS
+  designId: design._id,
+  productId: design.product?._id || design.productId,
+  title: design.productName || "Custom Design",
+  unitPrice: design.salePrice || design.product?.basePrice || 0,
+  basePrice: design.product?.basePrice || design.salePrice || 0,
+  previewImage: design.previewImage || design.views?.[0]?.previewImage || null,
+  views: design.views || [],
+  productColor: design.productColor
+};
+
 
       await dispatch(addToCart(cartData)).unwrap();
       
@@ -369,6 +385,14 @@ export default function Designdetailspage() {
       });
       return;
     }
+    if (!selectedSize) {
+  setNotification({
+    show: true,
+    message: "Please select a size before proceeding",
+    type: "warning",
+  });
+  return;
+}
 
     if (isInCart) {
       navigate('/cart');
@@ -823,7 +847,8 @@ export default function Designdetailspage() {
               ) : (
                 <button
                   onClick={handleAddToCart}
-                  disabled={isUpdating || !token}
+                  disabled={isUpdating || !token || !selectedSize}
+
                   className={`h-14 rounded-xl font-semibold transition-all flex items-center justify-center gap-3 group ${
                     token 
                       ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-90' 
@@ -835,13 +860,15 @@ export default function Designdetailspage() {
                   ) : (
                     <ShoppingCart className="w-5 h-5" />
                   )}
-                  {token ? 'Add to Cart' : 'Login to Cart'}
+                  {token ? (!selectedSize ? "Select Size" : "Add to Cart") : "Login to Cart"}
+
                 </button>
               )}
               
               <button
                 onClick={handleBuyNow}
-                disabled={isUpdating || !token}
+                disabled={isUpdating || !token || !selectedSize}
+
                 className={`h-14 rounded-xl font-semibold transition-all flex items-center justify-center gap-3 ${
                   token 
                     ? 'bg-gradient-to-r from-green-600 to-teal-600 text-white hover:opacity-90' 
@@ -849,7 +876,8 @@ export default function Designdetailspage() {
                 } ${isUpdating ? 'opacity-50' : ''}`}
               >
                 <CreditCard className="w-5 h-5" />
-                {token ? 'Buy Now' : 'Login to Buy'}
+                {token ? (!selectedSize ? "Select Size" : "Buy Now") : "Login to Buy"}
+
               </button>
 
               <button
@@ -910,12 +938,42 @@ export default function Designdetailspage() {
                         style={{ backgroundColor: design.productColor }}
                       />
                       <div>
-                        <span className="text-gray-600">{design.productColor}</span>
+                        <span className="text-gray-600">{design.productColorName}</span>
                         <p className="text-xs text-gray-400 mt-1">Click to copy</p>
                       </div>
                     </div>
                   </div>
                 )}
+                  {/* Size Selection */}
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-medium text-gray-700">Select Size</span>
+                      <span className="text-xs text-gray-400">Required</span>
+                    </div>
+
+                    <div className="grid grid-cols-5 gap-2">
+                      {SIZES.map((sz) => (
+                        <button
+                          key={sz}
+                          type="button"
+                          onClick={() => setSelectedSize(sz)}
+                          className={`py-2 rounded-lg border text-sm font-semibold transition-all ${
+                            selectedSize === sz
+                              ? "border-blue-600 bg-blue-50 text-blue-700"
+                              : "border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50"
+                          }`}
+                        >
+                          {sz}
+                        </button>
+                      ))}
+                    </div>
+
+                    {!selectedSize && (
+                      <p className="text-xs text-gray-400 mt-2">
+                        Please choose a size to add this design to cart.
+                      </p>
+                    )}
+                  </div>
 
                 {/* Design Stats */}
                 <div className="space-y-4">

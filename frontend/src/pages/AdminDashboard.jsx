@@ -125,6 +125,20 @@ const AdminDashboard = () => {
   const [localSubCategory, setLocalSubCategory] = useState('');
   const [viewMode, setViewMode] = useState('products'); // 'products' or 'designs'
   
+  // Helper function to get full image URL
+  const getImageUrl = (imagePath) => {
+    if (!imagePath) return null;
+    
+    // Check if it's already a full URL
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return imagePath;
+    }
+    
+    // Prepend base URL for relative paths
+    const baseUrl = import.meta.env.VITE_IMAGE_URL; 
+    return `${baseUrl}/${imagePath.replace(/^\/+/, '')}`;
+  };
+
   // Initialize on component mount
   useEffect(() => {
     dispatch(fetchFilters());
@@ -641,7 +655,7 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* Product Details Modal */}
+      {/* Product Details Modal - Updated for Variants with Base URL */}
       {showProductModal && selectedProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -661,9 +675,13 @@ const AdminDashboard = () => {
                 <div className="mb-4">
                   {selectedProduct.images && selectedProduct.images.length > 0 ? (
                     <img
-                      src={selectedProduct.images[0]}
+                      src={getImageUrl(selectedProduct.images[0])}
                       alt={selectedProduct.title}
                       className="w-full h-64 object-cover rounded-lg"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = 'https://via.placeholder.com/400x400?text=No+Image';
+                      }}
                     />
                   ) : (
                     <div className="w-full h-64 bg-gray-100 rounded-lg flex items-center justify-center">
@@ -676,9 +694,13 @@ const AdminDashboard = () => {
                     {selectedProduct.images.slice(1).map((img, index) => (
                       <img
                         key={index}
-                        src={img}
+                        src={getImageUrl(img)}
                         alt={`${selectedProduct.title} ${index + 2}`}
                         className="w-full h-20 object-cover rounded"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = 'https://via.placeholder.com/100x100?text=No+Image';
+                        }}
                       />
                     ))}
                   </div>
@@ -690,23 +712,78 @@ const AdminDashboard = () => {
                 <h4 className="text-2xl font-bold text-gray-900 mb-2">{selectedProduct.title}</h4>
                 <p className="text-gray-600 mb-4">{selectedProduct.description}</p>
                 
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div>
-                    <p className="text-sm text-gray-500">Price</p>
-                    <p className="text-xl font-bold text-blue-600">₹{selectedProduct.price}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Stock</p>
-                    <p className="text-xl font-bold text-gray-900">{selectedProduct.stock} units</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Category</p>
-                    <p className="font-medium text-gray-900">{selectedProduct.category}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Sub Category</p>
-                    <p className="font-medium text-gray-900">{selectedProduct.subCategory}</p>
-                  </div>
+                {/* Variants Section */}
+                <div className="mb-6">
+                  <h5 className="text-lg font-semibold text-gray-900 mb-3">Size-wise Pricing & Stock</h5>
+                  
+                  {selectedProduct.variants && selectedProduct.variants.length > 0 ? (
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="grid grid-cols-3 gap-4 mb-2 text-sm font-medium text-gray-500">
+                        <div>Size</div>
+                        <div>Price</div>
+                        <div>Stock</div>
+                      </div>
+                      {selectedProduct.variants.map((variant, index) => (
+                        <div key={index} className="grid grid-cols-3 gap-4 py-2 border-b border-gray-200 last:border-0">
+                          <div className="font-medium text-gray-900">
+                            {variant.size}
+                            {variant.sku && (
+                              <div className="text-xs text-gray-500">SKU: {variant.sku}</div>
+                            )}
+                          </div>
+                          <div className="text-lg font-bold text-blue-600">
+                            ₹{variant.price}
+                          </div>
+                          <div>
+                            <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              variant.stock > 10 
+                                ? 'bg-green-100 text-green-800'
+                                : variant.stock > 0
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {variant.stock} units
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {/* Summary */}
+                      <div className="mt-4 pt-4 border-t border-gray-300">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div className="text-gray-600">Total Stock:</div>
+                          <div className="font-bold text-gray-900">
+                            {selectedProduct.variants.reduce((sum, v) => sum + (v.stock || 0), 0)} units
+                          </div>
+                          <div className="text-gray-600">Price Range:</div>
+                          <div className="font-bold text-gray-900">
+                            ₹{Math.min(...selectedProduct.variants.map(v => v.price))} - 
+                            ₹{Math.max(...selectedProduct.variants.map(v => v.price))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    // Fallback for old products without variants
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                      <div>
+                        <p className="text-sm text-gray-500">Price</p>
+                        <p className="text-xl font-bold text-blue-600">₹{selectedProduct.price}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Stock</p>
+                        <p className="text-xl font-bold text-gray-900">{selectedProduct.stock || 0} units</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Category</p>
+                        <p className="font-medium text-gray-900">{selectedProduct.category}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Sub Category</p>
+                        <p className="font-medium text-gray-900">{selectedProduct.subCategory}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Tags */}
@@ -1101,6 +1178,7 @@ const AdminDashboard = () => {
                 </div>
               ) : (
                 <>
+                  {/* Edit Mode Products Grid - Updated for Variants with Base URL */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8 max-h-[500px] overflow-y-auto p-2">
                     {availableProducts.map(product => (
                       <div
@@ -1129,9 +1207,13 @@ const AdminDashboard = () => {
                         <div className="w-full h-40 bg-gray-100 rounded-lg mb-4 overflow-hidden">
                           {product.images && product.images.length > 0 ? (
                             <img
-                              src={product.images[0]}
+                              src={getImageUrl(product.images[0])}
                               alt={product.title}
                               className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = 'https://via.placeholder.com/400x400?text=No+Image';
+                              }}
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -1144,9 +1226,32 @@ const AdminDashboard = () => {
                         <h4 className="font-medium text-gray-900 mb-2 line-clamp-1">
                           {product.title}
                         </h4>
-                        <p className="text-lg font-bold text-blue-600 mb-2">
-                          ₹{product.price}
-                        </p>
+                        
+                        {/* Variants Info */}
+                        {product.variants && product.variants.length > 0 ? (
+                          <div className="mb-2">
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-sm text-gray-600">
+                                {product.variants.map(v => v.size).join(', ')}
+                              </p>
+                              <p className="text-lg font-bold text-blue-600">
+                                ₹{Math.min(...product.variants.map(v => v.price))}+
+                              </p>
+                            </div>
+                            <p className="text-xs text-gray-500">
+                              Total stock: {product.variants.reduce((sum, v) => sum + (v.stock || 0), 0)} units
+                            </p>
+                          </div>
+                        ) : (
+                          // Fallback for old products
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-sm text-gray-600">Single variant</p>
+                            <p className="text-lg font-bold text-blue-600">
+                              ₹{product.price}
+                            </p>
+                          </div>
+                        )}
+                        
                         <div className="flex items-center justify-between">
                           <p className="text-sm text-gray-500 truncate">
                             {product.category} › {product.subCategory}
@@ -1254,7 +1359,7 @@ const AdminDashboard = () => {
                 </div>
               ) : (
                 <>
-                  {/* Designs Table */}
+                  {/* Designs Table with Base URL */}
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead className="bg-gray-50">
@@ -1286,9 +1391,13 @@ const AdminDashboard = () => {
                               <div className="h-10 w-10 flex-shrink-0">
                                 {design.canvasData?.thumbnail ? (
                                   <img
-                                    src={design.canvasData.thumbnail}
+                                    src={getImageUrl(design.canvasData.thumbnail)}
                                     alt={design.title || 'Design'}
                                     className="h-10 w-10 rounded object-cover"
+                                    onError={(e) => {
+                                      e.target.onerror = null;
+                                      e.target.src = 'https://via.placeholder.com/40x40?text=No+Image';
+                                    }}
                                   />
                                 ) : (
                                   <div className="h-10 w-10 bg-gradient-to-br from-purple-100 to-pink-100 rounded flex items-center justify-center">
@@ -1507,7 +1616,7 @@ const AdminDashboard = () => {
                 </div>
               ) : (
                 <>
-                  {/* Products Table */}
+                  {/* Products Table - Updated for Variants with Base URL */}
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead className="bg-gray-50">
@@ -1519,10 +1628,10 @@ const AdminDashboard = () => {
                             Category
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Price
+                            Sizes / Price Range
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Stock
+                            Total Stock
                           </th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Status
@@ -1540,9 +1649,13 @@ const AdminDashboard = () => {
                                 <div className="h-10 w-10 flex-shrink-0">
                                   {product.images && product.images.length > 0 ? (
                                     <img
-                                      src={product.images[0]}
+                                      src={getImageUrl(product.images[0])}
                                       alt={product.title}
                                       className="h-10 w-10 rounded object-cover"
+                                      onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.src = 'https://via.placeholder.com/40x40?text=No+Image';
+                                      }}
                                     />
                                   ) : (
                                     <div className="h-10 w-10 bg-gray-100 rounded flex items-center justify-center">
@@ -1573,19 +1686,52 @@ const AdminDashboard = () => {
                               <div className="text-sm text-gray-900">{product.category}</div>
                               <div className="text-sm text-gray-500">{product.subCategory}</div>
                             </td>
-                            <td className="px-6 py-4 text-sm text-gray-900 font-medium">
-                              ₹{product.price}
+                            <td className="px-6 py-4">
+                              {product.variants && product.variants.length > 0 ? (
+                                <div>
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {product.variants.map(v => v.size).join(', ')}
+                                  </div>
+                                  <div className="text-sm text-gray-600">
+                                    ₹{Math.min(...product.variants.map(v => v.price))} - 
+                                    ₹{Math.max(...product.variants.map(v => v.price))}
+                                  </div>
+                                </div>
+                              ) : (
+                                // Fallback for old products
+                                <div className="text-sm font-medium text-gray-900">
+                                  ₹{product.price || 0}
+                                </div>
+                              )}
                             </td>
                             <td className="px-6 py-4">
-                              <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                product.stock > 10 
-                                  ? 'bg-green-100 text-green-800'
-                                  : product.stock > 0
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-red-100 text-red-800'
-                              }`}>
-                                {product.stock} units
-                              </span>
+                              {product.variants && product.variants.length > 0 ? (
+                                <div>
+                                  <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                    product.variants.reduce((sum, v) => sum + (v.stock || 0), 0) > 10 
+                                      ? 'bg-green-100 text-green-800'
+                                      : product.variants.reduce((sum, v) => sum + (v.stock || 0), 0) > 0
+                                      ? 'bg-yellow-100 text-yellow-800'
+                                      : 'bg-red-100 text-red-800'
+                                  }`}>
+                                    {product.variants.reduce((sum, v) => sum + (v.stock || 0), 0)} units
+                                  </span>
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {product.variants.filter(v => v.stock > 0).length} sizes available
+                                  </div>
+                                </div>
+                              ) : (
+                                // Fallback for old products
+                                <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                  product.stock > 10 
+                                    ? 'bg-green-100 text-green-800'
+                                    : product.stock > 0
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {product.stock || 0} units
+                                </span>
+                              )}
                             </td>
                             <td className="px-6 py-4">
                               <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${

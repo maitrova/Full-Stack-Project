@@ -29,6 +29,10 @@ const cartItemSchema = new mongoose.Schema(
       ref: "Product",
       default: null,
     },
+    size: {
+      type: String,
+      default: "M", // "S", "M", "L", etc.
+    },
 
     qty: { type: Number, required: true, min: 1, default: 1 },
 

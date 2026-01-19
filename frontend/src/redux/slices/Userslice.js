@@ -4,7 +4,7 @@ import axios from 'axios';
 
 // Base URL for your API
 const BASE_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
-const API_URL = `${BASE_URL}/api/auth`;
+const API_URL = `${BASE_URL}/auth`;
 
 // Async thunk for user registration
 export const registerUser = createAsyncThunk(

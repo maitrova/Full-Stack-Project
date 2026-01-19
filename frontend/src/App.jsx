@@ -23,6 +23,11 @@ import ReadymadeProductDetailPage from "./components/readymadeproductdetailspage
 import AdminDashboard from "./pages/AdminDashboard.jsx";
 import DesignUploadsManager from "./components/admindesignuploads.jsx";
 import HomepageAdmin from "./pages/setHomepage.jsx";
+import DropproductAdmin from "./components/dropproducts.jsx";
+import DropProductDetailsPage from "./components/Dropproductsdetailpage.jsx";
+import CustomProductsHub from "./components/CustomProductsHub.jsx";
+import AllProductsHub from "./components/AllproductsHub.jsx";
+
 
 // You'll need to create this
 
@@ -75,6 +80,12 @@ function App() {
           </MainLayout>
         } />
 
+        <Route path="/dropproducts/:id" element={
+          <MainLayout>
+            <DropProductDetailsPage />
+          </MainLayout>
+        } />
+
         <Route path="/products/:slug/customize" element={
           <MainLayout>
             <ProtectedRoute>
@@ -99,6 +110,18 @@ function App() {
             </ProtectedRoute>
           </MainLayout>
         } />
+         <Route path="/customproducts" element={
+          <MainLayout>
+            <CustomProductsHub/>
+          </MainLayout>
+        } />
+
+        <Route path="/Allproducts" element={
+          <MainLayout>
+            <AllProductsHub/>
+          </MainLayout>
+        } />
+
 
         <Route path="/adminpage/design/uploads" element={
           <MainLayout>
@@ -107,6 +130,16 @@ function App() {
             </ProtectedRoute>
           </MainLayout>
         } />
+
+        <Route path="/adminpage/drop-products" element={
+          <MainLayout>
+            <ProtectedRoute>
+              <DropproductAdmin />
+            </ProtectedRoute>
+          </MainLayout>
+        } />
+
+        
 
         <Route path="/usersaved_designs" element={
           <MainLayout>

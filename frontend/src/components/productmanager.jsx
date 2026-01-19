@@ -12,6 +12,7 @@ import {
   clearReadymadeSuccess
 } from '../redux/slices/predesignedslice.js';
 
+const IMAGE_URL = import.meta.env.VITE_IMAGE_URL;
 // Carousel Component
 const ProductCarousel = ({ images, title }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -72,7 +73,7 @@ const ProductCarousel = ({ images, title }) => {
             }`}
           >
             <img 
-              src={`http://localhost:5000/${image}`} 
+              src={`${IMAGE_URL}/${image}`} 
               alt={`${title} - Image ${imgIndex + 1}`}
               className="w-full h-full object-cover"
               onError={(e) => {
@@ -207,10 +208,10 @@ const ReadymadeProductsManager = () => {
           video: null
         });
         setImagePreviews(currentProduct.images ? 
-          currentProduct.images.map(img => `http://localhost:5000/${img}`) : 
+          currentProduct.images.map(img => `${IMAGE_URL}/${img}`) : 
           []);
         setVideoPreview(currentProduct.video ? 
-          `http://localhost:5000/${currentProduct.video}` : 
+          `${IMAGE_URL}/${currentProduct.video}` : 
           null);
         setIsFormOpen(true);
       } catch (err) {

@@ -19,6 +19,9 @@ import {
 } from '../redux/slices/Cartslice.js';
 import { selectCurrentToken } from '../redux/slices/Userslice.js';
 
+// Constants
+const API_BASE_URL = import.meta.env.VITE_IMAGE_URL;
+
 // Helper function to ensure image URLs have proper base URL
 const ensureImageUrl = (imagePath) => {
   if (!imagePath) return null;
@@ -28,13 +31,9 @@ const ensureImageUrl = (imagePath) => {
     return imagePath;
   }
   
-  // Add localhost:5000 base URL if it's a relative path
-  if (imagePath.startsWith('/')) {
-    return `http://localhost:5000${imagePath}`;
-  } else {
-    // If it doesn't start with slash, add one
-    return `http://localhost:5000/${imagePath}`;
-  }
+  // Remove any leading slash and create proper URL
+  const cleanPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
+  return `${API_BASE_URL}/${cleanPath}`;
 };
 
 const CartPage = () => {
@@ -93,7 +92,7 @@ const CartPage = () => {
 
   // Get main image URL - handle both previewImage and nested images
   const getImageUrl = (item) => {
-    // Try previewImage first (this might already have localhost:5000)
+    // Try previewImage first
     if (item.previewImage) {
       return ensureImageUrl(item.previewImage);
     }
@@ -135,6 +134,7 @@ const CartPage = () => {
       return {
         description: product.description,
         category: product.category,
+        subCategory: product.subCategory,
         brand: product.brand,
         size: product.size,
         color: product.color
@@ -264,7 +264,7 @@ const CartPage = () => {
     
     // Handle INR specially
     if (currency === 'INR' || currency === '₹') {
-      return `₹${numPrice.toFixed(2)}`;
+      return `₹${numPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
     } else if (currency === 'USD' || currency === '$') {
       return `$${numPrice.toFixed(2)}`;
     }
@@ -291,9 +291,9 @@ const CartPage = () => {
   // Handle image click to navigate to details page
   const handleImageClick = (item) => {
     if (item.kind === 'READYMADE' && item.readymadeProduct?._id) {
-      navigate(`/products/${item.readymadeProduct._id}`);
+      navigate(`/readymade/${item.readymadeProduct._id}`);
     } else if (item.kind === 'DESIGN' && item.design?._id) {
-      navigate(`/designs/${item.design._id}`);
+      navigate(`/catalogue/${item.design._id}`);
     } else if (item.product?._id) {
       navigate(`/products/${item.product._id}`);
     }
@@ -386,7 +386,7 @@ const CartPage = () => {
             <p className="text-gray-600 mb-6">Looks like you haven't added any items to your cart yet</p>
             <div className="flex justify-center space-x-4">
               <Link
-                to="/products"
+                to="/allproducts"
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition duration-200"
               >
                 Browse Products
@@ -490,36 +490,62 @@ const CartPage = () => {
                   return (
                     <div key={item._id} className="p-6">
                       <div className="flex flex-col sm:flex-row">
-                        {/* Product Image - Now clickable */}
+                        {/* Product Image with enhanced hover effects */}
                         <div 
                           className="flex-shrink-0 w-full sm:w-32 h-32 mb-4 sm:mb-0 cursor-pointer"
                           onClick={() => handleImageClick(item)}
                         >
                           {imageUrl ? (
-                            <div className="relative w-full h-full group">
+                            <div className="relative w-full h-full group overflow-hidden rounded-lg">
+                              {/* Main image with zoom effect */}
                               <img
                                 src={imageUrl}
                                 alt={itemName}
-                                className="w-full h-full object-cover rounded-lg transition-transform duration-200 group-hover:scale-105"
+                                className="w-full h-full object-cover transition-all duration-300 group-hover:scale-110"
                                 onError={(e) => {
                                   e.target.onerror = null;
                                   e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9IiNFNUU1RTUiLz48L3N2Zz4=';
                                 }}
                               />
-                              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 rounded-lg transition-all duration-200 flex items-center justify-center">
-                                <span className="opacity-0 group-hover:opacity-100 text-white bg-black bg-opacity-50 px-2 py-1 rounded text-sm transition-opacity duration-200">
-                                  View Details
-                                </span>
+                              
+                              {/* Black edge overlay - only on edges */}
+                              <div className="absolute inset-0 rounded-lg">
+                                {/* Top edge */}
+                                <div className="absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                
+                                {/* Bottom edge */}
+                                <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                
+                                {/* Left edge */}
+                                <div className="absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                
+                                {/* Right edge */}
+                                <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                              </div>
+                              
+                              {/* Black corners for emphasis */}
+                              <div className="absolute top-0 left-0 w-4 h-4 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-tl-lg"></div>
+                              <div className="absolute top-0 right-0 w-4 h-4 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-tr-lg"></div>
+                              <div className="absolute bottom-0 left-0 w-4 h-4 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-bl-lg"></div>
+                              <div className="absolute bottom-0 right-0 w-4 h-4 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-br-lg"></div>
+                              
+                              {/* View Details overlay */}
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="transform scale-95 opacity-0 group-hover:scale-100 group-hover:opacity-100 transition-all duration-300 bg-black/70 text-white px-4 py-2 rounded-lg">
+                                  <span className="text-sm font-medium">View Details</span>
+                                </div>
                               </div>
                             </div>
                           ) : (
                             <div 
-                              className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center cursor-pointer hover:bg-gray-300 transition-colors duration-200"
+                              className="w-full h-full bg-gray-200 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:bg-gray-300 transition-colors duration-200 group"
                               onClick={() => handleImageClick(item)}
                             >
-                              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-8 h-8 text-gray-400 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                               </svg>
+                              <span className="mt-2 text-sm text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200">No Image</span>
+                              <span className="absolute bottom-2 text-xs text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200">View Details</span>
                             </div>
                           )}
                         </div>
@@ -537,6 +563,24 @@ const CartPage = () => {
                               <p className="text-sm text-gray-500 mt-1">
                                 {productType} • {item.currency}
                               </p>
+                              {/* ✅ Size + Stock badges (only for READYMADE) */}
+{/* ✅ Size badge for BOTH READYMADE & DESIGN */}
+{item.size && (
+  <div className="flex flex-wrap gap-2 mt-2">
+    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+      Size: {String(item.size).toUpperCase()}
+    </span>
+
+    {/* Optional: stock only for READYMADE */}
+    {item.kind === "READYMADE" && typeof maxStock === "number" && maxStock > 0 && (
+      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+        Stock: {maxStock}
+      </span>
+    )}
+  </div>
+)}
+
+
                               
                               {/* Additional product info */}
                               {productInfo.description && (
@@ -544,13 +588,24 @@ const CartPage = () => {
                                   {productInfo.description}
                                 </p>
                               )}
+
+                              {productInfo.size && (
+                                <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                                  {productInfo.size && `Size: ${productInfo.size} `}
+                                </p>
+                              )}
                               
                               {/* Display category if available */}
-                              {(productInfo.category || productInfo.brand || productInfo.style) && (
+                              {(productInfo.category || productInfo.brand || productInfo.subCategory) && (
                                 <div className="flex flex-wrap gap-2 mt-2">
                                   {productInfo.category && (
                                     <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                       {productInfo.category}
+                                    </span>
+                                  )}
+                                  {productInfo.subCategory && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                      {productInfo.subCategory}
                                     </span>
                                   )}
                                   {productInfo.brand && (

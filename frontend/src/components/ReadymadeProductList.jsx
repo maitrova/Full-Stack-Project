@@ -13,7 +13,7 @@ import {
   clearSuccess,
   getItemQuantity 
 } from '../redux/slices/Cartslice.js'; // Adjust path as needed
-
+const IMAGE_URL = import.meta.env.VITE_IMAGE_URL;
 const ReadymadeProductList = () => {
   const dispatch = useDispatch();
   const { products, loading, error } = useSelector((state) => state.readymadeproducts);
@@ -253,9 +253,9 @@ const ReadymadeProductList = () => {
     if (imagePath.startsWith('http')) {
       return imagePath;
     } else if (imagePath.startsWith('/')) {
-      return `http://localhost:5000${imagePath}`;
+      return `${IMAGE_URL}${imagePath}`;
     } else {
-      return `http://localhost:5000/${imagePath}`;
+      return `${IMAGE_URL}/${imagePath}`;
     }
   };
 

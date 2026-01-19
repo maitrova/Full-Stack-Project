@@ -59,6 +59,9 @@ const designLayerSchema = new mongoose.Schema(
     widthInches: Number,
     heightInches: Number,
     areaInches: Number,
+    rawPrintWidthInches: Number,
+    rawPrintHeightInches: Number,
+    rawPrintAreaInches: Number,
   },
   { _id: false }
 );
@@ -100,6 +103,11 @@ const designSchema = new mongoose.Schema(
     productColor: {
       type: String,
       default: "#FFFFFF",
+    },
+
+    productColorName: {
+      type: String,
+      default: "White",
     },
 
     previewImage: {

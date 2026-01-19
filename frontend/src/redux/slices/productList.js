@@ -3,7 +3,8 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
 // Base API URL
-const API_BASE = 'http://localhost:5000/api/readymadeproducts';
+const API_BASE = `${import.meta.env.VITE_API_URL}/readymadeproducts`;
+
 
 // Async Thunks
 export const fetchProducts = createAsyncThunk(
@@ -30,6 +31,7 @@ export const fetchAllProducts = createAsyncThunk(
       const response = await axios.get(`${API_BASE}/public`, {
         params: { category, subCategory, limit }
       });
+      console.log('All products response:', response.data);
       return response.data.data;
     } catch (error) {
       console.error('fetchAllProducts Error:', error.response?.data || error.message);

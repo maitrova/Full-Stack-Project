@@ -1,1831 +1,1826 @@
-// client/src/pages/UnifiedProductHub.jsx
-import { useEffect, useState, useMemo, useCallback } from "react";
+// src/pages/DesignerPage.jsx
+import React, { useState, useEffect, useRef } from "react";
+import { useParams, useSearchParams, useNavigate, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { Link } from "react-router-dom";
+import { fetchProductBySlug } from "../redux/slices/productsSlice.js";
 import { 
-  Grid, 
-  Search, 
-  X, 
-  ChevronRight,
-  ChevronLeft,
-  Sparkles,
-  TrendingUp,
-  Star,
-  ShoppingBag,
-  Palette,
-  Package,
-  Zap,
-  Shield,
-  Truck,
-  Eye,
-  Heart,
-  ShoppingCart,
-  Loader2,
-  SlidersHorizontal,
-  CheckCircle,
-  Clock,
-  Trophy,
-  Flame,
-  TrendingDown,
-  Filter,
-  BadgeCheck,
-  Award,
-  Target,
-  Layers,
-  ChevronDown,
-  ChevronUp,
-  Tag,
-  Settings,
-  Grid3x3
-} from "lucide-react";
-
-// Import actions from different slices
-import { fetchProducts, fetchProductCategories } from "../redux/slices/productsSlice.js";
-
-// Import common saved data slice
-import { 
-  fetchCommonSavedData,
-  selectCommonSavedData,
-  selectCommonSavedDataLoading,
-  selectCommonSavedDataError,
-  updateFilters as updateCommonFilters,
-  resetCommonSavedData
-} from "../redux/slices/commonproducts.js";
-
-// Import cart actions
-import { 
-  addToCart, 
-  selectCartItems,
-  selectCartLoading,
-  selectCartError,
-  selectCartSuccess,
-  clearError,
-  clearSuccess 
-} from "../redux/slices/Cartslice.js";
+  fetchFolders, 
+  fetchImages, 
+  setCurrentFolder,
+  clearCurrentFolder
+} from "../redux/slices/admindesignuploads.js";
+import RecolorEditor from "./RecolorEditor.jsx";
 import { selectCurrentToken } from "../redux/slices/Userslice.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
 
-// Modern professional color palette
-const MODERN_COLORS = {
-  primary: {
-    DEFAULT: 'rgb(37 99 235)',
-    light: 'rgb(59 130 246)',
-    dark: 'rgb(29 78 216)'
-  },
-  secondary: {
-    DEFAULT: 'rgb(168 85 247)',
-    light: 'rgb(192 132 252)',
-    dark: 'rgb(147 51 234)'
-  },
-  accent: {
-    success: 'rgb(16 185 129)',
-    warning: 'rgb(245 158 11)',
-    error: 'rgb(239 68 68)',
-    info: 'rgb(14 165 233)'
-  },
-  neutral: {
-    50: 'rgb(250 250 250)',
-    100: 'rgb(245 245 245)',
-    200: 'rgb(229 229 229)',
-    300: 'rgb(212 212 212)',
-    400: 'rgb(163 163 163)',
-    500: 'rgb(115 115 115)',
-    600: 'rgb(82 82 82)',
-    700: 'rgb(64 64 64)',
-    800: 'rgb(38 38 38)',
-    900: 'rgb(23 23 23)'
-  }
+const FONT_OPTIONS = [
+  "Impact, sans-serif",
+  "Arial, sans-serif",
+  "Helvetica, sans-serif",
+  "'Times New Roman', serif",
+  "Georgia, serif",
+  "'Comic Sans MS', cursive, sans-serif",
+];
+
+// Pricing constants
+const FIXED_SIZE_INCHES = 4;
+const PRICE_PER_SQ_INCH = 6;
+const SLEEVE_PRICE = 30;
+const MINIMUM_DESIGN_CHARGE = 30;
+const DISPLAY_DPI = 300;
+const PRINT_DPI = 300;
+
+// Tab options
+const TABS = {
+  PRODUCT_COLORS: 'productColors',
+  DESIGNS: 'designs',
+  TEXT: 'text',
+  VIEWS: 'views',
+  DESIGN_LIBRARY: 'designLibrary' // New tab
 };
 
-// Product type definitions - Only two types
-const PRODUCT_TYPES = [
-  { 
-    id: 'custom', 
-    name: 'Custom Products', 
-    icon: Settings,
-    color: MODERN_COLORS.primary.DEFAULT,
-    description: 'Design your own personalized products',
-    gradient: 'from-blue-600 to-indigo-600'
-  },
-  { 
-    id: 'all', 
-    name: 'All Products', 
-    icon: Grid3x3,
-    color: MODERN_COLORS.secondary.DEFAULT,
-    description: 'Browse designs, ready-made & more',
-    gradient: 'from-purple-600 to-pink-600'
-  }
-];
+const createDefaultTextLayer = () => ({
+  id: "text-" + Date.now() + "-" + Math.random().toString(36).slice(2),
+  text: "YOUR TEXT",
+  x: 0.5,
+  y: 0.5,
+  fontSize: 42,
+  color: "#000000",
+  fontFamily: "Impact, sans-serif",
+  rotation: 0,
+});
 
-// Sort options
-const SORT_OPTIONS = [
-  { id: 'featured', name: 'Featured', icon: Sparkles },
-  { id: 'newest', name: 'New Arrivals', icon: Clock },
-  { id: 'best-sellers', name: 'Best Sellers', icon: Trophy },
-  { id: 'trending', name: 'Trending', icon: Flame },
-  { id: 'best-rated', name: 'Best Rated', icon: Star },
-  { id: 'price-low', name: 'Price: Low to High', icon: TrendingDown },
-  { id: 'price-high', name: 'Price: High to Low', icon: TrendingUp }
-];
-
-// Price ranges for quick selection
-const PRICE_RANGES = [
-  { label: 'Under ₹500', min: 0, max: 500 },
-  { label: '₹500 - ₹1000', min: 500, max: 1000 },
-  { label: '₹1000 - ₹2500', min: 1000, max: 2500 },
-  { label: '₹2500 - ₹5000', min: 2500, max: 5000 },
-  { label: '₹5000+', min: 5000, max: 10000 }
-];
-
-// Default placeholder image - Higher quality
-const DEFAULT_PRODUCT_IMAGE = "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&h=600&fit=crop&q=80";
-
-export default function UnifiedProductHub() {
-  const dispatch = useDispatch();
+const createDesignLayer = (id, imageUrl, file, width, height, isFromLibrary = false) => {
+  const displayWidthInches = width / DISPLAY_DPI;
+  const displayHeightInches = height / DISPLAY_DPI;
+  const displayAreaInches = displayWidthInches * displayHeightInches;
   
-  // Product type state
-  const [activeProductType, setActiveProductType] = useState('custom');
+  const printWidthInches = width / PRINT_DPI;
+  const printHeightInches = height / PRINT_DPI;
+  console.log("print width and height inches:", printWidthInches, printHeightInches); 
+  const printAreaInches = printWidthInches * printHeightInches;
   
-  // Common UI states
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortOption, setSortOption] = useState('featured');
-  const [priceRange, setPriceRange] = useState([0, 10000]);
-  const [showSidebar, setShowSidebar] = useState(true); // Default to show sidebar
-  const [viewMode, setViewMode] = useState('grid');
-  const [wishlist, setWishlist] = useState([]);
-  const [localCartItems, setLocalCartItems] = useState({});
-  const [showCartSuccess, setShowCartSuccess] = useState(false);
-  const [addedProductName, setAddedProductName] = useState('');
-  const [addingToCartId, setAddingToCartId] = useState(null);
+  const fixedArea = FIXED_SIZE_INCHES * FIXED_SIZE_INCHES;
+  const additionalPrintArea = Math.max(0, printAreaInches - fixedArea);
   
-  // Image slideshow states
-  const [imageIndices, setImageIndices] = useState({});
-  const [autoSlideIntervals, setAutoSlideIntervals] = useState({});
-  const [imageLoading, setImageLoading] = useState({});
+  let layerPrice = 0;
+  const scaledPrintArea = printAreaInches * 0.35 * 0.35;
+  const scaledFixedArea = fixedArea * 0.35 * 0.35;
   
-  // Custom products state
-  const { 
-    items: customProducts, 
-    itemsStatus: customStatus, 
-    itemsError: customError,
-    categories: backendCategories,
-    allSubCategories: backendAllSubCategories,
-    categoriesStatus: categoriesStatus,
-    categoriesError: categoriesError
-  } = useSelector((state) => state.products);
-  
-  // Common saved data state
-  const commonSavedData = useSelector(selectCommonSavedData);
-  const commonLoading = useSelector(selectCommonSavedDataLoading);
-  const commonError = useSelector(selectCommonSavedDataError);
-  
-  // Cart state
-  const cartItems = useSelector(selectCartItems);
-  const cartLoading = useSelector(selectCartLoading);
-  const cartError = useSelector(selectCartError);
-  const cartSuccess = useSelector(selectCartSuccess);
-  const token = useSelector(selectCurrentToken);
-  
-  // Filter states
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedSubCategory, setSelectedSubCategory] = useState('all');
-  const [productTypeFilter, setProductTypeFilter] = useState('all');
-  const [ratingFilter, setRatingFilter] = useState(0);
-  const [selectedCommonCategory, setSelectedCommonCategory] = useState('all');
-  const [selectedCommonSubCategory, setSelectedCommonSubCategory] = useState('all');
-  const [quickPriceRange, setQuickPriceRange] = useState(null);
-  const [expandedCategories, setExpandedCategories] = useState({});
-  const [isFirstLoad, setIsFirstLoad] = useState(true);
-
-  // State for subcategories of selected category
-  const [currentSubcategories, setCurrentSubcategories] = useState([]);
-
-  // State to prevent unnecessary re-fetches
-  const [lastFilters, setLastFilters] = useState({});
-
-  // Get image URL helper function
-  const getImageUrl = useCallback((imagePath) => {
-    if (!imagePath) return DEFAULT_PRODUCT_IMAGE;
-
-    if (imagePath.startsWith('http') || imagePath.startsWith('data:')) {
-      return imagePath;
+  if (scaledPrintArea <= scaledFixedArea) {
+    layerPrice = MINIMUM_DESIGN_CHARGE;
+  } else {
+    layerPrice = additionalPrintArea * PRICE_PER_SQ_INCH * 0.35 * 0.35;
+    if (layerPrice < MINIMUM_DESIGN_CHARGE) {
+      layerPrice = MINIMUM_DESIGN_CHARGE;
     }
+  }
+  
+  return {
+    id,
+    imageUrl,
+    file,
+    hasBgRemoved: false,
+    x: 0.5,
+    y: 0.5,
+    scale: 0.35,
+    rotation: 0,
+    originalWidthPx: width,
+    originalHeightPx: height,
+    renderedWidthPx: width * 0.35,
+    renderedHeightPx: height * 0.35,
+    originalFile: file,
+    isFromLibrary, // Flag to identify library images
+    displayWidthInches,
+    displayHeightInches,
+    displayAreaInches,
+    currentDisplayWidthInches: displayWidthInches * 0.35,
+    currentDisplayHeightInches: displayHeightInches * 0.35,
+    printWidthInches,
+    printHeightInches,
+    printAreaInches,
+    currentPrintWidthInches: printWidthInches * 0.35,
+    currentPrintHeightInches: printHeightInches * 0.35,
+    currentPrintAreaInches: printAreaInches * 0.35 * 0.35,
+    currentAdditionalArea: Math.max(0, (printAreaInches * 0.35 * 0.35) - (fixedArea * 0.35 * 0.35)),
+    layerPrice,
+    minimumChargeApplied: scaledPrintArea <= scaledFixedArea
+  };
+};
 
-    const baseUrl = API_URL.replace('/backend', '');
-    return `${baseUrl}${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
-  }, []);
+export default function DesignerPage() {
+  const { slug } = useParams();
+  const [searchParams] = useSearchParams();
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const token = useSelector(selectCurrentToken);
+  const { current: product, currentStatus, currentError } = useSelector(
+    (state) => state.products
+  );
 
-  // Helper function to extract all images from design views
-  const extractDesignImages = useCallback((design) => {
-    const images = [];
+  // Design uploads state
+  const { 
+    folders, 
+    images, 
+    currentFolder, 
+    loading: libraryLoading 
+  } = useSelector((state) => state.designUploads);
+
+  const BASE_PRICE = product?.basePrice || 600;
+  
+  const [productColor, setProductColor] = useState("#FFFFFF");
+  const [viewStates, setViewStates] = useState({});
+  const [viewCode, setViewCode] = useState("front");
+  const [bgRemovalLoading, setBgRemovalLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [designRenderWidth, setDesignRenderWidth] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [calculatingPrice, setCalculatingPrice] = useState(false);
+  const [selectedLibraryImage, setSelectedLibraryImage] = useState(null);
+  
+  const [price, setPrice] = useState(BASE_PRICE);
+  const [priceBreakdown, setPriceBreakdown] = useState({
+    basePrice: BASE_PRICE,
+    images: { count: 0, total: 0, items: [] },
+    text: { count: 0, total: 0, items: [] },
+    sleeves: { count: 0, total: 0 },
+    additionalArea: 0,
+    minimumCharges: 0,
+    totalPrice: BASE_PRICE
+  });
+
+  // Edit mode state
+  const editDesignId = searchParams.get("edit");
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [loadingEditData, setLoadingEditData] = useState(false);
+  const [originalDesign, setOriginalDesign] = useState(null);
+  const [editModeInitialized, setEditModeInitialized] = useState(false);
+
+  // Active tab state
+  const [activeTab, setActiveTab] = useState(TABS.PRODUCT_COLORS);
+
+  const editorRef = useRef(null);
+
+  const colorOptions = [
+    "#FFFFFF", "#000000", "#FF6B6B", "#4ECDC4", "#45B7D1",
+    "#96CEB4", "#FECA57", "#FF9FF3", "#54A0FF", "#5F27CD",
+    "#00D2D3", "#FF9F43",
+  ];
+
+  const handleColorChange = (color) => setProductColor(color);
+  
+  const getImageNaturalSize = (url) =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = reject;
+      img.src = url;
+    });
+
+  const updateDesignLayerDimensions = (layer, scale = null) => {
+    const currentScale = scale !== null ? scale : layer.scale;
     
-    if (!design) return images;
+    const currentDisplayWidthInches = layer.displayWidthInches * currentScale;
+    const currentDisplayHeightInches = layer.displayHeightInches * currentScale;
     
-    // Add main preview image from design
-    if (design.previewImage) {
-      const imgUrl = getImageUrl(design.previewImage);
-      if (imgUrl !== DEFAULT_PRODUCT_IMAGE && !images.includes(imgUrl)) {
-        images.push(imgUrl);
+    const currentPrintWidthInches = layer.printWidthInches * currentScale;
+    const currentPrintHeightInches = layer.printHeightInches * currentScale;
+    const currentPrintAreaInches = layer.printAreaInches * currentScale * currentScale;
+    
+    const fixedArea = FIXED_SIZE_INCHES * FIXED_SIZE_INCHES;
+    const additionalArea = Math.max(0, currentPrintAreaInches - fixedArea);
+    
+    let layerPrice = 0;
+    if (currentPrintAreaInches <= fixedArea) {
+      layerPrice = MINIMUM_DESIGN_CHARGE;
+    } else {
+      layerPrice = additionalArea * PRICE_PER_SQ_INCH;
+      if (layerPrice < MINIMUM_DESIGN_CHARGE) {
+        layerPrice = MINIMUM_DESIGN_CHARGE;
       }
     }
     
-    // Extract images from views array
-    if (design.views && Array.isArray(design.views)) {
-      design.views.forEach(view => {
-        if (view.previewImage) {
-          const imgUrl = getImageUrl(view.previewImage);
-          if (imgUrl !== DEFAULT_PRODUCT_IMAGE && !images.includes(imgUrl)) {
-            images.push(imgUrl);
+    return {
+      ...layer,
+      scale: currentScale,
+      currentDisplayWidthInches,
+      currentDisplayHeightInches,
+      currentPrintWidthInches,
+      currentPrintHeightInches,
+      currentPrintAreaInches,
+      currentAdditionalArea: additionalArea,
+      layerPrice,
+      renderedWidthPx: layer.originalWidthPx * currentScale,
+      renderedHeightPx: layer.originalHeightPx * currentScale,
+      minimumChargeApplied: currentPrintAreaInches <= fixedArea
+    };
+  };
+
+  // -------- PRICE CALCULATION --------
+  const calculatePrice = async (updateUI = true) => {
+    try {
+      if (updateUI) setCalculatingPrice(true);
+      
+      const currentBasePrice = product?.basePrice || BASE_PRICE;
+      
+      const allDesignLayers = [];
+      const allTextLayers = [];
+      const allZones = [];
+
+      Object.entries(viewStates).forEach(([viewCode, viewState]) => {
+        if (viewState.designLayers) {
+          viewState.designLayers.forEach(layer => {
+            let zone = layer.zone;
+            if (!zone) {
+              if (viewCode === 'left') zone = 'sleeve-left';
+              else if (viewCode === 'right') zone = 'sleeve-right';
+              else if (viewCode === 'back') zone = 'back-full';
+              else zone = 'front-full';
+            }
+            
+            allDesignLayers.push({
+              ...layer,
+              zone,
+              viewCode
+            });
+            allZones.push(zone);
+          });
+        }
+
+        if (viewState.textLayers) {
+          viewState.textLayers.forEach(textLayer => {
+            allTextLayers.push({
+              ...textLayer,
+              viewCode
+            });
+          });
+        }
+      });
+
+      const { totalPrice, breakdown } = calculateLocalPrice(
+        allDesignLayers, 
+        allTextLayers, 
+        allZones,
+        currentBasePrice
+      );
+      
+      if (updateUI) {
+        setPrice(totalPrice);
+        setPriceBreakdown(breakdown);
+      }
+
+      return { totalPrice, breakdown };
+
+    } catch (err) {
+      console.error("Price calculation error:", err);
+      if (updateUI) {
+        setError("Failed to calculate price: " + err.message);
+      }
+      return { totalPrice: BASE_PRICE, breakdown: null };
+    } finally {
+      if (updateUI) setCalculatingPrice(false);
+    }
+  };
+
+  const calculateLocalPrice = (designLayers, textLayers, zones, basePrice) => {
+    let totalPrice = basePrice;
+    const breakdown = {
+      basePrice: basePrice,
+      images: { count: 0, total: 0, items: [] },
+      text: { count: 0, total: 0, items: [] },
+      sleeves: { count: 0, total: 0 },
+      additionalArea: 0,
+      minimumCharges: 0,
+      totalPrice: basePrice
+    };
+
+    designLayers.forEach((layer, index) => {
+      const zone = layer.zone || zones[index] || 'front-full';
+      
+      if (zone === "sleeve-left" || zone === "sleeve-right") {
+        breakdown.sleeves.count += 1;
+        breakdown.sleeves.total += SLEEVE_PRICE;
+        totalPrice += SLEEVE_PRICE;
+        
+        breakdown.images.items.push({
+          id: layer.id,
+          type: 'sleeve',
+          price: SLEEVE_PRICE,
+          zone: zone,
+          viewCode: layer.viewCode,
+          displaySize: `${layer.currentDisplayWidthInches?.toFixed(2)}" × ${layer.currentDisplayHeightInches?.toFixed(2)}"`,
+          note: 'Sleeve - fixed price'
+        });
+      } else {
+        const printAreaInches = layer.currentPrintAreaInches || 0;
+        const fixedArea = FIXED_SIZE_INCHES * FIXED_SIZE_INCHES;
+        const additionalArea = layer.currentAdditionalArea || Math.max(0, printAreaInches - fixedArea);
+        const perSqInchPrice = additionalArea * PRICE_PER_SQ_INCH;
+        
+        let layerPrice = 0;
+        
+        if (printAreaInches > 0) {
+          if (printAreaInches <= fixedArea) {
+            layerPrice = MINIMUM_DESIGN_CHARGE;
+            breakdown.minimumCharges += MINIMUM_DESIGN_CHARGE;
+          } else {
+            layerPrice = perSqInchPrice;
+            if (perSqInchPrice < MINIMUM_DESIGN_CHARGE) {
+              layerPrice = MINIMUM_DESIGN_CHARGE;
+              breakdown.minimumCharges += MINIMUM_DESIGN_CHARGE;
+            }
+          }
+          
+          if (additionalArea > 0) {
+            breakdown.additionalArea += additionalArea;
           }
         }
-      });
-    }
-    
-    if (images.length === 0) {
-      return [DEFAULT_PRODUCT_IMAGE];
-    }
-    
-    return images;
-  }, [getImageUrl]);
-
-  // Helper function to extract images from readymade products
-  const extractReadymadeImages = useCallback((product) => {
-    const images = [];
-    
-    if (!product) return images;
-    
-    // Add images from images array
-    if (product.images && Array.isArray(product.images)) {
-      product.images.forEach(img => {
-        const imgUrl = getImageUrl(img);
-        if (imgUrl !== DEFAULT_PRODUCT_IMAGE && !images.includes(imgUrl)) {
-          images.push(imgUrl);
-        }
-      });
-    }
-    
-    if (product.previewImage) {
-      const imgUrl = getImageUrl(product.previewImage);
-      if (imgUrl !== DEFAULT_PRODUCT_IMAGE && !images.includes(imgUrl)) {
-        images.push(imgUrl);
+        
+        totalPrice += layerPrice;
+        breakdown.images.count += 1;
+        breakdown.images.total += layerPrice;
+        
+        breakdown.images.items.push({
+          id: layer.id,
+          type: 'image',
+          displaySize: `${layer.currentDisplayWidthInches?.toFixed(2)}" × ${layer.currentDisplayHeightInches?.toFixed(2)}"`,
+          printSize: `${layer.currentPrintWidthInches?.toFixed(2)}" × ${layer.currentPrintHeightInches?.toFixed(2)}"`,
+          printAreaInches: printAreaInches.toFixed(2),
+          additionalArea: additionalArea.toFixed(2),
+          price: layerPrice,
+          zone: zone,
+          viewCode: layer.viewCode,
+          scale: layer.scale,
+          note: printAreaInches <= fixedArea ? 
+                `Minimum charge (${printAreaInches.toFixed(1)} sq.in ≤ ${fixedArea} sq.in)` : 
+                `Area-based pricing`
+        });
       }
-    }
-    
-    if (images.length === 0) {
-      return [DEFAULT_PRODUCT_IMAGE];
-    }
-    
-    return images;
-  }, [getImageUrl]);
+    });
 
-  // Get product images based on type
-  const getProductImages = useCallback((product, type) => {
-    if (type === 'custom') {
-      const image = product.imageUrl || product.image;
-      return image ? [getImageUrl(image)] : [DEFAULT_PRODUCT_IMAGE];
-    } else {
-      const itemType = product.type || 'common';
+    textLayers.forEach((textLayer) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.font = `${textLayer.fontSize}px ${textLayer.fontFamily}`;
       
-      if (itemType === 'design' && product.raw) {
-        return extractDesignImages(product.raw);
-      } else if (itemType === 'readymade' && product.raw) {
-        return extractReadymadeImages(product.raw);
+      const textMetrics = ctx.measureText(textLayer.text);
+      const textWidthPx = textMetrics.width;
+      const textHeightPx = textLayer.fontSize * 1.2;
+      
+      const widthInches = textWidthPx / PRINT_DPI;
+      const heightInches = textHeightPx / PRINT_DPI;
+      const areaInches = widthInches * heightInches;
+      
+      const fixedArea = FIXED_SIZE_INCHES * FIXED_SIZE_INCHES;
+      const additionalArea = Math.max(0, areaInches - fixedArea);
+      let textPrice = additionalArea * PRICE_PER_SQ_INCH;
+      
+      if (areaInches > 0 && textPrice < MINIMUM_DESIGN_CHARGE && areaInches <= fixedArea) {
+        textPrice = MINIMUM_DESIGN_CHARGE;
+        breakdown.minimumCharges += MINIMUM_DESIGN_CHARGE;
       }
       
-      // Fallback
-      const images = [];
-      if (product.previewImage) {
-        const imgUrl = getImageUrl(product.previewImage);
-        if (imgUrl !== DEFAULT_PRODUCT_IMAGE) {
-          images.push(imgUrl);
-        }
+      if (additionalArea > 0) {
+        breakdown.additionalArea += additionalArea;
       }
       
-      return images.length > 0 ? images : [DEFAULT_PRODUCT_IMAGE];
-    }
-  }, [getImageUrl, extractDesignImages, extractReadymadeImages]);
+      if (textPrice > 0) {
+        totalPrice += textPrice;
+        breakdown.text.count += 1;
+        breakdown.text.total += textPrice;
+        
+        breakdown.text.items.push({
+          id: textLayer.id,
+          text: textLayer.text?.substring(0, 15) + (textLayer.text?.length > 15 ? "..." : ""),
+          fontSize: textLayer.fontSize,
+          displaySize: `${(textWidthPx / DISPLAY_DPI).toFixed(2)}" × ${(textHeightPx / DISPLAY_DPI).toFixed(2)}"`,
+          printSize: `${widthInches.toFixed(3)}" × ${heightInches.toFixed(3)}"`,
+          areaInches: areaInches.toFixed(3),
+          additionalArea: additionalArea.toFixed(3),
+          price: textPrice,
+          viewCode: textLayer.viewCode,
+        });
+      }
+    });
 
-  // Fetch data based on active product type - FIXED: Only fetch when necessary
+    breakdown.totalPrice = totalPrice;
+    return { totalPrice, breakdown };
+  };
+
   useEffect(() => {
-    console.log("Fetching data for product type:", activeProductType);
-    
-    if (activeProductType === 'custom') {
-      // Always fetch categories when switching to custom
-      dispatch(fetchProductCategories());
-      
-      const filters = {};
-      if (selectedCategory !== 'all') filters.category = selectedCategory;
-      if (selectedSubCategory !== 'all') filters.subCategory = selectedSubCategory;
-      
-      // Check if filters have actually changed before fetching
-      const filterKey = JSON.stringify(filters);
-      if (filterKey !== lastFilters.custom) {
-        console.log("Fetching custom products with filters:", filters);
-        dispatch(fetchProducts(filters));
-        setLastFilters(prev => ({ ...prev, custom: filterKey }));
+    if (Object.keys(viewStates).length > 0) {
+      const timeoutId = setTimeout(() => {
+        calculatePrice();
+      }, 300);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [viewStates]);
+
+  useEffect(() => {
+    if (product?.basePrice) {
+      setPrice(product.basePrice);
+      setPriceBreakdown(prev => ({
+        ...prev,
+        basePrice: product.basePrice,
+        totalPrice: product.basePrice + (prev.totalPrice - prev.basePrice)
+      }));
+    }
+  }, [product?.basePrice]);
+
+  const uploadDesignImage = async (file) => {
+    try {
+      const formData = new FormData();
+      formData.append("designImage", file);
+
+      const res = await fetch(`${API_URL}/api/upload-design`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to upload image");
       }
-    } else if (activeProductType === 'all') {
-      console.log("Fetching common saved data");
-      dispatch(fetchCommonSavedData({ page: 1, limit: 100 }));
+
+      return `${API_URL}${data.imageUrl}`;
+    } catch (err) {
+      console.error("Upload design image error:", err);
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      });
+    }
+  };
+
+  // Fetch design library folders on component mount
+  useEffect(() => {
+    dispatch(fetchFolders());
+  }, [dispatch]);
+
+  // Fetch images when folder changes
+  useEffect(() => {
+    if (activeTab === TABS.DESIGN_LIBRARY && currentFolder) {
+      dispatch(fetchImages(currentFolder));
+    }
+  }, [dispatch, currentFolder, activeTab]);
+
+  useEffect(() => {
+    if (slug) {
+      console.log("Fetching product for slug:", slug);
+      dispatch(fetchProductBySlug(slug));
+    }
+  }, [slug, dispatch]);
+
+  useEffect(() => {
+    if (!editDesignId || !product) {
+      console.log("Not in edit mode or product not loaded yet");
+      setIsEditMode(false);
+      return;
+    }
+
+    if (editModeInitialized) return;
+
+    const loadDesignForEdit = async () => {
+      try {
+        console.log("Loading design for edit, ID:", editDesignId);
+        setLoadingEditData(true);
+        setError("");
+        
+        const res = await fetch(`${API_URL}/savedata/${editDesignId}`);
+        const design = await res.json();
+
+        if (!res.ok) {
+          throw new Error(design.error || "Failed to load design");
+        }
+
+        console.log("Design loaded successfully:", design);
+        
+        setOriginalDesign(design);
+        setProductColor(design.productColor || "#FFFFFF");
+
+        const loadedViewStates = {};
+        design.views?.forEach((view) => {
+          loadedViewStates[view.code] = {
+            textLayers: view.textLayers?.map(t => ({
+              ...t,
+              id: t.id || `text-${Date.now()}-${Math.random().toString(36).slice(2)}`
+            })) || [],
+            activeTextId: view.textLayers?.[0]?.id || null,
+            designLayers: view.designLayers?.map(d => {
+              const widthPx = d.originalWidthPx || d.renderedWidthPx / (d.scale || 0.35);
+              const heightPx = d.originalHeightPx || d.renderedHeightPx / (d.scale || 0.35);
+              
+              const displayWidthInches = widthPx / DISPLAY_DPI;
+              const displayHeightInches = heightPx / DISPLAY_DPI;
+              const displayAreaInches = displayWidthInches * displayHeightInches;
+              
+              const printWidthInches = widthPx / PRINT_DPI;
+              const printHeightInches = heightPx / PRINT_DPI;
+              const printAreaInches = printWidthInches * printHeightInches;
+              
+              const scale = d.scale || 0.35;
+              
+              return {
+                ...d,
+                id: d.id || `design-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                imageUrl: d.imageUrl?.startsWith('http') || d.imageUrl?.startsWith('blob:') || d.imageUrl?.startsWith('data:')
+                  ? d.imageUrl 
+                  : d.imageUrl?.startsWith('/') 
+                    ? `${API_URL}${d.imageUrl}`
+                    : d.imageUrl,
+                file: null,
+                originalFile: null,
+                isFromLibrary: false,
+                originalWidthPx: widthPx,
+                originalHeightPx: heightPx,
+                displayWidthInches: displayWidthInches,
+                displayHeightInches: displayHeightInches,
+                displayAreaInches: displayAreaInches,
+                printWidthInches: printWidthInches,
+                printHeightInches: printHeightInches,
+                printAreaInches: printAreaInches,
+                scale: scale,
+                currentDisplayWidthInches: displayWidthInches * scale,
+                currentDisplayHeightInches: displayHeightInches * scale,
+                currentPrintWidthInches: printWidthInches * scale,
+                currentPrintHeightInches: printHeightInches * scale,
+                currentPrintAreaInches: printAreaInches * scale * scale,
+                renderedWidthPx: widthPx * scale,
+                renderedHeightPx: heightPx * scale
+              };
+            }) || [],
+            activeDesignId: view.designLayers?.[0]?.id || null,
+          };
+        });
+
+        setViewStates(loadedViewStates);
+        setIsEditMode(true);
+        setEditModeInitialized(true);
+        
+        if (design.views?.[0]?.code) {
+          setViewCode(design.views[0].code);
+        }
+        
+        setTimeout(() => calculatePrice(), 500);
+        
+      } catch (err) {
+        console.error("Error loading design for edit:", err);
+        setError(`Failed to load design: ${err.message}`);
+        setIsEditMode(false);
+      } finally {
+        setLoadingEditData(false);
+      }
+    };
+
+    loadDesignForEdit();
+  }, [editDesignId, product, editModeInitialized]);
+
+  useEffect(() => {
+    if (!product?.views?.length) {
+      console.log("No product views found");
+      return;
     }
     
-    if (isFirstLoad) {
-      setIsFirstLoad(false);
+    if (isEditMode && editModeInitialized) {
+      console.log("Edit mode already initialized, skipping new design init");
+      return;
     }
+
+    console.log("Initializing new design for product:", product.name);
     
-    // Clean up auto slide intervals
+    const initial = {};
+    product.views.forEach((v, index) => {
+      initial[v.code] = {
+        textLayers: index === 0 ? [createDefaultTextLayer()] : [],
+        activeTextId: index === 0 ? initial[v.code]?.textLayers?.[0]?.id || null : null,
+        designLayers: [],
+        activeDesignId: null,
+      };
+    });
+
+    setViewStates(initial);
+    setViewCode(product.views[0].code);
+    setIsEditMode(false);
+    setEditModeInitialized(false);
+    
+  }, [product, isEditMode, editModeInitialized]);
+
+  useEffect(() => {
     return () => {
-      Object.values(autoSlideIntervals).forEach(interval => {
-        if (interval) clearInterval(interval);
+      Object.values(viewStates).forEach(viewState => {
+        if (viewState.designLayers) {
+          viewState.designLayers.forEach(layer => {
+            if (layer.imageUrl && layer.imageUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(layer.imageUrl);
+            }
+          });
+        }
       });
     };
-  }, [activeProductType, dispatch, isFirstLoad, selectedCategory, selectedSubCategory]);
+  }, [viewStates]);
 
-  // Update subcategories when category changes for custom products
-  useEffect(() => {
-    if (activeProductType === 'custom' && selectedCategory !== 'all') {
-      const categoryData = backendCategories?.find(cat => cat.category === selectedCategory);
-      if (categoryData) {
-        setCurrentSubcategories(categoryData.subCategories || []);
-        console.log("Updated subcategories for category", selectedCategory, ":", categoryData.subCategories);
-      } else {
-        setCurrentSubcategories([]);
-        console.log("No category data found for", selectedCategory);
-      }
-    } else {
-      setCurrentSubcategories([]);
-    }
-  }, [selectedCategory, backendCategories, activeProductType]);
-
-  // Handle common saved data filtering - FIXED: New arrivals and best sellers logic
-  const filteredCommonData = useMemo(() => {
-    if (activeProductType === 'custom') return [];
-    
-    let filtered = [...commonSavedData];
-    
-    // Apply product type filter
-    if (productTypeFilter !== 'all') {
-      if (productTypeFilter === 'design') {
-        filtered = filtered.filter(item => item.type === 'design');
-      } else if (productTypeFilter === 'readymade') {
-        filtered = filtered.filter(item => item.type === 'readymade');
-      }
-    }
-    
-    // Apply category filter
-    if (selectedCommonCategory !== 'all') {
-      filtered = filtered.filter(item => item.category === selectedCommonCategory);
-    }
-    
-    // Apply subcategory filter
-    if (selectedCommonSubCategory !== 'all') {
-      filtered = filtered.filter(item => item.subCategory === selectedCommonSubCategory);
-    }
-    
-    // Apply search filter
-    if (searchQuery.trim()) {
-      filtered = filtered.filter(item => {
-        const name = item.title || '';
-        const description = item.description || '';
-        const category = item.category || '';
-        const subCategory = item.subCategory || '';
-        
-        const searchLower = searchQuery.toLowerCase();
-        return name.toLowerCase().includes(searchLower) ||
-               description.toLowerCase().includes(searchLower) ||
-               category.toLowerCase().includes(searchLower) ||
-               subCategory.toLowerCase().includes(searchLower);
-      });
-    }
-    
-    // Apply price range filter
-    filtered = filtered.filter(item => {
-      const price = item.price || 0;
-      return price >= priceRange[0] && price <= priceRange[1];
-    });
-    
-    // Apply rating filter
-    if (ratingFilter > 0) {
-      filtered = filtered.filter(item => {
-        const rating = item.rating || 0;
-        return rating >= ratingFilter;
-      });
-    }
-    
-    // Apply sorting - FIXED: Properly check newArrival and bestSeller flags
-    filtered.sort((a, b) => {
-      const priceA = a.price || 0;
-      const priceB = b.price || 0;
-      const ratingA = a.rating || 0;
-      const ratingB = b.rating || 0;
-      const dateA = new Date(a.createdAt || 0);
-      const dateB = new Date(b.createdAt || 0);
-      const salesA = a.totalSales || 0;
-      const salesB = b.totalSales || 0;
-      
-      // Check for newArrival flag in raw data if not in main object
-      const isNewArrivalA = a.newArrival || a.raw?.newArrival || a.raw?.newArrivals || false;
-      const isNewArrivalB = b.newArrival || b.raw?.newArrival || b.raw?.newArrivals || false;
-      
-      // Check for bestSeller flag in raw data if not in main object
-      const isBestSellerA = a.bestSeller || a.raw?.bestSeller || a.raw?.bestSellers || false;
-      const isBestSellerB = b.bestSeller || b.raw?.bestSeller || b.raw?.bestSellers || false;
-      
-      // Check for featured flag
-      const isFeaturedA = a.featured || a.raw?.featured || false;
-      const isFeaturedB = b.featured || b.raw?.featured || false;
-      
-      // Check for trending flag
-      const isTrendingA = a.trending || a.raw?.trending || false;
-      const isTrendingB = b.trending || b.raw?.trending || false;
-      
-      switch (sortOption) {
-        case 'price-low':
-          return priceA - priceB;
-        case 'price-high':
-          return priceB - priceA;
-        case 'best-rated':
-          return ratingB - ratingA;
-        case 'newest':
-          // Prioritize new arrivals, then by date
-          if (isNewArrivalA && !isNewArrivalB) return -1;
-          if (!isNewArrivalA && isNewArrivalB) return 1;
-          return dateB - dateA;
-        case 'best-sellers':
-          // Prioritize best sellers, then by sales count
-          if (isBestSellerA && !isBestSellerB) return -1;
-          if (!isBestSellerA && isBestSellerB) return 1;
-          return salesB - salesA;
-        case 'trending':
-          const trendScoreA = (isTrendingA ? 5 : 0) + (isNewArrivalA ? 3 : 0) + salesA;
-          const trendScoreB = (isTrendingB ? 5 : 0) + (isNewArrivalB ? 3 : 0) + salesB;
-          return trendScoreB - trendScoreA;
-        case 'featured':
-        default:
-          const featuredA = (isFeaturedA ? 5 : 0) + (isNewArrivalA ? 3 : 0) + (isBestSellerA ? 2 : 0);
-          const featuredB = (isFeaturedB ? 5 : 0) + (isNewArrivalB ? 3 : 0) + (isBestSellerB ? 2 : 0);
-          return featuredB - featuredA;
-      }
-    });
-    
-    return filtered;
-  }, [
-    activeProductType,
-    commonSavedData,
-    productTypeFilter,
-    selectedCommonCategory,
-    selectedCommonSubCategory,
-    searchQuery,
-    priceRange,
-    ratingFilter,
-    sortOption
-  ]);
-
-  // Show cart success message
-  useEffect(() => {
-    if (cartSuccess) {
-      setShowCartSuccess(true);
-      const timer = setTimeout(() => {
-        setShowCartSuccess(false);
-        dispatch(clearSuccess());
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [cartSuccess, dispatch]);
-
-  // Clear cart error
-  useEffect(() => {
-    if (cartError) {
-      alert(cartError);
-      dispatch(clearError());
-    }
-  }, [cartError, dispatch]);
-
-  // Get cart quantity for common saved data
-  const getCartQuantityForCommon = (item) => {
-    if (item.type === 'design') {
-      const cartItem = cartItems.find(cart => cart.designId === item._id);
-      return cartItem ? cartItem.qty : 0;
-    } else if (item.type === 'readymade') {
-      const cartItem = cartItems.find(cart => 
-        cart.kind === "READYMADE" && 
-        cart.readymadeProduct?._id === item._id
-      );
-      return cartItem ? cartItem.qty : 0;
-    }
-    return 0;
+  const baseViewState = {
+    textLayers: [],
+    activeTextId: null,
+    designLayers: [],
+    activeDesignId: null,
   };
 
-  // Get product price for common saved data
-  const getCommonItemPrice = (item) => {
-    return item.price || 0;
+  const getCurrentViewState = () => {
+    const existing = viewStates[viewCode];
+    return existing ? { ...baseViewState, ...existing } : baseViewState;
   };
 
-  // Calculate discount percentage for common saved data
-  const getCommonItemDiscount = (item) => {
-    if (item.type === 'readymade' && item.raw) {
-      const price = item.price || 0;
-      const originalPrice = item.raw.originalPrice || item.raw.mrp || 0;
-      if (originalPrice > price) {
-        return Math.round(((originalPrice - price) / originalPrice) * 100);
-      }
-    }
-    return 0;
-  };
-
-  // Start auto slideshow for a product
-  const startAutoSlideshow = useCallback((productId, images) => {
-    if (images.length <= 1) return;
-    
-    // Clear existing interval
-    if (autoSlideIntervals[productId]) {
-      clearInterval(autoSlideIntervals[productId]);
-    }
-    
-    const interval = setInterval(() => {
-      setImageIndices(prev => ({
+  const updateCurrentViewState = (patch) => {
+    setViewStates((prev) => {
+      const existing = prev[viewCode];
+      const current = existing ? { ...baseViewState, ...existing } : baseViewState;
+      return {
         ...prev,
-        [productId]: ((prev[productId] || 0) + 1) % images.length
-      }));
-    }, 4000); // 4 seconds interval
-    
-    setAutoSlideIntervals(prev => ({
-      ...prev,
-      [productId]: interval
-    }));
-  }, [autoSlideIntervals]);
+        [viewCode]: {
+          ...current,
+          ...patch,
+        },
+      };
+    });
+  };
 
-  // Stop auto slideshow for a product
-  const stopAutoSlideshow = useCallback((productId) => {
-    if (autoSlideIntervals[productId]) {
-      clearInterval(autoSlideIntervals[productId]);
-      setAutoSlideIntervals(prev => {
-        const newIntervals = { ...prev };
-        delete newIntervals[productId];
-        return newIntervals;
+  const { textLayers, activeTextId, designLayers, activeDesignId } = getCurrentViewState();
+  const activeTextLayer = textLayers.find((l) => l.id === activeTextId) || textLayers[0];
+  const activeDesign = designLayers.find((d) => d.id === activeDesignId) || null;
+
+  const updateActiveTextLayer = (patch) => {
+    if (!activeTextLayer) return;
+    const newLayers = textLayers.map((layer) =>
+      layer.id === activeTextLayer.id ? { ...layer, ...patch } : layer
+    );
+    updateCurrentViewState({ textLayers: newLayers });
+  };
+
+  const addNewText = () => {
+    const id = `text-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const newLayer = { ...createDefaultTextLayer(), id, text: "New Text" };
+    updateCurrentViewState({
+      textLayers: [...textLayers, newLayer],
+      activeTextId: id,
+    });
+  };
+
+  const removeActiveText = () => {
+    if (!activeTextLayer) return;
+    const remaining = textLayers.filter((l) => l.id !== activeTextLayer.id);
+    const newActiveId = remaining[0]?.id ?? null;
+    updateCurrentViewState({
+      textLayers: remaining,
+      activeTextId: newActiveId,
+    });
+  };
+
+  const handleDesignUpload = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setError("");
+
+    try {
+      const newLayers = [];
+      
+      for (const file of files) {
+        const serverUrl = await uploadDesignImage(file);
+        const id = `design-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const { width, height } = await getImageNaturalSize(serverUrl);
+        console.log("Pixels source: uploaded image", {
+          filename: file.name,
+          width,
+          height,
+        });
+        
+        newLayers.push(createDesignLayer(id, serverUrl, file, width, height, false));
+      }
+
+      const all = [...designLayers, ...newLayers];
+      const lastId = newLayers[newLayers.length - 1].id;
+
+      updateCurrentViewState({
+        designLayers: all,
+        activeDesignId: lastId,
       });
-    }
-  }, [autoSlideIntervals]);
 
-  // Cart handler for common saved data
-  const handleAddCommonToCart = async (item) => {
-    if (!token) {
-      alert("Please login to add items to cart");
+    } catch (err) {
+      console.error("Error uploading design images:", err);
+      setError("Failed to upload images: " + err.message);
+    }
+  };
+
+  // NEW: Handle selecting design from library
+  const handleSelectFromLibrary = async (image) => {
+    try {
+      setError("");
+      
+      // Construct full URL for the image from design library
+      const imageUrl = `http://localhost:5000/outputs/adminuploadeddesigns/${currentFolder}/${image.filename}`;
+      
+      // Fetch the image to create a file object for background removal
+      console.log("Fetching image from library...");
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.statusText}`);
+      }
+      
+      const blob = await response.blob();
+      const file = new File([blob], image.filename, { type: blob.type });
+      console.log("Created file object from library image:", image.filename);
+      
+      const id = `design-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const { width, height } = await getImageNaturalSize(imageUrl);
+      console.log("Pixels source: design library image", {
+        filename: image.filename,
+        width,
+        height,
+      });
+      
+      const newLayer = createDesignLayer(id, imageUrl, file, width, height, true);
+      
+      const all = [...designLayers, newLayer];
+      updateCurrentViewState({
+        designLayers: all,
+        activeDesignId: id,
+      });
+
+      // Switch to designs tab to show the controls
+      setActiveTab(TABS.DESIGNS);
+      setSelectedLibraryImage(image.filename);
+      
+    } catch (err) {
+      console.error("Error loading design from library:", err);
+      setError("Failed to load design from library: " + err.message);
+    }
+  };
+
+  const handleRemoveBackground = async () => {
+    if (!activeDesign) {
+      setError("Select a design first");
+      console.log("No design selected");
       return;
     }
 
     try {
-      setAddingToCartId(item._id);
-      let cartData;
+      setBgRemovalLoading(true);
+      setError("");
+      console.log("Starting background removal for:", activeDesign.id);
       
-      if (item.type === 'design') {
-        cartData = {
-          designId: item._id,
-          productId: item.raw?.product?._id || item.raw?.productId,
-          title: item.title || item.raw?.productName,
-          unitPrice: item.price || item.raw?.salePrice || 0,
-          basePrice: item.raw?.basePrice || item.price || 0,
-          qty: 1,
-          previewImage: item.previewImage || null,
-          signature: `${item._id}-${item.raw?.product?._id || item.raw?.productId}`,
-          views: item.raw?.views || [],
-          kind: "DESIGN"
-        };
-        setLocalCartItems(prev => ({ ...prev, [item._id]: 1 }));
-      } else if (item.type === 'readymade') {
-        cartData = {
-          kind: "READYMADE",
-          qty: 1,
-          readymadeProductId: item._id,
-          title: item.title,
-          unitPrice: item.price || 0,
-          basePrice: item.raw?.originalPrice || item.raw?.mrp || item.price || 0,
-          previewImage: item.previewImage || null,
-          size: item.raw?.sizes?.[0] || 'M',
-          color: item.raw?.colors?.[0] || 'Black'
-        };
-      }
+      let fileToUse = activeDesign.originalFile || activeDesign.file;
       
-      await dispatch(addToCart(cartData)).unwrap();
-      setAddedProductName(item.title);
-      
-      if (item.type === 'design') {
-        setTimeout(() => {
-          setLocalCartItems(prev => {
-            const newState = { ...prev };
-            delete newState[item._id];
-            return newState;
-          });
-        }, 2000);
-      }
-      
-    } catch (error) {
-      console.error("Failed to add to cart:", error);
-      alert(`Failed to add to cart: ${error.message || 'Please try again'}`);
-      if (item.type === 'design') {
-        setLocalCartItems(prev => {
-          const newState = { ...prev };
-          delete newState[item._id];
-          return newState;
-        });
-      }
-    } finally {
-      setAddingToCartId(null);
-    }
-  };
-
-  // Get unique categories from common saved data
-  const getCommonCategories = useMemo(() => {
-    const categories = new Map();
-    commonSavedData.forEach(item => {
-      if (item.category) {
-        const count = categories.get(item.category) || 0;
-        categories.set(item.category, count + 1);
-      }
-    });
-    return Array.from(categories.entries()).map(([name, count]) => ({ name, count }));
-  }, [commonSavedData]);
-
-  // Get unique subcategories from common saved data
-  const getCommonSubcategories = useMemo(() => {
-    if (selectedCommonCategory === 'all') return [];
-    
-    const subcategories = new Map();
-    commonSavedData.forEach(item => {
-      if (item.category === selectedCommonCategory && item.subCategory) {
-        const count = subcategories.get(item.subCategory) || 0;
-        subcategories.set(item.subCategory, count + 1);
-      }
-    });
-    return Array.from(subcategories.entries()).map(([name, count]) => ({ name, count }));
-  }, [commonSavedData, selectedCommonCategory]);
-
-  // Clear all filters
-  const handleClearFilters = () => {
-    setSearchQuery('');
-    setSortOption('featured');
-    setPriceRange([0, 10000]);
-    setSelectedCategory('all');
-    setSelectedSubCategory('all');
-    setProductTypeFilter('all');
-    setSelectedCommonCategory('all');
-    setSelectedCommonSubCategory('all');
-    setRatingFilter(0);
-    setQuickPriceRange(null);
-    setExpandedCategories({});
-    setLastFilters({}); // Reset last filters
-  };
-
-  // Get unique categories for custom products from backend
-  const getCustomCategories = () => {
-    return Array.isArray(backendCategories) ? backendCategories : [];
-  };
-
-  // Handle category change for custom products - FIXED: Don't trigger immediate fetch
-  const handleCategoryChange = (category) => {
-    console.log("Category changed to:", category);
-    setSelectedCategory(category);
-    setSelectedSubCategory('all');
-    
-    if (category === 'all') {
-      setCurrentSubcategories([]);
-    }
-  };
-
-  // Handle subcategory change for custom products - FIXED: Don't trigger immediate fetch
-  const handleSubCategoryChange = (subCategory) => {
-    console.log("Subcategory changed to:", subCategory);
-    setSelectedSubCategory(subCategory);
-  };
-
-  // Toggle category expansion
-  const toggleCategoryExpansion = (category) => {
-    setExpandedCategories(prev => ({
-      ...prev,
-      [category]: !prev[category]
-    }));
-  };
-
-  // Refresh custom products only when Apply Filters is clicked or product type changes
-  const handleApplyCustomFilters = () => {
-    if (activeProductType === 'custom') {
-      const filters = {};
-      if (selectedCategory !== 'all') filters.category = selectedCategory;
-      if (selectedSubCategory !== 'all') filters.subCategory = selectedSubCategory;
-      
-      const filterKey = JSON.stringify(filters);
-      if (filterKey !== lastFilters.custom) {
-        console.log("Applying custom filters:", filters);
-        dispatch(fetchProducts(filters));
-        setLastFilters(prev => ({ ...prev, custom: filterKey }));
-      }
-    }
-  };
-
-  // Apply quick price range
-  const applyQuickPriceRange = (range) => {
-    setQuickPriceRange(range.label);
-    setPriceRange([range.min, range.max]);
-  };
-
-  // Get active products based on product type
-  const getActiveProducts = () => {
-    switch (activeProductType) {
-      case 'custom':
-        return Array.isArray(customProducts) ? customProducts : [];
-      case 'all':
-        return filteredCommonData;
-      default:
-        return [];
-    }
-  };
-
-  // Get product price based on type
-  const getProductPrice = (product, type) => {
-    if (type === 'custom') {
-      return product.basePrice || product.price || 0;
-    } else {
-      return getCommonItemPrice(product);
-    }
-  };
-
-  // Filter products based on active filters - FIXED: Custom products client-side filtering
-  const filteredProducts = useMemo(() => {
-    if (activeProductType === 'all') {
-      return filteredCommonData;
-    }
-
-    let products = [...getActiveProducts()];
-    
-    // Apply search filter for custom (client-side only)
-    if (searchQuery) {
-      products = products.filter(product => {
-        const name = product.name || product.title || product.productName || '';
-        const desc = product.description || '';
-        const category = product.category || '';
+      // If no file object exists (design came from library or was previously loaded without file), fetch it
+      if (!fileToUse && activeDesign.imageUrl) {
+        console.log("No file object found, fetching image from URL...");
         
-        return name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-               desc.toLowerCase().includes(searchQuery.toLowerCase()) ||
-               category.toLowerCase().includes(searchQuery.toLowerCase());
-      });
-    }
-    
-    // Apply price range filter (client-side only)
-    products = products.filter(product => {
-      const price = getProductPrice(product, activeProductType);
-      return price >= priceRange[0] && price <= priceRange[1];
-    });
-    
-    // Apply rating filter (client-side only)
-    if (ratingFilter > 0) {
-      products = products.filter(product => {
-        const rating = product.rating || 0;
-        return rating >= ratingFilter;
-      });
-    }
-    
-    // Apply sorting (client-side only)
-    products.sort((a, b) => {
-      const priceA = getProductPrice(a, activeProductType);
-      const priceB = getProductPrice(b, activeProductType);
-      const ratingA = a.rating || 0;
-      const ratingB = b.rating || 0;
-      const dateA = new Date(a.createdAt || 0);
-      const dateB = new Date(b.createdAt || 0);
-      const salesA = a.totalSales || 0;
-      const salesB = b.totalSales || 0;
-      
-      // Check for flags in custom products
-      const isNewArrivalA = a.newArrival || a.isNew || false;
-      const isNewArrivalB = b.newArrival || b.isNew || false;
-      
-      const isBestSellerA = a.bestSeller || a.topSelling || false;
-      const isBestSellerB = b.bestSeller || b.topSelling || false;
-      
-      const isFeaturedA = a.featured || a.isFeatured || false;
-      const isFeaturedB = b.featured || b.isFeatured || false;
-      
-      const isTrendingA = a.trending || false;
-      const isTrendingB = b.trending || false;
-      
-      switch (sortOption) {
-        case 'price-low':
-          return priceA - priceB;
-        case 'price-high':
-          return priceB - priceA;
-        case 'best-rated':
-          return ratingB - ratingA;
-        case 'newest':
-          // Prioritize new arrivals, then by date
-          if (isNewArrivalA && !isNewArrivalB) return -1;
-          if (!isNewArrivalA && isNewArrivalB) return 1;
-          return dateB - dateA;
-        case 'best-sellers':
-          // Prioritize best sellers, then by sales count
-          if (isBestSellerA && !isBestSellerB) return -1;
-          if (!isBestSellerA && isBestSellerB) return 1;
-          return salesB - salesA;
-        case 'trending':
-          const trendScoreA = (isTrendingA ? 5 : 0) + (isNewArrivalA ? 3 : 0) + salesA;
-          const trendScoreB = (isTrendingB ? 5 : 0) + (isNewArrivalB ? 3 : 0) + salesB;
-          return trendScoreB - trendScoreA;
-        case 'featured':
-        default:
-          const featuredA = (isFeaturedA ? 5 : 0) + (isNewArrivalA ? 3 : 0) + (isBestSellerA ? 2 : 0);
-          const featuredB = (isFeaturedB ? 5 : 0) + (isNewArrivalB ? 3 : 0) + (isBestSellerB ? 2 : 0);
-          return featuredB - featuredA;
+        try {
+          // Fetch the image from the URL
+          const response = await fetch(activeDesign.imageUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch image: ${response.statusText}`);
+          }
+          
+          // Convert response to blob
+          const blob = await response.blob();
+          
+          // Create a File object from the blob
+          const filename = activeDesign.imageUrl.split('/').pop() || 'design.png';
+          fileToUse = new File([blob], filename, { type: blob.type });
+          console.log("Created file from image URL:", filename);
+          
+        } catch (fetchErr) {
+          console.error("Error fetching image:", fetchErr);
+          setError("Failed to load design image for background removal");
+          setBgRemovalLoading(false);
+          return;
+        }
       }
+      
+      if (!fileToUse) {
+        setError("No file available for background removal");
+        console.log("No file available for background removal");
+        setBgRemovalLoading(false);
+        return;
+      }
+
+      console.log("Preparing FormData with image");
+      const formData = new FormData();
+      formData.append("image", fileToUse);
+      
+      console.log("Sending to remove-bg API...");
+      const res = await fetch(`${API_URL}/api/remove-bg`, {
+        method: "POST",
+        body: formData,
+      });
+
+      console.log("Remove BG response status:", res.status);
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.log("Error response body:", errorText);
+        throw new Error(errorText || "Background removal failed");
+      }
+
+      const data = await res.json();
+      console.log("Response data:", data);
+
+      if (!data.outputUrl) {
+        console.log("Output URL is missing in the response");
+        throw new Error("Background removal failed: no output URL");
+      }
+
+      const updatedLayers = designLayers.map((d) =>
+        d.id === activeDesign.id
+          ? {
+              ...d,
+              imageUrl: `${API_URL}${data.outputUrl}?t=${Date.now()}`,
+              hasBgRemoved: true,
+              originalFile: fileToUse, // Store the file for future use
+              isFromLibrary: false, // Once processed, it's no longer a library image
+            }
+          : d
+      );
+
+      console.log("Updated layers with background removed:", updatedLayers);
+
+      updateCurrentViewState({ designLayers: updatedLayers });
+      
+      // Clear the library image indicator since it's now a processed image
+      setSelectedLibraryImage(null);
+      
+    } catch (err) {
+      console.error("Remove BG error:", err);
+      setError(err.message || "Background removal failed");
+    } finally {
+      setBgRemovalLoading(false);
+      console.log("Background removal process completed");
+    }
+  };
+
+  const clearActiveDesign = () => {
+    if (!activeDesign) return;
+    setError("");
+
+    if (activeDesign.imageUrl && activeDesign.imageUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(activeDesign.imageUrl);
+    }
+
+    const remaining = designLayers.filter((d) => d.id !== activeDesign.id);
+    const newActiveId = remaining[0]?.id ?? null;
+
+    updateCurrentViewState({
+      designLayers: remaining,
+      activeDesignId: newActiveId,
+    });
+
+    setDesignRenderWidth(null);
+    setSelectedLibraryImage(null);
+  };
+
+  const handleDesignScaleChange = (value) => {
+    if (!activeDesign) return;
+    const v = parseFloat(value);
+    
+    const updated = designLayers.map((d) => {
+      if (d.id === activeDesign.id) {
+        return updateDesignLayerDimensions(d, v);
+      }
+      return d;
     });
     
-    return products;
-  }, [
-    activeProductType,
-    customProducts, // Use customProducts directly
-    filteredCommonData,
-    searchQuery,
-    sortOption,
-    priceRange,
-    ratingFilter
-  ]);
+    updateCurrentViewState({ designLayers: updated });
+    calculatePrice();
+  };
 
-  // Loading state
-  const isLoading = () => {
-    switch (activeProductType) {
-      case 'custom': return customStatus === 'loading' || categoriesStatus === 'loading';
-      case 'all': return commonLoading;
-      default: return false;
+  const handleSetTextLayers = (updater) => {
+    setViewStates((prev) => {
+      const existing = prev[viewCode];
+      const current = existing ? { ...baseViewState, ...existing } : baseViewState;
+      const nextTextLayers = typeof updater === "function" ? updater(current.textLayers) : updater;
+      return {
+        ...prev,
+        [viewCode]: {
+          ...current,
+          textLayers: nextTextLayers,
+        },
+      };
+    });
+  };
+
+  const handleSetDesignLayers = (updater) => {
+    setViewStates((prev) => {
+      const existing = prev[viewCode];
+      const current = existing ? { ...baseViewState, ...existing } : baseViewState;
+      const nextDesignLayers = typeof updater === "function" ? updater(current.designLayers) : updater;
+      return {
+        ...prev,
+        [viewCode]: {
+          ...current,
+          designLayers: nextDesignLayers,
+        },
+      };
+    });
+  };
+
+  const handleSetActiveTextId = (idOrUpdater) => {
+    setViewStates((prev) => {
+      const existing = prev[viewCode];
+      const current = existing ? { ...baseViewState, ...existing } : baseViewState;
+      const nextId = typeof idOrUpdater === "function" ? idOrUpdater(current.activeTextId) : idOrUpdater;
+      return {
+        ...prev,
+        [viewCode]: {
+          ...current,
+          activeTextId: nextId,
+        },
+      };
+    });
+  };
+
+  const handleSetActiveDesignId = (idOrUpdater) => {
+    setViewStates((prev) => {
+      const existing = prev[viewCode];
+      const current = existing ? { ...baseViewState, ...existing } : baseViewState;
+      const nextId = typeof idOrUpdater === "function" ? idOrUpdater(current.activeDesignId) : idOrUpdater;
+      return {
+        ...prev,
+        [viewCode]: {
+          ...current,
+          activeDesignId: nextId,
+        },
+      };
+    });
+  };
+
+  const captureAllViewPreviews = async () => {
+    if (!product?.views || product.views.length === 0 || !editorRef.current) {
+      return {};
+    }
+
+    const previewsByCode = {};
+    const originalViewCode = viewCode;
+
+    for (const v of product.views) {
+      setViewCode(v.code);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      const img = editorRef.current?.capturePreview?.() || null;
+      if (img) {
+        previewsByCode[v.code] = img;
+      }
+    }
+
+    setViewCode(originalViewCode);
+    return previewsByCode;
+  };
+
+  const handleSaveDesign = async () => {
+    if (!product) return;
+
+    if (!token) {
+      setSaveError("Please login to save your design.");
+      setSaveSuccess(false);
+      return;
+    }
+
+    setSaving(true);
+    setSaveError("");
+    setSaveSuccess(false);
+
+    try {
+      const { totalPrice } = await calculatePrice(false);
+      const previewsByCode = await captureAllViewPreviews();
+
+      const processedViewStates = { ...viewStates };
+      for (const [viewCode, viewState] of Object.entries(processedViewStates)) {
+        if (viewState.designLayers?.length > 0) {
+          const processedLayers = [];
+          for (const layer of viewState.designLayers) {
+            if (layer.imageUrl && (layer.imageUrl.startsWith("blob:") || layer.imageUrl.startsWith("data:"))) {
+              if (layer.originalFile) {
+                const serverUrl = await uploadDesignImage(layer.originalFile);
+                processedLayers.push({ ...layer, imageUrl: serverUrl });
+              } else if (layer.file) {
+                const serverUrl = await uploadDesignImage(layer.file);
+                processedLayers.push({ ...layer, imageUrl: serverUrl });
+              } else {
+                console.warn(`No file available for layer ${layer.id}, skipping`);
+                continue;
+              }
+            } else {
+              processedLayers.push(layer);
+            }
+          }
+          processedViewStates[viewCode] = { ...viewState, designLayers: processedLayers };
+        }
+      }
+
+      const viewsPayload = product.views?.map((v) => {
+        const vs = processedViewStates[v.code] ? { ...baseViewState, ...processedViewStates[v.code] } : baseViewState;
+
+        const textLayersPayload = (vs.textLayers || []).map(
+          ({ id, text, x, y, fontSize, color, fontFamily, rotation }) => ({
+            id, text, x, y, fontSize, color, fontFamily, rotation,
+          })
+        );
+
+        const designLayersPayload = (vs.designLayers || []).map(
+          ({ id, imageUrl, hasBgRemoved, x, y, scale, rotation, zone, insideSafeArea, 
+             originalWidthPx, originalHeightPx, renderedWidthPx, renderedHeightPx,
+             displayWidthInches, displayHeightInches, displayAreaInches,
+             printWidthInches, printHeightInches, printAreaInches,
+             currentDisplayWidthInches, currentDisplayHeightInches,
+             currentPrintWidthInches, currentPrintHeightInches, currentPrintAreaInches,
+             currentAdditionalArea, layerPrice, minimumChargeApplied, isFromLibrary }) => ({
+            id, imageUrl, hasBgRemoved: !!hasBgRemoved, x, y, scale, rotation,
+            zone: zone || null, insideSafeArea: typeof insideSafeArea === "boolean" ? insideSafeArea : true,
+            originalWidthPx, originalHeightPx, 
+            renderedWidthPx, renderedHeightPx,
+            displayWidthInches, displayHeightInches, displayAreaInches,
+            printWidthInches, printHeightInches, printAreaInches,
+            currentDisplayWidthInches, currentDisplayHeightInches,
+            currentPrintWidthInches, currentPrintHeightInches, currentPrintAreaInches,
+            currentAdditionalArea, layerPrice, minimumChargeApplied,
+            isFromLibrary: isFromLibrary || false
+          })
+        );
+
+        return {
+          code: v.code,
+          textLayers: textLayersPayload,
+          designLayers: designLayersPayload,
+          previewImage: previewsByCode[v.code] || null,
+        };
+      }) || [];
+
+      const mainPreview = previewsByCode["front"] || (product.views?.[0] && previewsByCode[product.views[0].code]) || null;
+
+      const body = {
+        productId: product._id || product.id,
+        productSlug: product.slug || slug,
+        productColor,
+        previewImage: mainPreview,
+        views: viewsPayload,
+        basePrice: BASE_PRICE,
+        calculatedPrice: totalPrice,
+        priceBreakdown: priceBreakdown,
+      };
+
+      const url = isEditMode && editDesignId ? `${API_URL}/savedata/${editDesignId}` : `${API_URL}/savedata`;
+      const method = isEditMode && editDesignId ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.error || data?.message || "Failed to save design");
+      }
+
+      setSaveSuccess(true);
+      alert(isEditMode ? "Design updated successfully!" : "Design saved successfully!");
+      
+    } catch (err) {
+      console.error("Save design error:", err);
+      setSaveError(err.message || "Failed to save design");
+    } finally {
+      setSaving(false);
     }
   };
 
-  // Error state
-  const getError = () => {
-    switch (activeProductType) {
-      case 'custom': return customError || categoriesError;
-      case 'all': return commonError;
-      default: return null;
+  const handleResetToOriginal = () => {
+    if (!originalDesign || !window.confirm("Reset all changes to original design?")) {
+      return;
     }
+
+    const restoredViewStates = {};
+    originalDesign.views?.forEach((view) => {
+      restoredViewStates[view.code] = {
+        textLayers: view.textLayers?.map(t => ({
+          ...t,
+          id: t.id || `text-${Date.now()}-${Math.random().toString(36).slice(2)}`
+        })) || [],
+        activeTextId: view.textLayers?.[0]?.id || null,
+        designLayers: view.designLayers?.map(d => {
+          const widthPx = d.originalWidthPx || d.renderedWidthPx / (d.scale || 0.35);
+          const heightPx = d.originalHeightPx || d.renderedHeightPx / (d.scale || 0.35);
+          
+          const displayWidthInches = widthPx / DISPLAY_DPI;
+          const displayHeightInches = heightPx / DISPLAY_DPI;
+          const displayAreaInches = displayWidthInches * displayHeightInches;
+          
+          const printWidthInches = widthPx / PRINT_DPI;
+          const printHeightInches = heightPx / PRINT_DPI;
+          const printAreaInches = printWidthInches * printHeightInches;
+          
+          const scale = d.scale || 0.35;
+          
+          return {
+            ...d,
+            id: d.id || `design-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            imageUrl: d.imageUrl?.startsWith('http') || d.imageUrl?.startsWith('blob:') || d.imageUrl?.startsWith('data:')
+              ? d.imageUrl 
+              : d.imageUrl?.startsWith('/') 
+                ? `${API_URL}${d.imageUrl}`
+                : d.imageUrl,
+            file: null,
+            originalFile: null,
+            isFromLibrary: d.isFromLibrary || false,
+            originalWidthPx: widthPx,
+            originalHeightPx: heightPx,
+            displayWidthInches: displayWidthInches,
+            displayHeightInches: displayHeightInches,
+            displayAreaInches: displayAreaInches,
+            printWidthInches: printWidthInches,
+            printHeightInches: printHeightInches,
+            printAreaInches: printAreaInches,
+            scale: scale,
+            currentDisplayWidthInches: displayWidthInches * scale,
+            currentDisplayHeightInches: displayHeightInches * scale,
+            currentPrintWidthInches: printWidthInches * scale,
+            currentPrintHeightInches: printHeightInches * scale,
+            currentPrintAreaInches: printAreaInches * scale * scale,
+            renderedWidthPx: widthPx * scale,
+            renderedHeightPx: heightPx * scale
+          };
+        }) || [],
+        activeDesignId: view.designLayers?.[0]?.id || null,
+      };
+    });
+
+    setViewStates(restoredViewStates);
+    setProductColor(originalDesign.productColor || "#FFFFFF");
+    calculatePrice();
+    alert("Design reset to original!");
   };
 
-  // Handle image loading
-  const handleImageLoad = (productId) => {
-    setImageLoading(prev => ({ ...prev, [productId]: false }));
+  const handleBackToAdmin = () => {
+    navigate('/admin/designs');
   };
 
-  const handleImageError = (productId) => {
-    setImageLoading(prev => ({ ...prev, [productId]: false }));
-  };
-
-  // Render product card - Professional version with improved images
-  const renderProductCard = (product) => {
-    const isCustom = activeProductType === "custom";
-    const type = isCustom ? "custom" : product.type || "common";
-
-    const basePrice = getProductPrice(product, activeProductType);
-    const name = product.title || product.name || product.productName || "Unnamed Product";
-    const description = product.description || "";
-    const category = product.category || "";
-    const subCategory = product.subCategory || "";
-
-    const keyId = product._id || product.slug;
-    const isInWishlist = wishlist.includes(keyId);
-
-    const cartQuantity = !isCustom ? getCartQuantityForCommon(product) : 0;
-    const isInCart = cartQuantity > 0;
-    const isAdding = addingToCartId === product._id;
-
-    const images = getProductImages(product, activeProductType);
-    const currentImageIndex = imageIndices[product._id] || 0;
-    const currentImage = images[currentImageIndex];
-    const hasMultipleImages = images.length > 1;
-    const isLoadingImage = imageLoading[product._id] !== false;
-
-    // FIXED: Check flags in both main object and raw object
-    const isNewArrival = product.newArrival || product.raw?.newArrival || product.raw?.newArrivals || product.isNew;
-    const isBestSeller = product.bestSeller || product.raw?.bestSeller || product.raw?.bestSellers || product.topSelling;
-    const isTrending = product.trending || product.raw?.trending;
-    const rating = product.rating || product.raw?.rating || 0;
-    const discountPercent = !isCustom && type === "readymade" ? getCommonItemDiscount(product) : 0;
-
-    const viewDetailsLink = isCustom
-      ? `/products/${product.slug}`
-      : type === "readymade"
-      ? `/readymade/${product._id}`
-      : type === "design"
-      ? `/catalogue/${product._id}`
-      : "#";
-
+  if (currentStatus === "loading" || loadingEditData) {
     return (
-      <div
-        key={product._id}
-        className="group bg-white rounded-2xl border border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all duration-200 overflow-hidden"
-        onMouseEnter={() => {
-          if (hasMultipleImages) startAutoSlideshow(product._id, images);
-        }}
-        onMouseLeave={() => {
-          if (hasMultipleImages) stopAutoSlideshow(product._id);
-        }}
-      >
-        {/* Image */}
-        <div className="relative aspect-[4/5] bg-gray-50 overflow-hidden">
-          {/* Badges */}
-          <div className="absolute top-3 left-3 z-10 flex flex-wrap gap-2">
-            {discountPercent > 0 && (
-              <span className="text-[11px] font-semibold px-2 py-1 rounded-full bg-red-600 text-white">
-                {discountPercent}% OFF
-              </span>
-            )}
-            {isNewArrival && (
-              <span className="text-[11px] font-semibold px-2 py-1 rounded-full bg-emerald-600 text-white">
-                New
-              </span>
-            )}
-            {isBestSeller && (
-              <span className="text-[11px] font-semibold px-2 py-1 rounded-full bg-amber-500 text-white">
-                Best Seller
-              </span>
-            )}
-            {isTrending && (
-              <span className="text-[11px] font-semibold px-2 py-1 rounded-full bg-pink-600 text-white">
-                Trending
-              </span>
-            )}
-          </div>
-
-          {/* Wishlist */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setWishlist((prev) =>
-                prev.includes(keyId) ? prev.filter((id) => id !== keyId) : [...prev, keyId]
-              );
-            }}
-            className="absolute top-3 right-3 z-10 p-2 rounded-full bg-white/90 backdrop-blur border border-gray-200 hover:bg-white transition"
-          >
-            <Heart className={`w-5 h-5 ${isInWishlist ? "fill-rose-500 text-rose-500" : "text-gray-600"}`} />
-          </button>
-
-          {/* Loader */}
-          {isLoadingImage && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-10 h-10 border-4 border-gray-200 border-t-gray-700 rounded-full animate-spin" />
-            </div>
-          )}
-
-          {/* Image */}
-          {currentImage ? (
-            <>
-              <img
-                src={currentImage}
-                alt={name}
-                className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02] ${
-                  isLoadingImage ? "opacity-0" : "opacity-100"
-                }`}
-                onLoad={() => handleImageLoad(product._id)}
-                onError={() => handleImageError(product._id)}
-                loading="lazy"
-              />
-
-              {/* Arrows */}
-              {hasMultipleImages && (
-                <>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      stopAutoSlideshow(product._id);
-                      setImageIndices((prev) => ({
-                        ...prev,
-                        [product._id]: ((prev[product._id] || 0) - 1 + images.length) % images.length,
-                      }));
-                    }}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition bg-white/90 border border-gray-200 rounded-full p-2"
-                  >
-                    <ChevronLeft className="w-5 h-5 text-gray-700" />
-                  </button>
-
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      stopAutoSlideshow(product._id);
-                      setImageIndices((prev) => ({
-                        ...prev,
-                        [product._id]: ((prev[product._id] || 0) + 1) % images.length,
-                      }));
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition bg-white/90 border border-gray-200 rounded-full p-2"
-                  >
-                    <ChevronRight className="w-5 h-5 text-gray-700" />
-                  </button>
-                </>
-              )}
-
-              {/* Dots */}
-              {hasMultipleImages && images.length > 1 && (
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-                  {images.map((_, idx) => (
-                    <button
-                      key={idx}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        stopAutoSlideshow(product._id);
-                        setImageIndices((prev) => ({ ...prev, [product._id]: idx }));
-                      }}
-                      className={`w-2 h-2 rounded-full transition ${
-                        idx === currentImageIndex ? "bg-gray-900" : "bg-gray-300 hover:bg-gray-400"
-                      }`}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <Package className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-                <p className="text-sm text-gray-400 font-medium">No preview</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Info */}
-        <div className="p-4">
-          {/* Category + Rating */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs text-gray-500">
-                {category || "Uncategorized"}
-                {subCategory ? <span className="text-gray-300"> • </span> : null}
-                {subCategory ? subCategory : null}
-              </p>
-
-              <h3 className="mt-1 text-sm font-semibold text-gray-900 line-clamp-1">
-                {name}
-              </h3>
-            </div>
-
-            {rating > 0 && (
-              <div className="flex items-center gap-1 text-xs font-semibold text-gray-700 bg-gray-100 px-2 py-1 rounded-full shrink-0">
-                <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                {rating.toFixed(1)}
-              </div>
-            )}
-          </div>
-
-          {/* Description */}
-          {description ? (
-            <p className="mt-2 text-xs text-gray-600 line-clamp-2 leading-relaxed">
-              {description}
-            </p>
-          ) : null}
-
-          {/* Price + CTA */}
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-baseline gap-2">
-                <span className="text-base font-bold text-gray-900">
-                  ₹{Number(basePrice || 0).toLocaleString()}
-                </span>
-
-                {!isCustom &&
-                  type === "readymade" &&
-                  product.raw?.originalPrice &&
-                  product.raw.originalPrice > basePrice && (
-                    <span className="text-xs text-gray-400 line-through">
-                      ₹{product.raw.originalPrice.toLocaleString()}
-                    </span>
-                  )}
-              </div>
-              <p className="text-[11px] text-gray-500">Incl. taxes</p>
-            </div>
-
-            {isCustom ? (
-              <Link
-                to={`/products/${product.slug}/customize`}
-                className="px-4 py-2 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-black transition"
-              >
-                Customize
-              </Link>
-            ) : (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAddCommonToCart(product);
-                }}
-                disabled={isAdding || cartLoading}
-                className={`px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 ${
-                  isInCart
-                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                    : "bg-gray-900 text-white hover:bg-black"
-                } ${isAdding ? "opacity-70 cursor-not-allowed" : ""}`}
-              >
-                {isAdding ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Adding
-                  </>
-                ) : isInCart ? (
-                  <>
-                    <CheckCircle className="w-4 h-4" />
-                    Added
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart className="w-4 h-4" />
-                    Add
-                  </>
-                )}
-              </button>
-            )}
-          </div>
-
-          {/* ✅ View Details (Added Back) */}
-          <div className="mt-3">
-            <Link
-              to={viewDetailsLink}
-              className="inline-flex items-center gap-1 text-sm font-semibold text-gray-700 hover:text-gray-900"
-              onClick={(e) => e.stopPropagation()}
-            >
-              View Details
-              <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Skeleton loader
-  const ProductSkeleton = () => (
-    <div className="bg-white rounded-xl border border-gray-100 p-4 animate-pulse">
-      <div className="h-72 bg-gradient-to-br from-gray-100 to-gray-50 rounded-lg mb-4"></div>
-      <div className="space-y-3">
-        <div className="flex gap-2">
-          <div className="h-6 bg-gray-100 rounded-full w-20"></div>
-          <div className="h-6 bg-gray-100 rounded-full w-24"></div>
-        </div>
-        <div className="h-5 bg-gray-100 rounded w-3/4"></div>
-        <div className="h-4 bg-gray-100 rounded w-1/2"></div>
-        <div className="h-8 bg-gray-100 rounded w-1/4"></div>
-      </div>
-    </div>
-  );
-
-  if (isLoading()) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="animate-pulse">
-            <div className="h-10 bg-gray-100 rounded-lg w-1/4 mb-8"></div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {Array.from({ length: 8 }).map((_, index) => (
-                <ProductSkeleton key={index} />
-              ))}
-            </div>
-          </div>
+      <div className="flex h-screen items-center justify-center bg-neutral-100">
+        <div className="rounded-md bg-white px-4 py-3 shadow text-sm">
+          {loadingEditData ? "Loading design for editing..." : "Loading product…"}
         </div>
       </div>
     );
   }
 
-  const error = getError();
-  if (error) {
+  if (currentStatus === "failed") {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-gray-100 p-8 text-center">
-          <div className="w-20 h-20 bg-gradient-to-br from-red-50 to-rose-50 rounded-full flex items-center justify-center mx-auto mb-6">
-            <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-rose-500 rounded-full flex items-center justify-center">
-              <span className="text-2xl text-white font-bold">!</span>
-            </div>
-          </div>
-          <h3 className="text-xl font-bold text-gray-800 mb-2">Error Loading Products</h3>
-          <p className="text-gray-600 mb-6">{error.message || error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:opacity-90 transition-all font-semibold shadow-lg"
-          >
-            Try Again
-          </button>
+      <div className="flex h-screen items-center justify-center bg-neutral-100">
+        <div className="rounded-md bg-white px-4 py-3 shadow text-sm text-red-600">
+          Failed to load product: {currentError}
         </div>
       </div>
     );
   }
 
-  const productsToDisplay = filteredProducts;
+  if (!product) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-neutral-100">
+        <div className="rounded-md bg-white px-4 py-3 shadow text-sm text-red-600">
+          Product not found. Please check the URL.
+        </div>
+      </div>
+    );
+  }
+
+  const currentView = product.views.find((v) => v.code === viewCode) || product.views[0];
+  const mockupUrl = currentView?.mockupUrl;
+  const maskUrl = currentView?.maskUrl;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      {/* Cart Success Notification */}
-      {showCartSuccess && (
-        <div className="fixed top-6 right-6 z-50 animate-fade-in">
-          <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 text-emerald-800 px-5 py-4 rounded-xl shadow-2xl max-w-sm flex items-center gap-4">
-            <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-              <CheckCircle className="w-5 h-5 text-white" />
+    <div className="flex h-screen flex-col bg-neutral-100 text-slate-900">
+      {/* Top bar */}
+      <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-6">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="text-lg font-extrabold tracking-wide text-orange-500">
+              MYPRINT
             </div>
-            <div className="flex-1">
-              <p className="font-bold">Added to Cart!</p>
-              <p className="text-sm text-emerald-700 mt-1">"{addedProductName}" has been added to your cart</p>
-            </div>
-            <button
-              onClick={() => setShowCartSuccess(false)}
-              className="text-emerald-500 hover:text-emerald-700 ml-2"
+
+            <Link
+              to="/usersaved_designs"
+              className="rounded-full border border-sky-600 px-3 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-50 transition"
             >
-              <X className="w-4 h-4" />
+              My Designs
+            </Link>
+          </div>
+
+          <div className="text-xs text-slate-500">
+            {isEditMode ? "Edit Design" : "My Designs"} <span className="mx-1">›</span>{" "}
+            <span className="font-medium text-slate-700">
+              {product?.name || "Untitled design"}
+              {isEditMode && " (Editing)"}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4 text-xs">
+          {isEditMode && (
+            <button onClick={handleBackToAdmin} className="text-sky-700 hover:underline">
+              Back to Admin
+            </button>
+          )}
+
+          {isEditMode && originalDesign && (
+            <button onClick={handleResetToOriginal} className="rounded-full border border-slate-300 px-3 py-1 text-slate-700 hover:bg-slate-50">
+              Reset to Original
+            </button>
+          )}
+
+          <div className="flex items-center gap-3">
+            <div className="price-display text-right">
+              <div className="text-xs text-slate-500">Total Price</div>
+              <div className="text-xl font-bold text-green-600">
+                ₹{price.toFixed(2)}
+              </div>
+            </div>
+
+            <button onClick={handleSaveDesign} disabled={saving} className="rounded-full border border-sky-600 bg-sky-600 px-4 py-1 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60">
+              {saving ? "Saving…" : isEditMode ? "Update Design" : "Save Design"}
             </button>
           </div>
         </div>
-      )}
+      </header>
 
-      {/* Header */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600">
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center text-white">
-            <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 mb-4">
-              <BadgeCheck className="w-5 h-5" />
-              <span className="text-sm font-semibold">Premium Product Collection</span>
-            </div>
-            
-            <h1 className="text-4xl font-bold mb-4 leading-tight">
-              Product Hub
-            </h1>
-            <p className="text-lg opacity-90 mb-6 max-w-2xl mx-auto leading-relaxed">
-              Discover and customize premium products for every occasion
-            </p>
-            
-            {/* Search Bar */}
-            <div className="max-w-2xl mx-auto relative">
-              <div className="relative bg-white/10 backdrop-blur-sm border-2 border-white/20 rounded-2xl overflow-hidden">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/70 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder={`Search ${activeProductType === 'custom' ? 'custom products' : 'all products'}...`}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-10 py-3 bg-transparent text-white placeholder-white/60 focus:outline-none"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/60 hover:text-white p-1"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
+      {/* Main area */}
+      <div className="flex flex-1 min-h-0 p-6 gap-6">
+        {/* Left sidebar - Controls */}
+        <aside className="w-80 rounded-lg border border-slate-200 bg-white p-4 shadow-sm flex flex-col gap-6">
+          {/* Edit mode indicator */}
+          {isEditMode && (
+            <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                <span className="text-xs font-medium text-amber-700">Edit Mode</span>
               </div>
+              <p className="mt-1 text-[10px] text-amber-600">
+                Editing design ID: {editDesignId?.slice(0, 8)}...
+              </p>
             </div>
+          )}
+
+          {/* Tab navigation */}
+          <div className="flex border-b border-slate-200">
+            <button
+              onClick={() => setActiveTab(TABS.PRODUCT_COLORS)}
+              className={`px-3 py-2 text-xs font-medium ${activeTab === TABS.PRODUCT_COLORS ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Product Colors
+            </button>
+            <button
+              onClick={() => setActiveTab(TABS.DESIGNS)}
+              className={`px-3 py-2 text-xs font-medium ${activeTab === TABS.DESIGNS ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Designs
+            </button>
+            <button
+              onClick={() => setActiveTab(TABS.TEXT)}
+              className={`px-3 py-2 text-xs font-medium ${activeTab === TABS.TEXT ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Text
+            </button>
+            <button
+              onClick={() => setActiveTab(TABS.VIEWS)}
+              className={`px-3 py-2 text-xs font-medium ${activeTab === TABS.VIEWS ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Views
+            </button>
+            <button
+              onClick={() => setActiveTab(TABS.DESIGN_LIBRARY)}
+              className={`px-3 py-2 text-xs font-medium ${activeTab === TABS.DESIGN_LIBRARY ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Design Library
+            </button>
           </div>
-        </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Sidebar Filters */}
-          <div className={`${showSidebar ? 'block' : 'hidden lg:block'} lg:w-72`}>
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 sticky top-6">
-              {/* Header with Product Type Switcher */}
-              <div className="mb-6">
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Browse Products</h2>
-                <div className="grid grid-cols-2 gap-3">
-                  {PRODUCT_TYPES.map((type) => (
-                    <button
-                      key={type.id}
-                      onClick={() => {
-                        setActiveProductType(type.id);
-                        handleClearFilters();
-                      }}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-lg transition-all ${
-                        activeProductType === type.id
-                          ? `bg-gradient-to-r ${type.gradient} text-white shadow-lg`
-                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                      }`}
-                    >
-                      <type.icon className="w-5 h-5" />
-                      <span className="text-sm font-semibold">{type.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+          {/* Tab content */}
+          <div className="flex-1 overflow-auto">
+            {/* Product Colors Tab */}
+            {activeTab === TABS.PRODUCT_COLORS && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="mb-3 font-semibold text-sm">Product Colors</h3>
+                  <div className="mb-4">
+                    <label className="mb-2 block text-xs font-medium">Current Color</label>
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded border border-slate-300" style={{ backgroundColor: productColor }} />
+                      <input type="color" className="h-10 w-full cursor-pointer" value={productColor} onChange={(e) => handleColorChange(e.target.value)} />
+                    </div>
+                  </div>
 
-              {/* Product Type Filters (for 'all' view) */}
-              {activeProductType === 'all' && (
-                <div className="mb-6">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Filter by Type</h3>
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => setProductTypeFilter('all')}
-                      className={`w-full flex items-center justify-between p-3 rounded-lg transition-all ${
-                        productTypeFilter === 'all'
-                          ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200'
-                          : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Grid3x3 className={`w-4 h-4 ${productTypeFilter === 'all' ? 'text-blue-600' : 'text-gray-400'}`} />
-                        <span className={`text-sm ${productTypeFilter === 'all' ? 'text-blue-700 font-medium' : 'text-gray-600'}`}>
-                          All Products
-                        </span>
-                      </div>
-                      <span className="text-xs font-bold bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                        {commonSavedData.length}
-                      </span>
-                    </button>
-                    
-                    <button
-                      onClick={() => setProductTypeFilter('design')}
-                      className={`w-full flex items-center justify-between p-3 rounded-lg transition-all ${
-                        productTypeFilter === 'design'
-                          ? 'bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200'
-                          : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Palette className={`w-4 h-4 ${productTypeFilter === 'design' ? 'text-purple-600' : 'text-gray-400'}`} />
-                        <span className={`text-sm ${productTypeFilter === 'design' ? 'text-purple-700 font-medium' : 'text-gray-600'}`}>
-                          Designs Only
-                        </span>
-                      </div>
-                      <span className="text-xs font-bold bg-purple-100 text-purple-700 px-2 py-1 rounded">
-                        {commonSavedData.filter(p => p.type === 'design').length}
-                      </span>
-                    </button>
-                    
-                    <button
-                      onClick={() => setProductTypeFilter('readymade')}
-                      className={`w-full flex items-center justify-between p-3 rounded-lg transition-all ${
-                        productTypeFilter === 'readymade'
-                          ? 'bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200'
-                          : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Package className={`w-4 h-4 ${productTypeFilter === 'readymade' ? 'text-blue-600' : 'text-gray-400'}`} />
-                        <span className={`text-sm ${productTypeFilter === 'readymade' ? 'text-blue-700 font-medium' : 'text-gray-600'}`}>
-                          Readymade Only
-                        </span>
-                      </div>
-                      <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                        {commonSavedData.filter(p => p.type === 'readymade').length}
-                      </span>
-                    </button>
+                  <div className="mb-2">
+                    <label className="mb-2 block text-xs font-medium">Quick Select</label>
+                    <div className="grid grid-cols-6 gap-2">
+                      {colorOptions.map((color) => (
+                        <button key={color} className={`h-8 w-8 rounded-full border-2 ${color === productColor ? "border-sky-500" : "border-slate-300"}`} style={{ backgroundColor: color }} onClick={() => handleColorChange(color)} type="button" />
+                      ))}
+                    </div>
                   </div>
                 </div>
-              )}
 
-              {/* Category Filter */}
-              {(activeProductType === 'all' || activeProductType === 'custom') && (
-                <div className="mb-6">
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                    {activeProductType === 'all' ? 'Categories' : 'Custom Categories'}
-                  </h3>
-                  <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                    {/* All Categories Button */}
-                    <button
-                      onClick={() => {
-                        if (activeProductType === 'all') {
-                          setSelectedCommonCategory('all');
-                          setSelectedCommonSubCategory('all');
-                        } else {
-                          handleCategoryChange('all');
-                        }
-                      }}
-                      className={`w-full flex items-center justify-between p-2.5 rounded-lg transition-all text-sm ${
-                        (activeProductType === 'all' && selectedCommonCategory === 'all') ||
-                        (activeProductType === 'custom' && selectedCategory === 'all')
-                          ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 font-medium'
-                          : 'hover:bg-gray-50 text-gray-600'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Grid3x3 className="w-4 h-4" />
-                        <span>All Categories</span>
-                      </div>
-                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
-                        {activeProductType === 'all' 
-                          ? commonSavedData.length 
-                          : (Array.isArray(customProducts) ? customProducts.length : 0)}
-                      </span>
-                    </button>
+                <div className="text-xs text-slate-600 space-y-2">
+                  <p className="font-medium">How to use:</p>
+                  <p>• Select a color to change the product color</p>
+                  <p>• Use the color picker for custom colors</p>
+                  <p>• Quick select colors are commonly used options</p>
+                </div>
+              </div>
+            )}
 
-                    {/* Categories List */}
-                    {(activeProductType === 'all' ? getCommonCategories : getCustomCategories()).map((category) => {
-                      const categoryName = activeProductType === 'all' ? category.name : category.category;
-                      const categoryCount = activeProductType === 'all' ? category.count : (category.subCategories?.length || 0);
-                      const isSelected = activeProductType === 'all' 
-                        ? selectedCommonCategory === categoryName
-                        : selectedCategory === categoryName;
-                      const isExpanded = expandedCategories[categoryName];
-                      const hasSubcategories = (activeProductType === 'all' 
-                        ? getCommonSubcategories.length > 0
-                        : (category.subCategories && category.subCategories.length > 0)
-                      ) && isSelected;
+            {/* Designs Tab */}
+            {activeTab === TABS.DESIGNS && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="mb-3 font-semibold text-sm">Upload Designs</h3>
+                  <p className="mb-2 text-xs text-slate-600">Upload one or more images. They will be saved to the server automatically.</p>
 
-                      return (
-                        <div key={categoryName} className="ml-2">
-                          <button
-                            onClick={() => {
-                              if (activeProductType === 'all') {
-                                setSelectedCommonCategory(categoryName);
-                                setSelectedCommonSubCategory('all');
-                                toggleCategoryExpansion(categoryName);
-                              } else {
-                                handleCategoryChange(categoryName);
-                                toggleCategoryExpansion(categoryName);
-                              }
-                            }}
-                            className={`w-full flex items-center justify-between p-2.5 rounded-lg transition-all text-sm ${
-                              isSelected
-                                ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 font-medium'
-                                : 'hover:bg-gray-50 text-gray-600'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <Tag className="w-4 h-4" />
-                              <span className="text-left">{categoryName}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
-                                {categoryCount}
-                              </span>
-                              {hasSubcategories && (
-                                isExpanded ? (
-                                  <ChevronUp className="w-3 h-3 text-blue-600" />
-                                ) : (
-                                  <ChevronDown className="w-3 h-3 text-gray-400" />
-                                )
-                              )}
-                            </div>
-                          </button>
+                  <div className="mb-3 text-xs">
+                    <input type="file" accept="image/*" multiple onChange={handleDesignUpload} className="w-full text-xs border border-slate-300 rounded px-3 py-2" />
+                  </div>
 
-                          {/* Subcategories */}
-                          {hasSubcategories && isExpanded && (
-                            <div className="ml-4 mt-1 space-y-1">
-                              <button
-                                onClick={() => {
-                                  if (activeProductType === 'all') {
-                                    setSelectedCommonSubCategory('all');
-                                  } else {
-                                    handleSubCategoryChange('all');
-                                  }
-                                }}
-                                className={`w-full flex items-center justify-between p-1.5 rounded transition-all text-xs ${
-                                  (activeProductType === 'all' && selectedCommonSubCategory === 'all') ||
-                                  (activeProductType === 'custom' && selectedSubCategory === 'all')
-                                    ? 'bg-blue-100 text-blue-700 font-medium'
-                                    : 'hover:bg-gray-50 text-gray-500'
-                                }`}
-                              >
-                                <span>All Subcategories</span>
-                                <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
-                                  {activeProductType === 'all'
-                                    ? getCommonSubcategories.length
-                                    : (category.subCategories?.length || 0)}
-                                </span>
-                              </button>
-
-                              {(activeProductType === 'all' ? getCommonSubcategories : (category.subCategories || [])).map((subCat) => {
-                                const subCatName = activeProductType === 'all' ? subCat.name : subCat;
-                                const subCatCount = activeProductType === 'all' ? subCat.count : 1;
-                                const isSubSelected = activeProductType === 'all'
-                                  ? selectedCommonSubCategory === subCatName
-                                  : selectedSubCategory === subCatName;
-
-                                return (
-                                  <button
-                                    key={subCatName}
-                                    onClick={() => {
-                                      if (activeProductType === 'all') {
-                                        setSelectedCommonSubCategory(subCatName);
-                                      } else {
-                                        handleSubCategoryChange(subCatName);
-                                      }
-                                    }}
-                                    className={`w-full flex items-center justify-between p-1.5 rounded transition-all text-xs ${
-                                      isSubSelected
-                                        ? 'bg-blue-100 text-blue-700 font-medium'
-                                        : 'hover:bg-gray-50 text-gray-500'
-                                    }`}
-                                  >
-                                    <span>{subCatName}</span>
-                                    <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
-                                      {subCatCount}
-                                    </span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
+                  {activeDesign && (
+                    <>
+                      <div className="mb-4 p-3 bg-slate-50 rounded border border-slate-200">
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="font-medium text-slate-700 text-xs">Selected Design</span>
+                          <span className="text-[10px] text-slate-500">ID: {activeDesign.id.slice(0, 6)}…</span>
                         </div>
+                        
+                        {selectedLibraryImage && (
+                          <div className="mb-2 px-2 py-1 bg-sky-50 border border-sky-200 rounded text-xs text-sky-700">
+                            <span className="font-medium">From Library:</span> {selectedLibraryImage}
+                          </div>
+                        )}
+                        
+                        <div className="mb-3 text-xs">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="text-center">
+                              <div className="text-[10px] text-slate-500">Display</div>
+                              <div className="font-medium">{activeDesign.currentDisplayWidthInches?.toFixed(2)}" × {activeDesign.currentDisplayHeightInches?.toFixed(2)}"</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-[10px] text-slate-500">Print</div>
+                              <div className="font-medium">{activeDesign.currentPrintWidthInches?.toFixed(2)}" × {activeDesign.currentPrintHeightInches?.toFixed(2)}"</div>
+                            </div>
+                          </div>
+                          <div className="mt-2 text-center">
+                            <div className="text-[10px] text-slate-500">Print Area</div>
+                            <div className="font-medium">{activeDesign.currentPrintAreaInches?.toFixed(2)} sq.in</div>
+                            {activeDesign.currentAdditionalArea > 0 ? (
+                              <div className="text-[10px] text-green-600">
+                                +{activeDesign.currentAdditionalArea?.toFixed(2)} sq.in extra
+                              </div>
+                            ) : activeDesign.minimumChargeApplied && (
+                              <div className="text-[10px] text-amber-600">
+                                Minimum ₹{MINIMUM_DESIGN_CHARGE} charge
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button type="button" onClick={handleRemoveBackground} disabled={bgRemovalLoading} className={`flex-1 rounded border px-2 py-1 text-xs font-medium ${bgRemovalLoading ? "border-slate-300 text-slate-400" : "border-sky-500 text-sky-700 hover:bg-sky-50"}`}>
+                            {bgRemovalLoading ? "Removing…" : "Remove BG"}
+                          </button>
+                          <button type="button" onClick={clearActiveDesign} className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="mb-4">
+                        <label className="mb-2 block text-xs font-medium">Design Size</label>
+                        <div className="flex items-center gap-2">
+                          <input type="range" min={0.1} max={1.2} step={0.02} value={activeDesign.scale} onChange={(e) => handleDesignScaleChange(e.target.value)} className="flex-1" />
+                          <span className="w-10 text-right text-xs text-slate-600">{Math.round(activeDesign.scale * 100)}%</span>
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-slate-500">
+                          <div>Display: {activeDesign.currentDisplayWidthInches?.toFixed(2)}" × {activeDesign.currentDisplayHeightInches?.toFixed(2)}"</div>
+                          <div>Print: {activeDesign.currentPrintWidthInches?.toFixed(2)}" × {activeDesign.currentPrintHeightInches?.toFixed(2)}"</div>
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-slate-600 space-y-1">
+                        <p>• Click on a design in the editor to select it</p>
+                        <p>• Drag to reposition, or use the resize handle</p>
+                        <p>• Click "Remove BG" for transparent background</p>
+                        <p>• Sleeves have fixed pricing of ₹{SLEEVE_PRICE} each</p>
+                      </div>
+                    </>
+                  )}
+
+                  {!activeDesign && designLayers.length > 0 && (
+                    <div className="p-3 bg-slate-50 rounded border border-slate-200">
+                      <p className="text-xs text-slate-600 text-center">
+                        {designLayers.length} design{designLayers.length !== 1 ? 's' : ''} uploaded
+                      </p>
+                      <p className="text-[10px] text-slate-500 text-center mt-1">
+                        Click any design on the shirt to select it and edit.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Text Tab */}
+            {activeTab === TABS.TEXT && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-sm">Text Customization</h3>
+                  <div className="flex gap-2">
+                    <button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={addNewText}>+ Add Text</button>
+                    <button className="rounded border border-rose-300 px-2 py-1 text-xs text-rose-600 hover:bg-rose-50 disabled:opacity-40" type="button" onClick={removeActiveText} disabled={!activeTextLayer}>Remove</button>
+                  </div>
+                </div>
+
+                {activeTextLayer ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-500">Text Content</label>
+                      <input type="text" className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-sky-500" value={activeTextLayer.text} onChange={(e) => updateActiveTextLayer({ text: e.target.value })} placeholder="Enter text here" />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-500">Font</label>
+                        <select className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-sky-500" value={activeTextLayer.fontFamily} onChange={(e) => updateActiveTextLayer({ fontFamily: e.target.value })}>
+                          {FONT_OPTIONS.map((f) => <option key={f} value={f}>{f.replace(/,.*$/, "")}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-500">Color</label>
+                        <input type="color" className="h-8 w-full cursor-pointer rounded border border-slate-300" value={activeTextLayer.color} onChange={(e) => updateActiveTextLayer({ color: e.target.value })} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-500">Font Size</label>
+                      <div className="flex items-center gap-2">
+                        <input type="range" min={14} max={120} value={activeTextLayer.fontSize} onChange={(e) => updateActiveTextLayer({ fontSize: parseInt(e.target.value, 10) })} className="flex-1" />
+                        <span className="w-10 text-right text-xs text-slate-600">{activeTextLayer.fontSize}px</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-500">Rotation</label>
+                      <div className="flex items-center gap-2">
+                        <input type="range" min={-45} max={45} value={activeTextLayer.rotation} onChange={(e) => updateActiveTextLayer({ rotation: parseInt(e.target.value, 10) })} className="flex-1" />
+                        <span className="w-10 text-right text-xs text-slate-600">{activeTextLayer.rotation}°</span>
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-slate-600 space-y-1">
+                      <p>• Drag the text on the shirt to reposition</p>
+                      <p>• Use the corner handle to resize</p>
+                      <p>• Click "Remove" to delete selected text</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-slate-50 rounded border border-slate-200 text-center">
+                    <p className="text-xs text-slate-600">No text added yet.</p>
+                    <p className="text-[10px] text-slate-500 mt-1">Click "+ Add Text" to start customizing.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Views Tab */}
+            {activeTab === TABS.VIEWS && product.views && product.views.length > 1 && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="mb-3 font-semibold text-sm">Product Views</h3>
+                  <p className="mb-3 text-xs text-slate-600">Switch between different views of the product to add designs/text on different areas.</p>
+
+                  <div className="space-y-2">
+                    {product.views.map((v) => {
+                      const viewState = viewStates[v.code];
+                      const hasLayers = viewState && (viewState.textLayers?.length > 0 || viewState.designLayers?.length > 0);
+                      const isCurrent = v.code === viewCode;
+                      
+                      return (
+                        <button
+                          key={v.code}
+                          type="button"
+                          onClick={() => setViewCode(v.code)}
+                          className={`w-full flex items-center justify-between rounded px-3 py-2 text-xs border ${isCurrent ? 'bg-sky-50 border-sky-200 text-sky-700' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                        >
+                          <span>{v.label}</span>
+                          <div className="flex items-center gap-2">
+                            {hasLayers && <span className="h-2 w-2 bg-emerald-500 rounded-full"></span>}
+                            {isCurrent && (
+                              <svg className="w-3 h-3 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                        </button>
                       );
                     })}
                   </div>
                 </div>
-              )}
 
-              {/* Price Range */}
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Price Range</h3>
-                
-                {/* Quick Price Ranges */}
-                <div className="space-y-2 mb-4">
-                  {PRICE_RANGES.map((range) => (
-                    <button
-                      key={range.label}
-                      onClick={() => applyQuickPriceRange(range)}
-                      className={`w-full flex items-center justify-between p-2.5 rounded-lg transition-all text-sm ${
-                        quickPriceRange === range.label
-                          ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 font-medium'
-                          : 'hover:bg-gray-50 text-gray-600'
-                      }`}
-                    >
-                      <span>{range.label}</span>
-                      {quickPriceRange === range.label && (
-                        <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-                      )}
-                    </button>
-                  ))}
+                <div className="text-xs text-slate-600 space-y-2">
+                  <p className="font-medium">Current View: {product.views.find(v => v.code === viewCode)?.label}</p>
+                  <p>• Front: Main design area</p>
+                  <p>• Back: Back of the product</p>
+                  <p>• Left/Right Sleeves: Sleeve designs</p>
+                  <p>• Each view has separate text and design layers</p>
                 </div>
-                
-                {/* Custom Range Slider */}
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-medium text-gray-600">Custom Range</span>
-                    <span className="text-xs font-bold text-blue-600">
-                      ₹{priceRange[0].toLocaleString()} - ₹{priceRange[1].toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="px-1">
-                    <input
-                      type="range"
-                      min="0"
-                      max="10000"
-                      step="100"
-                      value={priceRange[1]}
-                      onChange={(e) => {
-                        setQuickPriceRange(null);
-                        setPriceRange([priceRange[0], parseInt(e.target.value)]);
-                      }}
-                      className="w-full h-1.5 bg-gradient-to-r from-blue-200 to-indigo-200 rounded-lg appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-600 [&::-webkit-slider-thumb]:shadow"
-                    />
-                    <div className="flex justify-between mt-2 text-xs text-gray-500">
-                      <span>₹0</span>
-                      <span>₹2,500</span>
-                      <span>₹5,000</span>
-                      <span>₹7,500</span>
-                      <span>₹10k</span>
+              </div>
+            )}
+
+            {/* Design Library Tab - NEW */}
+            {activeTab === TABS.DESIGN_LIBRARY && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="mb-3 font-semibold text-sm">Design Library</h3>
+                  <p className="mb-3 text-xs text-slate-600">Select designs from your library to use on your product.</p>
+
+                  {/* Folder selection */}
+                  <div className="mb-4">
+                    <label className="mb-2 block text-xs font-medium">Select Folder</label>
+                    <div className="flex flex-wrap gap-2">
+                      {folders.map((folder) => (
+                        <button
+                          key={folder}
+                          type="button"
+                          onClick={() => dispatch(setCurrentFolder(folder))}
+                          className={`px-3 py-1 rounded text-xs border ${currentFolder === folder ? 'bg-sky-100 border-sky-300 text-sky-700' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+                        >
+                          {folder}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Sort Options */}
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Sort By</h3>
-                <div className="space-y-2">
-                  {SORT_OPTIONS.map((option) => {
-                    const Icon = option.icon;
-                    return (
-                      <button
-                        key={option.id}
-                        onClick={() => setSortOption(option.id)}
-                        className={`w-full flex items-center gap-2.5 p-2.5 rounded-lg transition-all text-sm ${
-                          sortOption === option.id
-                            ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 font-medium'
-                            : 'hover:bg-gray-50 text-gray-600'
-                        }`}
-                      >
-                        <Icon className={`w-4 h-4 ${sortOption === option.id ? 'text-blue-600' : 'text-gray-400'}`} />
-                        <span>{option.name}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                  {/* Images grid */}
+                  {libraryLoading ? (
+                    <div className="flex justify-center py-8">
+                      <div className="text-xs text-slate-500">Loading designs...</div>
+                    </div>
+                  ) : currentFolder && images.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-2">
+                      {images.map((image) => (
+                        <div 
+                          key={image.filename} 
+                          className="relative group cursor-pointer"
+                          onClick={() => handleSelectFromLibrary(image)}
+                        >
+                          <div className="aspect-square overflow-hidden rounded border border-slate-200 bg-slate-50">
+                            <img 
+                              src={`http://localhost:5000/outputs/adminuploadeddesigns/${currentFolder}/${image.filename}`} 
+                              alt={image.filename}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                              loading="lazy"
+                            />
+                          </div>
+                          <div className="mt-1 text-[10px] text-slate-600 truncate">
+                            {image.filename}
+                          </div>
+                          <div className="absolute inset-0 bg-sky-500/0 group-hover:bg-sky-500/10 transition-colors rounded border-2 border-transparent group-hover:border-sky-400"></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : currentFolder ? (
+                    <div className="p-4 bg-slate-50 rounded border border-slate-200 text-center">
+                      <p className="text-xs text-slate-600">No designs in this folder</p>
+                      <p className="text-[10px] text-slate-500 mt-1">Upload designs to this folder in the admin panel</p>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-slate-50 rounded border border-slate-200 text-center">
+                      <p className="text-xs text-slate-600">Select a folder to view designs</p>
+                      <p className="text-[10px] text-slate-500 mt-1">Designs are organized in folders for easy access</p>
+                    </div>
+                  )}
 
-              {/* Apply Filters Button for Custom Products */}
-              {activeProductType === 'custom' && (
-                <button
-                  onClick={handleApplyCustomFilters}
-                  className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-medium text-sm hover:opacity-90 transition-all mb-4"
-                >
-                  Apply Filters
-                </button>
-              )}
-
-              {/* Clear Filters Button */}
-              <button
-                onClick={handleClearFilters}
-                className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium text-sm transition-colors"
-              >
-                Clear All Filters
-              </button>
-
-              {/* Mobile close button */}
-              <button
-                onClick={() => setShowSidebar(false)}
-                className="lg:hidden w-full mt-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-medium text-sm hover:opacity-90 transition-all"
-              >
-                Apply Filters
-              </button>
-            </div>
-          </div>
-
-          {/* Main Content Area */}
-          <div className="flex-1">
-            {/* Results Header */}
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-6">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">
-                    {activeProductType === 'custom' ? 'Custom Products' : 'All Products'}
-                    <span className="text-blue-600 ml-2">
-                      ({productsToDisplay.length})
-                    </span>
-                  </h2>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {activeProductType === 'all' && productTypeFilter !== 'all' && (
-                      <>
-                        Showing {productTypeFilter === 'design' ? 'designs' : 'readymade products'} only
-                      </>
-                    )}
-                    {activeProductType === 'custom' && (
-                      <span className="text-blue-600">
-                        {selectedCategory !== 'all' && ` • Category: ${selectedCategory}`}
-                        {selectedSubCategory !== 'all' && ` • Subcategory: ${selectedSubCategory}`}
-                      </span>
-                    )}
-                  </p>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  {/* Mobile Filter Button */}
-                  <button
-                    onClick={() => setShowSidebar(true)}
-                    className="lg:hidden flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-medium text-sm hover:opacity-90 transition-all"
-                  >
-                    <SlidersHorizontal className="w-4 h-4" />
-                    Filters
-                  </button>
-                  
-                  {/* View Toggle */}
-                  <div className="flex items-center bg-gray-100 rounded-lg p-1">
-                    <button
-                      onClick={() => setViewMode('grid')}
-                      className={`p-2 rounded transition-all ${
-                        viewMode === 'grid' 
-                          ? 'bg-white shadow-sm text-blue-600' 
-                          : 'hover:bg-white/50 text-gray-500'
-                      }`}
-                    >
-                      <Grid className="w-4 h-4" />
-                    </button>
+                  <div className="text-xs text-slate-600 space-y-2 mt-4">
+                    <p className="font-medium">How to use:</p>
+                    <p>• Select a folder to view available designs</p>
+                    <p>• Click on any design to add it to your product</p>
+                    <p>• Switch to "Designs" tab to edit the selected design</p>
+                    <p>• Background removal works for both uploaded and library designs</p>
                   </div>
                 </div>
-              </div>
-
-              {/* Active Filters */}
-              {(selectedCategory !== 'all' || selectedSubCategory !== 'all' || 
-                selectedCommonCategory !== 'all' || selectedCommonSubCategory !== 'all' ||
-                searchQuery || productTypeFilter !== 'all' || ratingFilter > 0 || 
-                priceRange[1] < 10000 || quickPriceRange) && (
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <div className="flex flex-wrap gap-2">
-                    <span className="text-xs font-medium text-gray-600 mr-2">Active:</span>
-                    
-                    {activeProductType === 'all' && productTypeFilter !== 'all' && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
-                        {productTypeFilter === 'design' ? 'Designs Only' : 'Readymade Only'}
-                        <button onClick={() => setProductTypeFilter('all')}>
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    )}
-                    
-                    {(activeProductType === 'all' && selectedCommonCategory !== 'all') && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                        Cat: {selectedCommonCategory}
-                        <button onClick={() => setSelectedCommonCategory('all')}>
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    )}
-                    
-                    {(activeProductType === 'all' && selectedCommonSubCategory !== 'all') && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
-                        Sub: {selectedCommonSubCategory}
-                        <button onClick={() => setSelectedCommonSubCategory('all')}>
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    )}
-                    
-                    {(activeProductType === 'custom' && selectedCategory !== 'all') && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
-                        Cat: {selectedCategory}
-                        <button onClick={() => handleCategoryChange('all')}>
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    )}
-                    
-                    {(activeProductType === 'custom' && selectedSubCategory !== 'all') && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
-                        Sub: {selectedSubCategory}
-                        <button onClick={() => handleSubCategoryChange('all')}>
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    )}
-                    
-                    {searchQuery && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
-                        Search: "{searchQuery}"
-                        <button onClick={() => setSearchQuery('')}>
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    )}
-                    
-                    {quickPriceRange ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
-                        Price: {quickPriceRange}
-                        <button onClick={() => {
-                          setQuickPriceRange(null);
-                          setPriceRange([0, 10000]);
-                        }}>
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    ) : priceRange[1] < 10000 && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
-                        Price: Up to ₹{priceRange[1].toLocaleString()}
-                        <button onClick={() => setPriceRange([0, 10000])}>
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    )}
-                    
-                    {ratingFilter > 0 && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-medium">
-                        Rating: {ratingFilter}+
-                        <button onClick={() => setRatingFilter(0)}>
-                          <X className="w-3 h-3" />
-                        </button>
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Products Grid */}
-            {!Array.isArray(productsToDisplay) || productsToDisplay.length === 0 ? (
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-8 text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-gray-50 to-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Search className="w-8 h-8 text-gray-400" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-800 mb-2">
-                  {isLoading() ? 'Loading products...' : 'No products found'}
-                </h3>
-                <p className="text-gray-600 mb-6 max-w-md mx-auto text-sm">
-                  {isLoading() 
-                    ? 'Please wait while we load the products...' 
-                    : 'Try adjusting your search or filter criteria to find what you\'re looking for.'}
-                </p>
-                {!isLoading() && (
-                  <button
-                    onClick={handleClearFilters}
-                    className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:opacity-90 transition-all font-medium text-sm shadow"
-                  >
-                    Reset All Filters
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                {productsToDisplay.map((product) => renderProductCard(product))}
               </div>
             )}
           </div>
-        </div>
+
+          {/* Error messages */}
+          {(error || saveError || saveSuccess) && (
+            <div className="mt-4">
+              {error && <div className="rounded border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</div>}
+              {saveError && <div className="rounded border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{saveError}</div>}
+              {saveSuccess && <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{isEditMode ? "Design updated successfully!" : "Design saved successfully!"}</div>}
+            </div>
+          )}
+        </aside>
+
+        {/* Center workspace */}
+        <main className="flex flex-1 flex-col overflow-auto">
+          <div className="flex-1 p-0">
+            <div className="mx-auto flex max-w-4xl items-center justify-center rounded-md border border-slate-200 bg-slate-50 p-4 shadow-sm">
+              <div className="w-full max-w-[650px]">
+                {mockupUrl && maskUrl ? (
+                  <RecolorEditor
+                    ref={editorRef}
+                    mockupUrl={mockupUrl}
+                    maskUrl={maskUrl}
+                    previewWidth={650}
+                    productColor={productColor}
+                    textLayers={textLayers}
+                    setTextLayers={handleSetTextLayers}
+                    activeTextId={activeTextId}
+                    setActiveTextId={handleSetActiveTextId}
+                    designLayers={designLayers}
+                    setDesignLayers={handleSetDesignLayers}
+                    activeDesignId={activeDesignId}
+                    setActiveDesignId={handleSetActiveDesignId}
+                    bgRemovalLoading={bgRemovalLoading}
+                    onDesignRenderWidthChange={setDesignRenderWidth}
+                  />
+                ) : (
+                  <div className="text-sm text-slate-500 text-center">{product?.name ? `No view configuration found for ${product.name}` : "Product not loaded"}</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </main>
+
+        {/* Right sidebar - Price Breakdown */}
+        <aside className="w-80 rounded-lg border border-slate-200 bg-white p-4 shadow-sm flex flex-col">
+          <div className="mb-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-green-800">Price Breakdown</h3>
+              <button onClick={() => calculatePrice()} disabled={calculatingPrice} className="text-xs text-green-600 hover:text-green-800">
+                {calculatingPrice ? "Calculating..." : "↻"}
+              </button>
+            </div>
+            <div className="text-xs text-slate-500 mt-1">Real-time price calculation</div>
+          </div>
+          
+          <div className="flex-1 overflow-auto">
+            <div className="space-y-4">
+              {/* Base Price */}
+              <div className="pb-3 border-b border-slate-100">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs font-medium text-slate-700">Base Product</span>
+                  <span className="text-sm font-semibold">₹{BASE_PRICE.toFixed(2)}</span>
+                </div>
+                <div className="text-[10px] text-slate-500">
+                  {product?.name || "Product"} base price
+                </div>
+              </div>
+              
+              {/* Sleeves */}
+              {priceBreakdown.sleeves.total > 0 && (
+                <div className="pb-3 border-b border-slate-100">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs font-medium text-slate-700">Sleeves</span>
+                    <span className="text-sm font-semibold text-green-600">+₹{priceBreakdown.sleeves.total.toFixed(2)}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    {priceBreakdown.sleeves.count} sleeve{priceBreakdown.sleeves.count !== 1 ? 's' : ''} × ₹{SLEEVE_PRICE} each
+                  </div>
+                </div>
+              )}
+              
+              {/* Images/Designs */}
+              {priceBreakdown.images.total > 0 && (
+                <div className="pb-3 border-b border-slate-100">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-medium text-slate-700">Designs</span>
+                    <span className="text-sm font-semibold text-green-600">+₹{priceBreakdown.images.total.toFixed(2)}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {priceBreakdown.images.items.map((item, index) => (
+                      <div key={index} className="text-[10px] bg-slate-50 p-2 rounded">
+                        <div className="flex justify-between">
+                          <span className="font-medium">Design {index + 1}</span>
+                          <span>₹{item.price.toFixed(2)}</span>
+                        </div>
+                        {item.type === 'sleeve' ? (
+                          <div className="text-slate-500 mt-1">Sleeve ({item.zone}) - Fixed price</div>
+                        ) : (
+                          <>
+                            <div className="text-slate-500 mt-1">Size: {item.displaySize}</div>
+                            <div className="text-slate-500">Print: {item.printSize}</div>
+                            <div className="text-amber-600 text-[9px] mt-1">{item.note}</div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Text */}
+              {priceBreakdown.text.total > 0 && (
+                <div className="pb-3 border-b border-slate-100">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-medium text-slate-700">Text</span>
+                    <span className="text-sm font-semibold text-green-600">+₹{priceBreakdown.text.total.toFixed(2)}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {priceBreakdown.text.items.map((item, index) => (
+                      <div key={index} className="text-[10px] bg-slate-50 p-2 rounded">
+                        <div className="flex justify-between">
+                          <span className="font-medium">"{item.text}"</span>
+                          <span>₹{item.price.toFixed(2)}</span>
+                        </div>
+                        <div className="text-slate-500 mt-1">Size: {item.displaySize} (Display)</div>
+                        <div className="text-slate-500">Print: {item.printSize}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Minimum Charges */}
+              {priceBreakdown.minimumCharges > 0 && (
+                <div className="pb-3 border-b border-slate-100">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs font-medium text-amber-700">Minimum Charges</span>
+                    <span className="text-sm font-semibold text-amber-700">+₹{priceBreakdown.minimumCharges.toFixed(2)}</span>
+                  </div>
+                  <div className="text-[10px] text-amber-600">
+                    Applied to designs/text smaller than {FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}"
+                  </div>
+                </div>
+              )}
+              
+              {/* Additional Area */}
+              {priceBreakdown.additionalArea > 0 && (
+                <div className="pb-3 border-b border-slate-100">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-xs font-medium text-green-700">Additional Area</span>
+                    <span className="text-sm font-semibold text-green-700">+₹{(priceBreakdown.additionalArea * PRICE_PER_SQ_INCH).toFixed(2)}</span>
+                  </div>
+                  <div className="text-[10px] text-green-600">
+                    {priceBreakdown.additionalArea.toFixed(2)} sq.in × ₹{PRICE_PER_SQ_INCH}/sq.in
+                  </div>
+                </div>
+              )}
+              
+              {/* Total */}
+              <div className="pt-3">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-bold text-slate-800">Total Price</span>
+                  <span className="text-xl font-bold text-green-600">₹{price.toFixed(2)}</span>
+                </div>
+                <div className="text-[10px] text-slate-500">
+                  Including all designs, text, and additional charges
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Pricing Info */}
+          <div className="mt-6 pt-4 border-t border-slate-200">
+            <div className="text-xs text-slate-600 space-y-1">
+              <p className="font-medium mb-1">Pricing Information:</p>
+              <p>• Base includes {FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}" design area</p>
+              <p>• Minimum charge: ₹{MINIMUM_DESIGN_CHARGE} (≤{FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}")</p>
+              <p>• Additional: ₹{PRICE_PER_SQ_INCH} per sq.inch beyond {FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}"</p>
+              <p>• Sleeves: Fixed ₹{SLEEVE_PRICE} each</p>
+              <p>• Display: 72 DPI (screen preview)</p>
+              <p>• Print: 300 DPI (production)</p>
+            </div>
+          </div>
+        </aside>
       </div>
 
-      {/* Add some custom animations */}
-      <style jsx>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-fade-in {
-          animation: fadeIn 0.3s ease-out;
-        }
-      `}</style>
+      {/* Bottom bar */}
+      <footer className="flex h-16 items-center justify-between border-t border-slate-200 bg-white px-6 text-xs">
+        <div className="flex flex-col">
+          <span className="font-semibold">{product?.name || "Custom Product"}</span>
+          <span className="text-slate-500">
+            Color: <span className="font-medium">{productColor}</span>
+            {isEditMode && <span className="ml-3 text-amber-600">• Editing mode •</span>}
+          </span>
+        </div>
+        <span className="text-slate-400">
+          {isEditMode ? "Editing existing design. Changes will update the original when you click 'Update Design'." : "Drag, resize, and customize elements. Click tabs on the left to switch between tools."}
+        </span>
+      </footer>
     </div>
   );
 }

@@ -13,7 +13,7 @@ import RecolorEditor from "./RecolorEditor.jsx";
 import { selectCurrentToken } from "../redux/slices/Userslice.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
-
+const IMAGE_URL = import.meta.env.VITE_IMAGE_URL;
 const FONT_OPTIONS = [
   "Impact, sans-serif",
   "Arial, sans-serif",
@@ -28,7 +28,7 @@ const FIXED_SIZE_INCHES = 4;
 const PRICE_PER_SQ_INCH = 6;
 const SLEEVE_PRICE = 30;
 const MINIMUM_DESIGN_CHARGE = 30;
-const DISPLAY_DPI = 72;
+const DISPLAY_DPI = 300;
 const PRINT_DPI = 300;
 
 // Tab options
@@ -38,6 +38,33 @@ const TABS = {
   TEXT: 'text',
   VIEWS: 'views',
   DESIGN_LIBRARY: 'designLibrary' // New tab
+};
+
+const COLOR_OPTIONS = [
+  { value: "#FFFFFF", label: "White" },
+  { value: "#000000", label: "Black" },
+  { value: "#FF6B6B", label: "Coral" },
+  { value: "#4ECDC4", label: "Mint" },
+  { value: "#45B7D1", label: "Sky" },
+  { value: "#96CEB4", label: "Seafoam" },
+  { value: "#FECA57", label: "Sunshine" },
+  { value: "#FF9FF3", label: "Pink" },
+  { value: "#54A0FF", label: "Azure" },
+  { value: "#5F27CD", label: "Violet" },
+  { value: "#00D2D3", label: "Teal" },
+  { value: "#FF9F43", label: "Orange" },
+];
+
+const COLOR_NAME_MAP = COLOR_OPTIONS.reduce((acc, option) => {
+  acc[option.value.toLowerCase()] = option.label;
+  return acc;
+}, {});
+
+const getColorLabel = (colorValue) => {
+  if (!colorValue) return "Custom Color";
+  const normalized = colorValue.trim().toLowerCase();
+  const label = COLOR_NAME_MAP[normalized];
+  return label ? label : `Custom (${colorValue.toUpperCase()})`;
 };
 
 const createDefaultTextLayer = () => ({
@@ -58,6 +85,7 @@ const createDesignLayer = (id, imageUrl, file, width, height, isFromLibrary = fa
   
   const printWidthInches = width / PRINT_DPI;
   const printHeightInches = height / PRINT_DPI;
+  console.log("print width and height inches:", printWidthInches, printHeightInches); 
   const printAreaInches = printWidthInches * printHeightInches;
   
   const fixedArea = FIXED_SIZE_INCHES * FIXED_SIZE_INCHES;
@@ -128,7 +156,10 @@ export default function DesignerPage() {
 
   const BASE_PRICE = product?.basePrice || 600;
   
-  const [productColor, setProductColor] = useState("#FFFFFF");
+  const defaultColorValue = COLOR_OPTIONS[0]?.value || "#FFFFFF";
+  const defaultColorLabel = getColorLabel(defaultColorValue);
+  const [productColor, setProductColor] = useState(defaultColorValue);
+  const [productColorName, setProductColorName] = useState(defaultColorLabel);
   const [viewStates, setViewStates] = useState({});
   const [viewCode, setViewCode] = useState("front");
   const [bgRemovalLoading, setBgRemovalLoading] = useState(false);
@@ -163,13 +194,10 @@ export default function DesignerPage() {
 
   const editorRef = useRef(null);
 
-  const colorOptions = [
-    "#FFFFFF", "#000000", "#FF6B6B", "#4ECDC4", "#45B7D1",
-    "#96CEB4", "#FECA57", "#FF9FF3", "#54A0FF", "#5F27CD",
-    "#00D2D3", "#FF9F43",
-  ];
-
-  const handleColorChange = (color) => setProductColor(color);
+  const handleColorChange = (color, label = null) => {
+    setProductColor(color);
+    setProductColorName(label || getColorLabel(color));
+  };
   
   const getImageNaturalSize = (url) =>
     new Promise((resolve, reject) => {
@@ -499,7 +527,9 @@ export default function DesignerPage() {
         console.log("Design loaded successfully:", design);
         
         setOriginalDesign(design);
-        setProductColor(design.productColor || "#FFFFFF");
+        const resolvedColor = design.productColor || defaultColorValue;
+        setProductColor(resolvedColor);
+        setProductColorName(design.productColorName || getColorLabel(resolvedColor));
 
         const loadedViewStates = {};
         design.views?.forEach((view) => {
@@ -691,6 +721,11 @@ export default function DesignerPage() {
         const serverUrl = await uploadDesignImage(file);
         const id = `design-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const { width, height } = await getImageNaturalSize(serverUrl);
+        console.log("Pixels source: uploaded image", {
+          filename: file.name,
+          width,
+          height,
+        });
         
         newLayers.push(createDesignLayer(id, serverUrl, file, width, height, false));
       }
@@ -715,7 +750,7 @@ export default function DesignerPage() {
       setError("");
       
       // Construct full URL for the image from design library
-      const imageUrl = `http://localhost:5000/outputs/adminuploadeddesigns/${currentFolder}/${image.filename}`;
+      const imageUrl = `${IMAGE_URL}/outputs/adminuploadeddesigns/${currentFolder}/${image.filename}`;
       
       // Fetch the image to create a file object for background removal
       console.log("Fetching image from library...");
@@ -730,6 +765,11 @@ export default function DesignerPage() {
       
       const id = `design-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const { width, height } = await getImageNaturalSize(imageUrl);
+      console.log("Pixels source: design library image", {
+        filename: image.filename,
+        width,
+        height,
+      });
       
       const newLayer = createDesignLayer(id, imageUrl, file, width, height, true);
       
@@ -1052,6 +1092,7 @@ export default function DesignerPage() {
         productId: product._id || product.id,
         productSlug: product.slug || slug,
         productColor,
+        productColorName,
         previewImage: mainPreview,
         views: viewsPayload,
         basePrice: BASE_PRICE,
@@ -1149,7 +1190,9 @@ export default function DesignerPage() {
     });
 
     setViewStates(restoredViewStates);
-    setProductColor(originalDesign.productColor || "#FFFFFF");
+    const resolvedColor = originalDesign.productColor || defaultColorValue;
+    setProductColor(resolvedColor);
+    setProductColorName(originalDesign.productColorName || getColorLabel(resolvedColor));
     calculatePrice();
     alert("Design reset to original!");
   };
@@ -1313,14 +1356,28 @@ export default function DesignerPage() {
                       <div className="h-10 w-10 rounded border border-slate-300" style={{ backgroundColor: productColor }} />
                       <input type="color" className="h-10 w-full cursor-pointer" value={productColor} onChange={(e) => handleColorChange(e.target.value)} />
                     </div>
+                    <p className="text-[11px] text-slate-500 mt-2 flex items-center gap-2">
+                      <span>{productColorName}</span>
+                      <span className="font-mono text-[10px] text-slate-400">{productColor?.toUpperCase()}</span>
+                    </p>
                   </div>
 
                   <div className="mb-2">
                     <label className="mb-2 block text-xs font-medium">Quick Select</label>
                     <div className="grid grid-cols-6 gap-2">
-                      {colorOptions.map((color) => (
-                        <button key={color} className={`h-8 w-8 rounded-full border-2 ${color === productColor ? "border-sky-500" : "border-slate-300"}`} style={{ backgroundColor: color }} onClick={() => handleColorChange(color)} type="button" />
-                      ))}
+                      {COLOR_OPTIONS.map((option) => {
+                        const currentColorKey = productColor?.toLowerCase() || "";
+                        const isActive = option.value.toLowerCase() === currentColorKey;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            className={`h-8 w-8 rounded-full border-2 ${isActive ? "border-sky-500" : "border-slate-300"}`}
+                            style={{ backgroundColor: option.value }}
+                            onClick={() => handleColorChange(option.value, option.label)}
+                          />
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -1576,7 +1633,7 @@ export default function DesignerPage() {
                         >
                           <div className="aspect-square overflow-hidden rounded border border-slate-200 bg-slate-50">
                             <img 
-                              src={`http://localhost:5000/outputs/adminuploadeddesigns/${currentFolder}/${image.filename}`} 
+                              src={`${IMAGE_URL}/outputs/adminuploadeddesigns/${currentFolder}/${image.filename}`} 
                               alt={image.filename}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                               loading="lazy"
@@ -1802,7 +1859,8 @@ export default function DesignerPage() {
         <div className="flex flex-col">
           <span className="font-semibold">{product?.name || "Custom Product"}</span>
           <span className="text-slate-500">
-            Color: <span className="font-medium">{productColor}</span>
+            Color: <span className="font-medium">{productColorName}</span>
+            <span className="ml-2 text-[10px] text-slate-400">{productColor?.toUpperCase()}</span>
             {isEditMode && <span className="ml-3 text-amber-600">• Editing mode •</span>}
           </span>
         </div>

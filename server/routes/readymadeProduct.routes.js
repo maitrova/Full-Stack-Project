@@ -15,6 +15,7 @@ import {
   getProductFilters,
   updateProductList,
   getAllReadymadeProductsPublic,
+  getHomeCategoryTiles,
   
 } from "../controllers/readymadeProduct.controller.js";
 import upload from "../middleware/readymadeProductUpload.middleware.js";
@@ -30,6 +31,7 @@ const productUpload = upload.fields([
 // These routes are accessible to all users
 
 // Product listing and details
+readymadeproducts.get("/categorylist", getHomeCategoryTiles);
 readymadeproducts.get("/public", getAllReadymadeProductsPublic);
 readymadeproducts.get("/", getAllReadymadeProducts); // Get all products with pagination
 readymadeproducts.get("/:id", getReadymadeProductById); // Get single product

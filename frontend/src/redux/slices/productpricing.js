@@ -4,7 +4,7 @@ import axios from 'axios';
 
 // Create axios instance with base URL
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api/admin',
+  baseURL: `${import.meta.env.VITE_API_URL}/admin` || "https://narifighter.online/backend",
   headers: {
     'Content-Type': 'application/json',
   },

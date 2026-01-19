@@ -44,12 +44,16 @@ import {
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
-
+const IMAGE_URL = import.meta.env.VITE_IMAGE_URL;
 export default function ProductDetailPage() {
   const { id, type = 'product' } = useParams(); // type can be 'product' or 'design'
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  
+  const [selectedVariant, setSelectedVariant] = useState(null);
+
+  // Helpers
+ 
+
   // State for the combined page
   const [itemData, setItemData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -76,6 +80,19 @@ export default function ProductDetailPage() {
   // For readymade products
   const { currentProduct: product } = useSelector((state) => state.productList);
   const isReadymade = type === 'product';
+  const hasVariants =
+  isReadymade &&
+  Array.isArray(itemData?.variants) &&
+  itemData.variants.length > 0;
+
+const getVariantBySize = (size) => {
+  if (!itemData?.variants || !size) return null;
+  return (
+    itemData.variants.find(
+      (v) => String(v.size).toUpperCase() === String(size).toUpperCase()
+    ) || null
+  );
+};
 
   // Fetch data based on type
   useEffect(() => {
@@ -121,6 +138,7 @@ export default function ProductDetailPage() {
       setQuantity(1);
       setSelectedSize('');
       setSelectedColor('');
+      setSelectedVariant(null);
     }
   }, [product, isReadymade]);
 
@@ -215,6 +233,48 @@ export default function ProductDetailPage() {
 
     // For readymade products: check stock and options
     if (isReadymade) {
+      // ✅ If variants exist, size is mandatory
+if (hasVariants && !selectedSize) {
+  setNotification({
+    show: true,
+    message: 'Please select a size',
+    type: 'error',
+  });
+  return;
+}
+
+const activeVariant = hasVariants ? getVariantBySize(selectedSize) : null;
+
+if (hasVariants && !activeVariant) {
+  setNotification({
+    show: true,
+    message: 'Selected size is not available',
+    type: 'error',
+  });
+  return;
+}
+
+// ✅ stock should be validated against variant stock when variants exist
+const maxStock = hasVariants ? Number(activeVariant.stock || 0) : Number(itemData.stock || 0);
+
+if (maxStock <= 0) {
+  setNotification({
+    show: true,
+    message: 'This size is out of stock',
+    type: 'error',
+  });
+  return;
+}
+
+if (quantity > maxStock) {
+  setNotification({
+    show: true,
+    message: `Only ${maxStock} items available in stock`,
+    type: 'error',
+  });
+  return;
+}
+
       if (!itemData.isActive || itemData.stock === 0) {
         setNotification({
           show: true,
@@ -225,15 +285,7 @@ export default function ProductDetailPage() {
       }
 
       // Validate stock
-      const maxStock = itemData.stock || 0;
-      if (quantity > maxStock) {
-        setNotification({
-          show: true,
-          message: `Only ${maxStock} items available in stock`,
-          type: 'error'
-        });
-        return;
-      }
+      
 
       // Check size selection if sizes are available
       if (itemData.sizes && itemData.sizes.length > 0 && !selectedSize) {
@@ -277,7 +329,8 @@ export default function ProductDetailPage() {
         cartData = {
           kind: "READYMADE",
           qty: quantity,
-          readymadeProductId: itemData._id
+          readymadeProductId: itemData._id,
+          size: hasVariants ? selectedSize : undefined, 
         };
       } else {
         cartData = {
@@ -329,28 +382,46 @@ export default function ProductDetailPage() {
 
   // Quantity change handler (only for readymade products)
   const handleQuantityChange = (change) => {
-    if (!isReadymade) return;
-    
-    const maxStock = itemData?.stock || 0;
-    const newQuantity = quantity + change;
-    
-    if (newQuantity < 1) return;
-    if (newQuantity > maxStock) {
-      setNotification({
-        show: true,
-        message: `Only ${maxStock} items available in stock`,
-        type: 'warning'
-      });
-      return;
-    }
-    
-    setQuantity(newQuantity);
-  };
+  if (!isReadymade) return;
+
+  // ✅ if variants exist, require size to change qty properly
+  if (hasVariants && !selectedVariant) {
+    setNotification({
+      show: true,
+      message: 'Please select a size first',
+      type: 'warning',
+    });
+    return;
+  }
+
+  const maxStock = hasVariants
+    ? Number(selectedVariant?.stock || 0)
+    : Number(itemData?.stock || 0);
+
+  const newQuantity = quantity + change;
+
+  if (newQuantity < 1) return;
+  if (newQuantity > maxStock) {
+    setNotification({
+      show: true,
+      message: `Only ${maxStock} items available in stock`,
+      type: 'warning',
+    });
+    return;
+  }
+
+  setQuantity(newQuantity);
+};
+
 
   // Size selection handler (only for readymade products)
   const handleSizeSelect = (size) => {
-    setSelectedSize(size);
-  };
+  setSelectedSize(size);
+  const v = getVariantBySize(size);
+  setSelectedVariant(v);
+  setQuantity(1); // reset qty when size changes (recommended)
+};
+
 
   // Color selection handler (only for readymade products)
   const handleColorSelect = (color) => {
@@ -364,9 +435,9 @@ export default function ProductDetailPage() {
     if (imagePath.startsWith('http')) {
       return imagePath;
     } else if (imagePath.startsWith('/')) {
-      return `http://localhost:5000${imagePath}`;
+      return `${IMAGE_URL}${imagePath}`;
     } else {
-      return `http://localhost:5000/${imagePath}`;
+      return `${IMAGE_URL}/${imagePath}`;
     }
   };
 
@@ -390,30 +461,47 @@ export default function ProductDetailPage() {
     if (!itemData) return null;
 
     if (isReadymade) {
-      return {
-        title: itemData.title,
-        description: itemData.description,
-        price: itemData.price,
-        originalPrice: itemData.originalPrice,
-        currency: itemData.currency || 'INR',
-        images: itemData.images || [],
-        stock: itemData.stock || 0,
-        isActive: itemData.isActive,
-        category: itemData.category,
-        material: itemData.material,
-        weight: itemData.weight,
-        dimensions: itemData.dimensions,
-        rating: itemData.rating || 4,
-        reviewCount: itemData.reviewCount || 24,
-        sku: itemData.sku || 'N/A',
-        specifications: itemData.specifications,
-        manufacturer: itemData.manufacturer,
-        warranty: itemData.warranty,
-        careInstructions: itemData.careInstructions,
-        isOutOfStock: !itemData.isActive || itemData.stock === 0,
-        type: 'product'
-      };
-    } else {
+  const activeVariant = selectedVariant || null;
+
+  const resolvedPrice =
+    activeVariant?.price !== undefined && activeVariant?.price !== null
+      ? Number(activeVariant.price)
+      : Number(itemData.price || 0);
+
+  const resolvedStock =
+    activeVariant?.stock !== undefined && activeVariant?.stock !== null
+      ? Number(activeVariant.stock)
+      : Number(itemData.stock || 0);
+
+  return {
+    title: itemData.title,
+    description: itemData.description,
+    price: resolvedPrice,              // ✅ variant price after selection
+    originalPrice: itemData.originalPrice,
+    currency: itemData.currency || 'INR',
+    images: itemData.images || [],
+    stock: resolvedStock,              // ✅ variant stock after selection
+    isActive: itemData.isActive,
+    category: itemData.category,
+    material: itemData.material,
+    weight: itemData.weight,
+    dimensions: itemData.dimensions,
+    rating: itemData.rating || 4,
+    reviewCount: itemData.reviewCount || 24,
+    sku: activeVariant?.sku || itemData.sku || 'N/A',   // ✅ variant sku if exists
+    specifications: itemData.specifications,
+    manufacturer: itemData.manufacturer,
+    warranty: itemData.warranty,
+    careInstructions: itemData.careInstructions,
+
+    // ✅ important: out of stock depends on variant if variants exist
+    isOutOfStock: !itemData.isActive || resolvedStock === 0,
+
+    type: 'product',
+    activeVariant, // optional, helpful
+  };
+}
+ else {
       const views = itemData.views || [];
       const currentView = views[activeView] || {};
       
@@ -447,7 +535,7 @@ export default function ProductDetailPage() {
   const displayData = getDisplayData();
   const isOutOfStock = displayData?.isOutOfStock || false;
   const images = displayData?.images || [];
-
+  
   // Loading state
   if (loading) {
     return (
@@ -786,7 +874,7 @@ export default function ProductDetailPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <button
                 onClick={handleAddToCart}
-                disabled={isOutOfStock || isAddingToCart || cartLoading || !isLoggedIn}
+                disabled={isOutOfStock || isAddingToCart || cartLoading || !isLoggedIn || (hasVariants && !selectedSize)}
                 className={`h-14 rounded-xl font-semibold transition-all flex items-center justify-center gap-3 group ${
                   isOutOfStock || !isLoggedIn
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -818,7 +906,7 @@ export default function ProductDetailPage() {
               
               <button
                 onClick={handleBuyNow}
-                disabled={isOutOfStock || !isLoggedIn}
+                disabled={isOutOfStock || !isLoggedIn || (hasVariants && !selectedSize)}
                 className={`h-14 rounded-xl font-semibold transition-all flex items-center justify-center gap-3 ${
                   isOutOfStock || !isLoggedIn
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -917,26 +1005,42 @@ export default function ProductDetailPage() {
               </div>
 
               {/* Size Selection (only for readymade products) */}
-              {isReadymade && itemData?.sizes && itemData.sizes.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Size</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {itemData.sizes.map((size) => (
-                      <button
-                        key={size}
-                        onClick={() => handleSizeSelect(size)}
-                        className={`px-4 py-2 border-2 rounded-lg font-medium transition-all duration-200 ${
-                          selectedSize === size
-                            ? 'border-blue-600 bg-blue-50 text-blue-600'
-                            : 'border-gray-300 hover:border-gray-400 text-gray-700'
-                        }`}
-                      >
-                        {size}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {isReadymade && hasVariants && (
+  <div className="mb-6">
+    <h3 className="text-lg font-semibold text-gray-900 mb-3">Size</h3>
+    <div className="flex flex-wrap gap-2">
+      {itemData.variants.map((v) => {
+        const isSelected = selectedSize === v.size;
+        const isDisabled = Number(v.stock || 0) <= 0;
+
+        return (
+          <button
+            key={v.size}
+            onClick={() => !isDisabled && handleSizeSelect(v.size)}
+            disabled={isDisabled}
+            className={`px-4 py-2 border-2 rounded-lg font-medium transition-all duration-200 ${
+              isSelected
+                ? 'border-blue-600 bg-blue-50 text-blue-600'
+                : isDisabled
+                ? 'border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50'
+                : 'border-gray-300 hover:border-gray-400 text-gray-700'
+            }`}
+            title={isDisabled ? 'Out of stock' : `Price: ${formatPrice(Number(v.price || 0), displayData.currency)}`}
+          >
+            {v.size}
+          </button>
+        );
+      })}
+    </div>
+
+    {!selectedSize && (
+      <p className="text-sm text-gray-500 mt-2">
+        Select a size to see the correct price and stock.
+      </p>
+    )}
+  </div>
+)}
+
 
               {/* Color Selection (only for readymade products) */}
               {isReadymade && itemData?.colors && itemData.colors.length > 0 && (

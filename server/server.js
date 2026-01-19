@@ -18,6 +18,7 @@ import cartrouter from './routes/cartRoutes.js';
 import homepagerouter from './routes/Homepagerouter.js';
 import designuploadsrouter from './routes/designuploadsrouter.js';
 import droprouter from './routes/dropproduct.routes.js';
+import caliberateroutes from './routes/mockupCalibrationRoutes.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -40,7 +41,7 @@ app.use("/outputs", express.static(path.join(__dirname, "outputs")));
 
 // Routes
 app.use('/api', removebgrouter);
-app.use('/savedata', designrouter);
+app.use('/api/savedata', designrouter);
 app.use('/api', designsrouters);
 app.use("/api/products", router);
 app.use('/api/auth',authrouter);
@@ -50,6 +51,7 @@ app.use('/api/readymadeproducts',readymadeproducts);
 app.use('/api/homepage',homepagerouter);
 app.use('/api/designuploads', designuploadsrouter);
 app.use('/api/dropproducts', droprouter);
+app.use("/api/mockup-calibrations", caliberateroutes);
 // Error handling
 app.use((err, req, res, next) => {
   console.error("Server error:", err);

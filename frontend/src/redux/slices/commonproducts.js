@@ -7,7 +7,7 @@ export const fetchCommonSavedData = createAsyncThunk(
   'commonSavedData/fetchCommonSavedData',
   async ({ page = 1, limit = 50 } = {}, { rejectWithValue }) => {
     try {
-      const response = await axios.get('http://localhost:5000/savedata/common', {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/savedata/common`, {
         params: { page, limit }
       });
       return response.data;
@@ -22,7 +22,7 @@ export const fetchMoreCommonSavedData = createAsyncThunk(
   'commonSavedData/fetchMoreCommonSavedData',
   async ({ page, limit = 50 }, { rejectWithValue, getState }) => {
     try {
-      const response = await axios.get('http://localhost:5000/savedata/common', {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/savedata/common`, {
         params: { page, limit }
       });
       return response.data;

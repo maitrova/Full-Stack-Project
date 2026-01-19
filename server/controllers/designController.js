@@ -222,6 +222,51 @@ const calculateDesignPrice = (designLayers, textLayers, zones, product) => {
   return { totalPrice, breakdown };
 };
 
+const getLayerMeasurements = (layer) => {
+  const rawPrintWidthInches = typeof layer.printWidthInches === "number"
+    ? layer.printWidthInches
+    : layer.originalWidthPx
+      ? pixelsToInches(layer.originalWidthPx)
+      : null;
+
+  const rawPrintHeightInches = typeof layer.printHeightInches === "number"
+    ? layer.printHeightInches
+    : layer.originalHeightPx
+      ? pixelsToInches(layer.originalHeightPx)
+      : null;
+
+  const fallbackScaledWidth = layer.renderedWidthPx ? pixelsToInches(layer.renderedWidthPx) : null;
+  const fallbackScaledHeight = layer.renderedHeightPx ? pixelsToInches(layer.renderedHeightPx) : null;
+
+  const scaledPrintWidthInches = typeof layer.currentPrintWidthInches === "number"
+    ? layer.currentPrintWidthInches
+    : rawPrintWidthInches && typeof layer.scale === "number"
+      ? rawPrintWidthInches * layer.scale
+      : fallbackScaledWidth ?? rawPrintWidthInches;
+
+  const scaledPrintHeightInches = typeof layer.currentPrintHeightInches === "number"
+    ? layer.currentPrintHeightInches
+    : rawPrintHeightInches && typeof layer.scale === "number"
+      ? rawPrintHeightInches * layer.scale
+      : fallbackScaledHeight ?? rawPrintHeightInches;
+
+  const widthInches = scaledPrintWidthInches ?? null;
+  const heightInches = scaledPrintHeightInches ?? null;
+  const areaInches = widthInches && heightInches ? widthInches * heightInches : null;
+  const rawPrintAreaInches = rawPrintWidthInches && rawPrintHeightInches
+    ? rawPrintWidthInches * rawPrintHeightInches
+    : null;
+
+  return {
+    widthInches,
+    heightInches,
+    areaInches,
+    rawPrintWidthInches,
+    rawPrintHeightInches,
+    rawPrintAreaInches,
+  };
+};
+
 
 
 
@@ -233,7 +278,7 @@ export const saveDesign = async (req, res) => {
       return res.status(401).json({ error: "Not authorized" });
     }
 
-    const { productId, productSlug, productColor, views = [], previewImage } = req.body;
+    const { productId, productSlug, productColor, productColorName, views = [], previewImage } = req.body;
 
     if (!productId || !productSlug) {
       return res.status(400).json({ error: "productId and productSlug are required" });
@@ -259,12 +304,14 @@ export const saveDesign = async (req, res) => {
           imageUrl = imageUrl.replace(apiUrl, "");
         }
 
-        let widthInches, heightInches, areaInches;
-        if (layer.renderedWidthPx && layer.renderedHeightPx) {
-          widthInches = pixelsToInches(layer.renderedWidthPx);
-          heightInches = pixelsToInches(layer.renderedHeightPx);
-          areaInches = widthInches * heightInches;
-        }
+        const {
+          widthInches,
+          heightInches,
+          areaInches,
+          rawPrintWidthInches,
+          rawPrintHeightInches,
+          rawPrintAreaInches,
+        } = getLayerMeasurements(layer);
 
         const processedLayer = {
           ...layer,
@@ -276,6 +323,9 @@ export const saveDesign = async (req, res) => {
           widthInches,
           heightInches,
           areaInches,
+          rawPrintWidthInches,
+          rawPrintHeightInches,
+          rawPrintAreaInches,
         };
 
         totalDesignLayers.push(processedLayer);
@@ -326,6 +376,7 @@ export const saveDesign = async (req, res) => {
       productSlug,
       productName: product.name,
       productColor: productColor || "#FFFFFF",
+      productColorName: productColorName || productColor || "White",
       previewImage: mainPreview,
       views: normalizedViews,
       basePrice: product.basePrice || 600,
@@ -381,7 +432,7 @@ export const getDesignPrice = async (req, res) => {
 export const updateDesign = async (req, res) => {
   try {
     const { id } = req.params;
-    const { productId, productSlug, productColor, views, previewImage } = req.body;
+    const { productId, productSlug, productColor, productColorName, views, previewImage } = req.body;
 
     if (!productId || !productSlug) {
       return res.status(400).json({ error: "productId and productSlug are required" });
@@ -412,12 +463,14 @@ export const updateDesign = async (req, res) => {
           imageUrl = imageUrl.replace(apiUrl, "");
         }
 
-        let widthInches, heightInches, areaInches;
-        if (layer.renderedWidthPx && layer.renderedHeightPx) {
-          widthInches = pixelsToInches(layer.renderedWidthPx);
-          heightInches = pixelsToInches(layer.renderedHeightPx);
-          areaInches = widthInches * heightInches;
-        }
+        const {
+          widthInches,
+          heightInches,
+          areaInches,
+          rawPrintWidthInches,
+          rawPrintHeightInches,
+          rawPrintAreaInches,
+        } = getLayerMeasurements(layer);
 
         const processedLayer = {
           ...layer,
@@ -429,6 +482,9 @@ export const updateDesign = async (req, res) => {
           widthInches,
           heightInches,
           areaInches,
+          rawPrintWidthInches,
+          rawPrintHeightInches,
+          rawPrintAreaInches,
         };
 
         totalDesignLayers.push(processedLayer);
@@ -478,6 +534,7 @@ export const updateDesign = async (req, res) => {
     design.productSlug = productSlug;
     design.productName = product.name;
     design.productColor = productColor || "#FFFFFF";
+    design.productColorName = productColorName || productColor || "White";
     design.previewImage = mainPreview;
     design.views = updatedViews;
     design.basePrice = product.basePrice || 600;

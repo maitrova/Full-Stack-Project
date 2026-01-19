@@ -19,7 +19,7 @@ export const fetchProducts = createAsyncThunk(
       if (category && category !== 'all') params.category = category;
       if (subCategory && subCategory !== 'all') params.subCategory = subCategory;
       
-      const res = await productsAPI.get("/api/products", { params });
+      const res = await productsAPI.get("/products", { params });
       console.log("Fetched products:", res.data);
       return res.data;
     } catch (err) {
@@ -36,7 +36,7 @@ export const fetchProductCategories = createAsyncThunk(
   "products/fetchCategories",
   async (_, thunkAPI) => {
     try {
-      const res = await productsAPI.get("/api/products/categories");
+      const res = await productsAPI.get("/products/categories");
       return res.data; // { categories: [{category, subCategories: []}], allSubCategories: [] }
     } catch (err) {
       return thunkAPI.rejectWithValue({
@@ -52,7 +52,7 @@ export const fetchProductBySlug = createAsyncThunk(
   "products/fetchBySlug",
   async (slug, thunkAPI) => {
     try {
-      const res = await productsAPI.get(`/api/products/${slug}`);
+      const res = await productsAPI.get(`/products/${slug}`);
       return res.data;
     } catch (err) {
       return thunkAPI.rejectWithValue({

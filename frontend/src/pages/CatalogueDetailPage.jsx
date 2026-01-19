@@ -62,7 +62,8 @@ export default function CatalogueDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  
+  const SIZES = ["S", "M", "L", "XL", "XXL"];
+  const [selectedSize, setSelectedSize] = useState("");
   const [design, setDesign] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -79,6 +80,7 @@ export default function CatalogueDetailPage() {
   const cartError = useSelector(selectCartError);
   const cartSuccess = useSelector(selectCartSuccess);
   const token = useSelector(selectCurrentToken);
+  const canPurchase = !!token && !!selectedSize;
 
   useEffect(() => {
     const fetchDesign = async () => {
@@ -151,53 +153,49 @@ export default function CatalogueDetailPage() {
 
   // Handle add to cart
   const handleAddToCart = async () => {
-    if (!token) {
-      setNotification({
-        show: true,
-        message: 'Please login to add items to cart',
-        type: 'warning'
-      });
-      return;
-    }
+  if (!token) {
+    setNotification({ show: true, message: "Please login to add items to cart", type: "warning" });
+    return;
+  }
+  if (!design) return;
 
-    if (!design) return;
+  if (!selectedSize) {
+    setNotification({ show: true, message: "Please select a size before adding to cart", type: "warning" });
+    return;
+  }
 
-    try {
-      // Get the kind from design, default to "DESIGN" if not specified
-      const designKind = design.kind || "DESIGN";
-      
-      // Ensure kind is either "READYMADE" or "DESIGN"
-      const kind = designKind.toUpperCase() === "READYMADE" ? "READYMADE" : "DESIGN";
-      
-      const cartData = {
-        designId: design._id,
-        productId: design.product?._id || design.productId,
-        title: design.title || design.productName,
-        unitPrice: design.salePrice || design.product?.basePrice || 0,
-        basePrice: design.product?.basePrice || design.salePrice || 0,
-        qty: 1,
-        previewImage: design.previewImage || design.views?.[0]?.previewImage || null,
-        signature: `${design._id}-${design.product?._id || design.productId}`,
-        views: design.views || [],
-        kind: kind // Include kind in the request body
-      };
+  try {
+    const designKind = design.kind || "DESIGN";
+    const kind = designKind.toUpperCase() === "READYMADE" ? "READYMADE" : "DESIGN";
 
-      // Optimistic update: show item as added immediately
-      setLocalCartQuantity(1);
+    const fd = new FormData();
+    fd.append("designId", design._id);
+    fd.append("productId", design.product?._id || design.productId || "");
+    fd.append("title", design.title || design.productName || "");
+    fd.append("unitPrice", String(design.salePrice || design.product?.basePrice || 0));
+    fd.append("basePrice", String(design.product?.basePrice || design.salePrice || 0));
+    fd.append("qty", "1");
+    fd.append("previewImage", design.previewImage || design.views?.[0]?.previewImage || "");
+    fd.append("signature", `${design._id}-${design.product?._id || design.productId || ""}`);
+    fd.append("kind", kind);
 
-      await dispatch(addToCart(cartData)).unwrap();
-      
-      // Clear local state after successful update
-      setTimeout(() => {
-        setLocalCartQuantity(0);
-      }, 2000);
-      
-    } catch (error) {
-      console.error("Failed to add to cart:", error);
-      // Revert optimistic update on error
-      setLocalCartQuantity(0);
-    }
-  };
+    // ✅ IMPORTANT
+    fd.append("size", selectedSize);
+
+    // If backend expects views as JSON string:
+    fd.append("views", JSON.stringify(design.views || []));
+
+    setLocalCartQuantity(1);
+
+    await dispatch(addToCart(fd)).unwrap();
+
+    setTimeout(() => setLocalCartQuantity(0), 2000);
+  } catch (error) {
+    console.error("Failed to add to cart:", error);
+    setLocalCartQuantity(0);
+  }
+};
+
 
   // Handle increment quantity
   const handleIncrement = async () => {
@@ -740,10 +738,43 @@ export default function CatalogueDetailPage() {
                       className="w-12 h-12 rounded-lg border-2 border-white shadow-lg"
                       style={{ backgroundColor: design.productColor }}
                     />
-                    <span className="text-gray-600">{design.productColor}</span>
+                    <span className="text-gray-600">{design.productColorName || design.productColor}</span>
                   </div>
                 </div>
               )}
+              {/* Size Selector */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-gray-700">Select Size</span>
+                  <Layers className="w-4 h-4 text-gray-400" />
+                </div>
+
+                <div className="grid grid-cols-5 gap-2">
+                  {SIZES.map((s) => {
+                    const active = selectedSize === s;
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setSelectedSize(s)}
+                        className={`py-2 rounded-lg border text-sm font-semibold transition-all ${
+                          active
+                            ? "border-indigo-600 bg-indigo-50 text-indigo-700"
+                            : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {!selectedSize && (
+                  <p className="text-xs text-amber-700 mt-2">
+                    Please select a size to continue.
+                  </p>
+                )}
+              </div>
 
               {/* Price Display */}
               <div className="mb-6">
