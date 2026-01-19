@@ -28,7 +28,7 @@ import DropProductDetailsPage from "./components/Dropproductsdetailpage.jsx";
 import CustomProductsHub from "./components/CustomProductsHub.jsx";
 import AllProductsHub from "./components/AllproductsHub.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
-
+import ProductPricingManager from "./pages/productpricingmanager.jsx";
 
 // You'll need to create this
 
@@ -209,6 +209,12 @@ function App() {
         <Route path="/designs/:id" element={
           <MainLayout>
             <Designdetailspage />
+          </MainLayout>
+        } />
+
+        <Route path="/price" element={
+          <MainLayout>
+            <ProductPricingManager />
           </MainLayout>
         } />
 

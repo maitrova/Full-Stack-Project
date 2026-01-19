@@ -165,54 +165,59 @@ export const toggleUnlimitedPricing = async (req, res) => {
       return res.status(404).json({ error: "Product not found" });
     }
 
-    // Update unlimited pricing
-    product.unlimitedPricing = {
-      ...product.unlimitedPricing,
-      enabled: enabled !== undefined ? enabled : !product.unlimitedPricing.enabled,
-      flatCharge: flatCharge || product.unlimitedPricing.flatCharge,
-      label: label || product.unlimitedPricing.label,
-      description: description || product.unlimitedPricing.description
+    // Ensure defaults (important for old docs)
+    const currentUnlimited = product.unlimitedPricing || {
+      enabled: false,
+      flatCharge: 0,
+      label: "",
+      description: "",
     };
 
-    // Update pricing mode based on unlimited pricing status
-    if (product.unlimitedPricing.enabled) {
-      product.pricingMode = 'unlimited';
-    } else {
-      product.pricingMode = 'normal';
-    }
+    const nextEnabled =
+      enabled !== undefined ? Boolean(enabled) : !Boolean(currentUnlimited.enabled);
+
+    product.unlimitedPricing = {
+      ...currentUnlimited,
+      enabled: nextEnabled,
+      flatCharge: flatCharge ?? currentUnlimited.flatCharge,
+      label: label ?? currentUnlimited.label,
+      description: description ?? currentUnlimited.description,
+    };
+
+    product.pricingMode = nextEnabled ? "unlimited" : "normal";
 
     const updatedProduct = await product.save();
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: product.unlimitedPricing.enabled 
-        ? 'Unlimited pricing enabled' 
-        : 'Unlimited pricing disabled',
+      message: nextEnabled
+        ? "Unlimited pricing enabled"
+        : "Unlimited pricing disabled",
       data: {
         _id: updatedProduct._id,
         name: updatedProduct.name,
         pricingMode: updatedProduct.pricingMode,
-        unlimitedPricing: updatedProduct.unlimitedPricing
-      }
+        unlimitedPricing: updatedProduct.unlimitedPricing,
+      },
     });
-
   } catch (error) {
-    console.error('Toggle unlimited pricing error:', error);
-    
-    if (error.kind === 'ObjectId') {
+    console.error("Toggle unlimited pricing error:", error);
+
+    if (error?.kind === "ObjectId") {
       return res.status(400).json({
         success: false,
-        message: 'Invalid product ID'
+        message: "Invalid product ID",
       });
     }
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: 'Server error while toggling unlimited pricing',
-      error: error.message
+      message: "Server error while toggling unlimited pricing",
+      error: error.message,
     });
   }
 };
+
 
 // Update normal pricing parameters
 export const updateNormalPricing = async (req, res) => {

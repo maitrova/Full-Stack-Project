@@ -10,10 +10,11 @@ import {
   clearCurrentFolder
 } from "../redux/slices/admindesignuploads.js";
 import RecolorEditor from "./RecolorEditor.jsx";
-import { selectCurrentToken } from "../redux/slices/Userslice.js";
+import { selectCurrentToken, selectCurrentUser } from "../redux/slices/Userslice.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
-
+const IMAGE_URL = import.meta.env.VITE_IMAGE_URL;
+console.log("image_url:", IMAGE_URL);
 const FONT_OPTIONS = [
   "Impact, sans-serif",
   "Arial, sans-serif",
@@ -28,7 +29,7 @@ const FIXED_SIZE_INCHES = 4;
 const PRICE_PER_SQ_INCH = 6;
 const SLEEVE_PRICE = 30;
 const MINIMUM_DESIGN_CHARGE = 30;
-const DISPLAY_DPI = 72;
+const DISPLAY_DPI = 300;
 const PRINT_DPI = 300;
 
 // Tab options
@@ -38,6 +39,33 @@ const TABS = {
   TEXT: 'text',
   VIEWS: 'views',
   DESIGN_LIBRARY: 'designLibrary' // New tab
+};
+
+const COLOR_OPTIONS = [
+  { value: "#FFFFFF", label: "White" },
+  { value: "#000000", label: "Black" },
+  { value: "#FF6B6B", label: "Coral" },
+  { value: "#4ECDC4", label: "Mint" },
+  { value: "#45B7D1", label: "Sky" },
+  { value: "#96CEB4", label: "Seafoam" },
+  { value: "#FECA57", label: "Sunshine" },
+  { value: "#FF9FF3", label: "Pink" },
+  { value: "#54A0FF", label: "Azure" },
+  { value: "#5F27CD", label: "Violet" },
+  { value: "#00D2D3", label: "Teal" },
+  { value: "#FF9F43", label: "Orange" },
+];
+
+const COLOR_NAME_MAP = COLOR_OPTIONS.reduce((acc, option) => {
+  acc[option.value.toLowerCase()] = option.label;
+  return acc;
+}, {});
+
+const getColorLabel = (colorValue) => {
+  if (!colorValue) return "Custom Color";
+  const normalized = colorValue.trim().toLowerCase();
+  const label = COLOR_NAME_MAP[normalized];
+  return label ? label : `Custom (${colorValue.toUpperCase()})`;
 };
 
 const createDefaultTextLayer = () => ({
@@ -58,6 +86,7 @@ const createDesignLayer = (id, imageUrl, file, width, height, isFromLibrary = fa
   
   const printWidthInches = width / PRINT_DPI;
   const printHeightInches = height / PRINT_DPI;
+  console.log("print width and height inches:", printWidthInches, printHeightInches); 
   const printAreaInches = printWidthInches * printHeightInches;
   
   const fixedArea = FIXED_SIZE_INCHES * FIXED_SIZE_INCHES;
@@ -117,7 +146,9 @@ export default function DesignerPage() {
   const { current: product, currentStatus, currentError } = useSelector(
     (state) => state.products
   );
+  const user = useSelector(selectCurrentUser);
 
+  const isAdmin = user?.role === "admin" || user?.isAdmin === true || user?.role === "superuser";
   // Design uploads state
   const { 
     folders, 
@@ -128,7 +159,10 @@ export default function DesignerPage() {
 
   const BASE_PRICE = product?.basePrice || 600;
   
-  const [productColor, setProductColor] = useState("#FFFFFF");
+  const defaultColorValue = COLOR_OPTIONS[0]?.value || "#FFFFFF";
+  const defaultColorLabel = getColorLabel(defaultColorValue);
+  const [productColor, setProductColor] = useState(defaultColorValue);
+  const [productColorName, setProductColorName] = useState(defaultColorLabel);
   const [viewStates, setViewStates] = useState({});
   const [viewCode, setViewCode] = useState("front");
   const [bgRemovalLoading, setBgRemovalLoading] = useState(false);
@@ -163,13 +197,10 @@ export default function DesignerPage() {
 
   const editorRef = useRef(null);
 
-  const colorOptions = [
-    "#FFFFFF", "#000000", "#FF6B6B", "#4ECDC4", "#45B7D1",
-    "#96CEB4", "#FECA57", "#FF9FF3", "#54A0FF", "#5F27CD",
-    "#00D2D3", "#FF9F43",
-  ];
-
-  const handleColorChange = (color) => setProductColor(color);
+  const handleColorChange = (color, label = null) => {
+    setProductColor(color);
+    setProductColorName(label || getColorLabel(color));
+  };
   
   const getImageNaturalSize = (url) =>
     new Promise((resolve, reject) => {
@@ -434,7 +465,7 @@ export default function DesignerPage() {
       const formData = new FormData();
       formData.append("designImage", file);
 
-      const res = await fetch(`${API_URL}/api/upload-design`, {
+      const res = await fetch(`${API_URL}/upload-design`, {
         method: "POST",
         body: formData,
       });
@@ -499,7 +530,9 @@ export default function DesignerPage() {
         console.log("Design loaded successfully:", design);
         
         setOriginalDesign(design);
-        setProductColor(design.productColor || "#FFFFFF");
+        const resolvedColor = design.productColor || defaultColorValue;
+        setProductColor(resolvedColor);
+        setProductColorName(design.productColorName || getColorLabel(resolvedColor));
 
         const loadedViewStates = {};
         design.views?.forEach((view) => {
@@ -592,14 +625,15 @@ export default function DesignerPage() {
     console.log("Initializing new design for product:", product.name);
     
     const initial = {};
-    product.views.forEach((v, index) => {
+    product.views.forEach((v) => {
       initial[v.code] = {
-        textLayers: index === 0 ? [createDefaultTextLayer()] : [],
-        activeTextId: index === 0 ? initial[v.code]?.textLayers?.[0]?.id || null : null,
+        textLayers: [],          // ✅ no default text on load
+        activeTextId: null,      // ✅ no active text selected
         designLayers: [],
         activeDesignId: null,
       };
     });
+
 
     setViewStates(initial);
     setViewCode(product.views[0].code);
@@ -691,6 +725,11 @@ export default function DesignerPage() {
         const serverUrl = await uploadDesignImage(file);
         const id = `design-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const { width, height } = await getImageNaturalSize(serverUrl);
+        console.log("Pixels source: uploaded image", {
+          filename: file.name,
+          width,
+          height,
+        });
         
         newLayers.push(createDesignLayer(id, serverUrl, file, width, height, false));
       }
@@ -715,7 +754,7 @@ export default function DesignerPage() {
       setError("");
       
       // Construct full URL for the image from design library
-      const imageUrl = `http://localhost:5000/outputs/adminuploadeddesigns/${currentFolder}/${image.filename}`;
+      const imageUrl = `${IMAGE_URL}/outputs/adminuploadeddesigns/${currentFolder}/${image.filename}`;
       
       // Fetch the image to create a file object for background removal
       console.log("Fetching image from library...");
@@ -730,6 +769,11 @@ export default function DesignerPage() {
       
       const id = `design-${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const { width, height } = await getImageNaturalSize(imageUrl);
+      console.log("Pixels source: design library image", {
+        filename: image.filename,
+        width,
+        height,
+      });
       
       const newLayer = createDesignLayer(id, imageUrl, file, width, height, true);
       
@@ -802,7 +846,7 @@ export default function DesignerPage() {
       formData.append("image", fileToUse);
       
       console.log("Sending to remove-bg API...");
-      const res = await fetch(`${API_URL}/api/remove-bg`, {
+      const res = await fetch(`${API_URL}/remove-bg`, {
         method: "POST",
         body: formData,
       });
@@ -1052,6 +1096,7 @@ export default function DesignerPage() {
         productId: product._id || product.id,
         productSlug: product.slug || slug,
         productColor,
+        productColorName,
         previewImage: mainPreview,
         views: viewsPayload,
         basePrice: BASE_PRICE,
@@ -1149,7 +1194,9 @@ export default function DesignerPage() {
     });
 
     setViewStates(restoredViewStates);
-    setProductColor(originalDesign.productColor || "#FFFFFF");
+    const resolvedColor = originalDesign.productColor || defaultColorValue;
+    setProductColor(resolvedColor);
+    setProductColorName(originalDesign.productColorName || getColorLabel(resolvedColor));
     calculatePrice();
     alert("Design reset to original!");
   };
@@ -1313,14 +1360,28 @@ export default function DesignerPage() {
                       <div className="h-10 w-10 rounded border border-slate-300" style={{ backgroundColor: productColor }} />
                       <input type="color" className="h-10 w-full cursor-pointer" value={productColor} onChange={(e) => handleColorChange(e.target.value)} />
                     </div>
+                    <p className="text-[11px] text-slate-500 mt-2 flex items-center gap-2">
+                      <span>{productColorName}</span>
+                      <span className="font-mono text-[10px] text-slate-400">{productColor?.toUpperCase()}</span>
+                    </p>
                   </div>
 
                   <div className="mb-2">
                     <label className="mb-2 block text-xs font-medium">Quick Select</label>
                     <div className="grid grid-cols-6 gap-2">
-                      {colorOptions.map((color) => (
-                        <button key={color} className={`h-8 w-8 rounded-full border-2 ${color === productColor ? "border-sky-500" : "border-slate-300"}`} style={{ backgroundColor: color }} onClick={() => handleColorChange(color)} type="button" />
-                      ))}
+                      {COLOR_OPTIONS.map((option) => {
+                        const currentColorKey = productColor?.toLowerCase() || "";
+                        const isActive = option.value.toLowerCase() === currentColorKey;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            className={`h-8 w-8 rounded-full border-2 ${isActive ? "border-sky-500" : "border-slate-300"}`}
+                            style={{ backgroundColor: option.value }}
+                            onClick={() => handleColorChange(option.value, option.label)}
+                          />
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
@@ -1576,7 +1637,7 @@ export default function DesignerPage() {
                         >
                           <div className="aspect-square overflow-hidden rounded border border-slate-200 bg-slate-50">
                             <img 
-                              src={`http://localhost:5000/outputs/adminuploadeddesigns/${currentFolder}/${image.filename}`} 
+                              src={`${IMAGE_URL}/outputs/adminuploadeddesigns/${currentFolder}/${image.filename}`} 
                               alt={image.filename}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                               loading="lazy"
@@ -1645,6 +1706,8 @@ export default function DesignerPage() {
                     setActiveDesignId={handleSetActiveDesignId}
                     bgRemovalLoading={bgRemovalLoading}
                     onDesignRenderWidthChange={setDesignRenderWidth}
+                    isAdmin={isAdmin}
+                    showMeasurements={true} 
                   />
                 ) : (
                   <div className="text-sm text-slate-500 text-center">{product?.name ? `No view configuration found for ${product.name}` : "Product not loaded"}</div>
@@ -1802,7 +1865,8 @@ export default function DesignerPage() {
         <div className="flex flex-col">
           <span className="font-semibold">{product?.name || "Custom Product"}</span>
           <span className="text-slate-500">
-            Color: <span className="font-medium">{productColor}</span>
+            Color: <span className="font-medium">{productColorName}</span>
+            <span className="ml-2 text-[10px] text-slate-400">{productColor?.toUpperCase()}</span>
             {isEditMode && <span className="ml-3 text-amber-600">• Editing mode •</span>}
           </span>
         </div>
@@ -1813,1605 +1877,3 @@ export default function DesignerPage() {
     </div>
   );
 }
-
-
-// src/RecolorEditor.jsx
-import React, {
-  useEffect,
-  useState,
-  useCallback,
-  useRef,
-  forwardRef,
-  useImperativeHandle,
-  useMemo,
-} from "react";
-import CanvasRenderer from "./CanvasRenderer.jsx";
-
-/* =========================
-   Product Type Detection from URL
-   ========================= */
-function getProductTypeFromUrl() {
-  const url = window.location.pathname;
-  const match = url.match(/\/products\/([^\/]+)\/customize/);
-  if (match && match[1]) {
-    return match[1].toLowerCase();
-  }
-  return "hoodie"; // default
-}
-
-/* =========================
-   Zone Configurations by Product Type - EMPTY START
-   ========================= */
-const PRODUCT_ZONES = {
-  hoodie: {
-    views: ["front", "back"],
-  },
-  "t-shirt": {
-    views: ["front", "back"],
-  },
-  "long-sleeve": {
-    views: ["front", "back"],
-  },
-  sweater: {
-    views: ["front", "back"],
-  },
-  default: {
-    views: ["front", "back"],
-  },
-};
-
-const TEXT_BOUNDARIES = { minX: 0.15, maxX: 0.85, minY: 0.15, maxY: 0.85 };
-
-/* =========================
-   Helpers
-   ========================= */
-function clamp01(n) {
-  return Math.max(0, Math.min(1, n));
-}
-
-function rectToBoundary(rect) {
-  const minX = clamp01(rect.x);
-  const minY = clamp01(rect.y);
-  const maxX = clamp01(rect.x + rect.w);
-  const maxY = clamp01(rect.y + rect.h);
-  return { minX, minY, maxX, maxY };
-}
-
-function boundaryToRect(boundary) {
-  return {
-    x: boundary.minX,
-    y: boundary.minY,
-    w: boundary.maxX - boundary.minX,
-    h: boundary.maxY - boundary.minY,
-  };
-}
-
-function snapToBoundaryCenter(x, y, boundary, halfW, halfH, threshold = 0.02) {
-  const minCX = boundary.minX + halfW;
-  const maxCX = boundary.maxX - halfW;
-  const minCY = boundary.minY + halfH;
-  const maxCY = boundary.maxY - halfH;
-
-  let sx = x;
-  let sy = y;
-
-  if (Math.abs(x - minCX) < threshold) sx = minCX;
-  if (Math.abs(x - maxCX) < threshold) sx = maxCX;
-  if (Math.abs(y - minCY) < threshold) sy = minCY;
-  if (Math.abs(y - maxCY) < threshold) sy = maxCY;
-
-  return { x: sx, y: sy };
-}
-
-function getZoneForLayer(layer, zones) {
-  if (layer?.zoneId) {
-    return zones.find(z => z.id === layer.zoneId);
-  }
-  
-  // If no zone assigned, return null
-  return null;
-}
-
-function getPrintableAreaPx(canvasSize, boundary) {
-  return {
-    widthPx: canvasSize.width * (boundary.maxX - boundary.minX),
-    heightPx: canvasSize.height * (boundary.maxY - boundary.minY),
-  };
-}
-
-function inchesFromPx(px, zonePx, zoneInches) {
-  if (!zonePx || zonePx <= 0) return 0;
-  return (px / zonePx) * zoneInches;
-}
-
-function clampScaleToMaxInches({
-  currentScale,
-  drawWpx,
-  drawHpx,
-  zoneWpx,
-  zoneHpx,
-  maxWIn,
-  maxHIn,
-}) {
-  const wIn = inchesFromPx(drawWpx, zoneWpx, maxWIn);
-  const hIn = inchesFromPx(drawHpx, zoneHpx, maxHIn);
-
-  if (wIn <= maxWIn + 1e-6 && hIn <= maxHIn + 1e-6) return currentScale;
-
-  const fitScaleW = (maxWIn / wIn) * currentScale;
-  const fitScaleH = (maxHIn / hIn) * currentScale;
-  return Math.min(fitScaleW, fitScaleH, currentScale);
-}
-
-function loadImage(src) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
-}
-
-/* =========================
-   LocalStorage persistence
-   ========================= */
-function getCalibrationKey({ productType, view, mockupUrl, maskUrl }) {
-  const base = `${productType}::${view}::${mockupUrl || ""}::${maskUrl || ""}`;
-  return `mockup_calibration::${base}`;
-}
-
-function loadCalibration({ productType, view, mockupUrl, maskUrl }) {
-  try {
-    const key = getCalibrationKey({ productType, view, mockupUrl, maskUrl });
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    return { zones: data.zones || [], boundaries: data.boundaries || {} };
-  } catch {
-    return null;
-  }
-}
-
-function saveCalibration({ productType, view, mockupUrl, maskUrl, zones, boundaries }) {
-  const key = getCalibrationKey({ productType, view, mockupUrl, maskUrl });
-  localStorage.setItem(key, JSON.stringify({ zones, boundaries }));
-}
-
-/* =========================
-   Measurement Overlay
-   ========================= */
-function MeasurementOverlay({ canvasSize, zones, boundaries, view }) {
-  if (!canvasSize || !zones || !boundaries) return null;
-
-  const zonesToShow = zones.filter(z => z.view === view);
-
-  return (
-    <div className="pointer-events-none absolute inset-0 z-40">
-      {zonesToShow.map((zone) => {
-        const b = boundaries[zone.id];
-        if (!b) return null;
-
-        const left = `${b.minX * 100}%`;
-        const top = `${b.minY * 100}%`;
-        const width = `${(b.maxX - b.minX) * 100}%`;
-        const height = `${(b.maxY - b.minY) * 100}%`;
-
-        return (
-          <div key={zone.id} className="absolute" style={{ left, top, width, height }}>
-            <div
-              className="absolute inset-0"
-              style={{
-                border: "2px solid rgba(59, 130, 246, 0.95)",
-                boxShadow: "0 0 0 1px rgba(59,130,246,0.15) inset",
-              }}
-            />
-
-            <div
-              className="absolute left-1/2 -bottom-6 -translate-x-1/2 text-[12px] font-medium"
-              style={{ color: "rgba(30, 64, 175, 0.95)" }}
-            >
-              {zone.maxW} inches
-            </div>
-
-            <div
-              className="absolute -left-12 top-1/2 -translate-y-1/2 text-[12px] font-medium"
-              style={{ color: "rgba(30, 64, 175, 0.95)" }}
-            >
-              {zone.maxH} inches
-            </div>
-
-            <div
-              className="absolute right-2 top-2 rounded px-2 py-1 text-[12px] font-semibold"
-              style={{
-                background: "rgba(255,255,255,0.85)",
-                color: "rgba(15, 23, 42, 0.95)",
-                border: "1px solid rgba(59,130,246,0.4)",
-              }}
-            >
-              {zone.maxW} × {zone.maxH} inches
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/* =========================
-   Zone Management Modal - ZERO DEFAULT START
-   ========================= */
-function ZoneManagementModal({ isOpen, onClose, zones, setZones, activeView, boundaries, setBoundaries, productType }) {
-  const [newZoneLabel, setNewZoneLabel] = useState("");
-  const [newZoneWidth, setNewZoneWidth] = useState("6");
-  const [newZoneHeight, setNewZoneHeight] = useState("8");
-  const [selectedView, setSelectedView] = useState("front");
-  const [editingZone, setEditingZone] = useState(null);
-
-  if (!isOpen) return null;
-
-  const productConfig = PRODUCT_ZONES[productType] || PRODUCT_ZONES.default;
-  const availableViews = productConfig.views || ["front", "back"];
-
-  const currentViewZones = zones.filter(z => z.view === selectedView);
-
-  const handleAddZone = () => {
-    if (!newZoneLabel.trim()) {
-      alert("Please enter a zone label");
-      return;
-    }
-
-    if (!newZoneWidth || !newZoneHeight) {
-      alert("Please enter width and height");
-      return;
-    }
-
-    const width = parseFloat(newZoneWidth);
-    const height = parseFloat(newZoneHeight);
-    
-    if (isNaN(width) || isNaN(height) || width <= 0 || height <= 0) {
-      alert("Please enter valid width and height values");
-      return;
-    }
-
-    const newId = `zone-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const newZone = {
-      id: newId,
-      label: newZoneLabel,
-      view: selectedView,
-      maxW: width,
-      maxH: height,
-    };
-
-    setZones(prev => [...prev, newZone]);
-    
-    // Create default boundary at center for new zone
-    setBoundaries(prev => ({
-      ...prev,
-      [newId]: { minX: 0.4, minY: 0.4, maxX: 0.6, maxY: 0.6 }
-    }));
-
-    setNewZoneLabel("");
-    setNewZoneWidth("6");
-    setNewZoneHeight("8");
-    
-    alert(`Zone "${newZoneLabel}" added to ${selectedView} view`);
-  };
-
-  const handleUpdateZone = (zoneId) => {
-    if (!newZoneLabel.trim()) {
-      alert("Please enter a zone label");
-      return;
-    }
-
-    if (!newZoneWidth || !newZoneHeight) {
-      alert("Please enter width and height");
-      return;
-    }
-
-    const width = parseFloat(newZoneWidth);
-    const height = parseFloat(newZoneHeight);
-    
-    if (isNaN(width) || isNaN(height) || width <= 0 || height <= 0) {
-      alert("Please enter valid width and height values");
-      return;
-    }
-
-    setZones(prev => prev.map(z => 
-      z.id === zoneId ? {
-        ...z,
-        label: newZoneLabel,
-        maxW: width,
-        maxH: height
-      } : z
-    ));
-
-    setEditingZone(null);
-    setNewZoneLabel("");
-    setNewZoneWidth("6");
-    setNewZoneHeight("8");
-    
-    alert(`Zone updated successfully`);
-  };
-
-  const handleDeleteZone = (zoneId) => {
-    if (!confirm("Are you sure you want to delete this zone?")) return;
-    
-    setZones(prev => prev.filter(z => z.id !== zoneId));
-    setBoundaries(prev => {
-      const updated = { ...prev };
-      delete updated[zoneId];
-      return updated;
-    });
-    
-    alert("Zone deleted successfully");
-  };
-
-  const startEditZone = (zone) => {
-    setEditingZone(zone.id);
-    setNewZoneLabel(zone.label);
-    setNewZoneWidth(zone.maxW.toString());
-    setNewZoneHeight(zone.maxH.toString());
-    setSelectedView(zone.view);
-  };
-
-  const resetAllZones = () => {
-    if (!confirm("Are you sure you want to delete ALL zones? This cannot be undone.")) return;
-    
-    setZones([]);
-    setBoundaries({});
-    setEditingZone(null);
-    setNewZoneLabel("");
-    setNewZoneWidth("6");
-    setNewZoneHeight("8");
-    
-    alert("All zones have been deleted");
-  };
-
-  return (
-    <div className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-hidden">
-        <div className="p-4 border-b border-slate-200">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-slate-900">
-              Manage Print Zones - {productType}
-            </h3>
-            <button
-              onClick={onClose}
-              className="text-slate-500 hover:text-slate-700"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <p className="text-sm text-slate-600 mt-1">
-            Create and manage custom print areas from scratch
-          </p>
-        </div>
-
-        <div className="p-4 space-y-6 overflow-y-auto max-h-[70vh]">
-          {/* View Selection */}
-          <div>
-            <div className="text-sm font-medium text-slate-800 mb-2">Select View</div>
-            <div className="flex gap-2">
-              {availableViews.map(view => (
-                <button
-                  key={view}
-                  onClick={() => setSelectedView(view)}
-                  className={`px-3 py-2 rounded text-sm font-medium ${
-                    selectedView === view
-                      ? "bg-blue-600 text-white"
-                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                  }`}
-                >
-                  {view.charAt(0).toUpperCase() + view.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Add/Edit Zone Form */}
-          <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-            <div className="text-sm font-medium text-slate-800 mb-3">
-              {editingZone ? "Edit Zone" : "Add New Zone to " + selectedView.charAt(0).toUpperCase() + selectedView.slice(1)}
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs text-slate-600 mb-1">Zone Label *</label>
-                <input
-                  type="text"
-                  value={newZoneLabel}
-                  onChange={(e) => setNewZoneLabel(e.target.value)}
-                  placeholder="e.g., 'Left Chest', 'Center Logo', etc."
-                  className="w-full text-sm px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-slate-600 mb-1">Width (inches) *</label>
-                  <input
-                    type="number"
-                    value={newZoneWidth}
-                    onChange={(e) => setNewZoneWidth(e.target.value)}
-                    step="0.1"
-                    min="1"
-                    max="20"
-                    className="w-full text-sm px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-600 mb-1">Height (inches) *</label>
-                  <input
-                    type="number"
-                    value={newZoneHeight}
-                    onChange={(e) => setNewZoneHeight(e.target.value)}
-                    step="0.1"
-                    min="1"
-                    max="20"
-                    className="w-full text-sm px-3 py-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex gap-2 pt-2">
-                {editingZone ? (
-                  <>
-                    <button
-                      onClick={() => handleUpdateZone(editingZone)}
-                      className="flex-1 text-sm px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 font-medium"
-                    >
-                      Update Zone
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditingZone(null);
-                        setNewZoneLabel("");
-                        setNewZoneWidth("6");
-                        setNewZoneHeight("8");
-                      }}
-                      className="text-sm px-4 py-2 border border-slate-300 rounded hover:bg-slate-50 font-medium"
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={handleAddZone}
-                    className="flex-1 text-sm px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium"
-                  >
-                    Add Zone to {selectedView.charAt(0).toUpperCase() + selectedView.slice(1)}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Zone List */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm font-medium text-slate-800">
-                Zones in {selectedView.charAt(0).toUpperCase() + selectedView.slice(1)} ({currentViewZones.length})
-              </div>
-              {zones.length > 0 && (
-                <button
-                  onClick={resetAllZones}
-                  className="text-xs px-3 py-1 border border-red-300 text-red-600 rounded hover:bg-red-50 font-medium"
-                >
-                  Delete All Zones
-                </button>
-              )}
-            </div>
-            
-            <div className="space-y-2">
-              {currentViewZones.map((zone) => (
-                <div key={zone.id} className="flex items-center justify-between p-3 border border-slate-200 rounded hover:bg-slate-50">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">{zone.label}</span>
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">
-                        {zone.view}
-                      </span>
-                    </div>
-                    <div className="text-xs text-slate-600 mt-1">
-                      Size: {zone.maxW}″ × {zone.maxH}″
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => startEditZone(zone)}
-                      className="text-xs px-3 py-1 border border-slate-300 rounded hover:bg-slate-100 font-medium"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteZone(zone.id)}
-                      className="text-xs px-3 py-1 border border-red-300 text-red-600 rounded hover:bg-red-50 font-medium"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-              
-              {currentViewZones.length === 0 && (
-                <div className="text-center py-8 border-2 border-dashed border-slate-300 rounded bg-slate-50">
-                  <div className="text-slate-400 mb-3">
-                    <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div className="text-sm text-slate-500 font-medium">
-                    No zones created yet
-                  </div>
-                  <div className="text-xs text-slate-400 mt-1">
-                    Use the form above to create your first print zone
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="p-4 border-t border-slate-200 bg-slate-50">
-          <div className="flex justify-between items-center">
-            <div className="text-sm text-slate-600">
-              Total zones: {zones.length} • Current view: {selectedView}
-            </div>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-slate-800 text-white text-sm rounded hover:bg-slate-900 font-medium"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* =========================
-   Calibration Overlay UI
-   ========================= */
-function CalibrationOverlay({ view, zones, initialBoundaries, onSave, onClose }) {
-  const overlayRef = useRef(null);
-  const [activeZone, setActiveZone] = useState(null);
-
-  const [rects, setRects] = useState(() => {
-    const out = {};
-    const viewZones = zones.filter(z => z.view === view);
-    viewZones.forEach((zone) => {
-      const defaultRect = { x: 0.4, y: 0.4, w: 0.2, h: 0.2 };
-      if (initialBoundaries && initialBoundaries[zone.id]) {
-        out[zone.id] = boundaryToRect(initialBoundaries[zone.id]);
-      } else {
-        out[zone.id] = defaultRect;
-      }
-    });
-    return out;
-  });
-
-  const dragRef = useRef(null);
-
-  const onMove = (e) => {
-    const st = dragRef.current;
-    if (!st) return;
-
-    const dxPx = e.clientX - st.startX;
-    const dyPx = e.clientY - st.startY;
-
-    const dx = dxPx / st.rectW;
-    const dy = dyPx / st.rectH;
-
-    setRects((prev) => {
-      const next = { ...prev };
-      const r = { ...st.startRect };
-
-      const minSize = 0.04;
-
-      if (st.mode === "move") {
-        r.x = clamp01(r.x + dx);
-        r.y = clamp01(r.y + dy);
-        r.x = clamp01(Math.min(r.x, 1 - r.w));
-        r.y = clamp01(Math.min(r.y, 1 - r.h));
-      } else if (st.mode === "resize") {
-        if (st.handle === "se") {
-          r.w = clamp01(r.w + dx);
-          r.h = clamp01(r.h + dy);
-        } else if (st.handle === "sw") {
-          r.x = clamp01(r.x + dx);
-          r.w = clamp01(r.w - dx);
-          r.h = clamp01(r.h + dy);
-        } else if (st.handle === "ne") {
-          r.y = clamp01(r.y + dy);
-          r.h = clamp01(r.h - dy);
-          r.w = clamp01(r.w + dx);
-        } else if (st.handle === "nw") {
-          r.x = clamp01(r.x + dx);
-          r.y = clamp01(r.y + dy);
-          r.w = clamp01(r.w - dx);
-          r.h = clamp01(r.h - dy);
-        }
-
-        r.w = Math.max(minSize, r.w);
-        r.h = Math.max(minSize, r.h);
-
-        r.x = clamp01(Math.min(r.x, 1 - r.w));
-        r.y = clamp01(Math.min(r.y, 1 - r.h));
-      }
-
-      next[st.zoneId] = r;
-      return next;
-    });
-  };
-
-  const onUp = () => {
-    dragRef.current = null;
-    window.removeEventListener("pointermove", onMove);
-    window.removeEventListener("pointerup", onUp);
-  };
-
-  const startDrag = (e, zoneId, mode, handle = null) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (!overlayRef.current) return;
-    const r = rects[zoneId];
-    if (!r) return;
-
-    const bounds = overlayRef.current.getBoundingClientRect();
-
-    dragRef.current = {
-      zoneId,
-      mode,
-      handle,
-      startX: e.clientX,
-      startY: e.clientY,
-      startRect: { ...r },
-      rectW: bounds.width,
-      rectH: bounds.height,
-    };
-
-    setActiveZone(zoneId);
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-  };
-
-  const boundaryMap = useMemo(() => {
-    const out = {};
-    Object.keys(rects).forEach((zoneId) => {
-      out[zoneId] = rectToBoundary(rects[zoneId]);
-    });
-    return out;
-  }, [rects]);
-
-  const exportJson = () => {
-    const payload = {
-      view,
-      zones: zones.filter(z => z.view === view),
-      boundaries: boundaryMap,
-      updatedAt: new Date().toISOString(),
-    };
-    navigator.clipboard?.writeText(JSON.stringify(payload, null, 2));
-    alert("Copied calibration JSON to clipboard ✅");
-  };
-
-  const saveNow = () => onSave(boundaryMap);
-
-  const resetAllZones = () => {
-    const resetRects = {};
-    zones.filter(z => z.view === view).forEach((zone) => {
-      resetRects[zone.id] = { x: 0.4, y: 0.4, w: 0.2, h: 0.2 };
-    });
-    setRects(resetRects);
-  };
-
-  const viewZones = zones.filter(z => z.view === view);
-
-  return (
-    <div className="absolute inset-0 z-[999]">
-      <div className="absolute inset-0 bg-black/30 pointer-events-none" />
-
-      {/* Panel */}
-      <div className="absolute top-3 left-3 z-[2000] bg-white rounded-lg shadow-lg border border-slate-200 w-[320px] pointer-events-auto">
-        <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
-          <div className="text-sm font-semibold text-slate-900">
-            Calibration Mode - {view}
-          </div>
-          <button
-            onClick={onClose}
-            className="text-xs px-2 py-1 rounded border border-slate-200 hover:bg-slate-50"
-            type="button"
-          >
-            Close
-          </button>
-        </div>
-
-        <div className="p-3 space-y-2">
-          <div className="text-xs text-slate-600">
-            Drag & resize each zone to match your mockup.
-          </div>
-
-          <div className="text-xs font-medium text-slate-800">Select Zone</div>
-          <div className="grid grid-cols-2 gap-2">
-            {viewZones.map((zone) => (
-              <button
-                key={zone.id}
-                onClick={() => setActiveZone(zone.id)}
-                type="button"
-                className={`text-xs px-2 py-2 rounded border ${
-                  activeZone === zone.id
-                    ? "border-blue-500 bg-blue-50 text-blue-700"
-                    : "border-slate-200 hover:bg-slate-50"
-                }`}
-              >
-                {zone.label}
-              </button>
-            ))}
-          </div>
-
-          {activeZone && (
-            <div className="pt-2 border-t border-slate-200 text-xs text-slate-700">
-              <div className="font-medium">Current Zone</div>
-              <div className="flex justify-between">
-                <span>Size:</span>
-                <span className="font-semibold">
-                  {viewZones.find(z => z.id === activeZone)?.maxW}″ × {viewZones.find(z => z.id === activeZone)?.maxH}″
-                </span>
-              </div>
-            </div>
-          )}
-
-          <div className="flex gap-2 pt-2">
-            <button
-              onClick={saveNow}
-              className="flex-1 text-xs px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
-              type="button"
-            >
-              Save Calibration
-            </button>
-            <button
-              onClick={exportJson}
-              className="text-xs px-3 py-2 rounded border border-slate-200 hover:bg-slate-50"
-              type="button"
-            >
-              Copy JSON
-            </button>
-            <button
-              onClick={resetAllZones}
-              className="text-xs px-3 py-2 rounded border border-slate-200 hover:bg-slate-50 text-red-600"
-              type="button"
-            >
-              Reset
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Drag layer */}
-      <div ref={overlayRef} className="absolute inset-0 z-[1000] pointer-events-auto">
-        {viewZones.map((zone) => {
-          const r = rects[zone.id];
-          if (!r) return null;
-
-          const isActive = zone.id === activeZone;
-
-          return (
-            <div
-              key={zone.id}
-              className="absolute"
-              style={{
-                left: `${r.x * 100}%`,
-                top: `${r.y * 100}%`,
-                width: `${r.w * 100}%`,
-                height: `${r.h * 100}%`,
-              }}
-            >
-              <div
-                className="absolute inset-0"
-                onPointerDown={(e) => startDrag(e, zone.id, "move")}
-                style={{
-                  border: isActive
-                    ? "3px solid rgba(59,130,246,1)"
-                    : "2px solid rgba(59,130,246,0.7)",
-                  background: isActive ? "rgba(59,130,246,0.08)" : "transparent",
-                  cursor: "move",
-                }}
-              />
-
-              <div
-                className="absolute -top-7 left-0 text-[11px] font-semibold px-2 py-1 rounded"
-                style={{
-                  background: "rgba(0,0,0,0.65)",
-                  color: "white",
-                }}
-              >
-                {zone.label} • {zone.maxW}″×{zone.maxH}″
-              </div>
-
-              {isActive && (
-                <>
-                  {["nw", "ne", "sw", "se"].map((h) => (
-                    <div
-                      key={h}
-                      onPointerDown={(e) => startDrag(e, zone.id, "resize", h)}
-                      className="absolute w-3 h-3 bg-white border-2 border-blue-600 rounded"
-                      style={{
-                        cursor: h === "nw" || h === "se" ? "nwse-resize" : "nesw-resize",
-                        left: h.includes("w") ? "-6px" : "auto",
-                        right: h.includes("e") ? "-6px" : "auto",
-                        top: h.includes("n") ? "-6px" : "auto",
-                        bottom: h.includes("s") ? "-6px" : "auto",
-                      }}
-                    />
-                  ))}
-                </>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/* =========================
-   RecolorEditor - ZERO DEFAULT START
-   ========================= */
-const RecolorEditor = forwardRef(function RecolorEditor(
-  {
-    mockupUrl,
-    maskUrl,
-    previewWidth = 800,
-    productColor = "#FFFFFF",
-    productKey,
-
-    textLayers,
-    setTextLayers,
-    activeTextId,
-    setActiveTextId,
-
-    designLayers,
-    setDesignLayers,
-    activeDesignId,
-    setActiveDesignId,
-
-    bgRemovalLoading,
-    onDesignRenderWidthChange,
-
-    calibrationOverride = null,
-  },
-  ref
-) {
-  const [renderer, setRenderer] = useState(null);
-  const [canvasSize, setCanvasSize] = useState(null);
-
-  const [showMeasurements, setShowMeasurements] = useState(false);
-  const [calibrationMode, setCalibrationMode] = useState(false);
-  const [zoneManagementOpen, setZoneManagementOpen] = useState(false);
-
-  // Detect product type
-  const productType = useMemo(() => {
-    if (productKey) return productKey;
-    return getProductTypeFromUrl();
-  }, [productKey]);
-
-  // Get product config
-  const productConfig = useMemo(() => {
-    return PRODUCT_ZONES[productType] || PRODUCT_ZONES.default;
-  }, [productType]);
-
-  // Active view
-  const activeView = useMemo(() => {
-    const active = designLayers?.find((d) => d.id === activeDesignId);
-    const viewCode = active?.viewCode || designLayers?.[0]?.viewCode || "front";
-    return viewCode === "back" ? "back" : "front";
-  }, [designLayers, activeDesignId]);
-
-  // Zones state - EMPTY ARRAY (NO DEFAULT ZONES)
-  const [zones, setZones] = useState(() => {
-    return []; // Start with empty array - no default zones
-  });
-
-  // Boundaries state
-  const [boundaries, setBoundaries] = useState(() => {
-    return {}; // Start with empty object
-  });
-
-  // Load saved calibration
-  useEffect(() => {
-    const loaded = loadCalibration({ productType, view: activeView, mockupUrl, maskUrl });
-    if (loaded?.zones && loaded?.boundaries) {
-      setZones(loaded.zones);
-      setBoundaries(loaded.boundaries);
-    }
-  }, [productType, activeView, mockupUrl, maskUrl]);
-
-  // Apply calibration override
-  useEffect(() => {
-    if (calibrationOverride) {
-      setBoundaries(prev => ({ ...prev, ...calibrationOverride }));
-    }
-  }, [calibrationOverride]);
-
-  const handleRendererReady = useCallback((instance) => {
-    setRenderer(instance || null);
-    if (instance?.canvas) {
-      setCanvasSize({ width: instance.canvas.width, height: instance.canvas.height });
-    } else {
-      setCanvasSize(null);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!renderer?.canvas) return;
-    setCanvasSize({ width: renderer.canvas.width, height: renderer.canvas.height });
-  }, [renderer]);
-
-  useImperativeHandle(
-    ref,
-    () => ({
-      capturePreview() {
-        if (!renderer?.canvas) return null;
-        try {
-          return renderer.canvas.toDataURL("image/jpeg", 0.7);
-        } catch (e) {
-          console.error("Failed to capture preview", e);
-          return null;
-        }
-      },
-    }),
-    [renderer]
-  );
-
-  useEffect(() => {
-    if (!renderer?.canvas) return;
-    if (!canvasSize) return;
-
-    const glCanvas = renderer.canvas;
-    const w = glCanvas.width;
-    const h = glCanvas.height;
-    if (!w || !h) return;
-
-    const hasText = textLayers?.some((l) => l.text && l.text.trim().length > 0);
-    const imageLayers = (designLayers || []).filter((l) => !!l.imageUrl);
-    const hasImages = imageLayers.length > 0;
-
-    if (!hasText && !hasImages) {
-      renderer.clearDesignTexture();
-      renderer.render(productColor);
-      onDesignRenderWidthChange?.(null);
-      return;
-    }
-
-    let cancelled = false;
-
-    async function drawAll() {
-      try {
-        const offscreen = document.createElement("canvas");
-        offscreen.width = w;
-        offscreen.height = h;
-        const ctx = offscreen.getContext("2d");
-        ctx.clearRect(0, 0, w, h);
-
-        // Draw text layers
-        (textLayers || []).forEach((layer) => {
-          if (!layer.text) return;
-          const px = layer.x * w;
-          const py = layer.y * h;
-
-          ctx.save();
-          ctx.translate(px, py);
-          ctx.rotate(((layer.rotation || 0) * Math.PI) / 180);
-          ctx.fillStyle = layer.color || "#000000";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.font = `700 ${layer.fontSize || 40}px ${layer.fontFamily || "Impact, sans-serif"}`;
-          ctx.fillText(layer.text, 0, 0);
-          ctx.restore();
-        });
-
-        // Draw image layers
-        if (imageLayers.length) {
-          const imgs = await Promise.all(imageLayers.map((l) => loadImage(l.imageUrl)));
-          const updates = [];
-
-          imgs.forEach((img, idx) => {
-            const layer = imageLayers[idx];
-            const px = layer.x * w;
-            const py = layer.y * h;
-
-            const targetWidthPx = canvasSize.width * (layer.scale || 0.35);
-            const imgRatio = img.width > 0 ? targetWidthPx / img.width : 1;
-            const drawW = img.width * imgRatio;
-            const drawH = img.height * imgRatio;
-
-            const zone = getZoneForLayer(layer, zones);
-            const zoneBoundary = boundaries[zone?.id];
-
-            // If no zone or boundary, designs move freely
-            if (!zone || !zoneBoundary) {
-              updates.push({
-                id: layer.id,
-                patch: {
-                  renderedWidthPx: drawW,
-                  renderedHeightPx: drawH,
-                  renderedWidthInches: null,
-                  renderedHeightInches: null,
-                  printableAreaWidthInches: null,
-                  printableAreaHeightInches: null,
-                  zoneId: zone?.id,
-                },
-              });
-
-              ctx.save();
-              ctx.translate(px, py);
-              ctx.rotate(((layer.rotation || 0) * Math.PI) / 180);
-              ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
-              ctx.restore();
-              return;
-            }
-
-            const zonePx = getPrintableAreaPx(canvasSize, zoneBoundary);
-
-            const widthIn = inchesFromPx(drawW, zonePx.widthPx, zone.maxW);
-            const heightIn = inchesFromPx(drawH, zonePx.heightPx, zone.maxH);
-
-            const clampedScale = clampScaleToMaxInches({
-              currentScale: layer.scale || 0.35,
-              drawWpx: drawW,
-              drawHpx: drawH,
-              zoneWpx: zonePx.widthPx,
-              zoneHpx: zonePx.heightPx,
-              maxWIn: zone.maxW,
-              maxHIn: zone.maxH,
-            });
-
-            updates.push({
-              id: layer.id,
-              patch: {
-                renderedWidthPx: drawW,
-                renderedHeightPx: drawH,
-                renderedWidthInches: widthIn,
-                renderedHeightInches: heightIn,
-                printableAreaWidthInches: zone.maxW,
-                printableAreaHeightInches: zone.maxH,
-                zoneId: zone.id,
-                ...(clampedScale < (layer.scale || 0.35) ? { scale: clampedScale } : {}),
-              },
-            });
-
-            ctx.save();
-            ctx.translate(px, py);
-            ctx.rotate(((layer.rotation || 0) * Math.PI) / 180);
-            ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
-            ctx.restore();
-          });
-
-          if (updates.length) {
-            setDesignLayers((prev) =>
-              prev.map((l) => {
-                const u = updates.find((x) => x.id === l.id);
-                return u ? { ...l, ...u.patch } : l;
-              })
-            );
-          }
-        }
-
-        if (cancelled) return;
-
-        renderer.updateDesignTexture(offscreen);
-        renderer.render(productColor);
-
-        const activeDesign = designLayers.find((d) => d.id === activeDesignId);
-        if (activeDesign && canvasSize) {
-          onDesignRenderWidthChange?.(canvasSize.width * activeDesign.scale);
-        } else {
-          onDesignRenderWidthChange?.(null);
-        }
-      } catch (err) {
-        console.error("Error drawing texture:", err);
-      }
-    }
-
-    drawAll();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    renderer,
-    canvasSize,
-    textLayers,
-    designLayers,
-    productColor,
-    activeDesignId,
-    setDesignLayers,
-    boundaries,
-    zones,
-    onDesignRenderWidthChange,
-  ]);
-
-  const handleBackgroundMouseDown = () => {
-    setActiveDesignId(null);
-    setActiveTextId(null);
-  };
-
-  const saveCalibratedZones = (newBoundaries) => {
-    saveCalibration({ 
-      productType, 
-      view: activeView, 
-      mockupUrl, 
-      maskUrl, 
-      zones,
-      boundaries: newBoundaries 
-    });
-    setBoundaries(newBoundaries);
-    setCalibrationMode(false);
-    alert("Calibration saved ✅");
-  };
-
-  return (
-    <div className="relative w-full h-full" onMouseDown={handleBackgroundMouseDown}>
-      <CanvasRenderer
-        mockupUrl={mockupUrl}
-        maskUrl={maskUrl}
-        previewWidth={previewWidth}
-        productColor={productColor}
-        onRendererReady={handleRendererReady}
-      />
-
-      {showMeasurements && canvasSize && zones.length > 0 && (
-        <MeasurementOverlay 
-          canvasSize={canvasSize} 
-          zones={zones}
-          boundaries={boundaries}
-          view={activeView}
-        />
-      )}
-
-      <div className="absolute top-2 right-2 z-50 flex flex-col gap-2">
-        <div className="flex gap-2">
-          {zones.length > 0 && (
-            <button
-              onClick={() => setShowMeasurements((s) => !s)}
-              className="bg-white/85 hover:bg-white text-xs px-3 py-1.5 rounded border border-slate-300 shadow-sm font-medium"
-              type="button"
-            >
-              {showMeasurements ? "Hide Zones" : "Show Zones"}
-            </button>
-          )}
-
-          <button
-            onClick={() => setZoneManagementOpen(true)}
-            className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1.5 rounded shadow-sm font-medium"
-            type="button"
-          >
-            {zones.length === 0 ? "Create Zones" : "Manage Zones"}
-          </button>
-
-          {zones.filter(z => z.view === activeView).length > 0 && (
-            <button
-              onClick={() => setCalibrationMode(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded shadow-sm font-medium"
-              type="button"
-            >
-              Calibrate
-            </button>
-          )}
-        </div>
-
-        {showMeasurements && zones.filter(z => z.view === activeView).length > 0 && (
-          <div className="bg-white/90 backdrop-blur-sm rounded-lg p-3 border border-slate-300 shadow-sm max-w-xs">
-            <div className="text-xs font-semibold text-slate-800 mb-2">
-              Zones ({activeView.charAt(0).toUpperCase() + activeView.slice(1)})
-            </div>
-            <div className="text-xs text-slate-600 space-y-1.5 max-h-40 overflow-y-auto pr-1">
-              {zones.filter(z => z.view === activeView).map(zone => (
-                <div key={zone.id} className="flex justify-between items-center py-1 border-b border-slate-100 last:border-0">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                    <span className="truncate max-w-[120px]">{zone.label}</span>
-                  </div>
-                  <span className="font-semibold whitespace-nowrap">{zone.maxW}″ × {zone.maxH}″</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Zone Management Modal */}
-      <ZoneManagementModal
-        isOpen={zoneManagementOpen}
-        onClose={() => setZoneManagementOpen(false)}
-        zones={zones}
-        setZones={setZones}
-        activeView={activeView}
-        boundaries={boundaries}
-        setBoundaries={setBoundaries}
-        productType={productType}
-      />
-
-      {/* Calibration Overlay */}
-      {calibrationMode && canvasSize && zones.filter(z => z.view === activeView).length > 0 && (
-        <CalibrationOverlay
-          view={activeView}
-          zones={zones}
-          initialBoundaries={boundaries}
-          onSave={saveCalibratedZones}
-          onClose={() => setCalibrationMode(false)}
-        />
-      )}
-
-      {/* Text Overlay */}
-      {renderer && (
-        <TextOverlay
-          textLayers={textLayers}
-          setTextLayers={setTextLayers}
-          activeTextId={activeTextId}
-          setActiveTextId={setActiveTextId}
-          onAnyTextClick={() => setActiveDesignId(null)}
-          canvasSize={canvasSize}
-        />
-      )}
-
-      {/* Design Overlay */}
-      {renderer &&
-        canvasSize &&
-        (designLayers || []).map((layer) => (
-          <DesignOverlay
-            key={layer.id}
-            layer={layer}
-            canvasSize={canvasSize}
-            setDesignLayers={setDesignLayers}
-            isActive={layer.id === activeDesignId}
-            setActiveDesignId={setActiveDesignId}
-            disabled={bgRemovalLoading}
-            zones={zones}
-            boundaries={boundaries}
-          />
-        ))}
-
-      {bgRemovalLoading && (
-        <div className="pointer-events-none absolute inset-0 bg-white/40 flex items-center justify-center">
-          <div className="bg-white px-4 py-2 rounded shadow-md">
-            <div className="text-sm text-slate-700">Removing background...</div>
-            <div className="text-xs text-slate-500 mt-1">Please wait</div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-});
-
-/* =========================
-   TEXT OVERLAY
-   ========================= */
-function TextOverlay({ textLayers, setTextLayers, activeTextId, setActiveTextId, onAnyTextClick, canvasSize }) {
-  const overlayRef = useRef(null);
-  const dragStateRef = useRef(null);
-
-  const onPointerMove = useCallback(
-    (e) => {
-      const dragState = dragStateRef.current;
-      if (!dragState) return;
-
-      const { mode, id, startX, startY, rectWidth, rectHeight, initialLayer } = dragState;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-
-      if (mode === "drag") {
-        const nx = initialLayer.x + dx / rectWidth;
-        const ny = initialLayer.y + dy / rectHeight;
-
-        let constrainedX = nx;
-        let constrainedY = ny;
-
-        const textLayer = textLayers.find((l) => l.id === id);
-        if (textLayer && canvasSize) {
-          const canvas = document.createElement("canvas");
-          const ctx = canvas.getContext("2d");
-          ctx.font = `${textLayer.fontSize}px ${textLayer.fontFamily}`;
-          const textWidth = ctx.measureText(textLayer.text).width;
-          const textHeight = textLayer.fontSize * 1.2;
-
-          const halfWidth = textWidth / canvasSize.width / 2;
-          const halfHeight = textHeight / canvasSize.height / 2;
-
-          const adjusted = {
-            minX: TEXT_BOUNDARIES.minX + halfWidth,
-            maxX: TEXT_BOUNDARIES.maxX - halfWidth,
-            minY: TEXT_BOUNDARIES.minY + halfHeight,
-            maxY: TEXT_BOUNDARIES.maxY - halfHeight,
-          };
-
-          constrainedX = Math.max(adjusted.minX, Math.min(adjusted.maxX, nx));
-          constrainedY = Math.max(adjusted.minY, Math.min(adjusted.maxY, ny));
-        }
-
-        setTextLayers((prev) => prev.map((layer) => (layer.id === id ? { ...layer, x: constrainedX, y: constrainedY } : layer)));
-      } else if (mode === "resize") {
-        const newSize = Math.max(12, Math.min(200, initialLayer.fontSize + (dx + dy) * 0.3));
-        setTextLayers((prev) => prev.map((layer) => (layer.id === id ? { ...layer, fontSize: newSize } : layer)));
-      }
-    },
-    [setTextLayers, textLayers, canvasSize]
-  );
-
-  const onPointerUp = useCallback(() => {
-    dragStateRef.current = null;
-    window.removeEventListener("pointermove", onPointerMove);
-    window.removeEventListener("pointerup", onPointerUp);
-  }, [onPointerMove]);
-
-  const startDrag = (e, id, mode) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const overlay = overlayRef.current;
-    if (!overlay) return;
-
-    const rect = overlay.getBoundingClientRect();
-    const layer = textLayers.find((l) => l.id === id);
-    if (!layer) return;
-
-    dragStateRef.current = {
-      id,
-      mode,
-      startX: e.clientX,
-      startY: e.clientY,
-      rectWidth: rect.width,
-      rectHeight: rect.height,
-      initialLayer: { ...layer },
-    };
-
-    setActiveTextId(id);
-    onAnyTextClick?.();
-
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-  };
-
-  return (
-    <div ref={overlayRef} className="pointer-events-none absolute inset-0 z-20">
-      {(textLayers || []).map((layer) => {
-        const isActive = layer.id === activeTextId;
-        const left = `${layer.x * 100}%`;
-        const top = `${layer.y * 100}%`;
-
-        return (
-          <div
-            key={layer.id}
-            style={{ left, top, transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)` }}
-            className="pointer-events-auto absolute"
-            onPointerDown={(e) => startDrag(e, layer.id, "drag")}
-          >
-            <div
-              className={`relative inline-block border ${isActive ? "border-blue-500 bg-blue-50/30" : "border-transparent"} bg-transparent px-2 py-1 rounded`}
-              style={{
-                fontFamily: layer.fontFamily,
-                fontSize: layer.fontSize,
-                color: layer.color,
-                whiteSpace: "nowrap",
-                cursor: "move",
-                userSelect: "none",
-              }}
-            >
-              {layer.text || " "}
-              {isActive && (
-                <div
-                  onPointerDown={(e) => startDrag(e, layer.id, "resize")}
-                  className="absolute -bottom-2 -right-2 h-4 w-4 rounded-full border-2 border-blue-500 bg-white shadow-sm"
-                  style={{ cursor: "nwse-resize" }}
-                />
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/* =========================
-   DESIGN OVERLAY (IMAGES)
-   ========================= */
-/* =========================
-   DESIGN OVERLAY (IMAGES) - FIXED WITH PROPER BOUNDARY CONSTRAINTS
-   ========================= */
-// Complete fixed DesignOverlay component
-function DesignOverlay({ layer, canvasSize, setDesignLayers, isActive, setActiveDesignId, disabled, zones, boundaries }) {
-  const overlayRef = useRef(null);
-  const dragStateRef = useRef(null);
-
-  const onPointerMove = useCallback(
-    (e) => {
-      const st = dragStateRef.current;
-      if (!st) return;
-
-      const { id, startX, startY, rectWidth, rectHeight, initialLayer } = st;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-
-      const nx = initialLayer.x + dx / rectWidth;
-      const ny = initialLayer.y + dy / rectHeight;
-
-      const zone = getZoneForLayer(initialLayer, zones);
-      const b = boundaries?.[zone?.id];
-
-      // If no zone or boundary, allow free movement within canvas bounds
-      if (!zone || !b) {
-        const scale = initialLayer.scale || 0.35;
-        const aspect = (initialLayer.originalHeightPx / initialLayer.originalWidthPx) || 1;
-        const wPx = canvasSize.width * scale;
-        const hPx = wPx * aspect;
-        
-        const halfW = (wPx / canvasSize.width) / 2;
-        const halfH = (hPx / canvasSize.height) / 2;
-        
-        // Clamp to canvas bounds (0 to 1)
-        let constrainedX = Math.max(halfW, Math.min(1 - halfW, nx));
-        let constrainedY = Math.max(halfH, Math.min(1 - halfH, ny));
-        
-        setDesignLayers((prev) => prev.map((d) => (d.id === id ? { ...d, x: constrainedX, y: constrainedY } : d)));
-        return;
-      }
-
-      // Design size in normalized units (center anchored)
-      const scale = initialLayer.scale || 0.35;
-      const aspect = (initialLayer.originalHeightPx / initialLayer.originalWidthPx) || 1;
-
-      const wPx = canvasSize.width * scale;
-      const hPx = wPx * aspect;
-
-      const halfW = (wPx / canvasSize.width) / 2;   // normalized half width
-      const halfH = (hPx / canvasSize.height) / 2;  // normalized half height
-
-      // Calculate the boundaries where the CENTER of the design can go
-      const minCenterX = b.minX + halfW;
-      const maxCenterX = b.maxX - halfW;
-      const minCenterY = b.minY + halfH;
-      const maxCenterY = b.maxY - halfH;
-
-      // If the zone is smaller than the design, keep design centered in zone
-      let constrainedX, constrainedY;
-      
-      if (minCenterX > maxCenterX) {
-        // Zone is narrower than design - center design in zone
-        constrainedX = (b.minX + b.maxX) / 2;
-      } else {
-        // Normal case - clamp center within boundaries
-        constrainedX = Math.max(minCenterX, Math.min(maxCenterX, nx));
-      }
-      
-      if (minCenterY > maxCenterY) {
-        // Zone is shorter than design - center design in zone
-        constrainedY = (b.minY + b.maxY) / 2;
-      } else {
-        // Normal case - clamp center within boundaries
-        constrainedY = Math.max(minCenterY, Math.min(maxCenterY, ny));
-      }
-
-      // Snap to edges if close (optional)
-      const snapped = snapToBoundaryCenter(constrainedX, constrainedY, b, halfW, halfH);
-      constrainedX = snapped.x;
-      constrainedY = snapped.y;
-
-      setDesignLayers((prev) => prev.map((d) => (d.id === id ? { 
-        ...d, 
-        x: constrainedX, 
-        y: constrainedY 
-      } : d)));
-    },
-    [setDesignLayers, zones, boundaries, canvasSize]
-  );
-
-  const onPointerUp = useCallback(() => {
-    dragStateRef.current = null;
-    window.removeEventListener("pointermove", onPointerMove);
-    window.removeEventListener("pointerup", onPointerUp);
-  }, [onPointerMove]);
-
-  const startDrag = (e) => {
-    if (disabled) return;
-    e.preventDefault();
-    e.stopPropagation();
-
-    const overlay = overlayRef.current;
-    if (!overlay) return;
-
-    const rect = overlay.getBoundingClientRect();
-    dragStateRef.current = {
-      id: layer.id,
-      startX: e.clientX,
-      startY: e.clientY,
-      rectWidth: rect.width,
-      rectHeight: rect.height,
-      initialLayer: { ...layer },
-    };
-
-    setActiveDesignId(layer.id);
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-  };
-
-  // Get current zone to check if design is within bounds
-  const currentZone = getZoneForLayer(layer, zones);
-  const zoneBoundary = boundaries?.[currentZone?.id];
-  
-  // Calculate if design is within its zone
-  const isOutOfBounds = useMemo(() => {
-    if (!currentZone || !zoneBoundary || !canvasSize) return false;
-    
-    const scale = layer.scale || 0.35;
-    const aspect = (layer.originalHeightPx / layer.originalWidthPx) || 1;
-    const wPx = canvasSize.width * scale;
-    const hPx = wPx * aspect;
-    
-    const halfW = (wPx / canvasSize.width) / 2;
-    const halfH = (hPx / canvasSize.height) / 2;
-    
-    const minCenterX = zoneBoundary.minX + halfW;
-    const maxCenterX = zoneBoundary.maxX - halfW;
-    const minCenterY = zoneBoundary.minY + halfH;
-    const maxCenterY = zoneBoundary.maxY - halfH;
-    
-    // Check if design center is within allowed center positions
-    const isXInBounds = layer.x >= minCenterX && layer.x <= maxCenterX;
-    const isYInBounds = layer.y >= minCenterY && layer.y <= maxCenterY;
-    
-    return !(isXInBounds && isYInBounds);
-  }, [currentZone, zoneBoundary, canvasSize, layer]);
-
-  const left = `${layer.x * 100}%`;
-  const top = `${layer.y * 100}%`;
-
-  const widthPx = canvasSize.width * layer.scale;
-  const heightPx = widthPx * ((layer.originalHeightPx / layer.originalWidthPx) || 1);
-
-  const zone = getZoneForLayer(layer, zones);
-
-  return (
-    <div ref={overlayRef} className="pointer-events-none absolute inset-0 z-10">
-      <div
-        style={{
-          left,
-          top,
-          transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)`,
-          cursor: disabled ? "default" : "grab",
-        }}
-        className="pointer-events-auto absolute"
-        onPointerDown={startDrag}
-      >
-        <div
-          className={`overflow-hidden rounded-sm ${isActive ? "border-2 border-blue-500 bg-blue-50/20" : "border border-slate-300/50"} ${isOutOfBounds ? 'border-2 border-red-500' : ''}`}
-          style={{
-            width: `${widthPx}px`,
-            height: `${heightPx}px`,
-            opacity: disabled ? 0.6 : 1,
-          }}
-        >
-          {layer.imageUrl && (
-            <img
-              src={layer.imageUrl}
-              alt="design"
-              style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }}
-            />
-          )}
-        </div>
-
-        {isActive && (
-          <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/75 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap">
-            {layer.renderedWidthInches?.toFixed?.(1) || "?"}″ ×{" "}
-            {layer.renderedHeightInches?.toFixed?.(1) || "?"}″
-            {zone && ` (${zone.label}: ${zone.maxW}″ × ${zone.maxH}″)`}
-            {isOutOfBounds && " ⚠ Out of bounds"}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export default RecolorEditor;

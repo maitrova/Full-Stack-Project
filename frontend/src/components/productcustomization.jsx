@@ -14,6 +14,7 @@ import { selectCurrentToken, selectCurrentUser } from "../redux/slices/Userslice
 
 const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
 const IMAGE_URL = import.meta.env.VITE_IMAGE_URL;
+console.log("image_url:", IMAGE_URL);
 const FONT_OPTIONS = [
   "Impact, sans-serif",
   "Arial, sans-serif",
@@ -464,7 +465,7 @@ export default function DesignerPage() {
       const formData = new FormData();
       formData.append("designImage", file);
 
-      const res = await fetch(`${API_URL}/api/upload-design`, {
+      const res = await fetch(`${API_URL}/upload-design`, {
         method: "POST",
         body: formData,
       });
@@ -845,7 +846,7 @@ export default function DesignerPage() {
       formData.append("image", fileToUse);
       
       console.log("Sending to remove-bg API...");
-      const res = await fetch(`${API_URL}/api/remove-bg`, {
+      const res = await fetch(`${API_URL}/remove-bg`, {
         method: "POST",
         body: formData,
       });

@@ -14,6 +14,9 @@ import CanvasRenderer from "./CanvasRenderer.jsx";
    Print Specs (inches)
    ========================= */
 const API_URL = import.meta.env.VITE_API_URL;    
+const IMAGE_BASE_URL = import.meta.env.VITE_IMAGE_URL || "";
+console.log("RecolorEditor IMAGE_BASE_URL:", IMAGE_BASE_URL);
+
 const PRINT_SPECS = {
   hoodie_basic: {
     front: { maxW: 12, maxH: 14 },
@@ -85,6 +88,46 @@ const CAL_ZONES_BY_VIEW = {
 /* =========================
    Helpers
    ========================= */
+function normalizeImageUrl(url) {
+  if (!url) return url;
+
+  // already absolute
+  if (/^(https?:)?\/\//i.test(url) || url.startsWith("blob:") || url.startsWith("data:")) {
+    // ✅ Fix wrong "/api/outputs" URLs coming from backend
+    return url.replace(/\/api\/outputs\//, "/outputs/");
+  }
+
+  const base = (IMAGE_BASE_URL || "").replace(/\/$/, "");
+  const path = url.startsWith("/") ? url : `/${url}`;
+
+  // ✅ Also fix relative "/api/outputs"
+  const fixedPath = path.replace(/^\/api\/outputs\//, "/outputs/");
+  return `${base}${fixedPath}`;
+}
+
+
+function pointInBoundary(x, y, b) {
+  return x >= b.minX && x <= b.maxX && y >= b.minY && y <= b.maxY;
+}
+
+// Decide which zone the point belongs to (prefer smaller zones like pocket if overlap)
+function pickZoneForPoint(x, y, zones, boundaries) {
+  const candidates = (zones || [])
+    .map((z) => ({ z, b: boundaries?.[z] }))
+    .filter((it) => it.b && pointInBoundary(x, y, it.b));
+
+  if (!candidates.length) return null;
+
+  // pick smallest area zone (pocket wins over front-full usually)
+  candidates.sort((a, b) => {
+    const areaA = (a.b.maxX - a.b.minX) * (a.b.maxY - a.b.minY);
+    const areaB = (b.b.maxX - b.b.minX) * (b.b.maxY - b.b.minY);
+    return areaA - areaB;
+  });
+
+  return candidates[0].z;
+}
+
 function clamp01(n) {
   return Math.max(0, Math.min(1, n));
 }
@@ -174,13 +217,23 @@ function clampScaleToMaxInches({
 
 function loadImage(src) {
   return new Promise((resolve, reject) => {
+    if (!src) return reject(new Error("loadImage: empty src"));
+
     const img = new Image();
     img.crossOrigin = "anonymous";
+
     img.onload = () => resolve(img);
-    img.onerror = reject;
+
+    img.onerror = (e) => {
+      // Convert browser Event -> readable error
+      reject(new Error(`Failed to load image: ${src}`));
+    };
+
+    // cache-bust (optional, helps during updates)
     img.src = src;
   });
 }
+
 
 /* =========================
    LocalStorage persistence
@@ -846,114 +899,176 @@ const zonesForActiveView = useMemo(() => {
     let cancelled = false;
 
     async function drawAll() {
-      try {
-        const offscreen = document.createElement("canvas");
-        offscreen.width = w;
-        offscreen.height = h;
-        const ctx = offscreen.getContext("2d");
-        ctx.clearRect(0, 0, w, h);
+  try {
+    const offscreen = document.createElement("canvas");
+    offscreen.width = w;
+    offscreen.height = h;
 
-        (textLayers || []).forEach((layer) => {
-          if (!layer.text) return;
-          const px = layer.x * w;
-          const py = layer.y * h;
+    const ctx = offscreen.getContext("2d");
+    if (!ctx) {
+      console.error("Error drawing texture: 2D context not available");
+      return;
+    }
 
-          ctx.save();
-          ctx.translate(px, py);
-          ctx.rotate(((layer.rotation || 0) * Math.PI) / 180);
-          ctx.fillStyle = layer.color || "#000000";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.font = `700 ${layer.fontSize || 40}px ${layer.fontFamily || "Impact, sans-serif"}`;
-          ctx.fillText(layer.text, 0, 0);
-          ctx.restore();
+    ctx.clearRect(0, 0, w, h);
+
+    /* -------------------------
+       Draw TEXT layers
+       ------------------------- */
+    (textLayers || []).forEach((layer) => {
+      if (!layer?.text) return;
+
+      const px = (layer.x ?? 0.5) * w;
+      const py = (layer.y ?? 0.5) * h;
+
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate((((layer.rotation || 0) * Math.PI) / 180) || 0);
+      ctx.fillStyle = layer.color || "#000000";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      const fontSize = layer.fontSize || 40;
+      const fontFamily = layer.fontFamily || "Impact, sans-serif";
+      ctx.font = `700 ${fontSize}px ${fontFamily}`;
+
+      ctx.fillText(layer.text, 0, 0);
+      ctx.restore();
+    });
+
+    /* -------------------------
+       Draw IMAGE layers
+       ------------------------- */
+    if (imageLayers && imageLayers.length) {
+      // Load images safely (one failure should NOT break all)
+      const results = await Promise.allSettled(
+      imageLayers.map((l) => {
+        const url = l?.imageUrl;
+        if (!url) return Promise.reject(new Error("Missing imageUrl"));
+        return loadImage(normalizeImageUrl(url));
+      })
+    );
+
+
+      // Log failures
+      results.forEach((r, idx) => {
+        if (r.status === "rejected") {
+          console.warn(
+            "Image load failed:",
+            imageLayers[idx]?.imageUrl,
+            r.reason
+          );
+        }
+      });
+
+      // Pair each successful img with its layer
+      const loaded = results
+        .map((r, idx) => ({ r, layer: imageLayers[idx] }))
+        .filter((x) => x.r.status === "fulfilled")
+        .map((x) => ({ img: x.r.value, layer: x.layer }));
+
+      const updates = [];
+
+      loaded.forEach(({ img, layer }) => {
+        if (!img || !layer) return;
+
+        const px = (layer.x ?? 0.5) * w;
+        const py = (layer.y ?? 0.5) * h;
+
+        const scale = layer.scale || 0.35;
+
+        // Use canvasSize if available; otherwise fallback to w/h
+        const baseCanvasW = canvasSize?.width || w;
+        const baseCanvasH = canvasSize?.height || h;
+
+        const targetWidthPx = baseCanvasW * scale;
+        const imgRatio = img.width > 0 ? targetWidthPx / img.width : 1;
+
+        const drawW = img.width * imgRatio;
+        const drawH = img.height * imgRatio;
+
+        const zoneKey = getBoundaryKeyForLayer(layer);
+        const zoneBoundary = boundaries?.[zoneKey] || boundaries?.["front-full"] || FALLBACK_BOUNDARIES["front-full"];
+        const spec = getZoneSpec(zoneKey, specs, calibratedConfig);
+
+        const zonePx = getPrintableAreaPx(
+          { width: baseCanvasW, height: baseCanvasH },
+          zoneBoundary
+        );
+
+        const widthIn = inchesFromPx(drawW, zonePx.widthPx, spec.maxW);
+        const heightIn = inchesFromPx(drawH, zonePx.heightPx, spec.maxH);
+
+        const clampedScale = clampScaleToMaxInches({
+          currentScale: scale,
+          drawWpx: drawW,
+          drawHpx: drawH,
+          zoneWpx: zonePx.widthPx,
+          zoneHpx: zonePx.heightPx,
+          maxWIn: spec.maxW,
+          maxHIn: spec.maxH,
         });
 
-        if (imageLayers.length) {
-          const imgs = await Promise.all(imageLayers.map((l) => loadImage(l.imageUrl)));
-          const updates = [];
+        updates.push({
+          id: layer.id,
+          patch: {
+            renderedWidthPx: drawW,
+            renderedHeightPx: drawH,
+            renderedWidthInches: widthIn,
+            renderedHeightInches: heightIn,
+            printableAreaWidthInches: spec.maxW,
+            printableAreaHeightInches: spec.maxH,
+            zone: zoneKey, // ✅ important: this is what getBoundaryKeyForLayer reads
+            zoneKey,       // optional (debug)
+            ...(clampedScale < scale ? { scale: clampedScale } : {}),
+          },
+        });
 
-          imgs.forEach((img, idx) => {
-            const layer = imageLayers[idx];
-            const px = layer.x * w;
-            const py = layer.y * h;
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate((((layer.rotation || 0) * Math.PI) / 180) || 0);
+        ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+        ctx.restore();
+      });
 
-            const targetWidthPx = canvasSize.width * (layer.scale || 0.35);
-            const imgRatio = img.width > 0 ? targetWidthPx / img.width : 1;
-            const drawW = img.width * imgRatio;
-            const drawH = img.height * imgRatio;
-
-            const zoneKey = getBoundaryKeyForLayer(layer);
-            const zoneBoundary = boundaries[zoneKey] || boundaries["front-full"];
-            const spec = getZoneSpec(zoneKey, specs, calibratedConfig);
-
-
-            const zonePx = getPrintableAreaPx(canvasSize, zoneBoundary);
-
-            const widthIn = inchesFromPx(drawW, zonePx.widthPx, spec.maxW);
-            const heightIn = inchesFromPx(drawH, zonePx.heightPx, spec.maxH);
-
-            const clampedScale = clampScaleToMaxInches({
-              currentScale: layer.scale || 0.35,
-              drawWpx: drawW,
-              drawHpx: drawH,
-              zoneWpx: zonePx.widthPx,
-              zoneHpx: zonePx.heightPx,
-              maxWIn: spec.maxW,
-              maxHIn: spec.maxH,
-            });
-
-            updates.push({
-              id: layer.id,
-              patch: {
-                renderedWidthPx: drawW,
-                renderedHeightPx: drawH,
-                renderedWidthInches: widthIn,
-                renderedHeightInches: heightIn,
-                printableAreaWidthInches: spec.maxW,
-                printableAreaHeightInches: spec.maxH,
-                zoneKey,
-                ...(clampedScale < (layer.scale || 0.35) ? { scale: clampedScale } : {}),
-              },
-            });
-
-            ctx.save();
-            ctx.translate(px, py);
-            ctx.rotate(((layer.rotation || 0) * Math.PI) / 180);
-            ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
-            ctx.restore();
-          });
-
-          if (updates.length) {
-            setDesignLayers((prev) =>
-              prev.map((l) => {
-                const u = updates.find((x) => x.id === l.id);
-                return u ? { ...l, ...u.patch } : l;
-              })
-            );
-          }
-        }
-
-        if (cancelled) return;
-
-        renderer.updateDesignTexture(offscreen);
-        renderer.render(productColor);
-
-        const activeDesign = designLayers.find((d) => d.id === activeDesignId);
-        if (activeDesign && canvasSize) {
-          onDesignRenderWidthChange?.(canvasSize.width * activeDesign.scale);
-        } else {
-          onDesignRenderWidthChange?.(null);
-        }
-      } catch (err) {
-        console.error("Error drawing texture:", err);
+      if (updates.length) {
+        setDesignLayers((prev) =>
+          prev.map((l) => {
+            const u = updates.find((x) => x.id === l.id);
+            return u ? { ...l, ...u.patch } : l;
+          })
+        );
       }
     }
 
-    drawAll();
-    return () => {
-      cancelled = true;
-    };
+    if (cancelled) return;
+
+    renderer.updateDesignTexture(offscreen);
+    renderer.render(productColor);
+
+    const activeDesign = (designLayers || []).find((d) => d.id === activeDesignId);
+    if (activeDesign && canvasSize) {
+      onDesignRenderWidthChange?.(canvasSize.width * (activeDesign.scale || 0));
+    } else {
+      onDesignRenderWidthChange?.(null);
+    }
+  } catch (err) {
+    console.error("Error drawing texture:", err);
+  }
+}
+
+  console.log(
+  "RecolorEditor → imageUrls used for rendering:",
+  imageLayers.map(l => l.imageUrl)
+);
+
+drawAll();
+
+return () => {
+  cancelled = true;
+};
+
+    
   }, [
     renderer,
     canvasSize,
@@ -1069,19 +1184,21 @@ const zonesForActiveView = useMemo(() => {
       )}
 
       {renderer &&
-        canvasSize &&
-        (designLayers || []).map((layer) => (
-          <DesignOverlay
-            key={layer.id}
-            layer={layer}
-            canvasSize={canvasSize}
-            setDesignLayers={setDesignLayers}
-            isActive={layer.id === activeDesignId}
-            setActiveDesignId={setActiveDesignId}
-            disabled={bgRemovalLoading}
-            boundaries={boundaries}
-          />
-        ))}
+  canvasSize &&
+  (designLayers || []).map((layer) => (
+    <DesignOverlay
+      key={layer.id}
+      layer={layer}
+      canvasSize={canvasSize}
+      setDesignLayers={setDesignLayers}
+      isActive={layer.id === activeDesignId}
+      setActiveDesignId={setActiveDesignId}
+      disabled={bgRemovalLoading}
+      boundaries={boundaries}
+      zonesForView={zonesForActiveView}   // ✅ ADD THIS
+    />
+  ))}
+
 
       {bgRemovalLoading && (
         <div className="pointer-events-none absolute inset-0 bg-white/40 flex items-center justify-center">
@@ -1111,60 +1228,67 @@ function TextOverlay({
   const overlayRef = useRef(null);
   const dragStateRef = useRef(null);
 
-  const onPointerMove = useCallback(
-    (e) => {
-      const dragState = dragStateRef.current;
-      if (!dragState) return;
+ const onPointerMove = useCallback(
+  (e) => {
+    const dragState = dragStateRef.current;
+    if (!dragState) return;
 
-      const { mode, id, startX, startY, rectWidth, rectHeight, initialLayer } = dragState;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
+    const { mode, id, startX, startY, rectWidth, rectHeight, initialLayer } = dragState;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
 
-      if (mode === "drag") {
-        const nx = initialLayer.x + dx / rectWidth;
-        const ny = initialLayer.y + dy / rectHeight;
+    if (mode === "drag") {
+      const nx = initialLayer.x + dx / rectWidth;
+      const ny = initialLayer.y + dy / rectHeight;
 
-        let constrainedX = nx;
-        let constrainedY = ny;
+      let constrainedX = nx;
+      let constrainedY = ny;
 
-        const textLayer = textLayers.find((l) => l.id === id);
-        if (textLayer && canvasSize) {
-          const canvas = document.createElement("canvas");
-          const ctx = canvas.getContext("2d");
-          ctx.font = `${textLayer.fontSize}px ${textLayer.fontFamily}`;
-          const textWidth = ctx.measureText(textLayer.text).width;
-          const textHeight = textLayer.fontSize * 1.2;
+      const textLayer = textLayers.find((l) => l.id === id);
 
-          const halfWidth = textWidth / canvasSize.width / 2;
-          const halfHeight = textHeight / canvasSize.height / 2;
+      if (textLayer && canvasSize) {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
 
-          // pick zone boundary for this text layer
-const zoneKey = getBoundaryKeyForTextLayer(textLayer);
-const b =
-  boundaries?.[zoneKey] ||
-  FALLBACK_BOUNDARIES?.[zoneKey] ||
-  FALLBACK_BOUNDARIES["front-full"];
+        ctx.font = `${textLayer.fontSize}px ${textLayer.fontFamily}`;
+        const textWidth = ctx.measureText(textLayer.text || "").width;
+        const textHeight = (textLayer.fontSize || 20) * 1.2;
 
-const adjusted = {
-  minX: b.minX + halfWidth,
-  maxX: b.maxX - halfWidth,
-  minY: b.minY + halfHeight,
-  maxY: b.maxY - halfHeight,
-};
+        const halfWidth = textWidth / canvasSize.width / 2;
+        const halfHeight = textHeight / canvasSize.height / 2;
 
-constrainedX = Math.max(adjusted.minX, Math.min(adjusted.maxX, nx));
-constrainedY = Math.max(adjusted.minY, Math.min(adjusted.maxY, ny));
+        const zoneKey = getBoundaryKeyForTextLayer(textLayer);
+        const b =
+          boundaries?.[zoneKey] ||
+          FALLBACK_BOUNDARIES?.[zoneKey] ||
+          FALLBACK_BOUNDARIES["front-full"];
 
-        }
+        const adjusted = {
+          minX: b.minX + halfWidth,
+          maxX: b.maxX - halfWidth,
+          minY: b.minY + halfHeight,
+          maxY: b.maxY - halfHeight,
+        };
 
-        setTextLayers((prev) => prev.map((layer) => (layer.id === id ? { ...layer, x: constrainedX, y: constrainedY } : layer)));
-      } else if (mode === "resize") {
-        const newSize = Math.max(12, Math.min(200, initialLayer.fontSize + (dx + dy) * 0.3));
-        setTextLayers((prev) => prev.map((layer) => (layer.id === id ? { ...layer, fontSize: newSize } : layer)));
+        constrainedX = Math.max(adjusted.minX, Math.min(adjusted.maxX, nx));
+        constrainedY = Math.max(adjusted.minY, Math.min(adjusted.maxY, ny));
       }
-    },
-    [setTextLayers, textLayers, canvasSize]
-  );
+
+      setTextLayers((prev) =>
+        prev.map((layer) =>
+          layer.id === id ? { ...layer, x: constrainedX, y: constrainedY } : layer
+        )
+      );
+    } else if (mode === "resize") {
+      const newSize = Math.max(12, Math.min(200, initialLayer.fontSize + (dx + dy) * 0.3));
+      setTextLayers((prev) =>
+        prev.map((layer) => (layer.id === id ? { ...layer, fontSize: newSize } : layer))
+      );
+    }
+  },
+  [setTextLayers, textLayers, canvasSize, boundaries]
+);
+
 
   const onPointerUp = useCallback(() => {
     dragStateRef.current = null;
@@ -1244,52 +1368,68 @@ constrainedY = Math.max(adjusted.minY, Math.min(adjusted.maxY, ny));
    DESIGN OVERLAY (IMAGES)
    FIX: constrain using design SIZE (not just center)
    ========================= */
-function DesignOverlay({ layer, canvasSize, setDesignLayers, isActive, setActiveDesignId, disabled, boundaries }) {
+function DesignOverlay({ layer, canvasSize, setDesignLayers, isActive, setActiveDesignId, disabled, boundaries, zonesForView }) {
+
   const overlayRef = useRef(null);
   const dragStateRef = useRef(null);
 
   const onPointerMove = useCallback(
-    (e) => {
-      const st = dragStateRef.current;
-      if (!st) return;
+  (e) => {
+    const st = dragStateRef.current;
+    if (!st) return;
 
-      const { id, startX, startY, rectWidth, rectHeight, initialLayer } = st;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
+    const { id, startX, startY, rectWidth, rectHeight, initialLayer } = st;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
 
-      const nx = initialLayer.x + dx / rectWidth;
-      const ny = initialLayer.y + dy / rectHeight;
+    // raw target center (NOT constrained yet)
+    const nxRaw = initialLayer.x + dx / rectWidth;
+    const nyRaw = initialLayer.y + dy / rectHeight;
 
-      const zoneKey = getBoundaryKeyForLayer(initialLayer);
-      const b =
-        boundaries?.[zoneKey] ||
-        FALLBACK_BOUNDARIES[zoneKey] ||
-        FALLBACK_BOUNDARIES["front-full"];
+    // current zone (fallback)
+    const currentZoneKey = getBoundaryKeyForLayer(initialLayer);
 
-      // design size in normalized units (center anchored)
-      const scale = initialLayer.scale || 0.35;
-      const aspect = (initialLayer.originalHeightPx / initialLayer.originalWidthPx) || 1;
+    // ✅ Detect which zone the center is inside
+    const detectedZone =
+      pickZoneForPoint(nxRaw, nyRaw, zonesForView, boundaries) || currentZoneKey;
 
-      // width in px = canvasWidth * scale
-      const wPx = canvasSize.width * scale;
-      const hPx = wPx * aspect;
+    const zoneKey = detectedZone;
 
-      const halfW = (wPx / canvasSize.width) / 2;   // normalized
-      const halfH = (hPx / canvasSize.height) / 2;  // normalized
+    const b =
+      boundaries?.[zoneKey] ||
+      FALLBACK_BOUNDARIES?.[zoneKey] ||
+      FALLBACK_BOUNDARIES["front-full"];
 
-      // clamp center so full rect stays in boundary
-      let constrainedX = Math.max(b.minX + halfW, Math.min(b.maxX - halfW, nx));
-      let constrainedY = Math.max(b.minY + halfH, Math.min(b.maxY - halfH, ny));
+    // design size in normalized units (center anchored)
+    const scale = initialLayer.scale || 0.35;
+    const aspect =
+      (initialLayer.originalHeightPx / initialLayer.originalWidthPx) || 1;
 
-      // snap (optional)
-      const snapped = snapToBoundaryCenter(constrainedX, constrainedY, b, halfW, halfH);
-      constrainedX = snapped.x;
-      constrainedY = snapped.y;
+    const wPx = canvasSize.width * scale;
+    const hPx = wPx * aspect;
 
-      setDesignLayers((prev) => prev.map((d) => (d.id === id ? { ...d, x: constrainedX, y: constrainedY } : d)));
-    },
-    [setDesignLayers, boundaries, canvasSize]
-  );
+    const halfW = (wPx / canvasSize.width) / 2;
+    const halfH = (hPx / canvasSize.height) / 2;
+
+    // clamp center so full rect stays in boundary
+    let constrainedX = Math.max(b.minX + halfW, Math.min(b.maxX - halfW, nxRaw));
+    let constrainedY = Math.max(b.minY + halfH, Math.min(b.maxY - halfH, nyRaw));
+
+    // optional snap
+    const snapped = snapToBoundaryCenter(constrainedX, constrainedY, b, halfW, halfH);
+    constrainedX = snapped.x;
+    constrainedY = snapped.y;
+
+    // ✅ Save x,y AND zone
+    setDesignLayers((prev) =>
+      prev.map((d) =>
+        d.id === id ? { ...d, x: constrainedX, y: constrainedY, zone: zoneKey } : d
+      )
+    );
+  },
+  [setDesignLayers, boundaries, canvasSize, zonesForView]
+);
+
 
   const onPointerUp = useCallback(() => {
     dragStateRef.current = null;
@@ -1348,7 +1488,7 @@ function DesignOverlay({ layer, canvasSize, setDesignLayers, isActive, setActive
         >
           {layer.imageUrl && (
             <img
-              src={layer.imageUrl}
+              src={normalizeImageUrl(layer.imageUrl)}
               alt="design"
               style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }}
             />
