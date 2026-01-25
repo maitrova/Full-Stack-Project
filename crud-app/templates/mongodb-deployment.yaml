@@ -1,0 +1,53 @@
+{{- if .Values.mongodb.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.mongodb.name }}
+  labels:
+    {{- include "mongodb.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.mongodb.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "mongodb.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mongodb.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ .Values.mongodb.name }}
+          image: "{{ .Values.mongodb.image.repository }}:{{ .Values.mongodb.image.tag }}"
+          imagePullPolicy: {{ .Values.mongodb.image.pullPolicy }}
+          ports:
+            - name: mongodb
+              containerPort: {{ .Values.mongodb.service.targetPort }}
+              protocol: TCP
+          
+          env:
+            {{- range $key, $value := .Values.mongodb.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          
+          {{- if .Values.mongodb.livenessProbe.enabled }}
+          livenessProbe:
+            exec:
+              command:
+                {{- toYaml .Values.mongodb.livenessProbe.exec.command | nindent 16 }}
+            initialDelaySeconds: {{ .Values.mongodb.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.mongodb.livenessProbe.periodSeconds }}
+          {{- end }}
+          
+          {{- if .Values.mongodb.readinessProbe.enabled }}
+          readinessProbe:
+            exec:
+              command:
+                {{- toYaml .Values.mongodb.readinessProbe.exec.command | nindent 16 }}
+            initialDelaySeconds: {{ .Values.mongodb.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.mongodb.readinessProbe.periodSeconds }}
+          {{- end }}
+          
+          resources:
+            {{- toYaml .Values.mongodb.resources | nindent 12 }}
+{{- end }}
