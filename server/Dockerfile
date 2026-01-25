@@ -1,24 +1,27 @@
 # Use Node.js with Python support
-FROM node:20-bullseye
+FROM node:18-alpine
 
 WORKDIR /app
 
 # Install Python and dependencies
-RUN apt-get update && apt-get install -y \
+RUN apk add --no-cache \
     python3 \
-    python3-pip \
+    py3-pip \
     python3-dev \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
+    build-base \
+    libffi-dev \
+    jpeg-dev \
+    zlib-dev \
+    libpng-dev \
+    glib-dev
 
 # Copy package files
 COPY package*.json ./
 
 # Install Node.js dependencies
-RUN npm ci 
+RUN npm install
 
-
+# Install Python packages
 RUN pip3 install --no-cache-dir \
     rembg \
     Pillow \
@@ -29,13 +32,13 @@ RUN pip3 install --no-cache-dir \
 COPY . .
 
 # Create output directory
-RUN mkdir -p tshirt_recolor_output
+
 RUN mkdir -p /app/outputs/designs
+RUN mkdir -p /app/outputs/dropimages
+RUN mkdir -p /app/outputs/adminuploadeddesigns
+RUN mkdir -p /app/outputs/readymade-products
 # Expose port
 EXPOSE 5000
 
-# Set environment variable
-ENV PORT=5000
-
 # Start the server
-CMD ["node", "server.js"]
+CMD ["npm", "start"]

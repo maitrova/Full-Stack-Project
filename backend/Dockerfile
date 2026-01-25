@@ -3,10 +3,8 @@ FROM node:18-alpine as build
 WORKDIR /app
 
 # Accept build argument
-ARG VITE_API_URL
-ENV VITE_API_URL=$VITE_API_URL
-ARG VITE_IMAGE_URL
-ENV VITE_IMAGE_URL=$VITE_IMAGE_URL
+ARG REACT_APP_API_URL
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
 
 # Copy package files
 COPY package*.json ./
