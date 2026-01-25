@@ -7,7 +7,7 @@ import {
   selectUserProfile,
   selectProfileStatus,
   selectProfileError,
-} from "../redux/slices/userSlice.js";
+} from "../redux/slices/Userslice.js";
 import {
   User,
   Mail,

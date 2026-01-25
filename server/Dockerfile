@@ -1,19 +1,20 @@
 # Use Node.js with Python support
-FROM node:18-alpine
+FROM node:18-slim
 
 WORKDIR /app
 
 # Install Python and dependencies
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y \
     python3 \
-    py3-pip \
+    python3-pip \
     python3-dev \
-    build-base \
+    build-essential \
     libffi-dev \
-    jpeg-dev \
-    zlib-dev \
+    libjpeg-dev \
+    zlib1g-dev \
     libpng-dev \
-    glib-dev
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./
@@ -22,7 +23,7 @@ COPY package*.json ./
 RUN npm install
 
 # Install Python packages
-RUN pip3 install --no-cache-dir \
+RUN pip3 install --no-cache-dir --break-system-packages \
     rembg \
     Pillow \
     requests \

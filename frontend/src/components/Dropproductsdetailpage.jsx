@@ -14,7 +14,7 @@ import {
   selectCartError,
   selectCartSuccess,
   clearError as clearCartError,
-} from "../redux/slices/cartSlice.js";
+} from "../redux/slices/Cartslice.js";
 import {
   ChevronLeft,
   ChevronRight,

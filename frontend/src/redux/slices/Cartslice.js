@@ -3,7 +3,7 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 
 // Import the selector from userSlice
-import { selectCurrentToken } from "./userSlice.js";
+import { selectCurrentToken } from "./Userslice.js";
 
 // Create axios instance with common config
 const createApi = () => {
