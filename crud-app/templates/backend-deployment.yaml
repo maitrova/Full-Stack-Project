@@ -47,6 +47,8 @@ spec:
               port: {{ .Values.backend.livenessProbe.httpGet.port }}
             initialDelaySeconds: {{ .Values.backend.livenessProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.backend.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.backend.livenessProbe.timeoutSeconds | default 5 }}
+            failureThreshold: {{ .Values.backend.livenessProbe.failureThreshold | default 3 }}
           {{- end }}
           
           {{- if .Values.backend.readinessProbe.enabled }}
@@ -56,6 +58,8 @@ spec:
               port: {{ .Values.backend.readinessProbe.httpGet.port }}
             initialDelaySeconds: {{ .Values.backend.readinessProbe.initialDelaySeconds }}
             periodSeconds: {{ .Values.backend.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.backend.readinessProbe.timeoutSeconds | default 5 }}
+            failureThreshold: {{ .Values.backend.readinessProbe.failureThreshold | default 3 }}
           {{- end }}
           
           resources:

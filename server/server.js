@@ -40,6 +40,11 @@ app.use(cors({ origin: [
 // Static files
 app.use("/outputs", express.static(path.join(__dirname, "outputs")));
 
+// Health check endpoint for Kubernetes
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Routes
 app.use('/api', removebgrouter);
 app.use('/api/savedata', designrouter);
