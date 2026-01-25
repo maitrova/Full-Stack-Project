@@ -50,7 +50,7 @@ jobs:
           push: true
           build-args: |
             VITE_API_URL=https://narifighter.online/api
-            VITE_IMAGE_URL=https://narifighter.online/api
+            VITE_IMAGE_URL=https://narifighter.online
           tags: |
             ${{ env.FRONTEND_IMAGE }}:latest
             ${{ env.FRONTEND_IMAGE }}:${{ steps.version.outputs.tag }}
