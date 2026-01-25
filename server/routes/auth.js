@@ -1,6 +1,6 @@
 import express from 'express';
 import { getUserProfile, loginUser, registerUser, updateUserProfile } from '../controllers/auth.js';
-import { protect } from '../middleware/authmiddleware.js';
+import { protect } from '../middleware/authMiddleware.js';
 const authrouter = express.Router();
 
 authrouter.post('/register', registerUser);
