@@ -22,6 +22,12 @@ const cartItemSchema = new mongoose.Schema(
       ref: "Design",
       default: null,
     },
+    // CartItemSchema additions
+dropproduct: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Dropproduct",
+  default: null,
+},
 
     // Optional but useful (Design.product)
     product: {

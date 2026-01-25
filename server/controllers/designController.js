@@ -7,9 +7,46 @@ const PRINT_ZONE_DEFAULTS = {
   right: "sleeve-right",
   left: "sleeve-left",
 };
+const normalizeZone = (z, fallbackZone) => {
+  if (!z) return fallbackZone || "front-full";
+
+  const zone = String(z).trim().toLowerCase();
+
+  // ✅ map all pocket variants to ONE zone name
+  if (
+    zone === "pocket" ||
+    zone === "front-pocket" ||
+    zone === "front_pocket" ||
+    zone === "pocket-front" ||
+    zone.includes("pocket")
+  ) {
+    return "front-pocket"; // <-- pick ONE canonical name
+  }
+
+  // allow known zones
+  const allowed = new Set([
+    "front-full",
+    "back-full",
+    "sleeve-left",
+    "sleeve-right",
+    "front-pocket", // ✅ include it
+  ]);
+
+  return allowed.has(zone) ? zone : (fallbackZone || "front-full");
+};
 
 const PRINT_DPI = 300; // 300 DPI for print quality
-const MINIMUM_DESIGN_CHARGE = 30; // Minimum ₹30 for any design up to 4x4 inches
+const MINIMUM_DESIGN_CHARGE = 0; // Minimum ₹30 for any design up to 4x4 inches
+const getSizeBasePrice = (product, selectedSize) => {
+  const list = product?.sizePricing || [];
+  if (!selectedSize) return Number(product?.basePrice ?? 600);
+
+  const found = list.find(
+    (x) => String(x.size).toUpperCase() === String(selectedSize).toUpperCase()
+  );
+
+  return Number(found?.price ?? product?.basePrice ?? 600);
+};
 
 // Helper function to calculate inches from pixels
 const pixelsToInches = (pixels) => pixels / PRINT_DPI;
@@ -26,201 +63,127 @@ const calculateTextAreaInches = (fontSize, text = "") => {
 };
 
 // Calculate price based on product's pricing mode
-const calculateDesignPrice = (designLayers, textLayers, zones, product) => {
-  const basePrice = product.basePrice || 600;
+const calculateDesignPrice = (
+  designLayers,
+  textLayers,
+  zones,
+  product,
+  basePriceOverride = null
+) => {
+  const basePrice = Number(basePriceOverride ?? product.basePrice ?? 600);
   let totalPrice = basePrice;
-  
+
   const breakdown = {
-    basePrice: basePrice,
-    pricingMode: product.pricingMode || 'normal',
+    basePrice,
+    pricingMode: "fixed-image",
     designLayers: [],
     textLayers: [],
     sleeves: { count: 0, total: 0 },
-    additionalArea: 0,
     minimumDesignCharges: 0,
-    unlimitedPricing: null,
-    normalPricing: null,
-    totalPrice: basePrice
+    totalPrice: basePrice,
   };
 
-  // UNLIMITED PRICING MODE (Flat rate)
-  if (product.pricingMode === 'unlimited' && product.unlimitedPricing?.enabled) {
-    const flatCharge = product.unlimitedPricing.flatCharge || 200;
-    totalPrice += flatCharge;
-    
-    breakdown.unlimitedPricing = {
-      enabled: true,
-      flatCharge: flatCharge,
-      label: product.unlimitedPricing.label || "Unlimited Design",
-      description: product.unlimitedPricing.description,
-      chargeApplied: flatCharge
-    };
-    
-    // Track design layers (for display only, not for charging)
-    designLayers.forEach((layer) => {
-      const zone = layer.zone || 'front-full';
-      let areaInches = layer.areaInches;
-      
-      if (!areaInches && layer.widthInches && layer.heightInches) {
-        areaInches = layer.widthInches * layer.heightInches;
-      } else if (!areaInches && layer.renderedWidthPx && layer.renderedHeightPx) {
-        const widthInches = pixelsToInches(layer.renderedWidthPx);
-        const heightInches = pixelsToInches(layer.renderedHeightPx);
-        areaInches = widthInches * heightInches;
-      }
-      
+  // ✅ FIXED IMAGE PRICING CONSTANTS
+  const SMALL_MAX_IN = 4;
+  const SMALL_PRICE = 40;
+  const LARGE_PRICE = 100;
+  const SLEEVE_PRICE = product.normalPricing?.sleevePrice || 30;
+
+  const getFixedImagePrice = (wIn, hIn) => {
+    const w = Number(wIn || 0);
+    const h = Number(hIn || 0);
+    if (!w || !h) return 0;
+    return w <= SMALL_MAX_IN && h <= SMALL_MAX_IN
+      ? SMALL_PRICE
+      : LARGE_PRICE;
+  };
+
+  /* =========================
+     IMAGE / DESIGN LAYERS
+     ========================= */
+  designLayers.forEach((layer) => {
+    const zone = layer.zone || "front-full";
+
+    // Sleeves (fixed)
+    if (zone === "sleeve-left" || zone === "sleeve-right") {
+      totalPrice += SLEEVE_PRICE;
+      breakdown.sleeves.count += 1;
+      breakdown.sleeves.total += SLEEVE_PRICE;
+
       breakdown.designLayers.push({
         id: layer.id,
-        type: zone.includes('sleeve') ? 'sleeve' : 'image',
+        type: "sleeve",
         zone,
-        areaInches: (areaInches || 0).toFixed(2),
-        price: 0, // No charge in unlimited mode
-        unlimited: true
+        price: SLEEVE_PRICE,
+        note: "Sleeve fixed price",
       });
+      return;
+    }
+
+    // ✅ IMAGE FIXED PRICE
+    const widthIn =
+      layer.renderedWidthInches ??
+      layer.widthInches ??
+      layer.currentPrintWidthInches ??
+      0;
+
+    const heightIn =
+      layer.renderedHeightInches ??
+      layer.heightInches ??
+      layer.currentPrintHeightInches ??
+      0;
+
+    const layerPrice =
+      Number(layer.layerPrice) ||
+      getFixedImagePrice(widthIn, heightIn);
+
+    totalPrice += layerPrice;
+
+    breakdown.designLayers.push({
+      id: layer.id,
+      type: "image",
+      zone,
+      widthInches: Number(widthIn).toFixed(2),
+      heightInches: Number(heightIn).toFixed(2),
+      price: layerPrice,
+      minimumChargeApplied: layerPrice === SMALL_PRICE,
+      pricingRule:
+        layerPrice === SMALL_PRICE
+          ? "≤ 4×4 fixed price"
+          : "> 4×4 fixed price",
     });
-    
-    // Track text layers (for display only)
-    textLayers.forEach((textLayer) => {
-      let areaInches = textLayer.areaInches;
-      
-      if (!areaInches) {
-        areaInches = calculateTextAreaInches(textLayer.fontSize, textLayer.text);
-      }
-      
-      breakdown.textLayers.push({
-        id: textLayer.id,
-        text: textLayer.text,
-        fontSize: textLayer.fontSize,
-        areaInches: areaInches.toFixed(3),
-        price: 0, // No charge in unlimited mode
-        unlimited: true
-      });
+  });
+
+  /* =========================
+     TEXT LAYERS (UNCHANGED)
+     ========================= */
+  textLayers.forEach((textLayer) => {
+    const areaInches =
+      textLayer.areaInches ??
+      calculateTextAreaInches(textLayer.fontSize, textLayer.text);
+
+    if (!areaInches) return;
+
+    const textPrice = MINIMUM_DESIGN_CHARGE;
+    totalPrice += textPrice;
+
+    breakdown.textLayers.push({
+      id: textLayer.id,
+      text: textLayer.text,
+      fontSize: textLayer.fontSize,
+      areaInches: Number(areaInches).toFixed(2),
+      price: textPrice,
+      pricingRule: "Text minimum charge",
     });
 
-  } 
-  // NORMAL PRICING MODE (Size-based pricing with minimum charge)
-  else {
-    const fixedSizeInches = product.normalPricing?.fixedSizeInches || 4;
-    const pricePerSqInch = product.normalPricing?.pricePerSqInch || 6;
-    const sleevePrice = product.normalPricing?.sleevePrice || 30;
-    
-    breakdown.normalPricing = {
-      fixedSizeInches: fixedSizeInches,
-      pricePerSqInch: pricePerSqInch,
-      sleevePrice: sleevePrice,
-      minimumDesignCharge: MINIMUM_DESIGN_CHARGE
-    };
-
-    // Calculate price for design layers (images)
-    designLayers.forEach((layer) => {
-      const zone = layer.zone || 'front-full';
-      
-      if (zone === "sleeve-left" || zone === "sleeve-right") {
-        // Fixed price for sleeves
-        breakdown.sleeves.count += 1;
-        breakdown.sleeves.total += sleevePrice;
-        totalPrice += sleevePrice;
-        
-        breakdown.designLayers.push({
-          id: layer.id,
-          type: 'sleeve',
-          zone,
-          price: sleevePrice,
-        });
-      } else {
-        // Calculate area for normal pricing
-        let areaInches = layer.areaInches;
-        
-        if (!areaInches && layer.widthInches && layer.heightInches) {
-          areaInches = layer.widthInches * layer.heightInches;
-        } else if (!areaInches && layer.renderedWidthPx && layer.renderedHeightPx) {
-          const widthInches = pixelsToInches(layer.renderedWidthPx);
-          const heightInches = pixelsToInches(layer.renderedHeightPx);
-          areaInches = widthInches * heightInches;
-        } else if (!areaInches) {
-          areaInches = fixedSizeInches * fixedSizeInches;
-        }
-        
-        // Calculate additional area beyond fixed size
-        const fixedArea = fixedSizeInches * fixedSizeInches;
-        const additionalArea = Math.max(0, areaInches - fixedArea);
-        
-        // Calculate price with minimum charge
-        let layerPrice = 0;
-        
-        if (areaInches <= fixedArea) {
-          // For designs up to fixed size, charge minimum amount
-          layerPrice = MINIMUM_DESIGN_CHARGE;
-          breakdown.minimumDesignCharges = (breakdown.minimumDesignCharges || 0) + MINIMUM_DESIGN_CHARGE;
-        } else {
-          // For larger designs
-          layerPrice = additionalArea * pricePerSqInch;
-          if (layerPrice < MINIMUM_DESIGN_CHARGE) {
-            // Ensure minimum charge
-            layerPrice = MINIMUM_DESIGN_CHARGE;
-            breakdown.minimumDesignCharges = (breakdown.minimumDesignCharges || 0) + MINIMUM_DESIGN_CHARGE;
-          }
-        }
-        
-        if (additionalArea > 0) {
-          breakdown.additionalArea += additionalArea;
-        }
-        
-        totalPrice += layerPrice;
-        
-        breakdown.designLayers.push({
-          id: layer.id,
-          type: 'image',
-          zone,
-          areaInches: areaInches.toFixed(2),
-          additionalArea: additionalArea.toFixed(2),
-          price: layerPrice,
-          widthInches: layer.widthInches,
-          heightInches: layer.heightInches,
-          minimumChargeApplied: areaInches <= fixedArea
-        });
-      }
-    });
-
-    // Calculate price for text layers with minimum charge
-    textLayers.forEach((textLayer) => {
-      let areaInches = textLayer.areaInches;
-      
-      if (!areaInches) {
-        areaInches = calculateTextAreaInches(textLayer.fontSize, textLayer.text);
-      }
-      
-      const fixedArea = fixedSizeInches * fixedSizeInches;
-      const additionalArea = Math.max(0, areaInches - fixedArea);
-      let textPrice = additionalArea * pricePerSqInch;
-      
-      // Apply minimum charge for text
-      if (areaInches > 0 && textPrice < MINIMUM_DESIGN_CHARGE && areaInches <= fixedArea) {
-        textPrice = MINIMUM_DESIGN_CHARGE;
-        breakdown.minimumDesignCharges = (breakdown.minimumDesignCharges || 0) + MINIMUM_DESIGN_CHARGE;
-      }
-      
-      if (additionalArea > 0) {
-        breakdown.additionalArea += additionalArea;
-      }
-      
-      if (textPrice > 0) {
-        totalPrice += textPrice;
-        breakdown.textLayers.push({
-          id: textLayer.id,
-          text: textLayer.text,
-          fontSize: textLayer.fontSize,
-          areaInches: areaInches.toFixed(3),
-          additionalArea: additionalArea.toFixed(3),
-          price: textPrice,
-        });
-      }
-    });
-  }
+    breakdown.minimumDesignCharges += MINIMUM_DESIGN_CHARGE;
+  });
 
   breakdown.totalPrice = totalPrice;
   return { totalPrice, breakdown };
 };
+
+
 
 const getLayerMeasurements = (layer) => {
   const rawPrintWidthInches = typeof layer.printWidthInches === "number"
@@ -278,7 +241,15 @@ export const saveDesign = async (req, res) => {
       return res.status(401).json({ error: "Not authorized" });
     }
 
-    const { productId, productSlug, productColor, productColorName, views = [], previewImage } = req.body;
+    const {
+      productId,
+      productSlug,
+      productColor,
+      productColorName,
+      views = [],
+      previewImage,
+      selectedSize,
+    } = req.body;
 
     if (!productId || !productSlug) {
       return res.status(400).json({ error: "productId and productSlug are required" });
@@ -288,6 +259,32 @@ export const saveDesign = async (req, res) => {
     if (!product) {
       return res.status(404).json({ error: "Product not found" });
     }
+
+    // ✅ helper: base price from sizePricing
+    const getSizeBasePrice = (prod, size) => {
+      const list = prod?.sizePricing || [];
+      if (!size) return prod?.basePrice || 600;
+
+      const found = list.find(
+        (x) => String(x.size).toUpperCase() === String(size).toUpperCase()
+      );
+
+      return found?.price ?? prod?.basePrice ?? 600;
+    };
+
+    const basePriceBySize = getSizeBasePrice(product, selectedSize);
+
+    // ✅ FIXED IMAGE PRICING (only for IMAGE layers)
+    const SMALL_MAX_IN = 4;   // 4x4 threshold
+    const SMALL_PRICE = 40;
+    const LARGE_PRICE = 100;
+
+    const getFixedImagePrice = (wIn, hIn) => {
+      const w = Number(wIn || 0);
+      const h = Number(hIn || 0);
+      if (!w || !h) return 0;
+      return (w <= SMALL_MAX_IN && h <= SMALL_MAX_IN) ? SMALL_PRICE : LARGE_PRICE;
+    };
 
     let totalDesignLayers = [];
     let totalTextLayers = [];
@@ -304,28 +301,81 @@ export const saveDesign = async (req, res) => {
           imageUrl = imageUrl.replace(apiUrl, "");
         }
 
-        const {
-          widthInches,
-          heightInches,
-          areaInches,
-          rawPrintWidthInches,
-          rawPrintHeightInches,
-          rawPrintAreaInches,
-        } = getLayerMeasurements(layer);
+        /**
+         * ✅ IMPORTANT FIX:
+         * Prefer inches coming from RecolorEditor:
+         * - renderedWidthInches / renderedHeightInches
+         * - OR currentPrintWidthInches / currentPrintHeightInches
+         * - OR printWidthInches / printHeightInches
+         *
+         * Only if none exist, fallback to old getLayerMeasurements(layer).
+         */
+        let widthInches =
+          layer.renderedWidthInches ??
+          layer.currentPrintWidthInches ??
+          layer.printWidthInches ??
+          layer.widthInches;
+
+        let heightInches =
+          layer.renderedHeightInches ??
+          layer.currentPrintHeightInches ??
+          layer.printHeightInches ??
+          layer.heightInches;
+
+        let areaInches =
+          layer.renderedAreaInches ??
+          layer.currentPrintAreaInches ??
+          layer.printAreaInches ??
+          layer.areaInches;
+
+        let rawPrintWidthInches = layer.rawPrintWidthInches ?? null;
+        let rawPrintHeightInches = layer.rawPrintHeightInches ?? null;
+        let rawPrintAreaInches = layer.rawPrintAreaInches ?? null;
+
+        // fallback to old measurement function ONLY if still missing
+        if (
+          !Number(widthInches) ||
+          !Number(heightInches)
+        ) {
+          const old = getLayerMeasurements(layer);
+          widthInches = widthInches ?? old.widthInches;
+          heightInches = heightInches ?? old.heightInches;
+          areaInches = areaInches ?? old.areaInches;
+          rawPrintWidthInches = rawPrintWidthInches ?? old.rawPrintWidthInches;
+          rawPrintHeightInches = rawPrintHeightInches ?? old.rawPrintHeightInches;
+          rawPrintAreaInches = rawPrintAreaInches ?? old.rawPrintAreaInches;
+        }
+
+        // ✅ normalize numbers
+        widthInches = Number(widthInches || 0);
+        heightInches = Number(heightInches || 0);
+        areaInches = Number(areaInches || (widthInches * heightInches) || 0);
+
+        // ✅ fixed price based on canvas inches
+        const layerPrice = getFixedImagePrice(widthInches, heightInches);
+        const minimumChargeApplied = layerPrice === SMALL_PRICE;
 
         const processedLayer = {
           ...layer,
           imageUrl,
-          zone: layer.zone || defaultZone,
-          insideSafeArea: typeof layer.insideSafeArea === "boolean"
-            ? layer.insideSafeArea
-            : true,
+          zone: normalizeZone(layer.zone, defaultZone),
+
+          insideSafeArea:
+            typeof layer.insideSafeArea === "boolean" ? layer.insideSafeArea : true,
+
+          // ✅ persist the EXACT inches from RecolorEditor
           widthInches,
           heightInches,
           areaInches,
+
+          // keep these if you still want them
           rawPrintWidthInches,
           rawPrintHeightInches,
           rawPrintAreaInches,
+
+          // ✅ persist fixed layer pricing
+          layerPrice,
+          minimumChargeApplied,
         };
 
         totalDesignLayers.push(processedLayer);
@@ -336,7 +386,7 @@ export const saveDesign = async (req, res) => {
 
       const textLayers = (view.textLayers || []).map((textLayer) => {
         const areaInches = calculateTextAreaInches(textLayer.fontSize, textLayer.text);
-        
+
         const processedTextLayer = {
           ...textLayer,
           widthInches: null,
@@ -356,12 +406,17 @@ export const saveDesign = async (req, res) => {
       };
     });
 
-    // Calculate price based on product's pricing mode
+    // ✅ IMPORTANT:
+    // If calculateDesignPrice() still does old area pricing,
+    // then it will override again.
+    // So we pass layers already having layerPrice,
+    // and calculateDesignPrice must sum layer.layerPrice instead of area logic.
     const { totalPrice, breakdown } = calculateDesignPrice(
       totalDesignLayers,
       totalTextLayers,
       totalZones,
-      product
+      product,
+      basePriceBySize
     );
 
     let mainPreview = previewImage || null;
@@ -379,8 +434,11 @@ export const saveDesign = async (req, res) => {
       productColorName: productColorName || productColor || "White",
       previewImage: mainPreview,
       views: normalizedViews,
-      basePrice: product.basePrice || 600,
-      pricingMode: product.pricingMode || 'normal',
+
+      selectedSize: selectedSize || null,
+      basePrice: basePriceBySize,
+
+      pricingMode: product.pricingMode || "normal",
       calculatedPrice: totalPrice,
       priceBreakdown: breakdown,
       salePrice: totalPrice,
@@ -393,10 +451,11 @@ export const saveDesign = async (req, res) => {
   }
 };
 
+
 // Get price for current design (without saving)
 export const getDesignPrice = async (req, res) => {
   try {
-    const { designLayers = [], textLayers = [], zones = [], productId } = req.body;
+    const { designLayers = [], textLayers = [], zones = [], productId, selectedSize } = req.body;
 
     if (!productId) {
       return res.status(400).json({ error: "productId is required" });
@@ -407,19 +466,23 @@ export const getDesignPrice = async (req, res) => {
       return res.status(404).json({ error: "Product not found" });
     }
 
+    const basePriceBySize = getSizeBasePrice(product, selectedSize);
+
     const { totalPrice, breakdown } = calculateDesignPrice(
-      designLayers, 
-      textLayers, 
-      zones, 
-      product
+      designLayers,
+      textLayers,
+      zones,
+      product,
+      basePriceBySize // ✅ override base price by size
     );
 
     return res.json({
       price: totalPrice,
       breakdown,
       currency: "INR",
-      basePrice: product.basePrice || 600,
-      pricingMode: product.pricingMode || 'normal',
+      basePrice: basePriceBySize, // ✅ now valid
+      selectedSize: selectedSize || null,
+      pricingMode: product.pricingMode || "normal",
       productName: product.name,
     });
   } catch (err) {
@@ -428,11 +491,23 @@ export const getDesignPrice = async (req, res) => {
   }
 };
 
+
 // Update design with price calculation
 export const updateDesign = async (req, res) => {
   try {
+    
+
     const { id } = req.params;
-    const { productId, productSlug, productColor, productColorName, views, previewImage } = req.body;
+
+    const {
+      productId,
+      productSlug,
+      productColor,
+      productColorName,
+      views = [],
+      previewImage,
+      selectedSize,
+    } = req.body;
 
     if (!productId || !productSlug) {
       return res.status(400).json({ error: "productId and productSlug are required" });
@@ -448,11 +523,29 @@ export const updateDesign = async (req, res) => {
       return res.status(404).json({ error: "Product not found" });
     }
 
+    // ✅ Always decide final size (if UI didn't send it, keep the old one)
+    const finalSelectedSize = selectedSize || design.selectedSize || null;
+
+    // ✅ helper: base price from sizePricing
+    const getSizeBasePrice = (prod, size) => {
+      const list = prod?.sizePricing || [];
+      if (!size) return prod?.basePrice || 600;
+
+      const found = list.find(
+        (x) => String(x.size).toUpperCase() === String(size).toUpperCase()
+      );
+
+      return found?.price ?? prod?.basePrice ?? 600;
+    };
+
+    const basePriceBySize = getSizeBasePrice(product, finalSelectedSize);
+
     let totalDesignLayers = [];
     let totalTextLayers = [];
     let totalZones = [];
 
-    const updatedViews = views.map((view) => {
+    // ✅ Normalize views exactly like saveDesign (includes inches + safe defaults)
+    const updatedViews = (views || []).map((view) => {
       const viewCode = view.code || "front";
       const defaultZone = PRINT_ZONE_DEFAULTS[viewCode] || PRINT_ZONE_DEFAULTS.front;
 
@@ -475,10 +568,10 @@ export const updateDesign = async (req, res) => {
         const processedLayer = {
           ...layer,
           imageUrl,
-          zone: layer.zone || defaultZone,
-          insideSafeArea: typeof layer.insideSafeArea === "boolean" 
-            ? layer.insideSafeArea 
-            : true,
+          zone: normalizeZone(layer.zone, defaultZone),
+
+          insideSafeArea:
+            typeof layer.insideSafeArea === "boolean" ? layer.insideSafeArea : true,
           widthInches,
           heightInches,
           areaInches,
@@ -493,9 +586,9 @@ export const updateDesign = async (req, res) => {
         return processedLayer;
       });
 
-      const textLayers = (view.textLayers || []).map((textLayer) => {
+      const updatedTextLayers = (view.textLayers || []).map((textLayer) => {
         const areaInches = calculateTextAreaInches(textLayer.fontSize, textLayer.text);
-        
+
         const processedTextLayer = {
           ...textLayer,
           widthInches: null,
@@ -510,26 +603,29 @@ export const updateDesign = async (req, res) => {
       return {
         ...view,
         designLayers: updatedDesignLayers,
-        textLayers,
+        textLayers: updatedTextLayers,
         previewImage: view.previewImage || null,
       };
     });
 
-    // Calculate price based on product's pricing mode
+    // ✅ IMPORTANT: calculate using size base price override
     const { totalPrice, breakdown } = calculateDesignPrice(
       totalDesignLayers,
       totalTextLayers,
       totalZones,
-      product
+      product,
+      basePriceBySize
     );
 
-    let mainPreview = previewImage || design.previewImage;
+    // ✅ preview fallback
+    let mainPreview = previewImage || design.previewImage || null;
     if (!mainPreview && updatedViews.length > 0) {
       const frontView = updatedViews.find((v) => v.code === "front");
       mainPreview = frontView?.previewImage || updatedViews[0]?.previewImage || null;
     }
 
-    // Update the design
+    // ✅ update design doc
+    design.user = design.user || req.user._id;
     design.product = product._id;
     design.productSlug = productSlug;
     design.productName = product.name;
@@ -537,20 +633,25 @@ export const updateDesign = async (req, res) => {
     design.productColorName = productColorName || productColor || "White";
     design.previewImage = mainPreview;
     design.views = updatedViews;
-    design.basePrice = product.basePrice || 600;
-    design.pricingMode = product.pricingMode || 'normal';
+
+    design.selectedSize = finalSelectedSize;
+    design.basePrice = basePriceBySize;
+
+    design.pricingMode = product.pricingMode || "normal";
     design.calculatedPrice = totalPrice;
     design.priceBreakdown = breakdown;
     design.salePrice = totalPrice;
 
     const updatedDesign = await design.save();
-
     return res.status(200).json(updatedDesign);
   } catch (err) {
     console.error("Update design error:", err);
     return res.status(500).json({ error: "Failed to update design" });
   }
 };
+
+
+
 
 // Admin push designs
 export const publishDesign = async (req, res) => {

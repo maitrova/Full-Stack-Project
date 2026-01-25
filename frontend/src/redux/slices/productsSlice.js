@@ -53,6 +53,7 @@ export const fetchProductBySlug = createAsyncThunk(
   async (slug, thunkAPI) => {
     try {
       const res = await productsAPI.get(`/products/${slug}`);
+      console.log("Fetched product by slug:", res.data);  
       return res.data;
     } catch (err) {
       return thunkAPI.rejectWithValue({
@@ -144,6 +145,7 @@ const productsSlice = createSlice({
       .addCase(fetchProductBySlug.fulfilled, (state, action) => {
         state.currentStatus = "succeeded";
         state.current = action.payload;
+        console.log("Current product set to:", state.current);
       })
       .addCase(fetchProductBySlug.rejected, (state, action) => {
         state.currentStatus = "failed";
@@ -153,4 +155,8 @@ const productsSlice = createSlice({
 });
 
 export const { clearCurrentProduct, clearProductsError, setFilters } = productsSlice.actions;
+export const selectCurrentProduct = (state) => state.products.current;
+
+export const selectCurrentProductStatus = (state) =>
+  state.products.currentStatus;
 export default productsSlice.reducer;

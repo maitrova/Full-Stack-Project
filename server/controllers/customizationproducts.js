@@ -4,31 +4,52 @@ import { Product } from "../models/Product.js";
 // Controller to get all products (for listing page)
 export const getAllProducts = async (req, res) => {
   try {
-    // Get category and subCategory from query parameters
     const { category, subCategory } = req.query;
 
-    // Build the filter object based on query parameters
     let filter = {};
-    if (category && category !== 'all') {
+    if (category && category !== "all") {
       filter.category = category;
     }
-    if (subCategory && subCategory !== 'all') {
+    if (subCategory && subCategory !== "all") {
       filter.subCategory = subCategory;
     }
 
-    // Find products based on the filter object
-    const products = await Product.find(filter, "name slug basePrice category subCategory image").lean();
-    console.log("Products fetched from DB:", products);
+    // Fetch required fields (include sizePricing)
+    const products = await Product.find(
+      filter,
+      "name slug category subCategory basePrice sizePricing image"
+    ).lean();
+
     if (!products.length) {
       return res.status(404).json({ error: "No products found" });
     }
 
-    res.json(products);
+    // 🔥 Compute displayPrice (min size price)
+    const formattedProducts = products.map((product) => {
+      let displayPrice = product.basePrice;
+
+      if (product.sizePricing && product.sizePricing.length > 0) {
+        displayPrice = Math.min(
+          ...product.sizePricing.map((s) => s.price)
+        );
+      }
+
+      return {
+        ...product,
+        displayPrice, // 👈 use this in product cards
+      };
+    });
+
+    res.json(formattedProducts);
   } catch (err) {
     console.error("Error fetching products:", err);
-    res.status(500).json({ error: "Failed to fetch products", details: err.message });
+    res.status(500).json({
+      error: "Failed to fetch products",
+      details: err.message,
+    });
   }
 };
+
 
 // NEW: Get unique categories and subcategories from database
 export const getProductCategories = async (req, res) => {

@@ -56,7 +56,7 @@ const Header = () => {
     { path: "/allproducts", label: "Products", icon: "📦" },
     { path: "/customproducts", label: "Custom Design", icon: "🎨" },
     ...(isAuthenticated ? [
-      { path: "/usersaved_designs", label: "My Designs", icon: "✏️" }
+      // { path: "/usersaved_designs", label: "My Designs", icon: "✏️" }
     ] : [])
   ];
 

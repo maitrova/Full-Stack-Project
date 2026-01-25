@@ -11,8 +11,10 @@ import {
 } from "../redux/slices/admindesignuploads.js";
 import RecolorEditor from "./RecolorEditor.jsx";
 import { selectCurrentToken, selectCurrentUser } from "../redux/slices/Userslice.js";
+import { addToCart } from "../redux/slices/Cartslice.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
+console.log("api_url:", API_URL); 
 const IMAGE_URL = import.meta.env.VITE_IMAGE_URL;
 console.log("image_url:", IMAGE_URL);
 const FONT_OPTIONS = [
@@ -31,7 +33,15 @@ const SLEEVE_PRICE = 30;
 const MINIMUM_DESIGN_CHARGE = 30;
 const DISPLAY_DPI = 300;
 const PRINT_DPI = 300;
-
+const IMAGE_FIXED_INCH = 4;
+const IMAGE_PRICE_SMALL = 40;   // <= 4x4
+const IMAGE_PRICE_LARGE = 100; 
+const getFixedImageLayerPrice = (wIn, hIn) => {
+  const w = Number(wIn || 0);
+  const h = Number(hIn || 0);
+  if (!w || !h) return 0; // unknown yet
+  return (w <= IMAGE_FIXED_INCH && h <= IMAGE_FIXED_INCH) ? IMAGE_PRICE_SMALL : IMAGE_PRICE_LARGE;
+};
 // Tab options
 const TABS = {
   PRODUCT_COLORS: 'productColors',
@@ -82,29 +92,18 @@ const createDefaultTextLayer = () => ({
 const createDesignLayer = (id, imageUrl, file, width, height, isFromLibrary = false) => {
   const displayWidthInches = width / DISPLAY_DPI;
   const displayHeightInches = height / DISPLAY_DPI;
-  const displayAreaInches = displayWidthInches * displayHeightInches;
-  
+
   const printWidthInches = width / PRINT_DPI;
   const printHeightInches = height / PRINT_DPI;
-  console.log("print width and height inches:", printWidthInches, printHeightInches); 
-  const printAreaInches = printWidthInches * printHeightInches;
-  
-  const fixedArea = FIXED_SIZE_INCHES * FIXED_SIZE_INCHES;
-  const additionalPrintArea = Math.max(0, printAreaInches - fixedArea);
-  
-  let layerPrice = 0;
-  const scaledPrintArea = printAreaInches * 0.35 * 0.35;
-  const scaledFixedArea = fixedArea * 0.35 * 0.35;
-  
-  if (scaledPrintArea <= scaledFixedArea) {
-    layerPrice = MINIMUM_DESIGN_CHARGE;
-  } else {
-    layerPrice = additionalPrintArea * PRICE_PER_SQ_INCH * 0.35 * 0.35;
-    if (layerPrice < MINIMUM_DESIGN_CHARGE) {
-      layerPrice = MINIMUM_DESIGN_CHARGE;
-    }
-  }
-  
+
+  const initialScale = 0.35;
+
+  const initialWidthIn = printWidthInches * initialScale;
+  const initialHeightIn = printHeightInches * initialScale;
+
+  // ✅ FIXED PRICE here too
+  const layerPrice = getFixedImageLayerPrice(initialWidthIn, initialHeightIn);
+
   return {
     id,
     imageUrl,
@@ -112,30 +111,31 @@ const createDesignLayer = (id, imageUrl, file, width, height, isFromLibrary = fa
     hasBgRemoved: false,
     x: 0.5,
     y: 0.5,
-    scale: 0.35,
+    scale: initialScale,
     rotation: 0,
+
     originalWidthPx: width,
     originalHeightPx: height,
-    renderedWidthPx: width * 0.35,
-    renderedHeightPx: height * 0.35,
-    originalFile: file,
-    isFromLibrary, // Flag to identify library images
+
+    renderedWidthPx: width * initialScale,
+    renderedHeightPx: height * initialScale,
+
+    isFromLibrary,
     displayWidthInches,
     displayHeightInches,
-    displayAreaInches,
-    currentDisplayWidthInches: displayWidthInches * 0.35,
-    currentDisplayHeightInches: displayHeightInches * 0.35,
+
     printWidthInches,
     printHeightInches,
-    printAreaInches,
-    currentPrintWidthInches: printWidthInches * 0.35,
-    currentPrintHeightInches: printHeightInches * 0.35,
-    currentPrintAreaInches: printAreaInches * 0.35 * 0.35,
-    currentAdditionalArea: Math.max(0, (printAreaInches * 0.35 * 0.35) - (fixedArea * 0.35 * 0.35)),
+
+    // ✅ IMPORTANT: initialize inches so price works immediately
+    renderedWidthInches: initialWidthIn,
+    renderedHeightInches: initialHeightIn,
+
     layerPrice,
-    minimumChargeApplied: scaledPrintArea <= scaledFixedArea
+    minimumChargeApplied: layerPrice === IMAGE_PRICE_SMALL,
   };
 };
+
 
 export default function DesignerPage() {
   const { slug } = useParams();
@@ -150,16 +150,27 @@ export default function DesignerPage() {
 
   const isAdmin = user?.role === "admin" || user?.isAdmin === true || user?.role === "superuser";
   // Design uploads state
+  const DEFAULT_SIZE = "M";
+  const [selectedSize, setSelectedSize] = useState(DEFAULT_SIZE);
   const { 
     folders, 
     images, 
     currentFolder, 
     loading: libraryLoading 
   } = useSelector((state) => state.designUploads);
+const getSizeBasePrice = (prod, size) => {
+  const list = prod?.sizePricing || [];
+  const found = list.find((x) => String(x.size).toUpperCase() === String(size).toUpperCase());
+  return found?.price ?? prod?.basePrice ?? 600;
+  };
+  const BASE_PRICE = getSizeBasePrice(product, selectedSize);
 
-  const BASE_PRICE = product?.basePrice || 600;
-  
+  const [savedDesignId, setSavedDesignId] = useState(null);
+  const [lastSavedPreview, setLastSavedPreview] = useState(null);
+  const [addingToCart, setAddingToCart] = useState(false);
+
   const defaultColorValue = COLOR_OPTIONS[0]?.value || "#FFFFFF";
+  
   const defaultColorLabel = getColorLabel(defaultColorValue);
   const [productColor, setProductColor] = useState(defaultColorValue);
   const [productColorName, setProductColorName] = useState(defaultColorLabel);
@@ -184,7 +195,11 @@ export default function DesignerPage() {
     minimumCharges: 0,
     totalPrice: BASE_PRICE
   });
+  
 
+// ✅ Available sizes (prefer from DB)
+  const availableSizes = (product?.sizePricing?.length ? product.sizePricing : [])
+  .map((x) => x.size);
   // Edit mode state
   const editDesignId = searchParams.get("edit");
   const [isEditMode, setIsEditMode] = useState(false);
@@ -201,7 +216,25 @@ export default function DesignerPage() {
     setProductColor(color);
     setProductColorName(label || getColorLabel(color));
   };
-  
+  const getImageSizeFromFile = (file) =>
+  new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      const size = { width: img.naturalWidth, height: img.naturalHeight };
+      URL.revokeObjectURL(objectUrl);
+      resolve(size);
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Cannot read image size (invalid/corrupt file)"));
+    };
+
+    img.src = objectUrl;
+  });
+
   const getImageNaturalSize = (url) =>
     new Promise((resolve, reject) => {
       const img = new Image();
@@ -211,50 +244,51 @@ export default function DesignerPage() {
     });
 
   const updateDesignLayerDimensions = (layer, scale = null) => {
-    const currentScale = scale !== null ? scale : layer.scale;
-    
-    const currentDisplayWidthInches = layer.displayWidthInches * currentScale;
-    const currentDisplayHeightInches = layer.displayHeightInches * currentScale;
-    
-    const currentPrintWidthInches = layer.printWidthInches * currentScale;
-    const currentPrintHeightInches = layer.printHeightInches * currentScale;
-    const currentPrintAreaInches = layer.printAreaInches * currentScale * currentScale;
-    
-    const fixedArea = FIXED_SIZE_INCHES * FIXED_SIZE_INCHES;
-    const additionalArea = Math.max(0, currentPrintAreaInches - fixedArea);
-    
-    let layerPrice = 0;
-    if (currentPrintAreaInches <= fixedArea) {
-      layerPrice = MINIMUM_DESIGN_CHARGE;
-    } else {
-      layerPrice = additionalArea * PRICE_PER_SQ_INCH;
-      if (layerPrice < MINIMUM_DESIGN_CHARGE) {
-        layerPrice = MINIMUM_DESIGN_CHARGE;
-      }
-    }
-    
-    return {
-      ...layer,
-      scale: currentScale,
-      currentDisplayWidthInches,
-      currentDisplayHeightInches,
-      currentPrintWidthInches,
-      currentPrintHeightInches,
-      currentPrintAreaInches,
-      currentAdditionalArea: additionalArea,
-      layerPrice,
-      renderedWidthPx: layer.originalWidthPx * currentScale,
-      renderedHeightPx: layer.originalHeightPx * currentScale,
-      minimumChargeApplied: currentPrintAreaInches <= fixedArea
-    };
+  const currentScale = scale !== null ? scale : layer.scale;
+
+  const currentDisplayWidthInches = layer.displayWidthInches * currentScale;
+  const currentDisplayHeightInches = layer.displayHeightInches * currentScale;
+
+  const currentPrintWidthInches = layer.printWidthInches * currentScale;
+  const currentPrintHeightInches = layer.printHeightInches * currentScale;
+
+  // ✅ inches that must come from RecolorEditor (preferred)
+  const widthIn = Number(layer.renderedWidthInches ?? currentPrintWidthInches ?? 0);
+  const heightIn = Number(layer.renderedHeightInches ?? currentPrintHeightInches ?? 0);
+
+  const layerPrice = getFixedImageLayerPrice(widthIn, heightIn);
+
+  return {
+    ...layer,
+    scale: currentScale,
+
+    currentDisplayWidthInches,
+    currentDisplayHeightInches,
+
+    currentPrintWidthInches,
+    currentPrintHeightInches,
+
+    renderedWidthPx: layer.originalWidthPx * currentScale,
+    renderedHeightPx: layer.originalHeightPx * currentScale,
+
+    renderedWidthInches: widthIn,
+    renderedHeightInches: heightIn,
+
+    layerPrice,
+    minimumChargeApplied: layerPrice === IMAGE_PRICE_SMALL,
+    currentAdditionalArea: 0, // not used anymore for image pricing
   };
+};
+
+
 
   // -------- PRICE CALCULATION --------
   const calculatePrice = async (updateUI = true) => {
     try {
       if (updateUI) setCalculatingPrice(true);
       
-      const currentBasePrice = product?.basePrice || BASE_PRICE;
+      const currentBasePrice = getSizeBasePrice(product, selectedSize);
+
       
       const allDesignLayers = [];
       const allTextLayers = [];
@@ -328,68 +362,51 @@ export default function DesignerPage() {
     };
 
     designLayers.forEach((layer, index) => {
-      const zone = layer.zone || zones[index] || 'front-full';
-      
-      if (zone === "sleeve-left" || zone === "sleeve-right") {
-        breakdown.sleeves.count += 1;
-        breakdown.sleeves.total += SLEEVE_PRICE;
-        totalPrice += SLEEVE_PRICE;
-        
-        breakdown.images.items.push({
-          id: layer.id,
-          type: 'sleeve',
-          price: SLEEVE_PRICE,
-          zone: zone,
-          viewCode: layer.viewCode,
-          displaySize: `${layer.currentDisplayWidthInches?.toFixed(2)}" × ${layer.currentDisplayHeightInches?.toFixed(2)}"`,
-          note: 'Sleeve - fixed price'
-        });
-      } else {
-        const printAreaInches = layer.currentPrintAreaInches || 0;
-        const fixedArea = FIXED_SIZE_INCHES * FIXED_SIZE_INCHES;
-        const additionalArea = layer.currentAdditionalArea || Math.max(0, printAreaInches - fixedArea);
-        const perSqInchPrice = additionalArea * PRICE_PER_SQ_INCH;
-        
-        let layerPrice = 0;
-        
-        if (printAreaInches > 0) {
-          if (printAreaInches <= fixedArea) {
-            layerPrice = MINIMUM_DESIGN_CHARGE;
-            breakdown.minimumCharges += MINIMUM_DESIGN_CHARGE;
-          } else {
-            layerPrice = perSqInchPrice;
-            if (perSqInchPrice < MINIMUM_DESIGN_CHARGE) {
-              layerPrice = MINIMUM_DESIGN_CHARGE;
-              breakdown.minimumCharges += MINIMUM_DESIGN_CHARGE;
-            }
-          }
-          
-          if (additionalArea > 0) {
-            breakdown.additionalArea += additionalArea;
-          }
-        }
-        
-        totalPrice += layerPrice;
-        breakdown.images.count += 1;
-        breakdown.images.total += layerPrice;
-        
-        breakdown.images.items.push({
-          id: layer.id,
-          type: 'image',
-          displaySize: `${layer.currentDisplayWidthInches?.toFixed(2)}" × ${layer.currentDisplayHeightInches?.toFixed(2)}"`,
-          printSize: `${layer.currentPrintWidthInches?.toFixed(2)}" × ${layer.currentPrintHeightInches?.toFixed(2)}"`,
-          printAreaInches: printAreaInches.toFixed(2),
-          additionalArea: additionalArea.toFixed(2),
-          price: layerPrice,
-          zone: zone,
-          viewCode: layer.viewCode,
-          scale: layer.scale,
-          note: printAreaInches <= fixedArea ? 
-                `Minimum charge (${printAreaInches.toFixed(1)} sq.in ≤ ${fixedArea} sq.in)` : 
-                `Area-based pricing`
-        });
-      }
+  const zone = layer.zone || zones[index] || "front-full";
+
+  // sleeves fixed
+  if (zone === "sleeve-left" || zone === "sleeve-right") {
+    breakdown.sleeves.count += 1;
+    breakdown.sleeves.total += SLEEVE_PRICE;
+    totalPrice += SLEEVE_PRICE;
+
+    breakdown.images.count += 1;
+    breakdown.images.total += SLEEVE_PRICE;
+
+    breakdown.images.items.push({
+      id: layer.id,
+      type: "sleeve",
+      price: SLEEVE_PRICE,
+      zone,
+      viewCode: layer.viewCode,
+      size: "Sleeve",
+      note: "Sleeve - fixed price",
     });
+    return;
+  }
+
+  // ✅ FIXED PRICE based on RecolorEditor inches
+  const widthIn = Number(layer.renderedWidthInches || 0);
+  const heightIn = Number(layer.renderedHeightInches || 0);
+
+  const price = getFixedImageLayerPrice(widthIn, heightIn);
+
+  breakdown.images.count += 1;
+  breakdown.images.total += price;
+  totalPrice += price;
+
+  breakdown.images.items.push({
+    id: layer.id,
+    type: "image",
+    price,
+    zone,
+    viewCode: layer.viewCode,
+    size: `${widthIn.toFixed(2)}" × ${heightIn.toFixed(2)}"`,
+    note: "Fixed price (from RecolorEditor inches)",
+  });
+});
+
+
 
     textLayers.forEach((textLayer) => {
       const canvas = document.createElement('canvas');
@@ -410,7 +427,7 @@ export default function DesignerPage() {
       
       if (areaInches > 0 && textPrice < MINIMUM_DESIGN_CHARGE && areaInches <= fixedArea) {
         textPrice = MINIMUM_DESIGN_CHARGE;
-        breakdown.minimumCharges += MINIMUM_DESIGN_CHARGE;
+        breakdown.minimumCharges += MINIMUM_DESIGN_CHARGE; // add zero value here
       }
       
       if (additionalArea > 0) {
@@ -450,41 +467,79 @@ export default function DesignerPage() {
   }, [viewStates]);
 
   useEffect(() => {
-    if (product?.basePrice) {
-      setPrice(product.basePrice);
-      setPriceBreakdown(prev => ({
-        ...prev,
-        basePrice: product.basePrice,
-        totalPrice: product.basePrice + (prev.totalPrice - prev.basePrice)
-      }));
-    }
-  }, [product?.basePrice]);
+  if (!product) return;
+
+  const newBase = getSizeBasePrice(product, selectedSize);
+
+  setPrice(newBase);
+  setPriceBreakdown((prev) => ({
+    ...prev,
+    basePrice: newBase,
+    totalPrice: newBase + (prev.totalPrice - prev.basePrice),
+  }));
+
+  // also trigger full recalculation (design/text)
+  if (Object.keys(viewStates).length > 0) {
+    setTimeout(() => calculatePrice(), 0);
+  }
+}, [product, selectedSize]); // ✅ depends on selectedSize
+
+
 
   const uploadDesignImage = async (file) => {
+  const formData = new FormData();
+  formData.append("designImage", file);
+
+  try {
+    const res = await fetch(`${API_URL}/upload-design`, {
+      method: "POST",
+      body: formData,
+    });
+    console.log("upload-design response:", res.data);
+
+    // Safely parse JSON (backend might return HTML/text on error)
+    const text = await res.text();
+    let data = {};
     try {
-      const formData = new FormData();
-      formData.append("designImage", file);
-
-      const res = await fetch(`${API_URL}/upload-design`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to upload image");
-      }
-
-      return `${API_URL}${data.imageUrl}`;
-    } catch (err) {
-      console.error("Upload design image error:", err);
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.readAsDataURL(file);
-      });
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = {};
     }
-  };
+
+    if (!res.ok) {
+      throw new Error(data?.error || `Failed to upload image (${res.status})`);
+    }
+
+    const rawUrl =
+      data?.imageUrl || data?.url || data?.fileUrl || data?.path || null;
+
+    if (!rawUrl) {
+      throw new Error("Upload succeeded but response did not include imageUrl");
+    }
+
+    // If backend already returns absolute URL, use it as-is
+   const BASE_IMAGE_HOST = IMAGE_URL || API_URL; // prefer IMAGE_URL if provided
+
+const finalUrl = rawUrl.startsWith("http")
+  ? rawUrl
+  : `${BASE_IMAGE_HOST}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
+
+
+    return finalUrl;
+
+  } catch (err) {
+    console.error("Upload design image error:", err);
+
+    // Fallback: local preview (DataURL) — ensure it never resolves undefined
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result || "");
+      reader.onerror = () => reject(new Error("Failed to read file locally"));
+      reader.readAsDataURL(file);
+    });
+  }
+};
+
 
   // Fetch design library folders on component mount
   useEffect(() => {
@@ -530,6 +585,18 @@ export default function DesignerPage() {
         console.log("Design loaded successfully:", design);
         
         setOriginalDesign(design);
+        if (design.selectedSize) {
+          setSelectedSize(design.selectedSize);
+        }
+        const restoredBase = design.basePrice ?? getSizeBasePrice(product, design.selectedSize);
+setPrice(restoredBase);
+
+setPriceBreakdown((prev) => ({
+  ...prev,
+  basePrice: restoredBase,
+  totalPrice: restoredBase, // will be recalculated when calculatePrice runs
+}));
+
         const resolvedColor = design.productColor || defaultColorValue;
         setProductColor(resolvedColor);
         setProductColorName(design.productColorName || getColorLabel(resolvedColor));
@@ -597,7 +664,8 @@ export default function DesignerPage() {
           setViewCode(design.views[0].code);
         }
         
-        setTimeout(() => calculatePrice(), 500);
+        setTimeout(() => calculatePrice(), 0);
+
         
       } catch (err) {
         console.error("Error loading design for edit:", err);
@@ -641,6 +709,24 @@ export default function DesignerPage() {
     setEditModeInitialized(false);
     
   }, [product, isEditMode, editModeInitialized]);
+
+  useEffect(() => {
+  if (!product) return;
+
+  // ✅ If editing and the design already has a saved size, DO NOT override it
+  if (isEditMode && originalDesign?.selectedSize) return;
+
+  const sizes = (product.sizePricing || []).map((x) => x.size);
+  if (sizes.length === 0) return;
+
+  // keep existing selection if valid
+  if (selectedSize && sizes.includes(selectedSize)) return;
+
+  if (sizes.includes("M")) setSelectedSize("M");
+  else setSelectedSize(sizes[0]);
+}, [product, isEditMode, originalDesign, selectedSize]);
+
+
 
   useEffect(() => {
     return () => {
@@ -713,40 +799,57 @@ export default function DesignerPage() {
     });
   };
 
-  const handleDesignUpload = async (e) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    setError("");
+const handleDesignUpload = async (e) => {
+  const files = Array.from(e.target.files || []);
+  if (!files.length) return;
 
-    try {
-      const newLayers = [];
-      
-      for (const file of files) {
-        const serverUrl = await uploadDesignImage(file);
-        const id = `design-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        const { width, height } = await getImageNaturalSize(serverUrl);
-        console.log("Pixels source: uploaded image", {
-          filename: file.name,
-          width,
-          height,
-        });
-        
-        newLayers.push(createDesignLayer(id, serverUrl, file, width, height, false));
+  setError("");
+
+  try {
+    const newLayers = [];
+
+    for (const file of files) {
+      // ✅ 1) Read size from local file (no CORS / no server dependency)
+      const { width, height } = await getImageSizeFromFile(file);
+
+      // ✅ 2) Upload to server (for persistence)
+      const serverUrl = await uploadDesignImage(file);
+
+      if (!serverUrl || typeof serverUrl !== "string") {
+        console.warn("Upload returned invalid url:", file.name, serverUrl);
+        continue;
       }
 
-      const all = [...designLayers, ...newLayers];
-      const lastId = newLayers[newLayers.length - 1].id;
+      const id = `design-${crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
 
-      updateCurrentViewState({
-        designLayers: all,
-        activeDesignId: lastId,
-      });
+      console.log("Pixels source: local file", { filename: file.name, width, height });
+      console.log("Server URL:", serverUrl);
 
-    } catch (err) {
-      console.error("Error uploading design images:", err);
-      setError("Failed to upload images: " + err.message);
+      newLayers.push(createDesignLayer(id, serverUrl, file, width, height, false));
     }
-  };
+
+    if (!newLayers.length) {
+      setError("No valid images were uploaded. Try JPG/PNG and smaller file sizes.");
+      return;
+    }
+
+    const all = [...designLayers, ...newLayers];
+    const lastId = newLayers[newLayers.length - 1].id;
+
+    updateCurrentViewState({
+      designLayers: all,
+      activeDesignId: lastId,
+    });
+
+  } catch (err) {
+    console.error("Error uploading design images:", err);
+    setError("Failed to upload images: " + (err?.message || String(err)));
+  } finally {
+    e.target.value = "";
+  }
+};
+
+
 
   // NEW: Handle selecting design from library
   const handleSelectFromLibrary = async (image) => {
@@ -870,7 +973,7 @@ export default function DesignerPage() {
         d.id === activeDesign.id
           ? {
               ...d,
-              imageUrl: `${API_URL}${data.outputUrl}?t=${Date.now()}`,
+              imageUrl: `${import.meta.env.VITE_IMAGE_URL}${data.outputUrl.replace(/^\/api/, "")}?t=${Date.now()}`,
               hasBgRemoved: true,
               originalFile: fileToUse, // Store the file for future use
               isFromLibrary: false, // Once processed, it's no longer a library image
@@ -1025,7 +1128,8 @@ export default function DesignerPage() {
     setSaveSuccess(false);
 
     try {
-      const { totalPrice } = await calculatePrice(false);
+      const { totalPrice, breakdown } = await calculatePrice(false);
+
       const previewsByCode = await captureAllViewPreviews();
 
       const processedViewStates = { ...viewStates };
@@ -1062,25 +1166,103 @@ export default function DesignerPage() {
         );
 
         const designLayersPayload = (vs.designLayers || []).map(
-          ({ id, imageUrl, hasBgRemoved, x, y, scale, rotation, zone, insideSafeArea, 
-             originalWidthPx, originalHeightPx, renderedWidthPx, renderedHeightPx,
-             displayWidthInches, displayHeightInches, displayAreaInches,
-             printWidthInches, printHeightInches, printAreaInches,
-             currentDisplayWidthInches, currentDisplayHeightInches,
-             currentPrintWidthInches, currentPrintHeightInches, currentPrintAreaInches,
-             currentAdditionalArea, layerPrice, minimumChargeApplied, isFromLibrary }) => ({
-            id, imageUrl, hasBgRemoved: !!hasBgRemoved, x, y, scale, rotation,
-            zone: zone || null, insideSafeArea: typeof insideSafeArea === "boolean" ? insideSafeArea : true,
-            originalWidthPx, originalHeightPx, 
-            renderedWidthPx, renderedHeightPx,
-            displayWidthInches, displayHeightInches, displayAreaInches,
-            printWidthInches, printHeightInches, printAreaInches,
-            currentDisplayWidthInches, currentDisplayHeightInches,
-            currentPrintWidthInches, currentPrintHeightInches, currentPrintAreaInches,
-            currentAdditionalArea, layerPrice, minimumChargeApplied,
-            isFromLibrary: isFromLibrary || false
-          })
-        );
+  ({
+    id,
+    imageUrl,
+    hasBgRemoved,
+    x,
+    y,
+    scale,
+    rotation,
+    zone,
+    insideSafeArea,
+
+    originalWidthPx,
+    originalHeightPx,
+
+    renderedWidthPx,
+    renderedHeightPx,
+
+    // ✅ CANVAS-TRUE INCHES (FROM RecolorEditor)
+    renderedWidthInches,
+    renderedHeightInches,
+    printableAreaWidthInches,
+    printableAreaHeightInches,
+
+    // existing inches (keep – backward compatibility)
+    displayWidthInches,
+    displayHeightInches,
+    displayAreaInches,
+
+    printWidthInches,
+    printHeightInches,
+    printAreaInches,
+
+    currentDisplayWidthInches,
+    currentDisplayHeightInches,
+
+    currentPrintWidthInches,
+    currentPrintHeightInches,
+    currentPrintAreaInches,
+
+    currentAdditionalArea,
+    layerPrice,
+    minimumChargeApplied,
+    isFromLibrary,
+  }) => ({
+    id,
+    imageUrl,
+
+    hasBgRemoved: !!hasBgRemoved,
+
+    x,
+    y,
+    scale,
+    rotation,
+
+    zone: zone === "pocket" ? "front-pocket" : (zone || null),
+
+    insideSafeArea:
+      typeof insideSafeArea === "boolean" ? insideSafeArea : true,
+
+    originalWidthPx,
+    originalHeightPx,
+
+    renderedWidthPx,
+    renderedHeightPx,
+
+    // ✅ SAVE REAL CANVAS INCHES (IMPORTANT)
+    renderedWidthInches,
+    renderedHeightInches,
+    printableAreaWidthInches,
+    printableAreaHeightInches,
+
+    // keep existing fields (do NOT break old data)
+    displayWidthInches,
+    displayHeightInches,
+    displayAreaInches,
+
+    printWidthInches,
+    printHeightInches,
+    printAreaInches,
+
+    currentDisplayWidthInches,
+    currentDisplayHeightInches,
+
+    currentPrintWidthInches,
+    currentPrintHeightInches,
+    currentPrintAreaInches,
+
+    currentAdditionalArea,
+
+    // ✅ FINAL FIXED PRICE (40 / 100)
+    layerPrice,
+
+    minimumChargeApplied,
+    isFromLibrary: isFromLibrary || false,
+  })
+);
+
 
         return {
           code: v.code,
@@ -1100,10 +1282,11 @@ export default function DesignerPage() {
         previewImage: mainPreview,
         views: viewsPayload,
         basePrice: BASE_PRICE,
+        selectedSize,
         calculatedPrice: totalPrice,
-        priceBreakdown: priceBreakdown,
+        priceBreakdown: breakdown,
       };
-
+      console.log("Saving design with body:", body);
       const url = isEditMode && editDesignId ? `${API_URL}/savedata/${editDesignId}` : `${API_URL}/savedata`;
       const method = isEditMode && editDesignId ? "PUT" : "POST";
 
@@ -1118,13 +1301,29 @@ export default function DesignerPage() {
 
       const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data?.error || data?.message || "Failed to save design");
-      }
-
-      setSaveSuccess(true);
-      alert(isEditMode ? "Design updated successfully!" : "Design saved successfully!");
       
+
+        if (!res.ok) {
+          throw new Error(data?.error || data?.message || "Failed to save design");
+        }
+
+        // ✅ store saved design info for cart
+        const newDesignId =
+          data?.design?._id ||
+          data?.savedDesignId ||
+          data?._id ||
+          data?.id ||
+          editDesignId ||
+          null;
+
+        setSavedDesignId(newDesignId);
+        setLastSavedPreview(mainPreview);
+
+        setSaveSuccess(true);
+        alert(isEditMode ? "Design updated successfully!" : "Design saved successfully!");
+      // ✅ keep these after successful save
+
+
     } catch (err) {
       console.error("Save design error:", err);
       setSaveError(err.message || "Failed to save design");
@@ -1132,6 +1331,58 @@ export default function DesignerPage() {
       setSaving(false);
     }
   };
+
+  const handleSaveAndAddToCart = async () => {
+  if (!token) {
+    setSaveError("Please login to add items to cart.");
+    return;
+  }
+
+  try {
+    setAddingToCart(true);
+    setError("");
+
+    // If not saved yet, save first
+    let designIdToUse = savedDesignId;
+
+    if (!designIdToUse) {
+      await handleSaveDesign();
+
+      // handleSaveDesign sets savedDesignId; wait a tick for state
+      await new Promise((r) => setTimeout(r, 0));
+      designIdToUse = savedDesignId || editDesignId;
+    }
+
+    if (!designIdToUse) {
+      throw new Error("Design not saved yet. Please save the design first.");
+    }
+
+    // ✅ cart payload (backend can ignore extra fields if not needed)
+    const cartPayload = {
+      kind: "DESIGN",
+      design: designIdToUse,
+      productId: product?._id || product?.id,
+      qty: 1,
+      selectedSize,
+      productColor,
+      productColorName,
+      designId: designIdToUse,
+      previewImage: lastSavedPreview || null,
+      unitPrice: price, // total calculated price shown on UI
+      signature: `${product?._id || product?.id}|${selectedSize}|${productColor}|${designIdToUse}`,
+    };
+
+    await dispatch(addToCart(cartPayload)).unwrap();
+
+    // optional: go to cart page
+    navigate("/cart");
+  } catch (e) {
+    setError(e?.message || "Failed to add to cart");
+  } finally {
+    setAddingToCart(false);
+  }
+};
+
 
   const handleResetToOriginal = () => {
     if (!originalDesign || !window.confirm("Reset all changes to original design?")) {
@@ -1161,33 +1412,44 @@ export default function DesignerPage() {
           const scale = d.scale || 0.35;
           
           return {
-            ...d,
-            id: d.id || `design-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-            imageUrl: d.imageUrl?.startsWith('http') || d.imageUrl?.startsWith('blob:') || d.imageUrl?.startsWith('data:')
-              ? d.imageUrl 
-              : d.imageUrl?.startsWith('/') 
-                ? `${API_URL}${d.imageUrl}`
-                : d.imageUrl,
-            file: null,
-            originalFile: null,
-            isFromLibrary: d.isFromLibrary || false,
-            originalWidthPx: widthPx,
-            originalHeightPx: heightPx,
-            displayWidthInches: displayWidthInches,
-            displayHeightInches: displayHeightInches,
-            displayAreaInches: displayAreaInches,
-            printWidthInches: printWidthInches,
-            printHeightInches: printHeightInches,
-            printAreaInches: printAreaInches,
-            scale: scale,
-            currentDisplayWidthInches: displayWidthInches * scale,
-            currentDisplayHeightInches: displayHeightInches * scale,
-            currentPrintWidthInches: printWidthInches * scale,
-            currentPrintHeightInches: printHeightInches * scale,
-            currentPrintAreaInches: printAreaInches * scale * scale,
-            renderedWidthPx: widthPx * scale,
-            renderedHeightPx: heightPx * scale
-          };
+  ...d,
+  id: d.id || `design-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  imageUrl: d.imageUrl?.startsWith('http') || d.imageUrl?.startsWith('blob:') || d.imageUrl?.startsWith('data:')
+    ? d.imageUrl 
+    : d.imageUrl?.startsWith('/') 
+      ? `${API_URL}${d.imageUrl}`
+      : d.imageUrl,
+  file: null,
+  originalFile: null,
+  isFromLibrary: d.isFromLibrary || false,
+
+  originalWidthPx: widthPx,
+  originalHeightPx: heightPx,
+
+  displayWidthInches,
+  displayHeightInches,
+  displayAreaInches,
+
+  printWidthInches,
+  printHeightInches,
+  printAreaInches,
+
+  scale,
+
+  currentDisplayWidthInches: displayWidthInches * scale,
+  currentDisplayHeightInches: displayHeightInches * scale,
+  currentPrintWidthInches: printWidthInches * scale,
+  currentPrintHeightInches: printHeightInches * scale,
+  currentPrintAreaInches: printAreaInches * scale * scale,
+
+  renderedWidthPx: widthPx * scale,
+  renderedHeightPx: heightPx * scale,
+
+  // ✅ ADD THESE (CRITICAL FOR EDIT/UPDATE PRICE)
+  renderedWidthInches: d.renderedWidthInches ?? (printWidthInches * scale),
+  renderedHeightInches: d.renderedHeightInches ?? (printHeightInches * scale),
+};
+
         }) || [],
         activeDesignId: view.designLayers?.[0]?.id || null,
       };
@@ -1287,9 +1549,27 @@ export default function DesignerPage() {
               </div>
             </div>
 
-            <button onClick={handleSaveDesign} disabled={saving} className="rounded-full border border-sky-600 bg-sky-600 px-4 py-1 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60">
-              {saving ? "Saving…" : isEditMode ? "Update Design" : "Save Design"}
+            <button
+                onClick={handleSaveDesign}
+                disabled={saving || addingToCart}
+                className="rounded-full border border-sky-600 bg-sky-600 px-4 py-1 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+              >
+                {saving ? "Saving…" : isEditMode ? "Update Design" : "Save Design"}
             </button>
+
+            <button
+              onClick={handleSaveAndAddToCart}
+              disabled={saving || addingToCart}
+              className="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+            >
+              {addingToCart
+                ? "Adding…"
+                : savedDesignId
+                  ? "Add to Cart"
+                  : "Save & Add to Cart"}
+            </button>
+
+            
           </div>
         </div>
       </header>
@@ -1366,6 +1646,51 @@ export default function DesignerPage() {
                     </p>
                   </div>
 
+                 
+                  {/* ✅ Size Selection */}
+                  <div className="mt-5">
+                    <h3 className="mb-2 font-semibold text-sm">Size</h3>
+
+                    {availableSizes.length > 0 ? (
+                      <>
+                        <label className="mb-2 block text-xs font-medium">Select Size</label>
+
+                        <div className="grid grid-cols-4 gap-2">
+                          {availableSizes.map((size) => {
+                            const isActive = selectedSize === size;
+                            const sizePrice = getSizeBasePrice(product, size);
+
+                            return (
+                              <button
+                                key={size}
+                                type="button"
+                                onClick={() => setSelectedSize(size)}
+                                className={`rounded border px-2 py-2 text-xs font-semibold transition ${
+                                  isActive
+                                    ? "border-sky-500 bg-sky-50 text-sky-700"
+                                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                                }`}
+                              >
+                                <div>{size}</div>
+                                <div className="text-[10px] font-normal text-slate-500">₹{sizePrice}</div>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <div className="mt-2 text-[11px] text-slate-500">
+                          Selected: <span className="font-medium text-slate-700">{selectedSize}</span> • Base:{" "}
+                          <span className="font-medium text-slate-700">₹{BASE_PRICE}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-xs text-slate-500">
+                        No sizePricing configured for this product. Using basePrice.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Quick Select */}
                   <div className="mb-2">
                     <label className="mb-2 block text-xs font-medium">Quick Select</label>
                     <div className="grid grid-cols-6 gap-2">
@@ -1384,6 +1709,7 @@ export default function DesignerPage() {
                       })}
                     </div>
                   </div>
+
                 </div>
 
                 <div className="text-xs text-slate-600 space-y-2">
@@ -1708,6 +2034,7 @@ export default function DesignerPage() {
                     onDesignRenderWidthChange={setDesignRenderWidth}
                     isAdmin={isAdmin}
                     showMeasurements={true} 
+                    selectedView={viewCode}
                   />
                 ) : (
                   <div className="text-sm text-slate-500 text-center">{product?.name ? `No view configuration found for ${product.name}` : "Product not loaded"}</div>

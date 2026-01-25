@@ -223,7 +223,7 @@ const NewArrivals = () => {
   // Loading State
   if (loading) {
     return (
-      <section className="py-16 bg-white">
+      <section className="bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-2">
@@ -250,7 +250,7 @@ const NewArrivals = () => {
   // Error State
   if (error) {
     return (
-      <section className="py-16 bg-white">
+      <section className="bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-md mx-auto text-center">
             <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -274,7 +274,7 @@ const NewArrivals = () => {
   // Empty State
   if (!items || items.length === 0) {
     return (
-      <section className="py-16 bg-white">
+      <section className="bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-md mx-auto text-center">
             <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -290,7 +290,7 @@ const NewArrivals = () => {
 
   // Main Render
   return (
-    <section className="py-16 bg-white">
+    <section className="py-4 bg-white">
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="text-center mb-8">
@@ -376,7 +376,7 @@ const NewArrivals = () => {
 
         {/* Footer - Small */}
         {items.length > 0 && (
-          <div className="mt-8 text-center">
+          <div className="mt-3 text-center">
             <div className="text-xs text-gray-500 mb-2">
               Showing {items.length} new arrivals
             </div>

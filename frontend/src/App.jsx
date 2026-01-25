@@ -29,7 +29,7 @@ import CustomProductsHub from "./components/CustomProductsHub.jsx";
 import AllProductsHub from "./components/AllproductsHub.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import ProductPricingManager from "./pages/productpricingmanager.jsx";
-
+import AdminDashboards from "./components/admin/AdminDashboard.jsx";
 // You'll need to create this
 
 // Layout component with header for all pages except auth
@@ -126,6 +126,14 @@ function App() {
         <Route path="/Allproducts" element={
           <MainLayout>
             <AllProductsHub/>
+          </MainLayout>
+        } />
+
+
+
+        <Route path="/admindashboard" element={
+          <MainLayout>
+            <AdminDashboards/>
           </MainLayout>
         } />
 

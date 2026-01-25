@@ -34,9 +34,9 @@ const HomepageCustomizationCategoriesList = () => {
   // Skeleton loader
   if (loading) {
     return (
-      <section className="py-16 bg-white">
+      <section className="bg-white">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-8">
+          <div className="text-center mb-4">
             <div className="flex items-center justify-center mb-2">
               <Settings className="w-5 h-5 mr-2" />
               <h1 className="text-2xl font-bold text-gray-900">
@@ -63,7 +63,7 @@ const HomepageCustomizationCategoriesList = () => {
 
   if (categories.length === 0) {
     return (
-      <section className="py-16 bg-white">
+      <section className="bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-md mx-auto text-center">
             <svg
@@ -92,10 +92,10 @@ const HomepageCustomizationCategoriesList = () => {
   }
 
   return (
-    <section className="py-16 bg-white">
+    <section className="bg-white">
       <div className="container mx-auto px-4">
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-4">
           <div className="flex items-center justify-center mb-2">
             <Settings className="w-5 h-5 mr-2" />
             <h1 className="text-2xl font-bold text-gray-900">
@@ -167,7 +167,7 @@ const HomepageCustomizationCategoriesList = () => {
 
         {/* Footer */}
         {categories.length > 0 && (
-          <div className="mt-8 text-center">
+          <div className="mt-4 text-center">
             <div className="text-xs text-gray-500 mb-2">
               Showing {categories.length} customizable categories
             </div>

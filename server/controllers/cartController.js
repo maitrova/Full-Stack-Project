@@ -4,7 +4,7 @@ import ReadymadeProduct from "../models/readymadeproducts.js"; // default export
 import { Design } from "../models/Design.js";
 import { Cart } from "../models/Cart.js";
 
-
+import Dropproduct from "../models/dropproduct.model.js"; // ✅ NEW
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 const getOrCreateActiveCart = async (userId) => {
@@ -29,7 +29,14 @@ export const addToCart = async (req, res) => {
     const userId = req.user?._id;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    const { kind, qty = 1, readymadeProductId, designId, size } = req.body;
+    const {
+      kind,
+      qty = 1,
+      readymadeProductId,
+      dropproductId,          // ✅ NEW
+      designId,
+      size,
+    } = req.body;
 
     const parsedQty = Number(qty);
     if (!Number.isInteger(parsedQty) || parsedQty < 1) {
@@ -39,46 +46,57 @@ export const addToCart = async (req, res) => {
       return res.status(400).json({ message: "kind must be READYMADE or DESIGN" });
     }
 
-    // normalize size if passed (do NOT force default here for variant products)
     const normalizedSize = size && String(size).trim() ? String(size).trim() : "";
 
     let signature = "";
     let itemToInsert = null;
 
     // =========================
-    // READYMADE
+    // READYMADE (supports ReadymadeProduct OR Dropproduct)
     // =========================
     if (kind === "READYMADE") {
-      if (!readymadeProductId || !isValidObjectId(readymadeProductId)) {
-        return res.status(400).json({ message: "Valid readymadeProductId is required" });
+      const hasReadymadeId = !!readymadeProductId;
+      const hasDropId = !!dropproductId;
+
+      if (!hasReadymadeId && !hasDropId) {
+        return res.status(400).json({
+          message: "Valid readymadeProductId or dropproductId is required",
+        });
       }
 
-      const product = await ReadymadeProduct.findById(readymadeProductId).lean();
+      if (hasReadymadeId && !isValidObjectId(readymadeProductId)) {
+        return res.status(400).json({ message: "Valid readymadeProductId is required" });
+      }
+      if (hasDropId && !isValidObjectId(dropproductId)) {
+        return res.status(400).json({ message: "Valid dropproductId is required" });
+      }
+
+      // ✅ Pick model by which id is provided
+      const sourceType = hasDropId ? "DROP" : "READYMADE";
+      const ProductModel = hasDropId ? Dropproduct : ReadymadeProduct;
+      const productId = hasDropId ? dropproductId : readymadeProductId;
+
+      const product = await ProductModel.findById(productId).lean();
       if (!product || product.isActive === false) {
-        return res.status(404).json({ message: "Readymade product not found or inactive" });
+        return res.status(404).json({ message: `${sourceType} product not found or inactive` });
       }
 
       const hasVariants = Array.isArray(product.variants) && product.variants.length > 0;
 
-      // ✅ If variants exist, size is mandatory (don’t default silently)
       if (hasVariants && !normalizedSize) {
         return res.status(400).json({ message: "size is required for this product" });
       }
 
-      // Determine price/stock based on variant (if exists)
       let unitPrice = Number(product.price || 0);
       let availableStock = Number(product.stock || 0);
 
-      // ✅ Use variant price/stock when variants exist
       if (hasVariants) {
         const variant = product.variants.find(
           (v) => String(v.size).toUpperCase() === String(normalizedSize).toUpperCase()
         );
-
         if (!variant) {
           return res.status(400).json({ message: "Selected size is not available" });
         }
-
         unitPrice = Number(variant.price || 0);
         availableStock = Number(variant.stock || 0);
       }
@@ -86,26 +104,23 @@ export const addToCart = async (req, res) => {
       if (!(unitPrice >= 0)) {
         return res.status(400).json({ message: "Invalid price" });
       }
-
       if (availableStock < parsedQty) {
         return res.status(400).json({ message: "Not enough stock" });
       }
 
-      // ✅ include size in signature for variant products
-      signature = hasVariants
-        ? `READYMADE:${product._id.toString()}:SIZE:${normalizedSize.toUpperCase()}`
-        : `READYMADE:${product._id.toString()}:SIZE:${(normalizedSize || "M").toUpperCase()}`;
+      const finalSize = (hasVariants ? normalizedSize : (normalizedSize || "M")).toUpperCase();
+
+      // ✅ Signature includes source to avoid collisions between models
+      signature = `${sourceType}:${product._id.toString()}:SIZE:${finalSize}`;
 
       itemToInsert = {
         kind: "READYMADE",
-        readymadeProduct: product._id,
+        readymadeProduct: sourceType === "READYMADE" ? product._id : null,
+        dropproduct: sourceType === "DROP" ? product._id : null,   // ✅ NEW
         design: null,
         product: null,
         qty: parsedQty,
-
-        // ✅ store size (model has default "M", but we set it explicitly)
-        size: (hasVariants ? normalizedSize : (normalizedSize || "M")).toUpperCase(),
-
+        size: finalSize,
         unitPrice,
         currency: product.currency || "INR",
         previewImage: product.images?.[0] || null,
@@ -129,20 +144,17 @@ export const addToCart = async (req, res) => {
         return res.status(400).json({ message: "Design price is not valid" });
       }
 
-      // For design, size may be optional. If not sent, keep model default "M".
       const finalSize = (normalizedSize || "M").toUpperCase();
-
       signature = `DESIGN:${design._id.toString()}:SIZE:${finalSize}`;
 
       itemToInsert = {
         kind: "DESIGN",
         readymadeProduct: null,
+        dropproduct: null, // ✅ NEW (keep null)
         design: design._id,
         product: design.product || null,
         qty: parsedQty,
-
         size: finalSize,
-
         unitPrice,
         currency: "INR",
         previewImage: design.previewImage || null,
@@ -159,11 +171,15 @@ export const addToCart = async (req, res) => {
     if (idx >= 0) {
       const nextQty = cart.items[idx].qty + parsedQty;
 
-      // ✅ If READYMADE, re-check stock for merged qty (variant-aware)
       if (kind === "READYMADE") {
-        const p = await ReadymadeProduct.findById(readymadeProductId).lean();
+        // Determine whether this existing item is from DROP or READYMADE
+        const isDropItem = !!cart.items[idx].dropproduct;
+        const ProductModel = isDropItem ? Dropproduct : ReadymadeProduct;
+        const pid = isDropItem ? cart.items[idx].dropproduct : cart.items[idx].readymadeProduct;
+
+        const p = await ProductModel.findById(pid).lean();
         if (!p || p.isActive === false) {
-          return res.status(404).json({ message: "Readymade product not found or inactive" });
+          return res.status(404).json({ message: "Product not found or inactive" });
         }
 
         const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
@@ -171,14 +187,11 @@ export const addToCart = async (req, res) => {
         let availableStock = Number(p.stock || 0);
 
         if (hasVariants) {
-          // use size stored in cart item (already uppercase)
           const cartSize = String(cart.items[idx].size || "").trim();
           const variant = p.variants.find(
             (v) => String(v.size).toUpperCase() === cartSize.toUpperCase()
           );
-          if (!variant) {
-            return res.status(400).json({ message: "Selected size is not available" });
-          }
+          if (!variant) return res.status(400).json({ message: "Selected size is not available" });
           availableStock = Number(variant.stock || 0);
         }
 
@@ -186,7 +199,7 @@ export const addToCart = async (req, res) => {
           return res.status(400).json({ message: "Not enough stock" });
         }
 
-        // refresh snapshot price as well (variant-aware)
+        // refresh snapshot price as well
         if (hasVariants) {
           const cartSize = String(cart.items[idx].size || "").trim();
           const variant = p.variants.find(
@@ -202,8 +215,6 @@ export const addToCart = async (req, res) => {
       }
 
       cart.items[idx].qty = nextQty;
-
-      // also ensure size remains set
       cart.items[idx].size = String(cart.items[idx].size || "M").toUpperCase();
 
       await cart.save();
@@ -218,6 +229,7 @@ export const addToCart = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+
 
 
 
@@ -260,7 +272,6 @@ export const getCart = async (req, res) => {
   }
 };
 
-
 export const updateCartItemQty = async (req, res) => {
   try {
     const userId = req.user?._id;
@@ -283,53 +294,96 @@ export const updateCartItemQty = async (req, res) => {
     const item = cart.items.id(itemId);
     if (!item) return res.status(404).json({ message: "Cart item not found" });
 
+    // normalize size once (used by both drop/readymade)
+    const cartSize = String(item.size || "M").trim().toUpperCase();
+
     // =========================
-    // READYMADE (variant-aware)
+    // READYMADE (DropProduct OR ReadymadeProduct)
     // =========================
     if (item.kind === "READYMADE") {
-      const pId = item.readymadeProduct;
-      const p = await ReadymadeProduct.findById(pId).lean();
-      if (!p || p.isActive === false) {
-        return res.status(404).json({ message: "Readymade product not found or inactive" });
-      }
+      // ✅ Detect DropProduct first
+      const dropId =
+        item.dropproductId ||
+        item.dropproduct || // might store ObjectId
+        null;
 
-      const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
-
-      let availableStock = Number(p.stock || 0);
-      let unitPrice = Number(p.price || 0);
-
-      if (hasVariants) {
-        // item.size is stored in cart model (default "M")
-        const cartSize = String(item.size || "M").trim();
-
-        const variant = p.variants.find(
-          (v) => String(v.size).toUpperCase() === cartSize.toUpperCase()
-        );
-
-        if (!variant) {
-          return res.status(400).json({ message: "Selected size is not available" });
+      if (dropId) {
+        // ✅ DropProduct flow
+        const p = await Dropproduct.findById(dropId).lean(); // <-- IMPORTANT
+        if (!p || p.isActive === false) {
+          return res.status(404).json({ message: "Drop product not found or inactive" });
         }
 
-        availableStock = Number(variant.stock || 0);
-        unitPrice = Number(variant.price || 0);
+        const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
+
+        let availableStock = Number(p.stock || p.totalStock || 0);
+        let unitPrice = Number(p.price || 0);
+
+        if (hasVariants) {
+          const variant = p.variants.find(
+            (v) => String(v.size || "").toUpperCase() === cartSize
+          );
+
+          if (!variant) {
+            return res.status(400).json({ message: "Selected size is not available" });
+          }
+
+          availableStock = Number(variant.stock || 0);
+          unitPrice = Number(variant.price || 0);
+        }
+
+        if (availableStock < parsedQty) {
+          return res.status(400).json({ message: "Not enough stock" });
+        }
+
+        // refresh snapshot fields
+        item.unitPrice = unitPrice;
+        item.currency = p.currency || "INR";
+        item.previewImage = p.images?.[0] || null;
+
+        // ensure ids are consistent
+        item.size = cartSize;
+
+      } else {
+        // ✅ ReadymadeProduct flow (existing logic)
+        const pId = item.readymadeProduct || item.readymadeProductId;
+        const p = await ReadymadeProduct.findById(pId).lean();
+        if (!p || p.isActive === false) {
+          return res.status(404).json({ message: "Readymade product not found or inactive" });
+        }
+
+        const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
+
+        let availableStock = Number(p.stock || p.totalStock || 0);
+        let unitPrice = Number(p.price || 0);
+
+        if (hasVariants) {
+          const variant = p.variants.find(
+            (v) => String(v.size || "").toUpperCase() === cartSize
+          );
+
+          if (!variant) {
+            return res.status(400).json({ message: "Selected size is not available" });
+          }
+
+          availableStock = Number(variant.stock || 0);
+          unitPrice = Number(variant.price || 0);
+        }
+
+        if (availableStock < parsedQty) {
+          return res.status(400).json({ message: "Not enough stock" });
+        }
+
+        item.unitPrice = unitPrice;
+        item.currency = p.currency || "INR";
+        item.previewImage = p.images?.[0] || null;
+
+        item.size = cartSize;
       }
-
-      // Validate stock based on variant or product
-      if (availableStock < parsedQty) {
-        return res.status(400).json({ message: "Not enough stock" });
-      }
-
-      // Refresh snapshot fields (recommended)
-      item.unitPrice = unitPrice;
-      item.currency = p.currency || "INR";
-      item.previewImage = p.images?.[0] || null;
-
-      // normalize size format
-      item.size = String(item.size || "M").toUpperCase();
     }
 
     // =========================
-    // DESIGN (same as your logic)
+    // DESIGN (your logic)
     // =========================
     if (item.kind === "DESIGN") {
       const d = await Design.findById(item.design).lean();
@@ -348,9 +402,7 @@ export const updateCartItemQty = async (req, res) => {
       item.currency = "INR";
       item.previewImage = d.previewImage || null;
       item.product = d.product || item.product;
-
-      // keep size (default M) as-is; normalize
-      item.size = String(item.size || "M").toUpperCase();
+      item.size = cartSize;
     }
 
     item.qty = parsedQty;
@@ -362,6 +414,7 @@ export const updateCartItemQty = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+
 
 
 

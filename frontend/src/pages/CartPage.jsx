@@ -20,26 +20,68 @@ import {
 import { selectCurrentToken } from '../redux/slices/Userslice.js';
 
 // Constants
-const API_BASE_URL = import.meta.env.VITE_IMAGE_URL;
+const API_BASE_URL = import.meta.env.VITE_IMAGE_URL || "https://narifighter.online/backend";
 
-// Helper function to ensure image URLs have proper base URL
 const ensureImageUrl = (imagePath) => {
   if (!imagePath) return null;
+  if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) return imagePath;
+
+  // If stored as "/outputs/....jpg", just append to base
+  return `${API_BASE_URL}${imagePath.startsWith("/") ? "" : "/"}${imagePath}`;
+};
+
+
+// Helper function to ensure image URLs have proper base URL
+// const ensureImageUrl = (imagePath) => {
+//   if (!imagePath) return null;
   
-  // If already a full URL, return as is
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
+//   // If already a full URL, return as is
+//   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+//     return imagePath;
+//   }
+  
+//   // Remove any leading slash and create proper URL
+//   const cleanPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
+//   return `${API_BASE_URL}/${cleanPath}`;
+// };
+const getDropId = (item) => {
+  // supports dropproduct being either object or string
+  if (!item) return null;
+  if (typeof item.dropproduct === "string") return item.dropproduct;
+  return item.dropproduct?._id || item.dropproductId || null;
+};
+
+const getDropName = (item) => {
+  // supports object OR string id
+  if (!item) return "Product";
+  if (item.dropproduct && typeof item.dropproduct === "object") {
+    return item.dropproduct.name || item.dropproduct.title || "Product";
   }
-  
-  // Remove any leading slash and create proper URL
-  const cleanPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
-  return `${API_BASE_URL}/${cleanPath}`;
+  // if it's just an id string, we can't know name unless backend sends it
+  return "Drop Product";
 };
 
 const CartPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  
+  const getMaxStock = (item) => {
+  const p = item.dropproduct || item.readymadeProduct;
+  if (!p) return null;
+
+  // If variants exist, pick stock by size
+  if (Array.isArray(p.variants) && p.variants.length && item.size) {
+    const v = p.variants.find(
+      (x) => String(x.size).toUpperCase() === String(item.size).toUpperCase()
+    );
+    if (v && typeof v.stock === "number") return v.stock;
+  }
+
+  // fallback stock / totalStock
+  if (typeof p.stock === "number") return p.stock;
+  if (typeof p.totalStock === "number") return p.totalStock;
+
+  return null;
+};
   // Cart state
   const cart = useSelector(selectCart);
   const cartItems = useSelector(selectCartItems);
@@ -75,81 +117,89 @@ const CartPage = () => {
   }, [notification]);
 
   // Get item name based on kind
-  const getItemName = (item) => {
-    if (item.kind === 'READYMADE') {
-      return item.readymadeProduct?.title || 'Readymade Product';
-    } else if (item.kind === 'DESIGN') {
-      // Check different possible name fields for design
-      return item.design?.name || 
-             item.design?.title || 
-             item.design?.designName || 
-             'Design';
-    } else if (item.product?.title) {
-      return item.product.title;
-    }
-    return 'Product';
-  };
+const getItemName = (item) => {
+  if (item.kind === "READYMADE") {
+    // drop first
+    if (getDropId(item)) return getDropName(item);
+
+    return (
+      item.readymadeProduct?.title ||
+      item.readymadeProduct?.name ||
+      "Product"
+    );
+  }
+
+  if (item.kind === "DESIGN") {
+    return (
+      item.design?.name ||
+      item.design?.title ||
+      item.design?.designName ||
+      "Design"
+    );
+  }
+
+  return item.product?.title || item.product?.name || "Product";
+};
+
+
 
   // Get main image URL - handle both previewImage and nested images
   const getImageUrl = (item) => {
-    // Try previewImage first
-    if (item.previewImage) {
-      return ensureImageUrl(item.previewImage);
-    }
-    
-    // If no previewImage, try to get from product images
-    let imagePath = null;
-    
-    if (item.kind === 'READYMADE' && item.readymadeProduct?.images?.length > 0) {
-      // Get first image from readymade product
-      imagePath = item.readymadeProduct.images[0];
-    } else if (item.kind === 'DESIGN' && item.design?.images?.length > 0) {
-      // Get first image from design
-      imagePath = item.design.images[0];
-    } else if (item.kind === 'DESIGN' && item.design?.previewImage) {
-      // Try previewImage from design
-      imagePath = item.design.previewImage;
-    } else if (item.product?.images?.length > 0) {
-      imagePath = item.product.images[0];
-    }
-    
-    if (!imagePath) return null;
-    
-    return ensureImageUrl(imagePath);
-  };
+  if (item.previewImage) return ensureImageUrl(item.previewImage);
+
+  let imagePath = null;
+
+  if (item.kind === "READYMADE") {
+    if (item.dropproduct?.images?.length) imagePath = item.dropproduct.images[0];
+    else if (item.readymadeProduct?.images?.length) imagePath = item.readymadeProduct.images[0];
+  } else if (item.kind === "DESIGN") {
+    if (item.design?.images?.length) imagePath = item.design.images[0];
+    else if (item.design?.previewImage) imagePath = item.design.previewImage;
+  } else if (item.product?.images?.length) {
+    imagePath = item.product.images[0];
+  }
+
+  return imagePath ? ensureImageUrl(imagePath) : null;
+};
+
 
   // Get product type for display
   const getProductType = (item) => {
-    switch(item.kind) {
-      case 'READYMADE': return 'Readymade Product';
-      case 'DESIGN': return 'Custom Design';
-      default: return 'Product';
-    }
-  };
+  if (item.kind === "READYMADE") return item.dropproduct ? "Drop Product" : "Readymade Product";
+  if (item.kind === "DESIGN") return "Custom Design";
+  return "Product";
+};
+
 
   // Get additional product info
-  const getProductInfo = (item) => {
-    if (item.kind === 'READYMADE' && item.readymadeProduct) {
-      const product = item.readymadeProduct;
-      return {
-        description: product.description,
-        category: product.category,
-        subCategory: product.subCategory,
-        brand: product.brand,
-        size: product.size,
-        color: product.color
-      };
-    } else if (item.kind === 'DESIGN' && item.design) {
-      const design = item.design;
-      return {
-        description: design.description || design.designDescription,
-        category: design.category,
-        style: design.style,
-        color: design.colorPalette || design.primaryColor
-      };
-    }
-    return {};
-  };
+ const getProductInfo = (item) => {
+  if (item.kind === "READYMADE") {
+    const product = item.dropproduct || item.readymadeProduct;
+    if (!product) return {};
+
+    return {
+      description: product.description,
+      category: product.category,
+      subCategory: product.subCategory,
+      brand: product.brand,
+      size: product.size,
+      color: product.color,
+    };
+  }
+
+  if (item.kind === "DESIGN" && item.design) {
+    const design = item.design;
+    return {
+      description: design.description || design.designDescription,
+      category: design.category,
+      style: design.style,
+      color: design.colorPalette || design.primaryColor,
+    };
+  }
+
+  return {};
+};
+
 
   // Handle quantity updates
   const handleQuantityChange = async (itemId, newQty) => {
@@ -289,15 +339,24 @@ const CartPage = () => {
   };
 
   // Handle image click to navigate to details page
-  const handleImageClick = (item) => {
-    if (item.kind === 'READYMADE' && item.readymadeProduct?._id) {
-      navigate(`/readymade/${item.readymadeProduct._id}`);
-    } else if (item.kind === 'DESIGN' && item.design?._id) {
-      navigate(`/catalogue/${item.design._id}`);
-    } else if (item.product?._id) {
-      navigate(`/products/${item.product._id}`);
-    }
-  };
+const handleImageClick = (item) => {
+  if (item.kind === "READYMADE") {
+    const dropId = getDropId(item);
+    if (dropId) return navigate(`/dropproducts/${dropId}`);
+
+    if (item.readymadeProduct?._id) return navigate(`/readymade/${item.readymadeProduct._id}`);
+  }
+
+  if (item.kind === "DESIGN" && item.design?._id) {
+    return navigate(`/catalogue/${item.design._id}`);
+  }
+
+  if (item.product?._id) {
+    return navigate(`/products/${item.product._id}`);
+  }
+};
+
+
 
   // Loading state
   if (loading && cartItems.length === 0) {
@@ -404,6 +463,7 @@ const CartPage = () => {
     );
   }
 
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       {/* Notification Toast */}
@@ -478,6 +538,7 @@ const CartPage = () => {
               </div>
 
               <div className="divide-y divide-gray-200">
+                const maxStock = getMaxStock(item);
                 {cartItems.map((item) => {
                   const isUpdating = updatingItem === item._id;
                   const isRemoving = removingItem === item._id;

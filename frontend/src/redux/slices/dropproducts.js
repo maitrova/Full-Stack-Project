@@ -13,15 +13,17 @@ export const createDropproduct = createAsyncThunk(
       const formData = new FormData();
       
       // Append product fields
-      Object.keys(productData).forEach(key => {
-        if (key === 'images' && Array.isArray(productData[key])) {
-          productData[key].forEach((file, index) => {
-            formData.append('images', file);
-          });
-        } else {
-          formData.append(key, productData[key]);
-        }
-      });
+      Object.keys(productData).forEach((key) => {
+  if (key === "images" && Array.isArray(productData[key])) {
+    productData[key].forEach((file) => formData.append("images", file));
+  } else if (key === "variants") {
+    // ✅ important
+    formData.append("variants", JSON.stringify(productData.variants || []));
+  } else {
+    formData.append(key, productData[key]);
+  }
+});
+
 
       const response = await axios.post(
         `${API_BASE_URL}`,
@@ -70,18 +72,19 @@ export const updateDropproduct = createAsyncThunk(
       const formData = new FormData();
       
       // Append product fields
-      Object.keys(productData).forEach(key => {
-        if (key === 'images' && Array.isArray(productData[key])) {
-          productData[key].forEach((file, index) => {
-            // Check if it's a File object or string path
-            if (file instanceof File) {
-              formData.append('images', file);
-            }
-          });
-        } else {
-          formData.append(key, productData[key]);
-        }
-      });
+      Object.keys(productData).forEach((key) => {
+  if (key === "images" && Array.isArray(productData[key])) {
+    productData[key].forEach((file) => {
+      if (file instanceof File) formData.append("images", file);
+    });
+  } else if (key === "variants") {
+    // ✅ important
+    formData.append("variants", JSON.stringify(productData.variants || []));
+  } else {
+    formData.append(key, productData[key]);
+  }
+});
+
 
       const response = await axios.put(
         `${API_BASE_URL}/${id}`,

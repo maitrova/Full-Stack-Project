@@ -1,13 +1,20 @@
-// DropProductDetailsPage.jsx - Individual product page
-import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
+// DropProductDetailsPage.jsx - Individual product page (FIXED)
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import {
   getDropproductById,
   selectCurrentProduct,
   selectLoading,
   clearCurrentProduct,
-} from '../redux/slices/dropproducts.js';
+} from "../redux/slices/dropproducts.js";
+import {
+  addToCart,
+  selectCartLoading,
+  selectCartError,
+  selectCartSuccess,
+  clearError as clearCartError,
+} from "../redux/slices/cartSlice.js";
 import {
   ChevronLeft,
   ChevronRight,
@@ -26,62 +33,109 @@ import {
   Facebook,
   Twitter,
   Package,
-} from 'lucide-react';
+  AlertCircle,
+} from "lucide-react";
 
 const DropProductDetailsPage = () => {
   const { id } = useParams();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+
   const product = useSelector(selectCurrentProduct);
   const loading = useSelector(selectLoading);
-  
+
+  const cartLoading = useSelector(selectCartLoading);
+  const cartError = useSelector(selectCartError);
+  const cartSuccess = useSelector(selectCartSuccess);
+
+  const [selectedSize, setSelectedSize] = useState("");
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [isFavorite, setIsFavorite] = useState(false);
   const [showShareOptions, setShowShareOptions] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
-  
+  const [showCartSuccess, setShowCartSuccess] = useState(false);
+
   const mainImageRef = useRef(null);
   const thumbnailContainerRef = useRef(null);
 
+  // ✅ IMPORTANT: this should be your backend base URL for serving images
   const IMAGE_URL = import.meta.env.VITE_IMAGE_URL || "https://narifighter.online/backend";
 
-  useEffect(() => {
-    if (id) {
-      dispatch(getDropproductById(id));
-    }
+  const buildImg = (path) => {
+    if (!path) return "";
+    if (path.startsWith("http://") || path.startsWith("https://")) return path;
+    const base = IMAGE_URL.endsWith("/") ? IMAGE_URL.slice(0, -1) : IMAGE_URL;
+    const p = path.startsWith("/") ? path : `/${path}`;
+    return `${base}${p}`;
+  };
 
-    return () => {
-      dispatch(clearCurrentProduct());
-    };
+  useEffect(() => {
+    if (id) dispatch(getDropproductById(id));
+    return () => dispatch(clearCurrentProduct());
   }, [id, dispatch]);
+
+  // Clear cart error after timeout
+  useEffect(() => {
+    if (!cartError) return;
+    const timer = setTimeout(() => dispatch(clearCartError()), 5000);
+    return () => clearTimeout(timer);
+  }, [cartError, dispatch]);
+
+  useEffect(() => {
+    if (!cartSuccess) return;
+    setShowCartSuccess(true);
+    const timer = setTimeout(() => setShowCartSuccess(false), 3000);
+    return () => clearTimeout(timer);
+  }, [cartSuccess]);
+
+  // ✅ Normalize variants + selection
+  const variants = useMemo(() => (Array.isArray(product?.variants) ? product.variants : []), [product]);
+  const normalizedSelectedSize = String(selectedSize || "").toUpperCase();
+
+  const selectedVariant = useMemo(() => {
+    if (!variants.length) return null;
+    const found = variants.find((v) => String(v.size || "").toUpperCase() === normalizedSelectedSize);
+    return found || variants[0] || null;
+  }, [variants, normalizedSelectedSize]);
+
+  const currentPrice = selectedVariant?.price ?? 0;
+  const currentStock = selectedVariant?.stock ?? 0;
+
+  // ✅ Keep size default when product loads
+  useEffect(() => {
+    if (!product?._id) return;
+    if (!variants.length) return;
+
+    const stillValid = variants.some((v) => String(v.size || "").toUpperCase() === normalizedSelectedSize);
+    const defaultSize = stillValid ? selectedSize : variants[0].size;
+
+    setSelectedSize(defaultSize || "");
+    setQuantity(1);
+  }, [product?._id]); // intentionally only when product changes
 
   // Auto-rotate images
   useEffect(() => {
     if (!product?.images || product.images.length <= 1) return;
-
-    const interval = setInterval(() => {
-      nextImage();
-    }, 5000);
-
+    const interval = setInterval(() => nextImage(), 5000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product?.images, selectedImageIndex]);
 
   const scrollToImage = (index) => {
     setSelectedImageIndex(index);
     setImageLoading(true);
-    
-    // Scroll thumbnails container to show the selected thumbnail
+
     if (thumbnailContainerRef.current) {
-      const thumbnailWidth = 80; // thumbnail width + gap
+      const thumbnailWidth = 80; // width + gap
       const containerWidth = thumbnailContainerRef.current.clientWidth;
       const thumbnailsCount = product?.images?.length || 0;
-      const maxScroll = (thumbnailsCount * thumbnailWidth) - containerWidth;
+      const maxScroll = thumbnailsCount * thumbnailWidth - containerWidth;
       const scrollPosition = index * thumbnailWidth - containerWidth / 2 + thumbnailWidth / 2;
-      
+
       thumbnailContainerRef.current.scrollTo({
         left: Math.max(0, Math.min(maxScroll, scrollPosition)),
-        behavior: 'smooth'
+        behavior: "smooth",
       });
     }
   };
@@ -92,63 +146,149 @@ const DropProductDetailsPage = () => {
   };
 
   const prevImage = () => {
-    const prevIndex = (selectedImageIndex - 1 + (product?.images?.length || 1)) % (product?.images?.length || 1);
+    const prevIndex =
+      (selectedImageIndex - 1 + (product?.images?.length || 1)) % (product?.images?.length || 1);
     scrollToImage(prevIndex);
   };
 
   const handleQuantityChange = (change) => {
     const newQuantity = quantity + change;
-    if (newQuantity >= 1 && newQuantity <= (product?.stock || 0)) {
-      setQuantity(newQuantity);
-    }
+    if (newQuantity >= 1 && newQuantity <= currentStock) setQuantity(newQuantity);
   };
 
+  // ✅ INR formatting (you were formatting USD before)
   const formatPrice = (price) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(price);
+    const p = typeof price === "number" ? price : Number(price || 0);
+    return `₹${p.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
   };
 
   const calculateDiscount = (original, current) => {
-    if (original > current) {
-      const discount = ((original - current) / original) * 100;
-      return Math.round(discount);
-    }
+    if (original > current) return Math.round(((original - current) / original) * 100);
     return 0;
   };
 
-  const handleAddToCart = () => {
-    // Add to cart logic here
-    alert(`Added ${quantity} ${product?.name} to cart!`);
+  // ✅ Use currentPrice for discount, not product.price
+  const originalPrice = product?.originalPrice ?? currentPrice * 1.2;
+  const discount = calculateDiscount(originalPrice, currentPrice);
+
+  // ✅ Signature should NOT rely on variant._id (your variant objects may not have _id)
+  const generateSignature = () => {
+    const sku = selectedVariant?.sku ? String(selectedVariant.sku) : "";
+    return `READYMADE_DROP_${product?._id || ""}_${String(selectedSize || "").toUpperCase()}_${sku}`;
+  };
+
+  // ✅ Add to cart (FIX: send dropproductId + dropproductName for CartPage display)
+  const handleAddToCart = async () => {
+    if (!selectedVariant) {
+      alert("Please select a size first");
+      return;
+    }
+    if (currentStock === 0) {
+      alert("This product is out of stock");
+      return;
+    }
+    if (quantity > currentStock) {
+      alert(`Only ${currentStock} units available`);
+      return;
+    }
+
+    const cartData = {
+      kind: "READYMADE",
+      dropproductId: product._id, // ✅ correct id for drop product
+      size: selectedSize,
+      qty: quantity,
+      unitPrice: currentPrice,
+      currency: "INR",
+      previewImage: product?.images?.[0] || "",
+      signature: generateSignature(),
+
+      // ✅ these fields help you show correct name even if backend doesn't populate dropproduct object
+      dropproductName: product?.name || product?.title || "Drop Product",
+      name: product?.name || product?.title || "Drop Product",
+
+      // Optional metadata
+      category: product?.category,
+      variantSku: selectedVariant?.sku,
+      variantSize: selectedVariant?.size,
+      maxStock: currentStock,
+    };
+
+    try {
+      await dispatch(addToCart(cartData)).unwrap();
+    } catch (err) {
+      console.error("Failed to add to cart:", err);
+    }
+  };
+
+  // ✅ Buy now should use SAME dropproductId (your earlier code used readymadeProduct incorrectly)
+  const handleBuyNow = async () => {
+    if (!selectedVariant) {
+      alert("Please select a size first");
+      return;
+    }
+    if (currentStock === 0) {
+      alert("This product is out of stock");
+      return;
+    }
+    if (quantity > currentStock) {
+      alert(`Only ${currentStock} units available`);
+      return;
+    }
+
+    const cartData = {
+      kind: "READYMADE",
+      dropproductId: product._id,
+      size: selectedSize,
+      qty: quantity,
+      unitPrice: currentPrice,
+      currency: "INR",
+      previewImage: product?.images?.[0] || "",
+      signature: generateSignature(),
+      dropproductName: product?.name || product?.title || "Drop Product",
+      name: product?.name || product?.title || "Drop Product",
+      category: product?.category,
+      variantSku: selectedVariant?.sku,
+      variantSize: selectedVariant?.size,
+      maxStock: currentStock,
+    };
+
+    try {
+      await dispatch(addToCart(cartData)).unwrap();
+      navigate("/checkout");
+    } catch (err) {
+      console.error("Failed to add to cart:", err);
+    }
   };
 
   const handleShare = (platform) => {
     const shareUrl = window.location.href;
-    const text = `Check out ${product?.name} - ${formatPrice(product?.price || 0)}`;
-    
+    const text = `Check out ${product?.name} - ${formatPrice(currentPrice)}`;
+
     switch (platform) {
-      case 'facebook':
-        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
+      case "facebook":
+        window.open(
+          `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`,
+          "_blank"
+        );
         break;
-      case 'twitter':
-        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`, '_blank');
+      case "twitter":
+        window.open(
+          `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(
+            shareUrl
+          )}`,
+          "_blank"
+        );
         break;
-      case 'instagram':
-        // Instagram doesn't support direct sharing via web
+      case "instagram":
         navigator.clipboard.writeText(shareUrl);
-        alert('Link copied to clipboard! Paste it in Instagram.');
+        alert("Link copied to clipboard! Paste it in Instagram.");
         break;
       default:
         if (navigator.share) {
-          navigator.share({
-            title: product?.name,
-            text: text,
-            url: shareUrl,
-          });
+          navigator.share({ title: product?.name, text, url: shareUrl });
         } else {
           navigator.clipboard.writeText(shareUrl);
-          alert('Link copied to clipboard!');
+          alert("Link copied to clipboard!");
         }
     }
     setShowShareOptions(false);
@@ -165,10 +305,60 @@ const DropProductDetailsPage = () => {
     );
   }
 
-  const discount = calculateDiscount(product.originalPrice || product.price * 1.2, product.price);
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      {/* Cart Success Notification */}
+      {showCartSuccess && (
+        <div className="fixed top-4 right-4 z-50 animate-slide-in">
+          <div className="bg-green-50 border border-green-200 rounded-xl shadow-lg p-4 max-w-sm">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Check className="h-6 w-6 text-green-600" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-green-800">Added to cart successfully!</h3>
+                <p className="mt-1 text-sm text-green-700">
+                  {quantity} × {product.name} ({selectedVariant?.size})
+                </p>
+                <div className="mt-2">
+                  <button
+                    onClick={() => navigate("/cart")}
+                    className="text-sm font-medium text-green-700 hover:text-green-800 underline"
+                  >
+                    View Cart →
+                  </button>
+                </div>
+              </div>
+              <button onClick={() => setShowCartSuccess(false)} className="ml-auto pl-3">
+                <span className="sr-only">Close</span>
+                <span className="text-green-500 hover:text-green-700">×</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cart Error Notification */}
+      {cartError && (
+        <div className="fixed top-4 right-4 z-50 animate-slide-in">
+          <div className="bg-red-50 border border-red-200 rounded-xl shadow-lg p-4 max-w-sm">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <AlertCircle className="h-6 w-6 text-red-600" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Cart Error</h3>
+                <p className="mt-1 text-sm text-red-700">{cartError}</p>
+              </div>
+              <button onClick={() => dispatch(clearCartError())} className="ml-auto pl-3">
+                <span className="sr-only">Close</span>
+                <span className="text-red-500 hover:text-red-700">×</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Back Navigation */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         <button
@@ -185,34 +375,32 @@ const DropProductDetailsPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 xl:gap-16">
           {/* Left Column - Images */}
           <div className="space-y-6">
-            {/* Main Image with Horizontal Navigation */}
+            {/* Main Image */}
             <div className="relative bg-white rounded-3xl shadow-xl overflow-hidden group">
-              {/* Main Image Container */}
               <div className="relative h-[500px] md:h-[600px] overflow-hidden">
                 {product.images?.map((image, index) => (
                   <div
                     key={index}
                     className={`absolute inset-0 transition-opacity duration-500 ${
-                      index === selectedImageIndex ? 'opacity-100' : 'opacity-0'
+                      index === selectedImageIndex ? "opacity-100" : "opacity-0"
                     }`}
                   >
-                    {imageLoading && (
-                      <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>
-                    )}
+                    {imageLoading && <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>}
+
                     <img
                       ref={mainImageRef}
-                      src={`${IMAGE_URL}${image}`}
+                      src={buildImg(image)}
                       alt={`${product.name} - ${index + 1}`}
                       className={`w-full h-full object-contain p-4 transition-transform duration-700 ${
-                        imageLoading ? 'opacity-0' : 'opacity-100'
+                        imageLoading ? "opacity-0" : "opacity-100"
                       }`}
                       onLoad={() => setImageLoading(false)}
                       onError={() => setImageLoading(false)}
                     />
                   </div>
                 ))}
-                
-                {/* Navigation Overlay */}
+
+                {/* Nav overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={prevImage}
@@ -230,12 +418,12 @@ const DropProductDetailsPage = () => {
                   </button>
                 </div>
 
-                {/* Image Counter */}
+                {/* Counter */}
                 <div className="absolute bottom-6 right-6 px-3 py-1 bg-black/60 backdrop-blur-sm text-white text-sm rounded-full">
                   {selectedImageIndex + 1} / {product.images?.length}
                 </div>
 
-                {/* Discount Badge */}
+                {/* Discount */}
                 {discount > 0 && (
                   <div className="absolute top-6 left-6 px-4 py-2 bg-red-500 text-white font-bold rounded-lg shadow-lg">
                     -{discount}%
@@ -244,12 +432,12 @@ const DropProductDetailsPage = () => {
               </div>
             </div>
 
-            {/* Thumbnail Strip - Horizontal Scroll */}
+            {/* Thumbnails */}
             <div className="relative">
               <div
                 ref={thumbnailContainerRef}
                 className="flex space-x-3 overflow-x-auto pb-4 scrollbar-hide"
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
               >
                 {product.images?.map((image, index) => (
                   <button
@@ -257,38 +445,25 @@ const DropProductDetailsPage = () => {
                     onClick={() => scrollToImage(index)}
                     className={`flex-none w-20 h-20 rounded-xl border-2 overflow-hidden transition-all duration-300 ${
                       index === selectedImageIndex
-                        ? 'border-blue-500 ring-4 ring-blue-100 scale-105'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? "border-blue-500 ring-4 ring-blue-100 scale-105"
+                        : "border-gray-200 hover:border-gray-300"
                     }`}
                   >
-                    <img
-                      src={`${IMAGE_URL}${image}`}
-                      alt={`Thumbnail ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={buildImg(image)} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
-              
-              {/* Thumbnail Scroll Arrows */}
+
               {product.images?.length > 5 && (
                 <>
                   <button
-                    onClick={() => {
-                      if (thumbnailContainerRef.current) {
-                        thumbnailContainerRef.current.scrollBy({ left: -100, behavior: 'smooth' });
-                      }
-                    }}
+                    onClick={() => thumbnailContainerRef.current?.scrollBy({ left: -100, behavior: "smooth" })}
                     className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-2 p-2 bg-white rounded-full shadow-lg hover:shadow-xl"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => {
-                      if (thumbnailContainerRef.current) {
-                        thumbnailContainerRef.current.scrollBy({ left: 100, behavior: 'smooth' });
-                      }
-                    }}
+                    onClick={() => thumbnailContainerRef.current?.scrollBy({ left: 100, behavior: "smooth" })}
                     className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-2 p-2 bg-white rounded-full shadow-lg hover:shadow-xl"
                   >
                     <ChevronRight className="w-4 h-4" />
@@ -300,23 +475,22 @@ const DropProductDetailsPage = () => {
 
           {/* Right Column - Product Info */}
           <div className="space-y-8">
-            {/* Product Header */}
             <div>
               <div className="flex items-center justify-between mb-4">
                 <span className="px-4 py-1.5 bg-blue-100 text-blue-600 rounded-full text-sm font-medium">
                   {product.category}
                 </span>
+
                 <div className="flex items-center space-x-3">
                   <button
                     onClick={() => setIsFavorite(!isFavorite)}
                     className={`p-2.5 rounded-full transition-all hover:scale-110 ${
-                      isFavorite
-                        ? 'bg-red-50 text-red-500'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      isFavorite ? "bg-red-50 text-red-500" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                     }`}
                   >
-                    <Heart className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`} />
+                    <Heart className={`w-5 h-5 ${isFavorite ? "fill-current" : ""}`} />
                   </button>
+
                   <div className="relative">
                     <button
                       onClick={() => setShowShareOptions(!showShareOptions)}
@@ -324,26 +498,25 @@ const DropProductDetailsPage = () => {
                     >
                       <Share2 className="w-5 h-5" />
                     </button>
-                    
-                    {/* Share Dropdown */}
+
                     {showShareOptions && (
                       <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl border py-2 z-50 min-w-[200px]">
                         <button
-                          onClick={() => handleShare('facebook')}
+                          onClick={() => handleShare("facebook")}
                           className="flex items-center w-full px-4 py-3 hover:bg-blue-50 text-gray-700"
                         >
                           <Facebook className="w-5 h-5 mr-3 text-blue-600" />
                           Share on Facebook
                         </button>
                         <button
-                          onClick={() => handleShare('twitter')}
+                          onClick={() => handleShare("twitter")}
                           className="flex items-center w-full px-4 py-3 hover:bg-blue-50 text-gray-700"
                         >
                           <Twitter className="w-5 h-5 mr-3 text-blue-500" />
                           Share on Twitter
                         </button>
                         <button
-                          onClick={() => handleShare('instagram')}
+                          onClick={() => handleShare("instagram")}
                           className="flex items-center w-full px-4 py-3 hover:bg-pink-50 text-gray-700"
                         >
                           <Instagram className="w-5 h-5 mr-3 text-pink-600" />
@@ -355,57 +528,43 @@ const DropProductDetailsPage = () => {
                 </div>
               </div>
 
-              <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4 leading-tight">
-                {product.name}
-              </h1>
-              
+              <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4 leading-tight">{product.name}</h1>
+
               <div className="flex items-center space-x-6 mb-6">
                 <div className="flex items-center">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <Star
                       key={star}
-                      className={`w-6 h-6 ${
-                        star <= 4.5 ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
-                      }`}
+                      className={`w-6 h-6 ${star <= 4 ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`}
                     />
                   ))}
-                  <span className="ml-3 text-gray-600 font-medium">4.5 (128 reviews)</span>
+                  <span className="ml-3 text-gray-600 font-medium">4.0 (128 reviews)</span>
                 </div>
                 <div className="h-4 w-px bg-gray-300"></div>
-                <span className={`font-bold text-lg ${
-                  product.stock > 10 ? 'text-green-600' :
-                  product.stock > 0 ? 'text-yellow-600' : 'text-red-600'
-                }`}>
-                  {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
+                <span
+                  className={`font-bold text-lg ${
+                    currentStock > 10 ? "text-green-600" : currentStock > 0 ? "text-yellow-600" : "text-red-600"
+                  }`}
+                >
+                  {currentStock > 0 ? `${currentStock} in stock` : "Out of stock"}
                 </span>
               </div>
 
-              {/* Price */}
               <div className="flex items-baseline mb-8">
-                <span className="text-5xl font-bold text-blue-600 mr-4">
-                  {formatPrice(product.price)}
-                </span>
+                <span className="text-5xl font-bold text-blue-600 mr-4">{formatPrice(currentPrice)}</span>
                 {discount > 0 && (
                   <>
-                    <span className="text-2xl text-gray-400 line-through mr-4">
-                      {formatPrice(product.originalPrice || product.price * 1.2)}
-                    </span>
-                    <span className="px-3 py-1 bg-red-100 text-red-600 font-bold rounded-full">
-                      Save {discount}%
-                    </span>
+                    <span className="text-2xl text-gray-400 line-through mr-4">{formatPrice(originalPrice)}</span>
+                    <span className="px-3 py-1 bg-red-100 text-red-600 font-bold rounded-full">Save {discount}%</span>
                   </>
                 )}
               </div>
             </div>
 
-            {/* Product Description */}
+            {/* Description */}
             <div className="prose max-w-none border-t pt-8">
               <h3 className="text-2xl font-bold text-gray-900 mb-6">Product Details</h3>
-              <p className="text-gray-700 leading-relaxed text-lg mb-8">
-                {product.description}
-              </p>
-              
-              {/* Features */}
+              <p className="text-gray-700 leading-relaxed text-lg mb-8">{product.description}</p>
               <div className="space-y-4">
                 <div className="flex items-center">
                   <Check className="w-5 h-5 text-green-500 mr-3" />
@@ -422,7 +581,47 @@ const DropProductDetailsPage = () => {
               </div>
             </div>
 
-            {/* Quantity Selector */}
+            {/* Size Selector */}
+            {variants.length > 0 && (
+              <div className="space-y-4 border-t pt-8">
+                <h3 className="text-xl font-semibold text-gray-900">Select Size</h3>
+                <div className="flex flex-wrap gap-3">
+                  {variants.map((v) => {
+                    const isSelected = String(v.size || "").toUpperCase() === normalizedSelectedSize;
+                    const isOut = (v.stock ?? 0) === 0;
+
+                    return (
+                      <button
+                        key={v.size}
+                        type="button"
+                        onClick={() => {
+                          setSelectedSize(v.size);
+                          setQuantity(1);
+                        }}
+                        disabled={isOut}
+                        className={`px-5 py-3 rounded-xl border font-semibold transition-all
+                          ${isSelected ? "border-blue-500 ring-4 ring-blue-100" : "border-gray-200 hover:border-gray-300"}
+                          ${isOut ? "opacity-50 cursor-not-allowed bg-gray-50" : "bg-white"}
+                        `}
+                      >
+                        {v.size}
+                        <span className="ml-2 text-sm text-gray-500">({v.stock} left)</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {selectedVariant && (
+                  <div className="text-gray-600">
+                    <span className="font-semibold text-gray-900">Price:</span> {formatPrice(currentPrice)}
+                    <span className="mx-2">•</span>
+                    <span className="font-semibold text-gray-900">Stock:</span> {currentStock}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Quantity */}
             <div className="space-y-4 border-t pt-8">
               <h3 className="text-xl font-semibold text-gray-900">Quantity</h3>
               <div className="flex items-center space-x-6">
@@ -437,46 +636,54 @@ const DropProductDetailsPage = () => {
                   <span className="px-8 py-3 text-xl font-bold border-x border-gray-300">{quantity}</span>
                   <button
                     onClick={() => handleQuantityChange(1)}
-                    disabled={quantity >= product.stock}
+                    disabled={quantity >= currentStock}
                     className="px-5 py-3 text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
                   >
                     <Plus className="w-5 h-5" />
                   </button>
                 </div>
-                <span className="text-gray-600">
-                  {product.stock} units available
-                </span>
+                <span className="text-gray-600">{currentStock} units available</span>
               </div>
             </div>
 
-            {/* Action Buttons */}
+            {/* Actions */}
             <div className="space-y-4 border-t pt-8">
               <button
                 onClick={handleAddToCart}
-                disabled={product.stock === 0}
+                disabled={currentStock === 0 || !selectedVariant || cartLoading}
                 className={`w-full py-4 rounded-xl font-bold text-lg transition-all duration-300 flex items-center justify-center ${
-                  product.stock === 0
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 hover:shadow-xl active:scale-95'
-                }`}
+                  currentStock === 0 || !selectedVariant
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 hover:shadow-xl active:scale-95"
+                } ${cartLoading ? "opacity-70 cursor-wait" : ""}`}
               >
-                <ShoppingBag className="w-6 h-6 mr-3" />
-                {product.stock === 0 ? 'Out of Stock' : `Add to Cart - ${formatPrice(product.price * quantity)}`}
+                {cartLoading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3"></div>
+                    Adding to Cart...
+                  </>
+                ) : (
+                  <>
+                    <ShoppingBag className="w-6 h-6 mr-3" />
+                    {currentStock === 0 ? "Out of Stock" : `Add to Cart - ${formatPrice(currentPrice * quantity)}`}
+                  </>
+                )}
               </button>
-              
+
               <button
-                disabled={product.stock === 0}
+                onClick={handleBuyNow}
+                disabled={currentStock === 0 || !selectedVariant || cartLoading}
                 className={`w-full py-4 rounded-xl font-bold text-lg transition-all duration-300 ${
-                  product.stock === 0
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 hover:shadow-xl active:scale-95'
-                }`}
+                  currentStock === 0 || !selectedVariant
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700 hover:shadow-xl active:scale-95"
+                } ${cartLoading ? "opacity-70 cursor-wait" : ""}`}
               >
-                {product.stock === 0 ? 'Unavailable' : `Buy Now - ${formatPrice(product.price * quantity)}`}
+                {currentStock === 0 ? "Unavailable" : `Buy Now - ${formatPrice(currentPrice * quantity)}`}
               </button>
             </div>
 
-            {/* Product Features */}
+            {/* Features */}
             <div className="grid grid-cols-2 gap-6 pt-8 border-t">
               <div className="flex items-center space-x-4 p-4 bg-blue-50 rounded-xl">
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -487,6 +694,7 @@ const DropProductDetailsPage = () => {
                   <p className="text-sm text-gray-600">Delivery in 3-5 days</p>
                 </div>
               </div>
+
               <div className="flex items-center space-x-4 p-4 bg-green-50 rounded-xl">
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                   <Shield className="w-6 h-6 text-green-600" />
@@ -496,6 +704,7 @@ const DropProductDetailsPage = () => {
                   <p className="text-sm text-gray-600">Free repairs included</p>
                 </div>
               </div>
+
               <div className="flex items-center space-x-4 p-4 bg-purple-50 rounded-xl">
                 <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
                   <RotateCw className="w-6 h-6 text-purple-600" />
@@ -505,6 +714,7 @@ const DropProductDetailsPage = () => {
                   <p className="text-sm text-gray-600">30-day return policy</p>
                 </div>
               </div>
+
               <div className="flex items-center space-x-4 p-4 bg-amber-50 rounded-xl">
                 <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
                   <Package className="w-6 h-6 text-amber-600" />
@@ -518,13 +728,11 @@ const DropProductDetailsPage = () => {
           </div>
         </div>
 
-        {/* Related Products Section */}
+        {/* Related Products (placeholder) */}
         <div className="mt-20 pt-12 border-t">
           <h2 className="text-3xl font-bold text-gray-900 mb-8">You Might Also Like</h2>
-          
           <div className="relative">
             <div className="flex overflow-x-auto space-x-6 pb-6 scrollbar-hide">
-              {/* Add related products here */}
               <div className="flex-none w-64">
                 <div className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
                   <div className="h-40 bg-gray-200 animate-pulse"></div>
@@ -535,7 +743,7 @@ const DropProductDetailsPage = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="absolute right-0 top-0 transform -translate-y-1/2">
               <Link
                 to="/"

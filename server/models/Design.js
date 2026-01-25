@@ -4,6 +4,8 @@ const PRINT_ZONES = [
   "front-full",
   "front-chest",
   "front-left-chest",
+  "front-pocket",   // ✅ add this
+  "pocket",         // ✅ add this (optional but recommended since frontend sends it)
   "back-full",
   "back-upper",
   "sleeve-left",
@@ -116,6 +118,7 @@ const designSchema = new mongoose.Schema(
     },
     
     // Pricing fields
+    selectedSize: { type: String, default: null }, 
     basePrice: { type: Number, default: 600 },
     calculatedPrice: { type: Number, default: 0 },
     priceBreakdown: {

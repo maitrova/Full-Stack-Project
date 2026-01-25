@@ -43,7 +43,8 @@ import {
   Zap,
   Globe,
   Cpu,
-  BarChart3
+  BarChart3,
+  AlertCircle
 } from "lucide-react";
 
 // Import cart actions and selectors
@@ -62,6 +63,20 @@ import {
 
 // Import user selector for login check
 import { selectCurrentToken } from "../redux/slices/Userslice.js";
+
+// Import product size selection slice actions and selectors
+import {
+  fetchProductPrice,
+  selectSize,
+  setDesignId,
+  calculatePriceLocally,
+  clearError as clearPriceError,
+  selectPriceDetails,
+  selectIsLoading as selectPriceLoading,
+  selectError as selectPriceError,
+  selectIsSizeSelected,
+  resetProductSizeSelection
+} from "../redux/slices/productsizeselection.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
 
@@ -87,6 +102,13 @@ export default function CatalogueDetailPage() {
   const cartError = useSelector(selectCartError);
   const cartSuccess = useSelector(selectCartSuccess);
   const token = useSelector(selectCurrentToken);
+  
+  // Product size selection selectors
+  const priceDetails = useSelector(selectPriceDetails);
+  const priceLoading = useSelector(selectPriceLoading);
+  const priceError = useSelector(selectPriceError);
+  const isSizeSelected = useSelector(selectIsSizeSelected);
+  
   const canPurchase = !!token && !!selectedSize;
 
   useEffect(() => {
@@ -96,6 +118,9 @@ export default function CatalogueDetailPage() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to load design");
         setDesign(data);
+        
+        // Set design ID in the size selection slice
+        dispatch(setDesignId(data._id));
       } catch (err) {
         setError(err.message);
       } finally {
@@ -103,21 +128,68 @@ export default function CatalogueDetailPage() {
       }
     };
     fetchDesign();
-  }, [id]);
+  }, [id, dispatch]);
 
-  // Get cart quantity for this design
+  // Fetch price when size is selected
+  useEffect(() => {
+    if (selectedSize && design?._id) {
+      console.log(`Fetching price for design ${design._id}, size ${selectedSize}`);
+      dispatch(fetchProductPrice({ designId: design._id, selectedSize }))
+        .unwrap()
+        .catch((error) => {
+          console.warn('Price API failed, using local calculation:', error);
+          // If API fails, calculate price locally
+          const basePrice = design.salePrice || design.product?.basePrice || 0;
+          if (basePrice > 0) {
+            dispatch(calculatePriceLocally({ basePrice, selectedSize }));
+          }
+        });
+    }
+  }, [selectedSize, design?._id, dispatch]);
+
+  // Handle size selection
+  const handleSizeSelect = (size) => {
+    setSelectedSize(size);
+    dispatch(selectSize(size));
+    dispatch(clearPriceError()); // Clear any previous errors
+  };
+
+  // Get the current price (either from API, local calculation, or fallback to design sale price)
+  const getCurrentPrice = () => {
+    // If we have calculated price from API or local calculation
+    if (priceDetails?.calculatedPrice > 0) {
+      return priceDetails.calculatedPrice;
+    }
+    
+    // If we have base price from API
+    if (priceDetails?.basePrice > 0) {
+      return priceDetails.basePrice;
+    }
+    
+    // Fallback to design sale price
+    return design?.salePrice || design?.product?.basePrice || 0;
+  };
+
+  // Check if price is from API or local calculation
+  const isLocalPrice = priceDetails?.calculatedPrice > 0 && priceError;
+
+  // Get cart quantity for this design and size
   const getCartQuantity = () => {
     if (localCartQuantity !== 0) {
       return localCartQuantity;
     }
     
-    const item = cartItems.find(item => item.designId === id);
+    const item = cartItems.find(item => 
+      item.designId === id && 
+      item.size === selectedSize
+    );
     return item ? item.qty : 0;
   };
 
   const quantity = getCartQuantity();
   const isInCart = quantity > 0;
   const isUpdating = cartLoading && localCartQuantity !== 0;
+  const currentPrice = getCurrentPrice();
 
   // Handle notifications
   useEffect(() => {
@@ -138,7 +210,19 @@ export default function CatalogueDetailPage() {
       });
       dispatch(clearError());
     }
-  }, [cartSuccess, cartError, dispatch]);
+    
+    if (priceError) {
+      console.log('Price error detected:', priceError);
+      // Don't show notification for price errors if we have local calculation
+      if (!priceDetails?.calculatedPrice) {
+        setNotification({
+          show: true,
+          message: `Using estimated price for ${selectedSize}. API temporarily unavailable.`,
+          type: 'warning'
+        });
+      }
+    }
+  }, [cartSuccess, cartError, priceError, dispatch, priceDetails, selectedSize]);
 
   // Clear notifications after 3 seconds
   useEffect(() => {
@@ -177,20 +261,30 @@ export default function CatalogueDetailPage() {
       fd.append("designId", design._id);
       fd.append("productId", design.product?._id || design.productId || "");
       fd.append("title", design.title || design.productName || "");
-      fd.append("unitPrice", String(design.salePrice || design.product?.basePrice || 0));
-      fd.append("basePrice", String(design.product?.basePrice || design.salePrice || 0));
+      fd.append("unitPrice", String(currentPrice));
+      fd.append("basePrice", String(design.product?.basePrice || currentPrice));
       fd.append("qty", "1");
       fd.append("previewImage", design.previewImage || design.views?.[0]?.previewImage || "");
-      fd.append("signature", `${design._id}-${design.product?._id || design.productId || ""}`);
+      fd.append("signature", `${design._id}-${design.product?._id || design.productId || ""}-${selectedSize}`);
       fd.append("kind", kind);
       fd.append("size", selectedSize);
       fd.append("views", JSON.stringify(design.views || []));
+      
+      // Add price details if available
+      if (priceDetails) {
+        fd.append("priceDetails", JSON.stringify(priceDetails));
+      }
 
       setLocalCartQuantity(1);
       await dispatch(addToCart(fd)).unwrap();
       setTimeout(() => setLocalCartQuantity(0), 2000);
     } catch (error) {
       console.error("Failed to add to cart:", error);
+      setNotification({
+        show: true,
+        message: 'Failed to add to cart. Please try again.',
+        type: 'error'
+      });
       setLocalCartQuantity(0);
     }
   };
@@ -209,7 +303,10 @@ export default function CatalogueDetailPage() {
     if (!design) return;
 
     const currentQty = quantity;
-    const cartItem = cartItems.find(item => item.designId === design._id);
+    const cartItem = cartItems.find(item => 
+      item.designId === design._id && 
+      item.size === selectedSize
+    );
     
     if (!cartItem) {
       handleAddToCart();
@@ -247,7 +344,10 @@ export default function CatalogueDetailPage() {
     if (!design) return;
 
     const currentQty = quantity;
-    const cartItem = cartItems.find(item => item.designId === design._id);
+    const cartItem = cartItems.find(item => 
+      item.designId === design._id && 
+      item.size === selectedSize
+    );
     
     if (!cartItem || currentQty <= 1) {
       handleRemoveFromCart();
@@ -284,7 +384,10 @@ export default function CatalogueDetailPage() {
 
     if (!design) return;
 
-    const cartItem = cartItems.find(item => item.designId === design._id);
+    const cartItem = cartItems.find(item => 
+      item.designId === design._id && 
+      item.size === selectedSize
+    );
     if (!cartItem) return;
 
     try {
@@ -322,16 +425,18 @@ export default function CatalogueDetailPage() {
     }
   };
 
-  // Reset cart state on unmount
+  // Reset states on unmount
   useEffect(() => {
     return () => {
       dispatch(resetCartState());
+      dispatch(resetProductSizeSelection());
     };
   }, [dispatch]);
 
   // Reset local cart quantity when design changes
   useEffect(() => {
     setLocalCartQuantity(0);
+    setSelectedSize("");
   }, [id]);
 
   if (loading) return (
@@ -532,7 +637,7 @@ export default function CatalogueDetailPage() {
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                       <span className="text-sm font-medium text-gray-700 tracking-tight">
-                        IN CART • {quantity} ITEMS
+                        IN CART • {quantity} ITEMS • SIZE: {selectedSize}
                       </span>
                     </div>
                   )}
@@ -639,7 +744,7 @@ export default function CatalogueDetailPage() {
                 <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
                   <button
                     onClick={handleDecrement}
-                    disabled={isUpdating}
+                    disabled={isUpdating || priceLoading}
                     className="flex-1 p-4 text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors flex items-center justify-center border-r border-gray-300"
                   >
                     <Minus className="w-5 h-5" />
@@ -647,15 +752,15 @@ export default function CatalogueDetailPage() {
                   <div className="flex-1 p-4 text-center">
                     <div>
                       <span className="text-lg font-semibold text-gray-900 tracking-tight">{quantity}</span>
-                      <span className="text-xs text-gray-500 block tracking-tight">IN CART</span>
+                      <span className="text-xs text-gray-500 block tracking-tight">IN CART • SIZE: {selectedSize}</span>
                     </div>
                   </div>
                   <button
                     onClick={handleIncrement}
-                    disabled={isUpdating}
+                    disabled={isUpdating || priceLoading}
                     className="flex-1 p-4 text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors flex items-center justify-center border-l border-gray-300"
                   >
-                    {isUpdating ? (
+                    {isUpdating || priceLoading ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
                     ) : (
                       <Plus className="w-5 h-5" />
@@ -665,33 +770,34 @@ export default function CatalogueDetailPage() {
               ) : (
                 <button
                   onClick={handleAddToCart}
-                  disabled={isUpdating || !token || !selectedSize}
+                  disabled={isUpdating || priceLoading || !token || !selectedSize}
                   className={`h-14 rounded-lg font-semibold tracking-tight transition-all flex items-center justify-center gap-3 border ${
                     token && selectedSize
                       ? 'border-gray-900 bg-gray-900 text-white hover:bg-gray-800' 
                       : 'border-gray-300 bg-gray-100 text-gray-500 cursor-not-allowed'
-                  } ${isUpdating ? 'opacity-50' : ''}`}
+                  } ${isUpdating || priceLoading ? 'opacity-50' : ''}`}
                 >
-                  {isUpdating ? (
+                  {(isUpdating || priceLoading) ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
                     <ShoppingCart className="w-5 h-5" />
                   )}
                   {token ? 'ADD TO CART' : 'LOGIN REQUIRED'}
                   <span className={`${token && selectedSize ? 'text-gray-300' : 'text-gray-400'}`}>
-                    ₹{design.salePrice || 0}
+                    ₹{currentPrice}
+                    {(priceLoading) && <span className="text-xs ml-1">(loading...)</span>}
                   </span>
                 </button>
               )}
               
               <button
                 onClick={handleBuyNow}
-                disabled={isUpdating || !token || !selectedSize}
+                disabled={isUpdating || priceLoading || !token || !selectedSize}
                 className={`h-14 rounded-lg font-semibold tracking-tight transition-all flex items-center justify-center gap-3 border ${
                   token && selectedSize
                     ? 'border-gray-900 bg-white text-gray-900 hover:bg-gray-50' 
                     : 'border-gray-300 bg-gray-100 text-gray-500 cursor-not-allowed'
-                } ${isUpdating ? 'opacity-50' : ''}`}
+                } ${isUpdating || priceLoading ? 'opacity-50' : ''}`}
               >
                 <CreditCard className="w-5 h-5" />
                 {token ? 'BUY NOW' : 'LOGIN TO BUY'}
@@ -736,7 +842,12 @@ export default function CatalogueDetailPage() {
               <div className="mb-8">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-medium text-gray-700 tracking-tight">SELECT SIZE</span>
-                  <Layers className="w-4 h-4 text-gray-400" />
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-gray-400" />
+                    {priceLoading && selectedSize && (
+                      <Loader2 className="w-3 h-3 text-gray-500 animate-spin" />
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-5 gap-2">
@@ -746,12 +857,13 @@ export default function CatalogueDetailPage() {
                       <button
                         key={s}
                         type="button"
-                        onClick={() => setSelectedSize(s)}
+                        onClick={() => handleSizeSelect(s)}
+                        disabled={priceLoading}
                         className={`py-3 rounded-lg border text-sm font-medium tracking-tight transition-all ${
                           active
                             ? "border-gray-900 bg-gray-900 text-white"
                             : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
-                        }`}
+                        } ${priceLoading ? 'opacity-50' : ''}`}
                       >
                         {s}
                       </button>
@@ -770,16 +882,76 @@ export default function CatalogueDetailPage() {
               <div className="mb-8">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-gray-700 tracking-tight">PRICE</span>
-                  <Tag className="w-4 h-4 text-gray-400" />
+                  <div className="flex items-center gap-2">
+                    {selectedSize && (
+                      <span className="text-xs text-gray-600 tracking-tight">SIZE: {selectedSize}</span>
+                    )}
+                    <Tag className="w-4 h-4 text-gray-400" />
+                  </div>
                 </div>
+                
+                {/* Price warning for local calculation */}
+                {isLocalPrice && (
+                  <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs font-medium text-yellow-800 tracking-tight">
+                          Using estimated price. Live price calculation temporarily unavailable.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="flex items-baseline gap-3">
                   <span className="text-3xl font-bold text-gray-900 tracking-tight">
-                    ₹{design.salePrice || 0}
+                    ₹{currentPrice}
+                    {priceLoading && selectedSize && (
+                      <span className="text-sm font-normal text-gray-500 ml-2">(loading...)</span>
+                    )}
                   </span>
-                  {design.product?.basePrice && design.salePrice < design.product.basePrice && (
+                  {design.product?.basePrice && currentPrice < design.product.basePrice && (
                     <span className="text-gray-400 line-through text-sm">₹{design.product.basePrice}</span>
                   )}
                 </div>
+                
+                {/* Price Breakdown (if available from API or local calculation) */}
+                {(priceDetails?.priceBreakdown || priceDetails?.calculatedPrice > 0) && (
+                  <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-gray-600 tracking-tight">
+                        Price breakdown for {selectedSize}:
+                        {isLocalPrice && (
+                          <span className="text-yellow-600 ml-1">(estimated)</span>
+                        )}
+                      </p>
+                      {!isLocalPrice && priceDetails?.size === selectedSize && (
+                        <div className="flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3 text-green-500" />
+                          <span className="text-xs text-green-600 tracking-tight">Live price</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-1 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Base Price:</span>
+                        <span className="font-medium">₹{priceDetails.basePrice || design.salePrice || 0}</span>
+                      </div>
+                      {priceDetails.additionalCharges > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Size Adjustment:</span>
+                          <span className="font-medium">+₹{priceDetails.additionalCharges}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between border-t border-gray-300 pt-1">
+                        <span className="text-gray-900 font-semibold">Total:</span>
+                        <span className="font-bold">₹{currentPrice}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <p className="text-xs text-gray-500 mt-2 tracking-tight">Inclusive of all taxes</p>
                 
                 {/* Cart Summary */}
@@ -787,7 +959,8 @@ export default function CatalogueDetailPage() {
                   <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
                     <p className="text-sm text-gray-900 font-medium tracking-tight">
                       <span className="font-bold">{quantity} item(s)</span> in cart • 
-                      Total: <span className="font-bold">₹{(quantity * (design.salePrice || 0)).toFixed(2)}</span>
+                      Size: <span className="font-bold">{selectedSize}</span> • 
+                      Total: <span className="font-bold">₹{(quantity * currentPrice).toFixed(2)}</span>
                     </p>
                   </div>
                 )}

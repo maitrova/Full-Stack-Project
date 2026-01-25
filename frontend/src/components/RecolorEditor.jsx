@@ -32,6 +32,8 @@ const DEFAULT_PRODUCT_KEY = "hoodie_basic";
 const DEFAULT_ZONES_BY_VIEW = {
   front: ["front-full", "pocket"],
   back: ["back-full"],
+  left: ["sleeve-left"],
+  right: ["sleeve-right"],
 };
 
 /* =========================
@@ -54,8 +56,8 @@ const DEFAULT_ZONE_TO_SPEC_KEY = {
 const FALLBACK_BOUNDARIES = {
   "front-full": { minX: 0.3, maxX: 0.7, minY: 0.25, maxY: 0.65 },
   pocket: { minX: 0.365, maxX: 0.635, minY: 0.67, maxY: 0.87 },
-  // "sleeve-left": { minX: 0.15, maxX: 0.3, minY: 0.18, maxY: 0.32 },
-  // "sleeve-right": { minX: 0.7, maxX: 0.85, minY: 0.18, maxY: 0.32 },
+  "sleeve-left": { minX: 0.15, maxX: 0.3, minY: 0.18, maxY: 0.32 },
+  "sleeve-right": { minX: 0.7, maxX: 0.85, minY: 0.18, maxY: 0.32 },
   "back-full": { minX: 0.3, maxX: 0.7, minY: 0.25, maxY: 0.75 },
 };
 
@@ -67,16 +69,16 @@ const TEXT_BOUNDARIES = { minX: 0.15, maxX: 0.85, minY: 0.15, maxY: 0.85 };
 const ZONE_TO_SPEC_KEY = {
   "front-full": "front",
   pocket: "pocket",
-  // "sleeve-left": "sleeve",
-  // "sleeve-right": "sleeve",
+  "sleeve-left": "sleeve",
+  "sleeve-right": "sleeve",
   "back-full": "back",
 };
 
 const ZONE_LABELS = {
   "front-full": "Front",
   pocket: "Pocket",
-  // "sleeve-left": "Sleeve Left",
-  // "sleeve-right": "Sleeve Right",
+  "sleeve-left": "Sleeve Left",
+  "sleeve-right": "Sleeve Right",
   "back-full": "Back",
 };
 
@@ -88,6 +90,26 @@ const CAL_ZONES_BY_VIEW = {
 /* =========================
    Helpers
    ========================= */
+
+
+function normalizeViewFromLayer(layer) {
+  const vc = String(layer?.viewCode || "").toLowerCase();
+  const zone = String(layer?.zone || "").toLowerCase();
+
+  // viewCode cases
+  if (vc === "back") return "back";
+  if (vc === "left" || vc === "sleeve-left") return "left";
+  if (vc === "right" || vc === "sleeve-right") return "right";
+  if (vc === "front") return "front";
+
+  // zone fallback (VERY IMPORTANT if viewCode stays "front")
+  if (zone === "sleeve-left") return "left";
+  if (zone === "sleeve-right") return "right";
+  if (zone.startsWith("back")) return "back";
+
+  return "front";
+}
+
 function normalizeImageUrl(url) {
   if (!url) return url;
 
@@ -179,8 +201,8 @@ function getBoundaryKeyForLayer(layer) {
 
   const viewCode = layer?.viewCode || "front";
   if (viewCode === "back") return "back-full";
-  // if (viewCode === "left") return "sleeve-left";
-  // if (viewCode === "right") return "sleeve-right";
+  if (viewCode === "left") return "sleeve-left";
+  if (viewCode === "right") return "sleeve-right";
   return "front-full";
 }
 
@@ -726,6 +748,7 @@ function getZonesForView(view, calibratedConfig) {
     : (DEFAULT_ZONES_BY_VIEW[view] || []);
 }
 
+
 function getZoneLabel(zoneKey, calibratedConfig) {
   return (
     calibratedConfig?.zoneMeta?.[zoneKey]?.label ||
@@ -768,6 +791,7 @@ const RecolorEditor = forwardRef(function RecolorEditor(
     bgRemovalLoading,
     onDesignRenderWidthChange,
     isAdmin,
+    selectedView = "front", 
     
     // OPTIONAL: you can pass your tested front boundaries here if you want to force them
     // Example: { "front-full": {minX, minY, maxX, maxY} }
@@ -783,11 +807,10 @@ const RecolorEditor = forwardRef(function RecolorEditor(
 
   const specs = PRINT_SPECS[productKey] || PRINT_SPECS[DEFAULT_PRODUCT_KEY];
 
-  const activeView = useMemo(() => {
-    const active = designLayers?.find((d) => d.id === activeDesignId);
-    const viewCode = active?.viewCode || designLayers?.[0]?.viewCode || "front";
-    return viewCode === "back" ? "back" : "front";
-  }, [designLayers, activeDesignId]);
+const activeView = selectedView;
+
+
+
 
   const [calibratedConfig, setCalibratedConfig] = useState(null);
 
@@ -1057,11 +1080,7 @@ const zonesForActiveView = useMemo(() => {
   }
 }
 
-  console.log(
-  "RecolorEditor → imageUrls used for rendering:",
-  imageLayers.map(l => l.imageUrl)
-);
-
+  
 drawAll();
 
 return () => {
