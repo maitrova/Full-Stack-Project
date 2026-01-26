@@ -818,11 +818,11 @@ export const listDesigns = async (req, res) => {
   try {
     const apiUrl = process.env.API_URL || "https://narifighter.online/backend";
 
-    const filter = req.user?.role === "admin"
-      ? {}
-      : { user: req.user._id };
+    // const filter = req.user?.role === "admin"
+    //   ? {}
+    //   : { user: req.user._id };
 
-    const designs = await Design.find(filter)
+    const designs = await Design.find({ user: req.user._id })
       .sort({ createdAt: -1 })
       .lean();
 

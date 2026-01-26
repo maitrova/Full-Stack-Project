@@ -461,7 +461,7 @@ const getSizeBasePrice = (prod, size) => {
     if (Object.keys(viewStates).length > 0) {
       const timeoutId = setTimeout(() => {
         calculatePrice();
-      }, 300);
+      }, 3000);
       return () => clearTimeout(timeoutId);
     }
   }, [viewStates]);
@@ -814,7 +814,7 @@ const handleDesignUpload = async (e) => {
 
       // ✅ 2) Upload to server (for persistence)
       const serverUrl = await uploadDesignImage(file);
-
+      console.log("Uploaded file:", file.name, "to URL:", serverUrl);
       if (!serverUrl || typeof serverUrl !== "string") {
         console.warn("Upload returned invalid url:", file.name, serverUrl);
         continue;
@@ -1102,7 +1102,7 @@ const handleDesignUpload = async (e) => {
 
     for (const v of product.views) {
       setViewCode(v.code);
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 3000));
 
       const img = editorRef.current?.capturePreview?.() || null;
       if (img) {

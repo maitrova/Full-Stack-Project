@@ -24,11 +24,20 @@ const API_BASE_URL = import.meta.env.VITE_IMAGE_URL || "https://narifighter.onli
 
 const ensureImageUrl = (imagePath) => {
   if (!imagePath) return null;
+
+  // ✅ base64 preview images
+  if (imagePath.startsWith("data:")) return imagePath;
+
+  // ✅ blob urls (sometimes used by browsers)
+  if (imagePath.startsWith("blob:")) return imagePath;
+
+  // ✅ already full url
   if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) return imagePath;
 
-  // If stored as "/outputs/....jpg", just append to base
+  // ✅ stored as "/outputs/..", "/mockups/..", etc.
   return `${API_BASE_URL}${imagePath.startsWith("/") ? "" : "/"}${imagePath}`;
 };
+
 
 
 // Helper function to ensure image URLs have proper base URL
@@ -527,18 +536,18 @@ const handleImageClick = (item) => {
               <div className="p-6 border-b border-gray-200">
                 <div className="flex justify-between items-center">
                   <h2 className="text-lg font-semibold text-gray-900">Cart Items</h2>
-                  <button
+                  {/* <button
                     onClick={handleClearCart}
                     disabled={cartItems.length === 0}
                     className="text-sm text-red-600 hover:text-red-800 disabled:text-gray-400 disabled:cursor-not-allowed"
                   >
                     Clear Cart
-                  </button>
+                  </button> */}
                 </div>
               </div>
 
               <div className="divide-y divide-gray-200">
-                const maxStock = getMaxStock(item);
+                
                 {cartItems.map((item) => {
                   const isUpdating = updatingItem === item._id;
                   const isRemoving = removingItem === item._id;
