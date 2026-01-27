@@ -39,7 +39,7 @@ app.use(cors({ origin: [
 
 // Static files - serve at both /outputs and /api/outputs
 app.use("/outputs", express.static(path.join(__dirname, "outputs")));
-app.use("/api/outputs", express.static(path.join(__dirname, "outputs")));
+//app.use("/api/outputs", express.static(path.join(__dirname, "outputs")));
 
 // Health check endpoint for Kubernetes
 app.get('/health', (req, res) => {
