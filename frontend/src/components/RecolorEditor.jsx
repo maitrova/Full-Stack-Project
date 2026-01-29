@@ -113,18 +113,17 @@ function normalizeViewFromLayer(layer) {
 function normalizeImageUrl(url) {
   if (!url) return url;
 
-  // already absolute
+  // already absolute (http/https/protocol-relative/blob/data)
   if (/^(https?:)?\/\//i.test(url) || url.startsWith("blob:") || url.startsWith("data:")) {
-    // ✅ Fix wrong "/api/outputs" URLs coming from backend
-    return url.replace(/\/api\/outputs\//, "/outputs/");
+    // ✅ DO NOT rewrite /api/outputs -> /outputs
+    return url;
   }
 
-  const base = (IMAGE_BASE_URL || "").replace(/\/$/, "");
+  const base = (IMAGE_BASE_URL || window.location.origin).replace(/\/$/, "");
   const path = url.startsWith("/") ? url : `/${url}`;
 
-  // ✅ Also fix relative "/api/outputs"
-  const fixedPath = path.replace(/^\/api\/outputs\//, "/outputs/");
-  return `${base}${fixedPath}`;
+  // ✅ keep /api/outputs as-is (because ingress routes /api to backend)
+  return `${base}${path}`;
 }
 
 
