@@ -973,7 +973,7 @@ const handleDesignUpload = async (e) => {
         d.id === activeDesign.id
           ? {
               ...d,
-              imageUrl: `${import.meta.env.VITE_IMAGE_URL}${data.outputUrl.replace(/^\/api/, "")}?t=${Date.now()}`,
+              imageUrl: `${import.meta.env.VITE_API_URL}${data.outputUrl}?t=${Date.now()}`,
               hasBgRemoved: true,
               originalFile: fileToUse, // Store the file for future use
               isFromLibrary: false, // Once processed, it's no longer a library image
