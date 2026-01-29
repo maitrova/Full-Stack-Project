@@ -32,12 +32,17 @@ RUN pip3 install --no-cache-dir --break-system-packages \
 # Copy application code
 COPY . .
 
-# Create output directory
-
+# Create required directories
 RUN mkdir -p /app/outputs/designs
 RUN mkdir -p /app/outputs/dropimages
 RUN mkdir -p /app/outputs/adminuploadeddesigns
 RUN mkdir -p /app/outputs/readymade-products
+RUN mkdir -p /app/uploads
+RUN mkdir -p /app/scripts
+
+# Ensure Python script has execute permissions
+RUN chmod +x /app/scripts/remove_bg_cli.py || true
+
 # Expose port
 EXPOSE 5000
 

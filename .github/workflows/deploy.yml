@@ -2,7 +2,7 @@ name: Build and Push Docker Images
 
 on:
   push:
-    branches: [ deploymentcode ]
+    branches: [ test1122 ]
   workflow_dispatch:
 
 env:
