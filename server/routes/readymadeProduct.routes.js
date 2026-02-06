@@ -16,6 +16,7 @@ import {
   updateProductList,
   getAllReadymadeProductsPublic,
   getHomeCategoryTiles,
+  getHomeSubCategoryTiles,
   
 } from "../controllers/readymadeProduct.controller.js";
 import upload from "../middleware/readymadeProductUpload.middleware.js";
@@ -25,6 +26,7 @@ const readymadeproducts = express.Router();
 const productUpload = upload.fields([
   { name: "images", maxCount: 4 },
   { name: "video", maxCount: 1 },
+  { name: "thumbnail", maxCount: 1 },
 ]);
 
 // ==================== PUBLIC ROUTES ====================
@@ -32,6 +34,7 @@ const productUpload = upload.fields([
 
 // Product listing and details
 readymadeproducts.get("/categorylist", getHomeCategoryTiles);
+readymadeproducts.get("/subcategorylist", getHomeSubCategoryTiles);
 readymadeproducts.get("/public", getAllReadymadeProductsPublic);
 readymadeproducts.get("/", getAllReadymadeProducts); // Get all products with pagination
 readymadeproducts.get("/:id", getReadymadeProductById); // Get single product

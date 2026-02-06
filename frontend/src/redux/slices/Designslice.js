@@ -68,6 +68,20 @@ export const updateDesignDetails = createAsyncThunk(
   }
 );
 
+export const getDesignMeta = createAsyncThunk(
+  "designs/getDesignMeta",
+  async (_, { rejectWithValue }) => {
+    try {
+      
+      const res = await axios.get(`${API_URL}/design-meta`);
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  }
+);
+
+
 export const getDesign = createAsyncThunk(
   'designs/getDesign',
   async (id, { rejectWithValue }) => {
@@ -166,17 +180,22 @@ const initialState = {
   designs: [],
   catalogueDesigns: [],
   currentDesign: null,
-  pagination: {
-    page: 1,
-    limit: 10,
-    total: 0,
-    pages: 0,
-  },
+  pagination: { page: 1, limit: 10, total: 0, pages: 0 },
   loading: false,
   error: null,
   success: false,
-  operation: null, // Track current operation for specific loading states
+  operation: null,
+
+  // ✅ ADD THIS
+  meta: {
+    categories: [],
+    map: {},
+    loading: false,
+    error: null,
+    loaded: false,
+  },
 };
+
 
 // Slice - FIXED THE TYPO AND ADDED MISSING EXPORTS
 const designsSlice = createSlice({
@@ -288,6 +307,22 @@ const designsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
         state.operation = null;
+      })
+
+      .addCase(getDesignMeta.pending, (state) => {
+        state.meta.loading = true;
+        state.meta.error = null;
+      })
+      .addCase(getDesignMeta.fulfilled, (state, action) => {
+          state.meta.loading = false;
+          state.meta.loaded = true;
+
+          state.meta.categories = action.payload.categories || [];
+          state.meta.map = action.payload.subCategoriesByCategory || {}; // ✅ FIX
+        })
+      .addCase(getDesignMeta.rejected, (state, action) => {
+        state.meta.loading = false;
+        state.meta.error = action.payload || "Failed to load meta";
       })
 
       // Get Single Design
@@ -419,4 +454,11 @@ export const selectDesignsLoading = (state) => state.designs.loading;
 export const selectDesignsError = (state) => state.designs.error;
 export const selectDesignsSuccess = (state) => state.designs.success;
 export const selectDesignsOperation = (state) => state.designs.operation;
+
+export const selectDesignMetaCategories = (state) => state.designs.meta.categories;
+export const selectDesignMetaMap = (state) => state.designs.meta.map;
+export const selectDesignMetaLoading = (state) => state.designs.meta.loading;
+export const selectDesignMetaError = (state) => state.designs.meta.error;
+export const selectDesignMetaLoaded = (state) => state.designs.meta.loaded;
+
 export default designsSlice.reducer;

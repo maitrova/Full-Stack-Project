@@ -17,6 +17,8 @@ import dropproductSliceReducer from "./slices/dropproducts.js";
 import homeCategoryTilesSliceReducer from "./slices/Homepagecategorylist.js";
 import productCategoriesSliceReducer from "./slices/productcategories.js";
 import productSizeSelectionReducer from "./slices/productsizeselection.js";
+import addressSliceReducer from "./slices/address.js"
+import ordersReducer from "./slices/orderSlice.js"
 // Persist configuration for user slice only
 const persistConfig = {
   key: 'user', // key for localStorage
@@ -45,7 +47,9 @@ export const store = configureStore({
     dropproducts : dropproductSliceReducer,
     homeCategoryTiles : homeCategoryTilesSliceReducer,
     productCategories : productCategoriesSliceReducer,
-    productSizeSelection: productSizeSelectionReducer, // Use persisted reducer instead of regular one
+    productSizeSelection: productSizeSelectionReducer,
+    address  : addressSliceReducer,
+    orders: ordersReducer, // Use persisted reducer instead of regular one
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

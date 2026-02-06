@@ -235,6 +235,7 @@ export const addToCart = async (req, res) => {
 
 // cartController.js
 
+
 export const getCart = async (req, res) => {
   try {
     const userId = req.user?._id;
@@ -242,6 +243,7 @@ export const getCart = async (req, res) => {
 
     const cart = await Cart.findOne({ user: userId, status: "ACTIVE" })
       .populate("items.readymadeProduct")
+      .populate("items.dropproduct") // ✅ NEW
       .populate("items.design")
       .populate("items.product")
       .lean();
@@ -250,11 +252,13 @@ export const getCart = async (req, res) => {
       return res.status(200).json({ message: "Cart is empty", cart: null });
     }
 
-    // ✅ Optional but helpful:
-    // If product has variants, attach "activeVariant" snapshot for UI debugging/display.
-    // No model change, just response enrichment.
+    // ✅ Optional enrichment for UI (readymade variant support)
     const enrichedItems = (cart.items || []).map((it) => {
-      if (it.kind === "READYMADE" && it.readymadeProduct && Array.isArray(it.readymadeProduct.variants)) {
+      if (
+        it.kind === "READYMADE" &&
+        it.readymadeProduct &&
+        Array.isArray(it.readymadeProduct.variants)
+      ) {
         const v = it.readymadeProduct.variants.find(
           (x) => String(x.size).toUpperCase() === String(it.size || "M").toUpperCase()
         );
@@ -271,6 +275,9 @@ export const getCart = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+
+
+
 
 export const updateCartItemQty = async (req, res) => {
   try {

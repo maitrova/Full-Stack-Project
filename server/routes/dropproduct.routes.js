@@ -1,7 +1,7 @@
-import express from 'express';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
+import express from "express";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 
 import {
   createDropproduct,
@@ -9,17 +9,12 @@ import {
   getDropproductById,
   updateDropproduct,
   deleteDropproduct,
-} from '../controllers/dropproduct.controller.js';
+} from "../controllers/dropproduct.controller.js";
 
 const droprouter = express.Router();
 
 /* 🔹 Use existing output folder */
-const uploadDir = path.join(
-  process.cwd(),   // server/
-  'outputs',
-  'dropimages'
-);
-
+const uploadDir = path.join(process.cwd(), "outputs", "dropimages");
 
 /* 🔹 Create dropimages only if missing */
 if (!fs.existsSync(uploadDir)) {
@@ -30,27 +25,34 @@ if (!fs.existsSync(uploadDir)) {
 const storage = multer.diskStorage({
   destination: (_, __, cb) => cb(null, uploadDir),
   filename: (_, file, cb) => {
-    const uniqueName =
-      Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const uniqueName = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, uniqueName + path.extname(file.originalname));
   },
 });
 
 const upload = multer({
   storage,
-  limits: { files: 6 },
+  // ✅ allow up to 7 total files (6 images + 1 thumbnail)
+  limits: { files: 7 },
   fileFilter: (_, file, cb) => {
-    if (!file.mimetype.startsWith('image/')) {
-      return cb(new Error('Only image files allowed'));
+    if (!file.mimetype.startsWith("image/")) {
+      return cb(new Error("Only image files allowed"));
     }
     cb(null, true);
   },
 });
 
+/* ✅ Accept both images + thumbnail */
+const uploadDropFiles = upload.fields([
+  { name: "images", maxCount: 6 },
+  { name: "thumbnail", maxCount: 1 },
+]);
+
 /* 🔹 Routes */
-droprouter.post('/', upload.array('images', 6), createDropproduct);
-droprouter.get('/', getAllDropproducts);
-droprouter.get('/:id', getDropproductById);
-droprouter.put('/:id', upload.array('images', 6), updateDropproduct);
-droprouter.delete('/:id', deleteDropproduct);
+droprouter.post("/", uploadDropFiles, createDropproduct);
+droprouter.get("/", getAllDropproducts);
+droprouter.get("/:id", getDropproductById);
+droprouter.put("/:id", uploadDropFiles, updateDropproduct);
+droprouter.delete("/:id", deleteDropproduct);
+
 export default droprouter;

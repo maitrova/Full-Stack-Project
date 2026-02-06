@@ -46,7 +46,9 @@ const DropproductAdmin = () => {
   const [previewImages, setPreviewImages] = useState([]);
   const [availableCategories, setAvailableCategories] = useState([]);
   const [availableSubCategories, setAvailableSubCategories] = useState([]);
-  
+  const [thumbnail, setThumbnail] = useState(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState(null);
+  const [removeThumbnailFlag, setRemoveThumbnailFlag] = useState(false);
   // Form states
   const [selectedCategory, setSelectedCategory] = useState('');
   const [newCategory, setNewCategory] = useState('');
@@ -113,7 +115,15 @@ const DropproductAdmin = () => {
         description: currentProduct.description || '',
         images: [],
       });
-      
+      if (currentProduct.thumbnail) {
+  setThumbnail(null); // no new file yet
+  setRemoveThumbnailFlag(false);
+  setThumbnailPreview(`${imageBaseUrl}${currentProduct.thumbnail}`);
+} else {
+  setThumbnail(null);
+  setThumbnailPreview(null);
+  setRemoveThumbnailFlag(false);
+}
       // Set category and subcategory
       if (currentProduct.category) {
         setSelectedCategory(currentProduct.category);
@@ -209,6 +219,48 @@ const DropproductAdmin = () => {
     }
   };
 
+const handleThumbnailChange = (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    alert("Only image files are allowed for thumbnail");
+    return;
+  }
+
+  // Optional size validation (5MB)
+  const maxSize = 5 * 1024 * 1024;
+  if (file.size > maxSize) {
+    alert("Thumbnail must be less than 5MB");
+    return;
+  }
+
+  // If replacing existing thumbnail in edit mode, clear remove flag
+  setRemoveThumbnailFlag(false);
+
+  // Cleanup old object URL if it was a blob preview
+  if (thumbnailPreview && thumbnailPreview.startsWith("blob:")) {
+    URL.revokeObjectURL(thumbnailPreview);
+  }
+
+  setThumbnail(file);
+  setThumbnailPreview(URL.createObjectURL(file));
+};
+
+const removeThumbnail = () => {
+  // cleanup blob preview
+  if (thumbnailPreview && thumbnailPreview.startsWith("blob:")) {
+    URL.revokeObjectURL(thumbnailPreview);
+  }
+
+  setThumbnail(null);
+  setThumbnailPreview(null);
+
+  // ✅ for edit: tell backend to remove it
+  if (isEditMode) setRemoveThumbnailFlag(true);
+};
+
+
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
     
@@ -269,98 +321,120 @@ const DropproductAdmin = () => {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Basic validation
-    if (!formData.name.trim()) {
-      alert('Product name is required');
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  // Basic validation
+  if (!formData.name.trim()) {
+    alert("Product name is required");
+    return;
+  }
+
+  // Validate category
+  const finalCategory = newCategory.trim() || selectedCategory;
+  if (!finalCategory) {
+    alert("Category is required");
+    return;
+  }
+
+  // Validate subcategory
+  const finalSubCategory = newSubCategory.trim() || selectedSubCategory;
+  if (!finalSubCategory) {
+    alert("Sub-category is required");
+    return;
+  }
+
+  // Validate variants
+  const validVariants = variants.filter(
+    (v) => v.size.trim() && v.price !== "" && v.stock !== ""
+  );
+
+  if (validVariants.length === 0) {
+    alert("At least one size variant is required");
+    return;
+  }
+
+  // Check for duplicate sizes
+  const sizes = validVariants.map((v) => v.size.toUpperCase());
+  const uniqueSizes = new Set(sizes);
+  if (uniqueSizes.size !== sizes.length) {
+    alert("Duplicate sizes are not allowed");
+    return;
+  }
+
+  // Validate all variant fields
+  for (const variant of validVariants) {
+    if (!variant.size.trim()) {
+      alert("Size is required for all variants");
       return;
     }
-
-    // Validate category
-    const finalCategory = newCategory.trim() || selectedCategory;
-    if (!finalCategory) {
-      alert('Category is required');
+    if (Number(variant.price) <= 0) {
+      alert(`Valid price required for size ${variant.size}`);
       return;
     }
-
-    // Validate subcategory
-    const finalSubCategory = newSubCategory.trim() || selectedSubCategory;
-    if (!finalSubCategory) {
-      alert('Sub-category is required');
+    if (Number(variant.stock) < 0) {
+      alert(`Valid stock quantity required for size ${variant.size}`);
       return;
     }
+  }
 
-    // Validate variants
-    const validVariants = variants.filter(v => 
-      v.size.trim() && v.price !== '' && v.stock !== ''
-    );
-    
-    if (validVariants.length === 0) {
-      alert('At least one size variant is required');
-      return;
-    }
+  // Require at least 1 image overall (existing + new)
+  const existingCount = previewImages.filter((img) => img.isNew === false).length;
+  if (formData.images.length + existingCount < 1) {
+    alert("At least 1 image is required");
+    return;
+  }
 
-    // Check for duplicate sizes
-    const sizes = validVariants.map(v => v.size.toUpperCase());
-    const uniqueSizes = new Set(sizes);
-    if (uniqueSizes.size !== sizes.length) {
-      alert('Duplicate sizes are not allowed');
-      return;
-    }
+  try {
+    const productData = {
+      name: formData.name,
+      description: formData.description,
+      category: finalCategory,
+      subCategory: finalSubCategory,
 
-    // Validate all variant fields
-    for (const variant of validVariants) {
-      if (!variant.size.trim()) {
-        alert('Size is required for all variants');
-        return;
-      }
-      if (variant.price <= 0) {
-        alert(`Valid price required for size ${variant.size}`);
-        return;
-      }
-      if (variant.stock < 0) {
-        alert(`Valid stock quantity required for size ${variant.size}`);
-        return;
-      }
-    }
+      // ✅ new images (File objects)
+      images: formData.images,
 
-    if (formData.images.length + previewImages.filter(img => img.isNew === false).length < 1) {
-      alert('At least 1 image is required');
-      return;
-    }
+      // ✅ thumbnail File (or null)
+      thumbnail: thumbnail || null,
 
-    try {
-      const productData = {
-        name: formData.name,
-        description: formData.description,
-        category: finalCategory,
-        subCategory: finalSubCategory,
-        images: formData.images,
-        variants: validVariants.map(v => ({
-          size: v.size.toUpperCase(),
-          price: Number(v.price),
-          stock: Number(v.stock),
-          sku: v.sku || `SKU-${formData.name.substring(0, 3).toUpperCase()}-${v.size}`
-        }))
-      };
+      // ✅ in edit mode, if user removed existing thumbnail
+      removeThumbnail: isEditMode ? !!removeThumbnailFlag : false,
 
-      if (isEditMode && currentProduct) {
-        await dispatch(updateDropproduct({
+      variants: validVariants.map((v) => ({
+        size: v.size.toUpperCase(),
+        price: Number(v.price),
+        stock: Number(v.stock),
+        sku:
+          v.sku ||
+          `SKU-${formData.name.substring(0, 3).toUpperCase()}-${v.size.toUpperCase()}`,
+      })),
+    };
+
+    if (isEditMode && currentProduct) {
+      await dispatch(
+        updateDropproduct({
           id: currentProduct._id,
-          productData
-        })).unwrap();
-      } else {
-        await dispatch(createDropproduct(productData)).unwrap();
-      }
-      
-      setIsModalOpen(false);
-      resetForm();
-    } catch (error) {
-      console.error('Failed to save product:', error);
+          productData,
+        })
+      ).unwrap();
+    } else {
+      await dispatch(createDropproduct(productData)).unwrap();
     }
-  };
+
+    setIsModalOpen(false);
+    resetForm();
+  } catch (error) {
+    console.error("Failed to save product:", error);
+    const msg =
+      error?.response?.data?.message ||
+      error?.payload?.message ||
+      error?.message ||
+      "Failed to save product";
+    alert(msg);
+  }
+};
+
 
   const handleDelete = async (productId) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
@@ -379,6 +453,9 @@ const DropproductAdmin = () => {
       images: [],
     });
     setPreviewImages([]);
+    setThumbnail(null);
+    setThumbnailPreview(null);
+    setRemoveThumbnailFlag(false);
     setSelectedCategory('');
     setNewCategory('');
     setSelectedSubCategory('');
@@ -537,12 +614,14 @@ const DropproductAdmin = () => {
             >
               {/* Product Image */}
               <div className="relative h-48 overflow-hidden">
-                {product.images?.[0] ? (
-                  <img
-                    src={`${imageBaseUrl}${product.images[0]}`}  // Prepend base URL from .env
-                    alt={product.name}
-                    className="w-full h-full object-cover"
-                  />
+                {(product.thumbnail || product.images?.[0]) ? (
+                <img
+                  src={`${imageBaseUrl}${product.thumbnail || product.images[0]}`}
+                  alt={product.name}
+                  className="w-full h-full object-cover"
+                />
+
+
                 ) : (
                   <div className="w-full h-full bg-gray-200 flex items-center justify-center">
                     <span className="text-gray-400">No Image</span>
@@ -856,6 +935,52 @@ const DropproductAdmin = () => {
                     </button>
                   </div>
                 </div>
+
+                {/* Thumbnail Upload */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Thumbnail Image
+                    <span className="text-xs text-gray-500 ml-2">(Optional, 1 image)</span>
+                  </label>
+
+                  <div className="flex items-center gap-4">
+                    <label className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload Thumbnail
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleThumbnailChange}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {thumbnailPreview && (
+                      <div className="relative group">
+                        <img
+                          src={thumbnailPreview}
+                          alt="Thumbnail Preview"
+                          className="w-24 h-24 object-cover rounded-lg border"
+                        />
+                        <button
+                          type="button"
+                          onClick={removeThumbnail}
+                          className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                          title="Remove thumbnail"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+
+                    {!thumbnailPreview && isEditMode && currentProduct?.thumbnail && (
+                      <div className="text-xs text-gray-500">
+                        Current thumbnail will remain unless you upload/remove.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
 
                 {/* Image Upload */}
                 <div>

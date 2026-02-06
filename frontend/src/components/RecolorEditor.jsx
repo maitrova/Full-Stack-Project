@@ -1197,6 +1197,8 @@ return () => {
   onAnyTextClick={() => setActiveDesignId(null)}
   canvasSize={canvasSize}
   boundaries={boundaries}
+  zonesForView={zonesForActiveView}
+  
 />
 
       )}
@@ -1240,11 +1242,74 @@ function TextOverlay({
   setActiveTextId, 
   onAnyTextClick, 
   canvasSize,
-  boundaries
+  boundaries,
+  zonesForView
+
 }) {
 
   const overlayRef = useRef(null);
   const dragStateRef = useRef(null);
+
+
+function measureTextBoxPx({ text, fontSize, fontFamily }) {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  ctx.font = `700 ${fontSize}px ${fontFamily || "Impact, sans-serif"}`;
+
+  const w = ctx.measureText(text || "").width;
+  const h = (fontSize || 20) * 1.2; // same height estimate you're using
+  return { w, h };
+}
+
+// Binary search the largest fontSize that still fits inside boundary
+function clampFontSizeToBoundary({
+  desiredFontSize,
+  minFontSize = 12,
+  maxFontSize = 200,
+  layer,
+  canvasSize,
+  boundary,
+}) {
+  if (!canvasSize || !boundary) return Math.max(minFontSize, Math.min(maxFontSize, desiredFontSize));
+
+  const text = layer.text || "";
+  const fontFamily = layer.fontFamily || "Impact, sans-serif";
+
+  // If empty text, just clamp numeric range
+  if (!text.trim()) return Math.max(minFontSize, Math.min(maxFontSize, desiredFontSize));
+
+  // available space around the current center point
+  const maxHalfWNorm = Math.min(layer.x - boundary.minX, boundary.maxX - layer.x);
+  const maxHalfHNorm = Math.min(layer.y - boundary.minY, boundary.maxY - layer.y);
+
+  const maxHalfWPx = maxHalfWNorm * canvasSize.width;
+  const maxHalfHPx = maxHalfHNorm * canvasSize.height;
+
+  // If already outside somehow, don’t explode
+  if (maxHalfWPx <= 0 || maxHalfHPx <= 0) return minFontSize;
+
+  let lo = minFontSize;
+  let hi = Math.max(minFontSize, Math.min(maxFontSize, desiredFontSize));
+  let best = minFontSize;
+
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const { w, h } = measureTextBoxPx({ text, fontSize: mid, fontFamily });
+
+    // must fit fully inside boundary at current x,y
+    const fits = (w / 2) <= maxHalfWPx && (h / 2) <= maxHalfHPx;
+
+    if (fits) {
+      best = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+
+  return best;
+}
+
 
  const onPointerMove = useCallback(
   (e) => {
@@ -1255,54 +1320,101 @@ function TextOverlay({
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
 
-    if (mode === "drag") {
-      const nx = initialLayer.x + dx / rectWidth;
-      const ny = initialLayer.y + dy / rectHeight;
+   if (mode === "drag") {
+  const nxRaw = initialLayer.x + dx / rectWidth;
+  const nyRaw = initialLayer.y + dy / rectHeight;
 
-      let constrainedX = nx;
-      let constrainedY = ny;
+  const textLayer = textLayers.find((l) => l.id === id);
+  if (!textLayer || !canvasSize) return;
 
-      const textLayer = textLayers.find((l) => l.id === id);
+  // ✅ detect which zone the center is inside (pocket/front-full etc.)
+  const currentZoneKey = getBoundaryKeyForTextLayer(textLayer);
+  const detectedZone =
+    pickZoneForPoint(nxRaw, nyRaw, zonesForView, boundaries) || currentZoneKey;
 
-      if (textLayer && canvasSize) {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
+  const zoneKey = detectedZone;
 
-        ctx.font = `${textLayer.fontSize}px ${textLayer.fontFamily}`;
-        const textWidth = ctx.measureText(textLayer.text || "").width;
-        const textHeight = (textLayer.fontSize || 20) * 1.2;
+  const b =
+    boundaries?.[zoneKey] ||
+    FALLBACK_BOUNDARIES?.[zoneKey] ||
+    FALLBACK_BOUNDARIES["front-full"];
 
-        const halfWidth = textWidth / canvasSize.width / 2;
-        const halfHeight = textHeight / canvasSize.height / 2;
+  // measure text size in px
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  const fontSize = textLayer.fontSize || 20;
+  const fontFamily = textLayer.fontFamily || "Impact, sans-serif";
+  ctx.font = `700 ${fontSize}px ${fontFamily}`;
 
-        const zoneKey = getBoundaryKeyForTextLayer(textLayer);
-        const b =
-          boundaries?.[zoneKey] ||
-          FALLBACK_BOUNDARIES?.[zoneKey] ||
-          FALLBACK_BOUNDARIES["front-full"];
+  const text = textLayer.text || "";
+  const textWidthPx = ctx.measureText(text).width || 0;
+  const textHeightPx = (fontSize || 20) * 1.2;
 
-        const adjusted = {
-          minX: b.minX + halfWidth,
-          maxX: b.maxX - halfWidth,
-          minY: b.minY + halfHeight,
-          maxY: b.maxY - halfHeight,
-        };
+  const halfW = (textWidthPx / canvasSize.width) / 2;
+  const halfH = (textHeightPx / canvasSize.height) / 2;
 
-        constrainedX = Math.max(adjusted.minX, Math.min(adjusted.maxX, nx));
-        constrainedY = Math.max(adjusted.minY, Math.min(adjusted.maxY, ny));
-      }
+  // clamp CENTER so the full text box stays inside boundary
+  const constrainedX = Math.max(b.minX + halfW, Math.min(b.maxX - halfW, nxRaw));
+  const constrainedY = Math.max(b.minY + halfH, Math.min(b.maxY - halfH, nyRaw));
 
-      setTextLayers((prev) =>
-        prev.map((layer) =>
-          layer.id === id ? { ...layer, x: constrainedX, y: constrainedY } : layer
-        )
-      );
-    } else if (mode === "resize") {
-      const newSize = Math.max(12, Math.min(200, initialLayer.fontSize + (dx + dy) * 0.3));
-      setTextLayers((prev) =>
-        prev.map((layer) => (layer.id === id ? { ...layer, fontSize: newSize } : layer))
-      );
-    }
+  setTextLayers((prev) =>
+    prev.map((layer) =>
+      layer.id === id
+        ? { ...layer, x: constrainedX, y: constrainedY, zone: zoneKey } // ✅ SAVE ZONE
+        : layer
+    )
+  );
+
+} else if (mode === "resize") {
+  const layerNow = textLayers.find((l) => l.id === id);
+  if (!layerNow || !canvasSize) return;
+
+  let proposed = Math.max(12, Math.min(200, initialLayer.fontSize + (dx + dy) * 0.3));
+
+  const zoneKey = getBoundaryKeyForTextLayer(layerNow);
+  const b =
+    boundaries?.[zoneKey] ||
+    FALLBACK_BOUNDARIES?.[zoneKey] ||
+    FALLBACK_BOUNDARIES["front-full"];
+
+  // helper to check if a font size fits at current x/y inside boundary
+  const fits = (fontSize) => {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const fontFamily = layerNow.fontFamily || "Impact, sans-serif";
+    ctx.font = `700 ${fontSize}px ${fontFamily}`;
+
+    const text = layerNow.text || "";
+    const wPx = ctx.measureText(text).width || 0;
+    const hPx = fontSize * 1.2;
+
+    const halfW = (wPx / canvasSize.width) / 2;
+    const halfH = (hPx / canvasSize.height) / 2;
+
+    const x = layerNow.x ?? initialLayer.x ?? 0.5;
+    const y = layerNow.y ?? initialLayer.y ?? 0.5;
+
+    return (
+      x - halfW >= b.minX &&
+      x + halfW <= b.maxX &&
+      y - halfH >= b.minY &&
+      y + halfH <= b.maxY
+    );
+  };
+
+  // clamp down until it fits
+  while (proposed > 12 && !fits(proposed)) {
+    proposed -= 1;
+  }
+
+  setTextLayers((prev) =>
+    prev.map((layer) =>
+      layer.id === id ? { ...layer, fontSize: proposed } : layer
+    )
+  );
+}
+
+
   },
   [setTextLayers, textLayers, canvasSize, boundaries]
 );

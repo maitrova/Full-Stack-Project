@@ -973,7 +973,7 @@ const handleDesignUpload = async (e) => {
         d.id === activeDesign.id
           ? {
               ...d,
-              imageUrl: `${import.meta.env.VITE_IMAGE_URL}${data.outputUrl.replace(/^\/api/, "")}?t=${Date.now()}`,
+              imageUrl: `${import.meta.env.VITE_API_URL}${data.outputUrl}?t=${Date.now()}`,
               hasBgRemoved: true,
               originalFile: fileToUse, // Store the file for future use
               isFromLibrary: false, // Once processed, it's no longer a library image
@@ -1848,13 +1848,13 @@ const handleDesignUpload = async (e) => {
                       </div>
                     </div>
 
-                    <div>
+                    {/* <div>
                       <label className="mb-1 block text-xs font-medium text-slate-500">Font Size</label>
                       <div className="flex items-center gap-2">
                         <input type="range" min={14} max={120} value={activeTextLayer.fontSize} onChange={(e) => updateActiveTextLayer({ fontSize: parseInt(e.target.value, 10) })} className="flex-1" />
                         <span className="w-10 text-right text-xs text-slate-600">{activeTextLayer.fontSize}px</span>
                       </div>
-                    </div>
+                    </div> */}
 
                     <div>
                       <label className="mb-1 block text-xs font-medium text-slate-500">Rotation</label>

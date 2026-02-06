@@ -30,6 +30,11 @@ import AllProductsHub from "./components/AllproductsHub.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import ProductPricingManager from "./pages/productpricingmanager.jsx";
 import AdminDashboards from "./components/admin/AdminDashboard.jsx";
+import SubCategoryTilesPage from "./pages/SubCategoryTilesPage.jsx";
+import CheckoutAddresses from "./components/CheckoutAddresses.jsx";
+import CheckoutPage from "./components/testcheckout.jsx";
+import UserOrders from "./components/userorders.jsx";
+import AdminOrders from "./components/admin/ordersmanagement.jsx";
 // You'll need to create this
 
 // Layout component with header for all pages except auth
@@ -130,6 +135,13 @@ function App() {
         } />
 
 
+        <Route path="/subcategory" element={
+          <MainLayout>
+            <SubCategoryTilesPage/>
+          </MainLayout>
+        } />
+
+
 
         <Route path="/admindashboard" element={
           <MainLayout>
@@ -171,6 +183,30 @@ function App() {
         <Route path="/admin/designs" element={
           <MainLayout>
             <AdminDesignsPage />
+          </MainLayout>
+        } />
+
+        <Route path="/orders" element={
+          <MainLayout>
+            <UserOrders />
+          </MainLayout>
+        } />
+
+         <Route path="/managementorders" element={
+          <MainLayout>
+            <AdminOrders />
+          </MainLayout>
+        } />
+
+         <Route path="/checkout" element={
+          <MainLayout>
+            <CheckoutAddresses />
+          </MainLayout>
+        } />
+
+        <Route path="/checkoutpage" element={
+          <MainLayout>
+            <CheckoutPage />
           </MainLayout>
         } />
 

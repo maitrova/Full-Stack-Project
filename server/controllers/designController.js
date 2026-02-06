@@ -653,7 +653,6 @@ export const updateDesign = async (req, res) => {
 
 
 
-// Admin push designs
 export const publishDesign = async (req, res) => {
   try {
     if (!req.user || req.user.role !== "admin") {
@@ -679,6 +678,7 @@ export const publishDesign = async (req, res) => {
     return res.status(500).json({ error: "Failed to publish design" });
   }
 };
+
 
 export const listCatalogueDesigns = async (req, res) => {
   try {
@@ -754,18 +754,20 @@ export const updatedesigndetails = async (req, res) => {
   // }
 
   try {
-    const { category, subCategory,calculatedPrice, stock, description, newArrivals, bestSellers } = req.body;
+    const { category, subCategory, calculatedPrice, stock, description, newArrivals, bestSellers, isActive } = req.body;
+
+    
 
     // Find the design by ID and update it
     const design = await Design.findById(designId);
-
+    if (isActive !== undefined) design.isActive = isActive;
     if (!design) {
       return res.status(404).json({ message: "Design not found" });
     }
 
     // Update fields if provided
-    if (category) design.category = category;
-    if (subCategory) design.subCategory = subCategory;
+    if (category !== undefined) design.category = (category || "").trim();
+    if (subCategory !== undefined) design.subCategory = (subCategory || "").trim();
     if (calculatedPrice !== undefined) design.calculatedPrice = calculatedPrice;
     if (stock !== undefined) design.stock = stock; // undefined check to allow stock=0
     if (description) design.description = description;
@@ -780,6 +782,40 @@ export const updatedesigndetails = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+export const getDesignMeta = async (req, res) => {
+  try {
+    const designs = await Design.find({}, { category: 1, subCategory: 1 });
+
+    const categoriesSet = new Set();
+    const subMap = {}; // category -> Set(subCats)
+
+    for (const d of designs) {
+      const c = (d.category || "").trim();
+      const s = (d.subCategory || "").trim();
+
+      if (!c) continue;
+
+      categoriesSet.add(c);
+
+      if (!subMap[c]) subMap[c] = new Set();
+      if (s) subMap[c].add(s);
+    }
+
+    const categories = Array.from(categoriesSet).sort();
+    const subCategoriesByCategory = {};
+
+    for (const c of categories) {
+      subCategoriesByCategory[c] = Array.from(subMap[c] || []).sort();
+    }
+
+    return res.json({ categories, subCategoriesByCategory });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Server error" });
   }
 };
 

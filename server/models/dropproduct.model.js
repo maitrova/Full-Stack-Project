@@ -60,6 +60,10 @@ const dropproductSchema = new mongoose.Schema(
         message: "Images must be between 1 and 6",
       },
     },
+    thumbnail: {
+      type: String,
+      default: null,
+    },
 
     // ✅ size-wise price & stock
     variants: {

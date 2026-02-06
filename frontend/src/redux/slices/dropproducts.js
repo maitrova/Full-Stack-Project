@@ -7,39 +7,56 @@ const API_BASE_URL = `${import.meta.env.VITE_API_URL}/dropproducts`; // Update w
 
 // Async thunks
 export const createDropproduct = createAsyncThunk(
-  'dropproducts/create',
+  "dropproducts/create",
   async (productData, { rejectWithValue }) => {
     try {
-      const formData = new FormData();
-      
-      // Append product fields
-      Object.keys(productData).forEach((key) => {
-  if (key === "images" && Array.isArray(productData[key])) {
-    productData[key].forEach((file) => formData.append("images", file));
-  } else if (key === "variants") {
-    // ✅ important
-    formData.append("variants", JSON.stringify(productData.variants || []));
-  } else {
-    formData.append(key, productData[key]);
-  }
-});
+      const fd = new FormData();
 
+      // ✅ required text fields
+      fd.append("name", productData.name || "");
+      fd.append("description", productData.description || "");
+      fd.append("category", productData.category || "");
+      fd.append("subCategory", productData.subCategory || "");
 
-      const response = await axios.post(
-        `${API_BASE_URL}`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        }
-      );
+      // ✅ images (array of Files)
+      (productData.images || []).forEach((file) => {
+        if (file instanceof File) fd.append("images", file);
+      });
+
+      // ✅ thumbnail (single File)
+      if (productData.thumbnail instanceof File) {
+        fd.append("thumbnail", productData.thumbnail);
+      }
+
+      // ✅ variants (send as JSON string)
+      fd.append("variants", JSON.stringify(productData.variants || []));
+
+      // ✅ isActive (optional)
+      if (productData.isActive !== undefined) {
+        fd.append("isActive", String(productData.isActive));
+      }
+
+      // ✅ removeThumbnail (only if true) - mostly for update, but harmless
+      if (productData.removeThumbnail) {
+        fd.append("removeThumbnail", "true");
+      }
+
+      const response = await axios.post(`${API_BASE_URL}`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(
+        error.response?.data?.message ||
+          error.response?.data ||
+          error.message ||
+          "Create dropproduct failed"
+      );
     }
   }
 );
+
 
 export const getAllDropproducts = createAsyncThunk(
   'dropproducts/getAll',

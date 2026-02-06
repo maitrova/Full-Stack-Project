@@ -20,6 +20,11 @@ import designuploadsrouter from './routes/designuploadsrouter.js';
 import droprouter from './routes/dropproduct.routes.js';
 import caliberateroutes from './routes/mockupCalibrationRoutes.js';
 import designsizeselection from './routes/designsizeselectionroute.js';
+import addressroute from './routes/addressroutes.js';
+import paymentrouter from './routes/paymentRoutes.js';
+import orderroutes from './routes/orderRoutes.js';
+import admincategory from './routes/adminCategoryRoutes.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -53,8 +58,12 @@ app.use('/api/designsizeselection', designsizeselection);
 app.use('/api', designsrouters);
 app.use("/api/products", router);
 app.use('/api/auth',authrouter);
+app.use('/api/addresses', addressroute);
+app.use('/api/payment', paymentrouter);
+app.use('/api/orders',orderroutes)
 app.use('/api/cart',cartrouter);
 app.use('/api/admin',adminrouter);
+app.use('/api/admin-category',admincategory);
 app.use('/api/readymadeproducts',readymadeproducts);
 app.use('/api/homepage',homepagerouter);
 app.use('/api/designuploads', designuploadsrouter);

@@ -67,6 +67,9 @@ const ProductFormModal = ({
   const [imagePreviews, setImagePreviews] = useState([]);
   const [videoPreview, setVideoPreview] = useState(null);
   const [errors, setErrors] = useState({});
+  const [thumbnail, setThumbnail] = useState(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState(null);
+
   
   // New category/sub-category state
   const [showNewCategory, setShowNewCategory] = useState(false);
@@ -171,7 +174,14 @@ const ProductFormModal = ({
         });
         setImagePreviews(previews);
       }
-      
+      // Thumbnail preview in edit mode
+      if (product.thumbnail) {
+        const thumbUrl = product.thumbnail.startsWith("http")
+          ? product.thumbnail
+          : `${baseUrl}${product.thumbnail.startsWith("/") ? product.thumbnail : "/" + product.thumbnail}`;
+        setThumbnailPreview(thumbUrl);
+      }
+
       if (product.video) {
         // Add base URL for video if it's a relative path
         const videoUrl = product.video.startsWith('http') 
@@ -200,6 +210,8 @@ const ProductFormModal = ({
       setVideo(null);
       setImagePreviews([]);
       setVideoPreview(null);
+      setThumbnail(null);
+      setThumbnailPreview(null);
       setErrors({});
       setNewCategoryName('');
       setNewSubCategoryName('');
@@ -278,6 +290,40 @@ const ProductFormModal = ({
       setVariants(updatedVariants);
     }
   };
+
+
+  const handleThumbnailUpload = (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+  const maxSize = 5 * 1024 * 1024;
+
+  if (!validTypes.includes(file.type)) {
+    setErrors(prev => ({ ...prev, thumbnail: 'Only JPG, PNG, and WebP images are allowed' }));
+    return;
+  }
+
+  if (file.size > maxSize) {
+    setErrors(prev => ({ ...prev, thumbnail: 'Thumbnail size should be less than 5MB' }));
+    return;
+  }
+
+  setThumbnail(file);
+
+  const reader = new FileReader();
+  reader.onloadend = () => setThumbnailPreview(reader.result);
+  reader.readAsDataURL(file);
+
+  if (errors.thumbnail) {
+    setErrors(prev => ({ ...prev, thumbnail: null }));
+  }
+  };
+
+const removeThumbnail = () => {
+  setThumbnail(null);
+  setThumbnailPreview(null);
+};
 
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);
@@ -503,6 +549,10 @@ const ProductFormModal = ({
     if (!isEdit && images.length === 0) {
       newErrors.images = 'At least one image is required';
     }
+    if (!isEdit && !thumbnail) {
+      newErrors.thumbnail = 'Thumbnail is required';
+    }
+
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -539,7 +589,11 @@ const ProductFormModal = ({
       images.forEach(image => {
         data.append('images', image);
       });
-      
+      // Add thumbnail
+      if (thumbnail) {
+        data.append('thumbnail', thumbnail);
+      }
+
       // Add video
       if (video) {
         data.append('video', video);
@@ -1047,6 +1101,79 @@ const ProductFormModal = ({
                 <p>Note: Each size can only be added once. Total stock will be calculated automatically.</p>
               </div>
             </div>
+
+            {/* Thumbnail Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Thumbnail Image
+                <span className="text-xs text-gray-500 ml-2">(Recommended, 1 image, max 5MB)</span>
+              </label>
+
+              <div className={`border-2 border-dashed rounded-lg p-6 ${
+                errors.thumbnail ? 'border-red-500 bg-red-50' : 'border-gray-300'
+              }`}>
+                {thumbnailPreview ? (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-medium text-gray-700">Thumbnail Preview</h4>
+                      <button
+                        type="button"
+                        onClick={removeThumbnail}
+                        className="text-red-600 hover:text-red-800 text-sm font-medium"
+                        disabled={loading}
+                      >
+                        Remove
+                      </button>
+                    </div>
+
+                    <img
+                      src={thumbnailPreview}
+                      alt="Thumbnail Preview"
+                      className="w-full max-w-xs h-40 object-cover rounded-lg"
+                    />
+
+                    {/* Show thumbnail path in edit mode */}
+                    {isEdit && product && product.thumbnail && (
+                      <div className="mt-2 p-2 bg-gray-50 rounded-lg">
+                        <div className="text-xs text-gray-600 font-mono truncate">
+                          Path: {baseUrl}{product.thumbnail.startsWith('/') ? product.thumbnail : '/' + product.thumbnail}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <ImageIcon className="mx-auto h-12 w-12 text-gray-400" />
+                    <div className="mt-4">
+                      <label className="cursor-pointer">
+                        <span className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium inline-flex items-center">
+                          <Upload className="w-4 h-4 mr-2" />
+                          Upload Thumbnail
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleThumbnailUpload}
+                          className="hidden"
+                          disabled={loading}
+                        />
+                      </label>
+                      <p className="text-xs text-gray-500 mt-2">
+                        PNG, JPG, WebP up to 5MB
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {errors.thumbnail && (
+                  <p className="mt-2 text-sm text-red-600 flex items-center justify-center">
+                    <AlertCircle className="w-4 h-4 mr-1" />
+                    {errors.thumbnail}
+                  </p>
+                )}
+              </div>
+            </div>
+
 
             {/* Images Upload */}
             <div>

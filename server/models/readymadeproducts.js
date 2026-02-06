@@ -25,8 +25,9 @@ const readymadeProductSchema = new mongoose.Schema(
     price: { type: Number, required: true, min: 0 },
     currency: { type: String, default: "INR" },
 
-    category: { type: String, default: "" },
-    subCategory: { type: String, default: "" },
+    category: { type: mongoose.Schema.Types.ObjectId, ref: "Category", required: true, index: true },
+    subCategory: { type: mongoose.Schema.Types.ObjectId, ref: "SubCategory", index: true },
+
     brand: { type: String, default: "" },
 
     stock: { type: Number, default: 0, min: 0 },
@@ -58,6 +59,11 @@ const readymadeProductSchema = new mongoose.Schema(
         message: "Maximum 4 images allowed",
       },
       default: [],
+    },
+
+    thumbnail: {
+      type: String,
+      default: null,
     },
 
     video: { type: String, default: null },

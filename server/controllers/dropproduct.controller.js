@@ -1,22 +1,50 @@
-import Dropproduct from '../models/dropproduct.model.js';
-import fs from 'fs';
-import path from 'path';
+import Dropproduct from "../models/dropproduct.model.js";
+import fs from "fs";
+import path from "path";
 
-const BASE_IMAGE_PATH = '/outputs/dropimages/';
+const BASE_IMAGE_PATH = "/outputs/dropimages/";
 
+/* =================================
+   Helper: safe file delete
+================================= */
+const safeUnlink = (filePath) => {
+  if (!filePath) return;
+  try {
+    const abs = path.join(process.cwd(), filePath.replace(/^\//, ""));
+    if (fs.existsSync(abs)) fs.unlinkSync(abs);
+  } catch {}
+};
+
+
+
+/* =========================================================
+   CREATE DROP PRODUCT  (WITH THUMBNAIL SUPPORT)
+========================================================= */
 export const createDropproduct = async (req, res) => {
   try {
-    // 1) images validation
-    if (!req.files || req.files.length < 1) {
+    const uploadedImages = req.files?.images || [];
+    const uploadedThumbnail = req.files?.thumbnail?.[0] || null;
+
+    // images validation
+    if (uploadedImages.length < 1) {
       return res.status(400).json({ message: "At least 1 image is required" });
     }
-    if (req.files.length > 6) {
+    if (uploadedImages.length > 6) {
       return res.status(400).json({ message: "Maximum 6 images allowed" });
     }
 
-    const images = req.files.map((file) => BASE_IMAGE_PATH + file.filename);
+    const images = uploadedImages.map((f) => BASE_IMAGE_PATH + f.filename);
 
-    // ✅ category + subCategory validation
+    // ✅ thumbnail (same path)
+    const thumbnail = uploadedThumbnail
+      ? BASE_IMAGE_PATH + uploadedThumbnail.filename
+      : images[0]; // fallback
+
+
+
+    /* =========================
+       CATEGORY VALIDATION
+    ========================= */
     const category = String(req.body.category || "").trim();
     const subCategory = String(req.body.subCategory || "").trim();
 
@@ -27,14 +55,17 @@ export const createDropproduct = async (req, res) => {
       return res.status(400).json({ message: "Sub-category is required" });
     }
 
-    // 2) variants parsing + validation
-    // variants can be sent as JSON string in multipart form-data
+
+
+    /* =========================
+       VARIANTS PARSE + VALIDATE
+    ========================= */
     let variants = req.body.variants;
 
     if (typeof variants === "string") {
       try {
         variants = JSON.parse(variants);
-      } catch (e) {
+      } catch {
         return res.status(400).json({
           message: "Invalid variants JSON. Send proper JSON array.",
         });
@@ -47,7 +78,6 @@ export const createDropproduct = async (req, res) => {
       });
     }
 
-    // normalize + validate each variant
     const normalized = variants.map((v) => ({
       size: String(v.size || "").trim(),
       price: Number(v.price),
@@ -55,37 +85,32 @@ export const createDropproduct = async (req, res) => {
       sku: v.sku ? String(v.sku).trim() : "",
     }));
 
-    // basic checks
     for (const v of normalized) {
-      if (!v.size) {
-        return res.status(400).json({ message: "Variant size is required" });
-      }
-      if (!Number.isFinite(v.price) || v.price < 0) {
-        return res
-          .status(400)
-          .json({ message: `Invalid price for size ${v.size}` });
-      }
-      if (!Number.isFinite(v.stock) || v.stock < 0) {
-        return res
-          .status(400)
-          .json({ message: `Invalid stock for size ${v.size}` });
-      }
+      if (!v.size) return res.status(400).json({ message: "Variant size is required" });
+      if (!Number.isFinite(v.price) || v.price < 0)
+        return res.status(400).json({ message: `Invalid price for size ${v.size}` });
+      if (!Number.isFinite(v.stock) || v.stock < 0)
+        return res.status(400).json({ message: `Invalid stock for size ${v.size}` });
     }
 
-    // duplicate size check
     const sizes = normalized.map((x) => x.size.toUpperCase());
     if (new Set(sizes).size !== sizes.length) {
       return res.status(400).json({ message: "Duplicate sizes are not allowed" });
     }
 
-    // 3) create
+
+
+    /* =========================
+       CREATE
+    ========================= */
     const product = await Dropproduct.create({
       name: req.body.name,
       description: req.body.description,
-      category,        // ✅ added
-      subCategory,     // ✅ added
+      category,
+      subCategory,
       isActive: req.body.isActive ?? true,
       images,
+      thumbnail, // ✅ NEW
       variants: normalized,
     });
 
@@ -98,6 +123,10 @@ export const createDropproduct = async (req, res) => {
 
 
 
+
+/* =========================================================
+   UPDATE DROP PRODUCT  (WITH THUMBNAIL SUPPORT)
+========================================================= */
 export const updateDropproduct = async (req, res) => {
   try {
     const product = await Dropproduct.findById(req.params.id);
@@ -105,52 +134,67 @@ export const updateDropproduct = async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    /* =========================
-       1) IMAGES (replace if new)
-       ========================= */
-    let images = product.images;
+    const uploadedImages = req.files?.images || [];
+    const uploadedThumbnail = req.files?.thumbnail?.[0] || null;
 
-    if (req.files && req.files.length > 0) {
-      if (req.files.length > 6) {
+    let images = product.images;
+    let thumbnail = product.thumbnail;
+
+
+
+    /* =========================
+       IMAGES (replace if new)
+    ========================= */
+    if (uploadedImages.length > 0) {
+      if (uploadedImages.length > 6) {
         return res.status(400).json({ message: "Maximum 6 images allowed" });
       }
 
       // delete old images
-      product.images.forEach((img) => {
-        const imagePath = path.join(process.cwd(), img.replace(/^\//, ""));
-        if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
-      });
+      product.images.forEach(safeUnlink);
 
-      // set new images
-      images = req.files.map((file) => BASE_IMAGE_PATH + file.filename);
+      images = uploadedImages.map((f) => BASE_IMAGE_PATH + f.filename);
+
+      // if thumbnail pointed to old image → reset
+      if (thumbnail && !images.includes(thumbnail)) {
+        thumbnail = images[0];
+      }
     }
 
+
+
     /* =========================
-       2) VARIANTS (optional)
-       ========================= */
-    let variants = undefined;
+       THUMBNAIL (replace if new)
+    ========================= */
+    if (uploadedThumbnail) {
+      if (thumbnail) safeUnlink(thumbnail);
+      thumbnail = BASE_IMAGE_PATH + uploadedThumbnail.filename;
+    }
+
+
+
+    /* =========================
+       REMOVE THUMBNAIL FLAG
+    ========================= */
+    if (String(req.body.removeThumbnail) === "true") {
+      safeUnlink(thumbnail);
+      thumbnail = images[0] || null;
+    }
+
+
+
+    /* =========================
+       VARIANTS (optional)
+    ========================= */
+    let variants;
 
     if (req.body.variants !== undefined) {
       variants = req.body.variants;
 
-      // variants can arrive as JSON string in multipart/form-data
       if (typeof variants === "string") {
-        try {
-          variants = JSON.parse(variants);
-        } catch (e) {
-          return res.status(400).json({
-            message: "Invalid variants JSON. Send proper JSON array.",
-          });
-        }
+        variants = JSON.parse(variants);
       }
 
-      if (!Array.isArray(variants) || variants.length < 1) {
-        return res.status(400).json({
-          message: "At least 1 size variant is required",
-        });
-      }
-
-      // normalize + validate
       const normalized = variants.map((v) => ({
         size: String(v.size || "").trim(),
         price: Number(v.price),
@@ -158,44 +202,25 @@ export const updateDropproduct = async (req, res) => {
         sku: v.sku ? String(v.sku).trim() : "",
       }));
 
-      for (const v of normalized) {
-        if (!v.size) {
-          return res.status(400).json({ message: "Variant size is required" });
-        }
-        if (!Number.isFinite(v.price) || v.price < 0) {
-          return res
-            .status(400)
-            .json({ message: `Invalid price for size ${v.size}` });
-        }
-        if (!Number.isFinite(v.stock) || v.stock < 0) {
-          return res
-            .status(400)
-            .json({ message: `Invalid stock for size ${v.size}` });
-        }
-      }
-
-      const sizes = normalized.map((x) => x.size);
-      if (new Set(sizes).size !== sizes.length) {
-        return res.status(400).json({ message: "Duplicate sizes are not allowed" });
-      }
-
       variants = normalized;
     }
 
+
+
     /* =========================
-       3) BUILD UPDATE PAYLOAD
-       ========================= */
+       UPDATE
+    ========================= */
     const updateData = {
-      // safe fields
       name: req.body.name ?? product.name,
       description: req.body.description ?? product.description,
+      category: req.body.category ?? product.category,
+      subCategory: req.body.subCategory ?? product.subCategory,
       isActive: req.body.isActive ?? product.isActive,
       images,
-      // variants only if provided
-      ...(variants !== undefined ? { variants } : {}),
+      thumbnail, // ✅ NEW
+      ...(variants ? { variants } : {}),
     };
 
-    // ✅ Use findByIdAndUpdate but also run validators
     const updatedProduct = await Dropproduct.findByIdAndUpdate(
       req.params.id,
       updateData,

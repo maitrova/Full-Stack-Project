@@ -117,7 +117,11 @@ export default function AllProductsHub() {
   const [addedProductName, setAddedProductName] = useState('');
   const [addingToCartId, setAddingToCartId] = useState(null);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-  
+  const showSubCategoryTiles =
+  selectedCommonCategory !== "all" &&
+  selectedCommonSubCategory === "all" &&
+  !searchQuery?.trim();   // optional: if user searches, show products directly
+
   // Redux state
   const commonSavedData = useSelector(selectCommonSavedData);
   const commonLoading = useSelector(selectCommonSavedDataLoading);
@@ -512,18 +516,33 @@ export default function AllProductsHub() {
     return Array.from(categories.entries()).map(([name, count]) => ({ name, count }));
   }, [commonSavedData]);
   
-  const getCommonSubcategories = useMemo(() => {
-    if (selectedCommonCategory === 'all') return [];
-    
-    const subcategories = new Map();
-    commonSavedData.forEach(item => {
-      if (item.category === selectedCommonCategory && item.subCategory) {
-        const count = subcategories.get(item.subCategory) || 0;
-        subcategories.set(item.subCategory, count + 1);
+ const getCommonSubcategories = useMemo(() => {
+  if (selectedCommonCategory === 'all') return [];
+
+  const map = new Map();
+
+  commonSavedData.forEach((item) => {
+    if (item.category === selectedCommonCategory && item.subCategory) {
+      if (!map.has(item.subCategory)) {
+        map.set(item.subCategory, {
+          name: item.subCategory,
+          count: 0,
+          thumb: item.raw.thumbnail || null, // pick first product image as thumbnail
+        });
       }
-    });
-    return Array.from(subcategories.entries()).map(([name, count]) => ({ name, count }));
-  }, [commonSavedData, selectedCommonCategory]);
+      const entry = map.get(item.subCategory);
+      entry.count += 1;
+
+      // If no thumbnail yet, try to fill it from later items
+      if (!entry.thumb && item.previewImage) {
+        entry.thumb = item.previewImage;
+      }
+    }
+  });
+
+  return Array.from(map.values());
+}, [commonSavedData, selectedCommonCategory]);
+
   
   const applyQuickPriceRange = (range) => {
     setQuickPriceRange(range.label);
@@ -1006,128 +1025,223 @@ export default function AllProductsHub() {
               </div>
             )}
             
-            {/* Products Grid */}
-            {filteredProducts.length === 0 ? (
-              <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Search className="w-6 h-6 text-gray-400" />
-                </div>
-                <h3 className="text-lg font-medium text-gray-800 mb-2">No products found</h3>
-                <p className="text-gray-600 mb-6 text-sm">
-                  Try adjusting your search or filter criteria
+            {/* Products Grid OR Subcategory Tiles */}
+{showSubCategoryTiles ? (
+  // ✅ Subcategory tiles view
+  <div>
+    <div className="flex items-center justify-between mb-4">
+      <h2 className="text-lg font-semibold text-gray-900">
+        {selectedCommonCategory} Subcategories
+      </h2>
+      <p className="text-sm text-gray-600">
+        {getCommonSubcategories.length} subcategories
+      </p>
+    </div>
+
+    {getCommonSubcategories.length === 0 ? (
+      <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+        <h3 className="text-lg font-medium text-gray-800 mb-2">
+          No subcategories found
+        </h3>
+        <p className="text-sm text-gray-600">
+          This category does not have subcategories yet.
+        </p>
+      </div>
+    ) : (
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {getCommonSubcategories.map((sub) => (
+          <button
+            key={sub.name}
+            onClick={() => selectSubCategory(sub.name)}
+            className="group bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden text-left"
+          >
+            <div className="relative aspect-square bg-white flex items-center justify-center overflow-hidden">
+              <img
+                src={getImageUrl(sub.thumb)}
+                alt={sub.name}
+                className="max-h-[85%] max-w-[85%] object-contain transition-transform duration-300 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 ring-1 ring-gray-200" />
+            </div>
+
+            <div className="p-3">
+              <h3 className="text-sm font-medium text-gray-900 line-clamp-1">
+                {sub.name}
+              </h3>
+              <p className="text-xs text-gray-500 mt-1">
+                {sub.count} products
+              </p>
+
+              <div className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-gray-700 group-hover:text-gray-900">
+                View products
+                <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    )}
+  </div>
+) : (
+  // ✅ Products view (your existing product list)
+  filteredProducts.length === 0 ? (
+    <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+      <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <Search className="w-6 h-6 text-gray-400" />
+      </div>
+      <h3 className="text-lg font-medium text-gray-800 mb-2">No products found</h3>
+      <p className="text-gray-600 mb-6 text-sm">
+        Try adjusting your search or filter criteria
+      </p>
+      <button
+        onClick={handleClearFilters}
+        className="px-5 py-2 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors font-medium text-sm"
+      >
+        Reset All Filters
+      </button>
+    </div>
+  ) : (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {filteredProducts.map((product) => {
+        const isInCart = getCartQuantityForCommon(product) > 0;
+        const isAdding = addingToCartId === product._id;
+
+        const discountPercent =
+          product.type === "readymade" &&
+          product.raw?.originalPrice &&
+          product.raw.originalPrice > (product.price || 0)
+            ? Math.round(
+                ((product.raw.originalPrice - (product.price || 0)) /
+                  product.raw.originalPrice) *
+                  100
+              )
+            : 0;
+
+        return (
+          <div
+            key={product._id}
+            className="group bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden"
+          >
+            {/* ===== Premium Square Image Block ===== */}
+            <div className="relative aspect-square bg-white flex items-center justify-center overflow-hidden rounded-t-xl">
+              <img
+                src={getImageUrl(product.previewImage)}
+                alt={product.title}
+                className="max-h-[85%] max-w-[85%] object-contain transition-transform duration-300 group-hover:scale-105"
+              />
+
+              {/* subtle border like ecommerce */}
+              <div className="absolute inset-0 ring-1 ring-gray-200" />
+
+              {/* ===== Badges ===== */}
+              <div className="absolute top-2 left-2 flex flex-col gap-2 z-10">
+                {product.bestSeller && (
+                  <span className="px-2 py-1 text-[11px] font-semibold bg-orange-500 text-white rounded-md">
+                    Best Seller
+                  </span>
+                )}
+
+                {product.customerFave && (
+                  <span className="px-2 py-1 text-[11px] font-semibold bg-pink-500 text-white rounded-md">
+                    Customer Fave
+                  </span>
+                )}
+
+                {product.staffPick && (
+                  <span className="px-2 py-1 text-[11px] font-semibold bg-indigo-500 text-white rounded-md">
+                    Staff Pick
+                  </span>
+                )}
+              </div>
+
+              {/* Eco Friendly badge bottom */}
+              {product.ecoFriendly && (
+                <span className="absolute bottom-2 right-2 px-2 py-1 text-[11px] font-medium bg-green-100 text-green-700 rounded-md">
+                  🌿 Eco-friendly
+                </span>
+              )}
+            </div>
+
+            {/* Product Info */}
+            <div className="p-3">
+              <div className="mb-2">
+                <p className="text-xs text-gray-500 mb-1">
+                  {product.category || "Uncategorized"}
                 </p>
+                <h3 className="text-sm font-medium text-gray-900 line-clamp-1">
+                  {product.title || "Unnamed Product"}
+                </h3>
+              </div>
+
+              {/* Price and Action */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-sm font-semibold text-gray-900">
+                      ₹{(product.price || 0).toLocaleString()}
+                    </span>
+
+                    {discountPercent > 0 && (
+                      <span className="text-xs text-gray-400 line-through">
+                        ₹{product.raw?.originalPrice?.toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-0.5">
+                    incl. taxes
+                  </p>
+                </div>
+
                 <button
-                  onClick={handleClearFilters}
-                  className="px-5 py-2 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors font-medium text-sm"
+                  onClick={() => handleAddToCart(product)}
+                  disabled={isAdding || cartLoading}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1.5 ${
+                    isInCart
+                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                      : "bg-gray-900 text-white hover:bg-black"
+                  } ${isAdding ? "opacity-70 cursor-not-allowed" : ""}`}
                 >
-                  Reset All Filters
+                  {isAdding ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Adding
+                    </>
+                  ) : isInCart ? (
+                    <>
+                      <CheckCircle className="w-3 h-3" />
+                      Added
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className="w-3 h-3" />
+                      Add
+                    </>
+                  )}
                 </button>
               </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {filteredProducts.map((product) => {
-                  const isInCart = getCartQuantityForCommon(product) > 0;
-                  const isAdding = addingToCartId === product._id;
-                  const discountPercent = product.type === 'readymade' && product.raw?.originalPrice && product.raw.originalPrice > (product.price || 0)
-                    ? Math.round(((product.raw.originalPrice - (product.price || 0)) / product.raw.originalPrice) * 100)
-                    : 0;
-                  
-                  return (
-                    <div key={product._id} className="group bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden">
-                      {/* Image Container - Made smaller for mobile */}
-                      <div className="relative aspect-[3/4] bg-gray-100 overflow-hidden">
-                        <img
-                          src={getImageUrl(product.previewImage)}
-                          alt={product.title}
-                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        />
-                        
-                        {/* Badges */}
-                        <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
-                          {discountPercent > 0 && (
-                            <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-red-600 text-white">
-                              {discountPercent}% OFF
-                            </span>
-                          )}
-                          {product.newArrival && (
-                            <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-gray-900 text-white">
-                              NEW
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Product Info */}
-                      <div className="p-3">
-                        <div className="mb-2">
-                          <p className="text-xs text-gray-500 mb-1">
-                            {product.category || 'Uncategorized'}
-                          </p>
-                          <h3 className="text-sm font-medium text-gray-900 line-clamp-1">
-                            {product.title || 'Unnamed Product'}
-                          </h3>
-                        </div>
-                        
-                        {/* Price and Action */}
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="flex items-baseline gap-1">
-                              <span className="text-sm font-semibold text-gray-900">
-                                ₹{(product.price || 0).toLocaleString()}
-                              </span>
-                              {discountPercent > 0 && (
-                                <span className="text-xs text-gray-400 line-through">
-                                  ₹{product.raw?.originalPrice?.toLocaleString()}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[10px] text-gray-500 mt-0.5">incl. taxes</p>
-                          </div>
-                          
-                          <button
-                            onClick={() => handleAddToCart(product)}
-                            disabled={isAdding || cartLoading}
-                            className={`px-3 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1.5 ${
-                              isInCart
-                                ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                                : 'bg-gray-900 text-white hover:bg-black'
-                            } ${isAdding ? 'opacity-70 cursor-not-allowed' : ''}`}
-                          >
-                            {isAdding ? (
-                              <>
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                                Adding
-                              </>
-                            ) : isInCart ? (
-                              <>
-                                <CheckCircle className="w-3 h-3" />
-                                Added
-                              </>
-                            ) : (
-                              <>
-                                <ShoppingCart className="w-3 h-3" />
-                                Add
-                              </>
-                            )}
-                          </button>
-                        </div>
-                        
-                        {/* View Details Link */}
-                        <div className="mt-3">
-                          <Link
-                            to={product.type === 'readymade' ? `/readymade/${product._id}` : `/catalogue/${product._id}`}
-                            className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
-                          >
-                            View Details
-                            <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+
+              {/* View Details Link */}
+              <div className="mt-3">
+                <Link
+                  to={
+                    product.type === "readymade"
+                      ? `/readymade/${product._id}`
+                      : `/catalogue/${product._id}`
+                  }
+                  className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                >
+                  View Details
+                  <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+                </Link>
               </div>
-            )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  )
+)}
+
           </div>
         </div>
       </div>

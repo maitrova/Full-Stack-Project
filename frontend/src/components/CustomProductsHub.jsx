@@ -802,7 +802,7 @@ export default function CustomProductsHub() {
                         </div>
                         
                         {/* View Details Link */}
-                        <div className="mt-3">
+                        {/* <div className="mt-3">
                           <Link
                             to={`/products/${product._id}`}
                             className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
@@ -810,7 +810,7 @@ export default function CustomProductsHub() {
                             View Details
                             <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
                           </Link>
-                        </div>
+                        </div> */}
                       </div>
                     </div>
                   );

@@ -450,6 +450,9 @@ export const createReadymadeProduct = async (req, res) => {
       bestSeller,
       newArrival,
       variants, // <-- NEW (array or JSON string)
+
+      // OPTIONAL: allow passing thumbnail URL as text too
+      thumbnail: thumbnailFromBody,
     } = req.body;
 
     if (!title || !description) {
@@ -459,9 +462,15 @@ export const createReadymadeProduct = async (req, res) => {
       });
     }
 
-    // images/video
-    const images = req.files?.images?.map((f) => f.path.replace(/\\/g, "/")) || [];
+    // images/video/thumbnail
+    const images =
+      req.files?.images?.map((f) => f.path.replace(/\\/g, "/")) || [];
+
     const video = req.files?.video?.[0]?.path.replace(/\\/g, "/") || null;
+
+    // ✅ NEW: thumbnail file (multipart)
+    const thumbnailFromFile =
+      req.files?.thumbnail?.[0]?.path.replace(/\\/g, "/") || null;
 
     if (images.length > 4) {
       return res.status(400).json({
@@ -469,6 +478,13 @@ export const createReadymadeProduct = async (req, res) => {
         message: "Maximum 4 images allowed",
       });
     }
+
+    // ✅ Decide thumbnail priority:
+    // 1) uploaded thumbnail file
+    // 2) thumbnail url from body
+    // 3) fallback to first image (if exists)
+    const thumbnail =
+      thumbnailFromFile || thumbnailFromBody || images[0] || null;
 
     // Parse variants (because multipart/form-data sends it as string usually)
     let parsedVariants = variants;
@@ -553,13 +569,21 @@ export const createReadymadeProduct = async (req, res) => {
       subCategory: subCategory || "",
       brand: brand || "",
 
-      variants: normalizedVariants, // <-- saved here
+      variants: normalizedVariants,
 
-      isActive: isActive !== undefined ? String(isActive).toLowerCase() === "true" : true,
-      bestSeller: bestSeller !== undefined ? String(bestSeller).toLowerCase() === "true" : false,
-      newArrival: newArrival !== undefined ? String(newArrival).toLowerCase() === "true" : false,
+      isActive:
+        isActive !== undefined ? String(isActive).toLowerCase() === "true" : true,
+      bestSeller:
+        bestSeller !== undefined
+          ? String(bestSeller).toLowerCase() === "true"
+          : false,
+      newArrival:
+        newArrival !== undefined
+          ? String(newArrival).toLowerCase() === "true"
+          : false,
 
       images,
+      thumbnail, // ✅ NEW FIELD
       video,
     });
 
@@ -575,6 +599,7 @@ export const createReadymadeProduct = async (req, res) => {
     });
   }
 };
+
 
 
 // Update product
@@ -608,6 +633,8 @@ export const updateReadymadeProduct = async (req, res) => {
       "isActive",
       "bestSeller",
       "newArrival",
+      // OPTIONAL: allow thumbnail url update via body
+      "thumbnail",
     ];
 
     for (const key of updatableFields) {
@@ -711,6 +738,18 @@ export const updateReadymadeProduct = async (req, res) => {
     if (removeImages.length) {
       await Promise.all(removeImages.map((p) => safeDeleteFile(p)));
       product.images = (product.images || []).filter((p) => !removeImages.includes(p));
+
+      // ✅ If thumbnail was one of the removed images, clear it
+      if (product.thumbnail && removeImages.includes(product.thumbnail)) {
+        product.thumbnail = null;
+      }
+    }
+
+    // ---------- Remove thumbnail if requested ----------
+    const removeThumbnail = String(req.body.removeThumbnail) === "true";
+    if (removeThumbnail && product.thumbnail) {
+      await safeDeleteFile(product.thumbnail);
+      product.thumbnail = null;
     }
 
     // ---------- Remove video if requested ----------
@@ -726,10 +765,20 @@ export const updateReadymadeProduct = async (req, res) => {
       ? req.files.video[0].path.replace(/\\/g, "/")
       : null;
 
+    // ✅ NEW: thumbnail file upload
+    const newThumbnail = req.files?.thumbnail?.[0]?.path
+      ? req.files.thumbnail[0].path.replace(/\\/g, "/")
+      : null;
+
     const replaceImages = String(req.body.replaceImages) === "true";
 
     if (newImages.length) {
       if (replaceImages) {
+        // if thumbnail is pointing to an existing image that is about to be deleted, clear it first
+        if (product.thumbnail && (product.images || []).includes(product.thumbnail)) {
+          product.thumbnail = null;
+        }
+
         await Promise.all((product.images || []).map((p) => safeDeleteFile(p)));
         product.images = [];
       }
@@ -752,6 +801,17 @@ export const updateReadymadeProduct = async (req, res) => {
       product.video = newVideo;
     }
 
+    // ✅ If a new thumbnail uploaded, replace old thumbnail file
+    if (newThumbnail) {
+      if (product.thumbnail) await safeDeleteFile(product.thumbnail);
+      product.thumbnail = newThumbnail;
+    }
+
+    // ✅ Final fallback: if thumbnail is empty but images exist, set first image
+    if (!product.thumbnail && product.images && product.images.length > 0) {
+      product.thumbnail = product.images[0];
+    }
+
     await product.save();
 
     return res.status(200).json({
@@ -766,6 +826,7 @@ export const updateReadymadeProduct = async (req, res) => {
     });
   }
 };
+
 
 
 // Update multiple products for newArrival/bestSeller
@@ -903,17 +964,33 @@ export const getHomeCategoryTiles = async (req, res) => {
         },
       },
 
-      // Build thumbnail (first image if exists)
+      // ✅ Include thumbnail (prefer sample.thumbnail, fallback to first image)
       {
         $project: {
           _id: 0,
           category: "$_id",
           count: 1,
+
+          // keep old field if you already use it in UI
           image: {
             $cond: [
               { $gt: [{ $size: "$sample.images" }, 0] },
               { $arrayElemAt: ["$sample.images", 0] },
               null,
+            ],
+          },
+
+          // new field
+          thumbnail: {
+            $ifNull: [
+              "$sample.thumbnail",
+              {
+                $cond: [
+                  { $gt: [{ $size: "$sample.images" }, 0] },
+                  { $arrayElemAt: ["$sample.images", 0] },
+                  null,
+                ],
+              },
             ],
           },
         },
@@ -935,6 +1012,87 @@ export const getHomeCategoryTiles = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to load home categories",
+    });
+  }
+};
+
+
+export const getHomeSubCategoryTiles = async (req, res) => {
+  try {
+    const onlyActive = (req.query.onlyActive ?? "true") === "true";
+    const limit = Math.min(parseInt(req.query.limit || "12", 10), 50);
+
+    // optional filter: get subcategories only for a category
+    const categoryFilter = (req.query.category || "").trim();
+
+    const match = {};
+    if (onlyActive) match.isActive = true;
+    if (categoryFilter) match.category = categoryFilter;
+
+    const subCategories = await ReadymadeProduct.aggregate([
+      { $match: match },
+      { $sort: { createdAt: -1 } }, // latest products first
+
+      // Group by subCategory and take one product as representative
+      {
+        $group: {
+          _id: "$subCategory",
+          count: { $sum: 1 },
+          sample: { $first: "$$ROOT" }, // first after sort = latest product
+        },
+      },
+
+      // ✅ Include thumbnail (prefer sample.thumbnail, fallback to first image)
+      {
+        $project: {
+          _id: 0,
+          subCategory: "$_id",
+          count: 1,
+
+          // optional: include category of sample for UI
+          category: "$sample.category",
+
+          // keep old field if you already use it in UI
+          image: {
+            $cond: [
+              { $gt: [{ $size: "$sample.images" }, 0] },
+              { $arrayElemAt: ["$sample.images", 0] },
+              null,
+            ],
+          },
+
+          // new field
+          thumbnail: {
+            $ifNull: [
+              "$sample.thumbnail",
+              {
+                $cond: [
+                  { $gt: [{ $size: "$sample.images" }, 0] },
+                  { $arrayElemAt: ["$sample.images", 0] },
+                  null,
+                ],
+              },
+            ],
+          },
+        },
+      },
+
+      // Remove empty subCategory names
+      { $match: { subCategory: { $ne: null, $ne: "" } } },
+
+      { $sort: { subCategory: 1 } },
+      { $limit: limit },
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: subCategories,
+    });
+  } catch (error) {
+    console.error("getHomeSubCategoryTiles error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load home sub categories",
     });
   }
 };

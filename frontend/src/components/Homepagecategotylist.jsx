@@ -14,6 +14,7 @@ const IMAGE_URL = import.meta.env.VITE_IMAGE_URL;
 const CategoryTilesHorizontal = ({ limit = 12, onlyActive = true }) => {
   const dispatch = useDispatch();
   const categories = useSelector(selectAllCategories);
+  console.log("Homepage Categories:", categories);
   const loading = useSelector(selectCategoriesLoading);
 
   useEffect(() => {
@@ -70,7 +71,7 @@ const CategoryTilesHorizontal = ({ limit = 12, onlyActive = true }) => {
         {/* Categories Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
           {categories.map((category) => {
-            const imageUrl = formatImageUrl(category.image);
+            const imageUrl = formatImageUrl(category.thumbnail);
             const label = titleCase(category.category);
 
             return (
