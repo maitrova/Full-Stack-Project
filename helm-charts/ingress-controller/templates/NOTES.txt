@@ -1,0 +1,85 @@
+Thank you for installing {{ .Chart.Name }}!
+
+Your ingress controller has been deployed with the following configuration:
+
+{{- if .Values.backend.ingress.enabled }}
+
+BACKEND INGRESS:
+  Name: {{ .Values.backend.name }}-ingress
+  Service: {{ .Values.backend.serviceName }}:{{ .Values.backend.servicePort }}
+  {{- range .Values.backend.ingress.hosts }}
+  Host: {{ .host }}
+    {{- range .paths }}
+    - {{ .path }} ({{ .pathType }})
+    {{- end }}
+  {{- end }}
+  {{- if .Values.backend.ingress.tls }}
+  TLS Enabled: Yes
+  {{- end }}
+{{- end }}
+
+{{- if .Values.frontend.ingress.enabled }}
+
+FRONTEND INGRESS:
+  Name: {{ .Values.frontend.name }}-ingress
+  Service: {{ .Values.frontend.serviceName }}:{{ .Values.frontend.servicePort }}
+  {{- range .Values.frontend.ingress.hosts }}
+  Host: {{ .host }}
+    {{- range .paths }}
+    - {{ .path }} ({{ .pathType }})
+    {{- end }}
+  {{- end }}
+  {{- if .Values.frontend.ingress.tls }}
+  TLS Enabled: Yes
+  {{- end }}
+{{- end }}
+
+{{- if .Values.backend.imagesIngress.enabled }}
+
+IMAGES INGRESS:
+  Name: {{ .Values.backend.name }}-images
+  Service: {{ .Values.backend.serviceName }}:{{ .Values.backend.servicePort }}
+  {{- range .Values.backend.imagesIngress.hosts }}
+  Host: {{ .host }}
+    {{- range .paths }}
+    - {{ .path }} ({{ .pathType }})
+    {{- end }}
+  {{- end }}
+  {{- if .Values.backend.imagesIngress.tls }}
+  TLS Enabled: Yes
+  {{- end }}
+{{- end }}
+
+{{- if .Values.combinedIngress.enabled }}
+
+COMBINED INGRESS:
+  Name: {{ include "ingress-controller.fullname" . }}-combined
+  {{- range .Values.combinedIngress.hosts }}
+  Host: {{ .host }}
+    {{- range .paths }}
+    - {{ .path }} → {{ .service }}:{{ .port }}
+    {{- end }}
+  {{- end }}
+  {{- if .Values.combinedIngress.tls }}
+  TLS Enabled: Yes
+  {{- end }}
+{{- end }}
+
+To check the status of your ingress resources:
+
+  kubectl get ingress -n {{ .Release.Namespace }}
+  kubectl describe ingress -n {{ .Release.Namespace }}
+
+{{- if or .Values.backend.ingress.tls .Values.frontend.ingress.tls }}
+
+To check TLS certificate status:
+
+  kubectl get certificate -n {{ .Release.Namespace }}
+  kubectl describe certificate -n {{ .Release.Namespace }}
+{{- end }}
+
+To view ingress controller logs:
+
+  kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx
+
+For more information, see the README.md file or visit the project documentation.

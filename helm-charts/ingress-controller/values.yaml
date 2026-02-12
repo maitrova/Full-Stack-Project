@@ -1,0 +1,106 @@
+# Ingress Controller Configuration for Full-Stack Application
+global:
+  domain: narifighter.online
+  environment: production
+
+# Backend Ingress Configuration
+backend:
+  enabled: true
+  name: backend
+  serviceName: backend-service
+  servicePort: 5000
+  
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+      nginx.ingress.kubernetes.io/proxy-connect-timeout: "120"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+      nginx.ingress.kubernetes.io/client-body-buffer-size: "10m"
+    hosts:
+      - host: narifighter.online
+        paths:
+          - path: /api
+            pathType: Prefix
+    tls:
+      - secretName: narifighter-tls
+        hosts:
+          - narifighter.online
+  
+  # Separate ingress for images endpoint
+  imagesIngress:
+    enabled: false
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/rewrite-target: /$2
+      nginx.ingress.kubernetes.io/use-regex: "true"
+    hosts:
+      - host: narifighter.online
+        paths:
+          - path: /images(/|$)(.*)
+            pathType: ImplementationSpecific
+    tls:
+      - secretName: narifighter-images-tls
+        hosts:
+          - narifighter.online
+
+# Frontend Ingress Configuration
+frontend:
+  enabled: true
+  name: frontend
+  serviceName: frontend-service
+  servicePort: 80
+  
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    hosts:
+      - host: narifighter.online
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: narifighter-tls
+        hosts:
+          - narifighter.online
+
+# Combined Ingress Configuration (Optional - for path-based routing)
+combinedIngress:
+  enabled: false
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+  
+  hosts:
+    - host: narifighter.online
+      paths:
+        - path: /api(/|$)(.*)
+          pathType: ImplementationSpecific
+          service: backend
+          port: 5000
+        - path: /
+          pathType: Prefix
+          service: frontend
+          port: 80
+  
+  tls:
+    - secretName: narifighter-tls
+      hosts:
+        - narifighter.online

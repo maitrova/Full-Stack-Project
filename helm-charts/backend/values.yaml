@@ -30,9 +30,8 @@ envSecrets:
   MONGOOSE_PASSWORD: "Saigollapalli@122"
  # MONGOOSE_URL: "mongodb://maitrova:Saigollapalli%40122@mongodb:27017/appdb?authSource=admin"
   MONGOOSE_URL: "mongodb+srv://hemanthnagala876_db_user:VRYnuUeDAbgNzdpp@cluster0.ru99jrx.mongodb.net/"
-  API_URL: "http://localhost:5000"
-
-
+  API_URL: "https://narifighter.online/api"
+  
 # Resource Limits
 resources:
   limits:
