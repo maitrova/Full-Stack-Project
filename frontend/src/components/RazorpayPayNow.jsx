@@ -65,7 +65,7 @@ export default function RazorpayPayNow({ token }) {
         key: created.razorpayKeyId,
         amount: created.amount,
         currency: created.currency,
-        name: "Narifighter",
+        name: "maitrova",
         description: "Secure Cart Payment",
         order_id: created.razorpayOrderId,
 

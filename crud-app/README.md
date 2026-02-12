@@ -211,7 +211,7 @@ kubectl get pods -n ingress-nginx
 kubectl describe ingress crud-app-ingress
 
 # Check TLS certificate
-kubectl describe certificate narifighter-tls
+kubectl describe certificate maitrova-tls
 ```
 
 ## Production Considerations
