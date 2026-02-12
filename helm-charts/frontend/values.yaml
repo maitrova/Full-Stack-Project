@@ -3,10 +3,9 @@ name: frontend
 fullnameOverride: frontend
 
 replicaCount: 1
-
 image:
-  repository: docker.io/maitrova/maitrova
-  tag: frontend
+  repository: maitrova/crud-frontend
+  tag: latest
   pullPolicy: Always
 
 # Service Configuration
