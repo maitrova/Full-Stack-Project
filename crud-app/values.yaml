@@ -1,6 +1,6 @@
-# Production Configuration for narifighter.online
+# Production Configuration for maitrova.in
 global:
-  domain: narifighter.online
+  domain: maitrova.in
   environment: production
 
 # Backend Configuration
@@ -28,7 +28,7 @@ backend:
     MONGOOSE_PASSWORD: "Saigollapalli@122"
   # MONGOOSE_URL: "mongodb://maitrova:Saigollapalli%40122@mongodb:27017/appdb?authSource=admin"
     MONGOOSE_URL: "mongodb+srv://hemanthnagala876_db_user:VRYnuUeDAbgNzdpp@cluster0.ru99jrx.mongodb.net/"
-    API_URL: "https://narifighter.online/api"
+    API_URL: "https://maitrova.in/api"
     
   resources:
     limits:
@@ -77,14 +77,14 @@ backend:
       nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
       nginx.ingress.kubernetes.io/client-body-buffer-size: "10m"
     hosts:
-      - host: narifighter.online
+      - host: maitrova.in
         paths:
           - path: /api
             pathType: Prefix
     tls:
-      - secretName: narifighter-tls
+      - secretName: maitrova-tls
         hosts:
-          - narifighter.online
+          - maitrova.in
   
   imagesIngress:
     enabled: false
@@ -96,14 +96,14 @@ backend:
       nginx.ingress.kubernetes.io/rewrite-target: /$2
       nginx.ingress.kubernetes.io/use-regex: "true"
     hosts:
-      - host: narifighter.online
+      - host: maitrova.in
         paths:
           - path: /images(/|$)(.*)
             pathType: ImplementationSpecific
     tls:
-      - secretName: narifighter-images-tls
+      - secretName: maitrova-images-tls
         hosts:
-          - narifighter.online
+          - maitrova.in
 
 # Frontend Configuration
 frontend:
@@ -163,14 +163,14 @@ frontend:
       nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
       nginx.ingress.kubernetes.io/proxy-body-size: "50m"
     hosts:
-      - host: narifighter.online
+      - host: maitrova.in
         paths:
           - path: /
             pathType: Prefix
     tls:
-      - secretName: narifighter-tls
+      - secretName: maitrova-tls
         hosts:
-          - narifighter.online
+          - maitrova.in
 
 # MongoDB Configuration
 mongodb:
@@ -234,7 +234,7 @@ ingress:
     nginx.ingress.kubernetes.io/rewrite-target: /$2
   
   hosts:
-    - host: narifighter.online
+    - host: maitrova.in
       paths:
         - path: /api(/|$)(.*)
           pathType: ImplementationSpecific
@@ -246,6 +246,6 @@ ingress:
           port: 80
   
   tls:
-    - secretName: narifighter-tls
+    - secretName: maitrova-tls
       hosts:
-        - narifighter.online
+        - maitrova.in

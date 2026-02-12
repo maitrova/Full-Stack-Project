@@ -153,11 +153,11 @@ kubectl get all -n production
 
 ## Step 10: Configure DNS
 
-Point your domain `narifighter.online` to the LoadBalancer EXTERNAL-IP from Step 8.
+Point your domain `maitrova.in` to the LoadBalancer EXTERNAL-IP from Step 8.
 
 **DNS Records:**
-- A record: `narifighter.online` → `EXTERNAL-IP`
-- A record: `www.narifighter.online` → `EXTERNAL-IP`
+- A record: `maitrova.in` → `EXTERNAL-IP`
+- A record: `www.maitrova.in` → `EXTERNAL-IP`
 
 Wait 5-10 minutes for DNS propagation and Caddy to obtain SSL certificate.
 
@@ -167,10 +167,10 @@ Wait 5-10 minutes for DNS propagation and Caddy to obtain SSL certificate.
 
 ```bash
 # Test frontend
-curl https://narifighter.online
+curl https://maitrova.in
 
 # Test backend API
-curl https://narifighter.online/api/health
+curl https://maitrova.in/api/health
 ```
 
 ---
@@ -222,6 +222,6 @@ kubectl delete namespace production
 - **MongoDB:** 1 replica, 20Gi storage at /home/sai/mongo_data
 - **Backend:** 2-5 replicas (HPA enabled), connects to mongodb:27017
 - **Frontend:** 2-5 replicas (HPA enabled)
-- **Caddy:** 2 replicas, LoadBalancer on ports 80/443, SSL for narifighter.online
-- **Domain:** narifighter.online
+- **Caddy:** 2 replicas, LoadBalancer on ports 80/443, SSL for maitrova.in
+- **Domain:** maitrova.in
 - **Docker Images:** docker.io/maitrova/maitrova:backend, docker.io/maitrova/maitrova:frontend

@@ -67,7 +67,7 @@ import {
 // Import user selector for login check
 import { selectCurrentToken } from "../redux/slices/Userslice.js";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
+const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
 
 export default function Designdetailspage() {
   const { id } = useParams();

@@ -1,0 +1,27 @@
+# Patterns to ignore when building packages
+.helmignore
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+.DS_Store
+.git/
+.gitignore
+.bzr/
+.bzrignore
+.hg/
+.hgignore
+.svn/
+.idea/
+*.iml
+.vscode/
+*.zip
+*.tar.gz
+CVS/
+.cvsignore
+OWNERS
+.*.swp
+.*.swo
+*~
+Thumbs.db

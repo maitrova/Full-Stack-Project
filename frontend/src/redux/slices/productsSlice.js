@@ -4,7 +4,7 @@ import axios from "axios";
 
 // Create axios instance specifically for products API
 const productsAPI = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "https://narifighter.online/backend",
+  baseURL: import.meta.env.VITE_API_URL || "https://maitrova.in/backend",
 });
 
 // Thunk: fetch all products for listing with optional filtering

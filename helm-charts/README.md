@@ -157,7 +157,7 @@ service:
   type: LoadBalancer  # K3s ServiceLB
 
 caddyfile: |
-  narifighter.online {
+  maitrova.in {
     @api path /api/*
     handle @api {
       reverse_proxy backend:5000
@@ -189,7 +189,7 @@ sudo chown -R 999:999 /home/sai/mongo_data
 ```
 
 3. **Configure DNS:**
-Point `narifighter.online` to your VPS IP address.
+Point `maitrova.in` to your VPS IP address.
 
 4. **Test K3s:**
 ```bash
@@ -287,7 +287,7 @@ kubectl get secret backend-secret -n production -o yaml
 kubectl logs -l app.kubernetes.io/name=caddy -n production
 
 # Verify DNS points to LoadBalancer IP
-nslookup narifighter.online
+nslookup maitrova.in
 ```
 
 ### LoadBalancer Pending:

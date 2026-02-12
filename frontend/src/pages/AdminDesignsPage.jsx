@@ -23,7 +23,7 @@ import {
   clearCurrentProductPricing
 } from "../redux/slices/productpricing.js";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
+const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
 
 export default function AdminDesignsPage() {
   const [designs, setDesigns] = useState([]);

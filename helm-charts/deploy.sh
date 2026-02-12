@@ -185,7 +185,7 @@ else
     print_status "LoadBalancer IP: ${EXTERNAL_IP}"
     echo ""
     print_info "Configure your DNS:"
-    echo "   narifighter.online → ${EXTERNAL_IP}"
+    echo "   maitrova.in → ${EXTERNAL_IP}"
 fi
 
 echo ""

@@ -13,7 +13,7 @@ import RecolorEditor from "./RecolorEditor.jsx";
 import { selectCurrentToken, selectCurrentUser } from "../redux/slices/Userslice.js";
 import { addToCart } from "../redux/slices/Cartslice.js";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
+const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
 console.log("api_url:", API_URL); 
 const IMAGE_URL = import.meta.env.VITE_IMAGE_URL;
 console.log("image_url:", IMAGE_URL);

@@ -78,7 +78,7 @@ import {
   resetProductSizeSelection
 } from "../redux/slices/productsizeselection.js";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
+const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
 
 export default function CatalogueDetailPage() {
   const { id } = useParams();

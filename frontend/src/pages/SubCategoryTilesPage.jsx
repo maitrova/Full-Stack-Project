@@ -9,7 +9,7 @@ import {
   selectSubCategoriesError,
 } from "../redux/slices/Homepagecategorylist.js";
 
-const IMAGE_URL = import.meta.env.VITE_IMAGE_URL || ""; // ex: https://narifighter.online/api/
+const IMAGE_URL = import.meta.env.VITE_IMAGE_URL || ""; // ex: https://maitrova.in/api/
 
 export default function SubCategoryTilesPage() {
   const dispatch = useDispatch();

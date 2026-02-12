@@ -1,0 +1,106 @@
+# Ingress Controller Configuration for Full-Stack Application
+global:
+  domain: maitrova.in
+  environment: production
+
+# Backend Ingress Configuration
+backend:
+  enabled: true
+  name: backend
+  serviceName: backend-service
+  servicePort: 5000
+  
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: "maitrova-cert"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+      nginx.ingress.kubernetes.io/proxy-connect-timeout: "120"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+      nginx.ingress.kubernetes.io/client-body-buffer-size: "10m"
+    hosts:
+      - host: maitrova.in
+        paths:
+          - path: /api
+            pathType: Prefix
+    tls:
+      - secretName: maitrova-tls
+        hosts:
+          - maitrova.in
+  
+  # Separate ingress for images endpoint
+  imagesIngress:
+    enabled: false
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: "maitrova-cert"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/rewrite-target: /$2
+      nginx.ingress.kubernetes.io/use-regex: "true"
+    hosts:
+      - host: maitrova.in
+        paths:
+          - path: /images(/|$)(.*)
+            pathType: ImplementationSpecific
+    tls:
+      - secretName: maitrova-images-tls
+        hosts:
+          - maitrova.in
+
+# Frontend Ingress Configuration
+frontend:
+  enabled: true
+  name: frontend
+  serviceName: frontend-service
+  servicePort: 80
+  
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: "maitrova-cert"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    hosts:
+      - host: maitrova.in
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: maitrova-tls
+        hosts:
+          - maitrova.in
+
+# Combined Ingress Configuration (Optional - for path-based routing)
+combinedIngress:
+  enabled: false
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "maitrova-cert"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+  
+  hosts:
+    - host: maitrova.in
+      paths:
+        - path: /api(/|$)(.*)
+          pathType: ImplementationSpecific
+          service: backend
+          port: 5000
+        - path: /
+          pathType: Prefix
+          service: frontend
+          port: 80
+  
+  tls:
+    - secretName: maitrova-tls
+      hosts:
+        - maitrova.in

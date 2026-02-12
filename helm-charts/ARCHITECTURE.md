@@ -43,7 +43,7 @@
 │                    └───────────────────────────┘                  │
 └─────────────────────────────────────────────────────────────────────┘
 
-INTERNET ──▶ narifighter.online ──▶ LoadBalancer IP ──▶ CADDY
+INTERNET ──▶ maitrova.in ──▶ LoadBalancer IP ──▶ CADDY
 ```
 
 ## 🎯 Why Each Resource Type?

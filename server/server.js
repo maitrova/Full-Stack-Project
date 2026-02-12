@@ -45,8 +45,8 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cors({ origin: [
     "http://localhost:5173", 
-    "http://narifighter.online", 
-    "https://narifighter.online"
+    "http://maitrova.in", 
+    "https://maitrova.in"
   ], credentials: true }));
 
   app.use((req, res, next) => {

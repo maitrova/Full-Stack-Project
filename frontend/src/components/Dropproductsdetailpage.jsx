@@ -60,7 +60,7 @@ const DropProductDetailsPage = () => {
   const thumbnailContainerRef = useRef(null);
 
   // ✅ IMPORTANT: this should be your backend base URL for serving images
-  const IMAGE_URL = import.meta.env.VITE_IMAGE_URL || "https://narifighter.online/backend";
+  const IMAGE_URL = import.meta.env.VITE_IMAGE_URL || "https://maitrova.in/backend";
 
   const buildImg = (path) => {
     if (!path) return "";

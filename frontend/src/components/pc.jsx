@@ -12,7 +12,7 @@ import {
 import RecolorEditor from "./RecolorEditor.jsx";
 import { selectCurrentToken, selectCurrentUser } from "../redux/slices/Userslice.js";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
+const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
 const IMAGE_URL = import.meta.env.VITE_IMAGE_URL;
 console.log("image_url:", IMAGE_URL);
 const FONT_OPTIONS = [

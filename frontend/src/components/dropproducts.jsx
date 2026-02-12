@@ -30,7 +30,7 @@ import {
   Loader2,
   Trash,
 } from 'lucide-react';
-const imageBaseUrl = import.meta.env.VITE_IMAGE_URL || "https://narifighter.online/backend";; 
+const imageBaseUrl = import.meta.env.VITE_IMAGE_URL || "https://maitrova.in/backend";; 
 const DropproductAdmin = () => {
   const dispatch = useDispatch();
   const products = useSelector(selectAllProducts);

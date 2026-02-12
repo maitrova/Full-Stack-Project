@@ -20,7 +20,7 @@ import {
 import { selectCurrentToken } from '../redux/slices/Userslice.js';
 
 // Constants
-const API_BASE_URL = import.meta.env.VITE_IMAGE_URL || "https://narifighter.online/backend";
+const API_BASE_URL = import.meta.env.VITE_IMAGE_URL || "https://maitrova.in/backend";
 
 const ensureImageUrl = (imagePath) => {
   if (!imagePath) return null;

@@ -58,7 +58,7 @@ import { selectCurrentToken } from "../redux/slices/Userslice.js";
 import { fetchProducts } from "../redux/slices/productsSlice.js";
 import { fetchReadymadeProducts } from "../redux/slices/predesignedslice.js";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
+const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
 
 export default function UnifiedDashboard() {
   const dispatch = useDispatch();

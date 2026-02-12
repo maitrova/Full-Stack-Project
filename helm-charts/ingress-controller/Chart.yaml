@@ -1,0 +1,13 @@
+apiVersion: v2
+name: ingress-controller
+description: Ingress Controller Helm Chart for Full-Stack Application
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+maintainers:
+  - name: DevOps Team
+keywords:
+  - ingress
+  - nginx
+  - routing
+dependencies: []

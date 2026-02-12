@@ -2,7 +2,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend"
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend"
 
 // Async thunk for fetching product categories
 export const fetchProductCategories = createAsyncThunk(

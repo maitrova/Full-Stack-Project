@@ -3,7 +3,7 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 
 // Base URL for your API
-const BASE_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
+const BASE_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
 const API_URL = `${BASE_URL}/auth`;
 
 // --------------------

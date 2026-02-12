@@ -22,7 +22,7 @@ import {
 import { fetchProducts, fetchProductCategories } from "../redux/slices/productsSlice.js";
 import { selectCurrentToken } from "../redux/slices/Userslice.js";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
+const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
 
 // Sort options
 const SORT_OPTIONS = [

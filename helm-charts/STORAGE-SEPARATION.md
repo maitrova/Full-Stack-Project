@@ -24,9 +24,9 @@ Your VPS Host Filesystem
 └── /home/sai/caddy_data/          ← Caddy's dedicated storage
     ├── certificates/
     │   ├── acme-v02.api.letsencrypt.org/
-    │   │   └── narifighter.online/
-    │   │       ├── narifighter.online.crt
-    │   │       └── narifighter.online.key
+    │   │   └── maitrova.in/
+    │   │       ├── maitrova.in.crt
+    │   │       └── maitrova.in.key
     └── locks/
 
 K8s Cluster
@@ -112,7 +112,7 @@ Bound to PV: caddy-pv
     ↓
 Maps to hostPath: /home/sai/caddy_data/
     ↓
-Physical files: narifighter.online.crt, .key, etc.
+Physical files: maitrova.in.crt, .key, etc.
 ```
 
 ---

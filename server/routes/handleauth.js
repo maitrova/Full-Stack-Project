@@ -23,7 +23,7 @@ callbackrouter.get('/callback', async (req, res) => {
 
     // Redirect to another route and pass the token via URL
     const accessToken = tokens.access_token;
-    const apiUrl = process.env.API_URL || "https://narifighter.online/backend";
+    const apiUrl = process.env.API_URL || "https://maitrova.in/backend";
     const redirectUrl = `${apiUrl}/api/drive/files?access_token=${accessToken}`;
 
     res.redirect(redirectUrl);  // Redirect with the token in the URL

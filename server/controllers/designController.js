@@ -296,7 +296,7 @@ export const saveDesign = async (req, res) => {
 
       const designLayers = (view.designLayers || []).map((layer) => {
         let imageUrl = layer.imageUrl;
-        const apiUrl = process.env.API_URL || "https://narifighter.online/backend";
+        const apiUrl = process.env.API_URL || "https://maitrova.in/backend";
         if (imageUrl && imageUrl.includes(apiUrl)) {
           imageUrl = imageUrl.replace(apiUrl, "");
         }
@@ -551,7 +551,7 @@ export const updateDesign = async (req, res) => {
 
       const updatedDesignLayers = (view.designLayers || []).map((layer) => {
         let imageUrl = layer.imageUrl;
-        const apiUrl = process.env.API_URL || "https://narifighter.online/backend";
+        const apiUrl = process.env.API_URL || "https://maitrova.in/backend";
         if (imageUrl && imageUrl.includes(apiUrl)) {
           imageUrl = imageUrl.replace(apiUrl, "");
         }
@@ -682,7 +682,7 @@ export const publishDesign = async (req, res) => {
 
 export const listCatalogueDesigns = async (req, res) => {
   try {
-    const apiUrl = process.env.API_URL || "https://narifighter.online/backend";
+    const apiUrl = process.env.API_URL || "https://maitrova.in/backend";
 
     const { page = 1, limit = 10 } = req.query;
 
@@ -828,7 +828,7 @@ export const getDesign = async (req, res) => {
       return res.status(404).json({ error: "Design not found" });
     }
     
-    const apiUrl = process.env.API_URL || 'https://narifighter.online/backend';
+    const apiUrl = process.env.API_URL || 'https://maitrova.in/backend';
     
     if (design.views) {
       design.views = design.views.map(view => ({
@@ -852,7 +852,7 @@ export const getDesign = async (req, res) => {
 // For admin listing all designs
 export const listDesigns = async (req, res) => {
   try {
-    const apiUrl = process.env.API_URL || "https://narifighter.online/backend";
+    const apiUrl = process.env.API_URL || "https://maitrova.in/backend";
 
     // const filter = req.user?.role === "admin"
     //   ? {}

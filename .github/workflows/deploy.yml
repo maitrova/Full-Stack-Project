@@ -2,7 +2,7 @@ name: Build and Push Docker Images
 
 on:
   push:
-    branches: [ test1122 ]
+    branches: [ deploy-ment ]
   workflow_dispatch:
 
 env:
@@ -49,8 +49,10 @@ jobs:
           file: ./frontend/Dockerfile
           push: true
           build-args: |
-            VITE_API_URL=https://narifighter.online/api
-            VITE_IMAGE_URL=https://narifighter.online/api
+            VITE_API_URL=https://maitrova.in/api
+            VITE_IMAGE_URL=https://maitrova.in/api
+            VITE_GOOGLE_CLIENT_ID=777795975212-0kfni6fgt4036k9rplvf1l7n70hukngo.apps.googleusercontent.com
+
           tags: |
             ${{ env.FRONTEND_IMAGE }}:latest
             ${{ env.FRONTEND_IMAGE }}:${{ steps.version.outputs.tag }}

@@ -6,7 +6,7 @@
 
 ```javascript
 // 1. Frontend sends request
-fetch('http://narifighter.online/api/products', {
+fetch('http://maitrova.in/api/products', {
   method: 'POST',
   body: JSON.stringify({
     name: "Cool T-Shirt",
@@ -22,7 +22,7 @@ fetch('http://narifighter.online/api/products', {
 ```
 User Browser
     ↓
-    http://narifighter.online/api/products
+    http://maitrova.in/api/products
     ↓
 Caddy Pod (caddy-abc123)
     └─ Reverse proxy to backend:5000

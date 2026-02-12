@@ -43,7 +43,7 @@ import {
   CreditCard
 } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || "https://narifighter.online/backend";
+const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
 const IMAGE_URL = import.meta.env.VITE_IMAGE_URL;
 export default function ProductDetailPage() {
   const { id, type = 'product' } = useParams(); // type can be 'product' or 'design'
