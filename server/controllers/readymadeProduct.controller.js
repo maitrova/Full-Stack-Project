@@ -64,39 +64,60 @@ export const getAllReadymadeProducts = async (req, res) => {
 export const getAllReadymadeProductsPublic = async (req, res) => {
   try {
     const { category, subCategory, page = 1, limit = 100 } = req.query;
-    
-    let query = { isActive: true };
-    
+
+    const query = { isActive: true };
     if (category) query.category = category;
     if (subCategory) query.subCategory = subCategory;
-    
-    const skip = (page - 1) * limit;
-    
+
+    const pageNum = Math.max(parseInt(page, 10), 1);
+    const limitNum = Math.min(parseInt(limit, 10), 200);
+    const skip = (pageNum - 1) * limitNum;
+
     const products = await ReadymadeProduct.find(query)
+      .populate("category", "name")       // used internally only
+      .populate("subCategory", "name")    // used internally only
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(parseInt(limit))
-      .select('-__v');
-    
+      .limit(limitNum)
+      .select("-__v")
+      .lean();
+
+    // ✅ FLATTEN → keep response unchanged
+    const normalizedProducts = products.map((p) => ({
+      ...p,
+      category:
+        typeof p.category === "string"
+          ? p.category
+          : p.category?.name || "",
+      subCategory:
+        typeof p.subCategory === "string"
+          ? p.subCategory
+          : p.subCategory?.name || "",
+    }));
+
     const total = await ReadymadeProduct.countDocuments(query);
-    
+
     res.status(200).json({
       success: true,
-      data: products,
+      data: normalizedProducts,   // 👈 unchanged shape
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: pageNum,
+        limit: limitNum,
         total,
-        pages: Math.ceil(total / limit)
-      }
+        pages: Math.ceil(total / limitNum),
+      },
     });
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
+    console.error("getAllReadymadeProductsPublic error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
     });
   }
 };
+
+
+
 // Get product by ID
 export const getReadymadeProductById = async (req, res) => {
   try {
@@ -121,77 +142,107 @@ export const getReadymadeProductById = async (req, res) => {
 export const getBestSellerProducts = async (req, res) => {
   try {
     const { page = 1, limit = 20 } = req.query;
-    const skip = (page - 1) * limit;
-    
-    const products = await ReadymadeProduct.find({ 
-      bestSeller: true, 
-      isActive: true 
+
+    const pageNumber = parseInt(page);
+    const limitNumber = parseInt(limit);
+    const skip = (pageNumber - 1) * limitNumber;
+
+    const products = await ReadymadeProduct.find({
+      bestSeller: true,
+      isActive: true
     })
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(parseInt(limit))
-    .select('-__v');
-    
-    const total = await ReadymadeProduct.countDocuments({ 
-      bestSeller: true, 
-      isActive: true 
+      .populate('category', 'name')       // populate only name
+      .populate('subCategory', 'name')    // populate only name
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNumber)
+      .select('-__v')
+      .lean();   // important for modifying response
+
+    // 🔥 Keep fields unchanged (convert object → string)
+    const formattedProducts = products.map(product => ({
+      ...product,
+      category: product.category?.name || null,
+      subCategory: product.subCategory?.name || null,
+    }));
+
+    const total = await ReadymadeProduct.countDocuments({
+      bestSeller: true,
+      isActive: true
     });
-    
+
     res.status(200).json({
       success: true,
-      data: products,
+      data: formattedProducts,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: pageNumber,
+        limit: limitNumber,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / limitNumber)
       }
     });
+
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
+    res.status(500).json({
+      success: false,
+      message: error.message
     });
   }
 };
+
 
 // Get new arrival products
 export const getNewArrivalProducts = async (req, res) => {
   try {
     const { page = 1, limit = 20 } = req.query;
-    const skip = (page - 1) * limit;
-    
-    const products = await ReadymadeProduct.find({ 
-      newArrival: true, 
-      isActive: true 
+
+    const pageNumber = parseInt(page);
+    const limitNumber = parseInt(limit);
+    const skip = (pageNumber - 1) * limitNumber;
+
+    const products = await ReadymadeProduct.find({
+      newArrival: true,
+      isActive: true
     })
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(parseInt(limit))
-    .select('-__v');
-    
-    const total = await ReadymadeProduct.countDocuments({ 
-      newArrival: true, 
-      isActive: true 
+      .populate('category', 'name')
+      .populate('subCategory', 'name')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNumber)
+      .select('-__v')
+      .lean();   // Important for modifying response
+
+    // 🔥 Keep fields unchanged (convert populated object → string)
+    const formattedProducts = products.map(product => ({
+      ...product,
+      category: product.category?.name || null,
+      subCategory: product.subCategory?.name || null,
+    }));
+
+    const total = await ReadymadeProduct.countDocuments({
+      newArrival: true,
+      isActive: true
     });
-    
+
     res.status(200).json({
       success: true,
-      data: products,
+      data: formattedProducts,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: pageNumber,
+        limit: limitNumber,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / limitNumber) // fixed
       }
     });
+
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
+    res.status(500).json({
+      success: false,
+      message: error.message
     });
   }
 };
+
 
 // Get products by category
 export const getProductsByCategory = async (req, res) => {
@@ -341,20 +392,20 @@ export const searchProducts = async (req, res) => {
 export const getFilteredProducts = async (req, res) => {
   try {
     const { filter, category, subCategory, search, page = 1, limit = 20 } = req.query;
-    
+
     let query = {};
-    
+
     // Apply filter
     if (filter === 'newArrival') {
       query.newArrival = true;
     } else if (filter === 'bestSeller') {
       query.bestSeller = true;
     }
-    
+
     // Apply category filters
     if (category) query.category = category;
     if (subCategory) query.subCategory = subCategory;
-    
+
     // Search functionality
     if (search) {
       query.$or = [
@@ -362,20 +413,33 @@ export const getFilteredProducts = async (req, res) => {
         { description: { $regex: search, $options: 'i' } }
       ];
     }
-    
+
     const skip = (page - 1) * limit;
-    
+
     const products = await ReadymadeProduct.find(query)
+      .populate('category', 'name')       // ✅ populate category
+      .populate('subCategory', 'name')    // ✅ populate subCategory
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
       .select('-__v');
-    
+
     const total = await ReadymadeProduct.countDocuments(query);
-    
+
+    // ✅ Transform response to keep fields unchanged
+    const formattedProducts = products.map(product => {
+      const obj = product.toObject();
+
+      return {
+        ...obj,
+        category: obj.category?.name || obj.category,
+        subCategory: obj.subCategory?.name || obj.subCategory,
+      };
+    });
+
     res.status(200).json({
       success: true,
-      data: products,
+      data: formattedProducts,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -383,13 +447,15 @@ export const getFilteredProducts = async (req, res) => {
         pages: Math.ceil(total / limit)
       }
     });
+
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
+    res.status(500).json({
+      success: false,
+      message: error.message
     });
   }
 };
+
 
 // Get distinct categories and subcategories
 export const getProductFilters = async (req, res) => {
@@ -955,23 +1021,44 @@ export const getHomeCategoryTiles = async (req, res) => {
       { $match: match },
       { $sort: { createdAt: -1 } }, // latest products first
 
-      // Group by category and take one product as representative
+      // Group by category ObjectId
       {
         $group: {
           _id: "$category",
           count: { $sum: 1 },
-          sample: { $first: "$$ROOT" }, // first after sort = latest product
+          sample: { $first: "$$ROOT" },
         },
       },
 
-      // ✅ Include thumbnail (prefer sample.thumbnail, fallback to first image)
+      // 🔹 Lookup category details
+      {
+        $lookup: {
+          from: "categories",          // collection name
+          localField: "_id",
+          foreignField: "_id",
+          as: "categoryData",
+        },
+      },
+
+      // Convert array → object
+      {
+        $unwind: {
+          path: "$categoryData",
+          preserveNullAndEmptyArrays: false,
+        },
+      },
+
+      // ✅ Final projection (SAME response fields)
       {
         $project: {
           _id: 0,
-          category: "$_id",
+
+          // SAME FIELD NAME, now populated
+          category: "$categoryData.name",
+
           count: 1,
 
-          // keep old field if you already use it in UI
+          // keep old image behavior
           image: {
             $cond: [
               { $gt: [{ $size: "$sample.images" }, 0] },
@@ -980,10 +1067,10 @@ export const getHomeCategoryTiles = async (req, res) => {
             ],
           },
 
-          // new field
+          // category thumbnail (preferred)
           thumbnail: {
             $ifNull: [
-              "$sample.thumbnail",
+              "$categoryData.thumbnail",
               {
                 $cond: [
                   { $gt: [{ $size: "$sample.images" }, 0] },
@@ -996,8 +1083,8 @@ export const getHomeCategoryTiles = async (req, res) => {
         },
       },
 
-      // Remove empty category names
-      { $match: { category: { $ne: null, $ne: "" } } },
+      // Safety: remove empty names
+      { $match: { category: { $ne: "", $ne: null } } },
 
       { $sort: { category: 1 } },
       { $limit: limit },
@@ -1015,6 +1102,7 @@ export const getHomeCategoryTiles = async (req, res) => {
     });
   }
 };
+
 
 
 export const getHomeSubCategoryTiles = async (req, res) => {

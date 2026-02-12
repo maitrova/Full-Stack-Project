@@ -953,7 +953,11 @@ export default function CatalogueDetailPage() {
                 )}
                 
                 <p className="text-xs text-gray-500 mt-2 tracking-tight">Inclusive of all taxes</p>
-                
+                <h2 class="bg-red-50 text-red-700 border-l-4 border-red-600 
+                          p-4 rounded-md font-semibold text-lg my-4">
+                  Customized Products Are Not Eligible for Return
+                </h2>
+
                 {/* Cart Summary */}
                 {isInCart && (
                   <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">

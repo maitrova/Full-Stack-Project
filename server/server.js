@@ -24,6 +24,13 @@ import addressroute from './routes/addressroutes.js';
 import paymentrouter from './routes/paymentRoutes.js';
 import orderroutes from './routes/orderRoutes.js';
 import admincategory from './routes/adminCategoryRoutes.js';
+import exportrouter from './routes/exportRoutes.js';
+import emailrouter from './routes/emailroute.js';
+import searchproductroute from './routes/searchproduct.js';
+import invoicerouter from './routes/invoiceroutes.js';
+import brandroute from './routes/brandroute.js';
+
+import colorselection from './routes/adminColorRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,6 +48,13 @@ app.use(cors({ origin: [
     "http://narifighter.online", 
     "https://narifighter.online"
   ], credentials: true }));
+
+  app.use((req, res, next) => {
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
+  next();
+});
+
 
 // Static files - serve at both /outputs and /api/outputs
 // app.use("/outputs", express.static(path.join(__dirname, "outputs")));
@@ -62,13 +76,20 @@ app.use('/api/addresses', addressroute);
 app.use('/api/payment', paymentrouter);
 app.use('/api/orders',orderroutes)
 app.use('/api/cart',cartrouter);
+app.use('/api/searchproduct', searchproductroute);  
 app.use('/api/admin',adminrouter);
+app.use("/api/admin/excel-export", exportrouter);
+app.use('/api/email',emailrouter);
+app.use('/api/invoice',invoicerouter);
+app.use('/api/admin-color', colorselection);  
+
 app.use('/api/admin-category',admincategory);
 app.use('/api/readymadeproducts',readymadeproducts);
 app.use('/api/homepage',homepagerouter);
 app.use('/api/designuploads', designuploadsrouter);
 app.use('/api/dropproducts', droprouter);
 app.use("/api/mockup-calibrations", caliberateroutes);
+app.use("/api/brands", brandroute);
 
 // Error handling
 app.use((err, req, res, next) => {

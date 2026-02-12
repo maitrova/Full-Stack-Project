@@ -35,6 +35,8 @@ import CheckoutAddresses from "./components/CheckoutAddresses.jsx";
 import CheckoutPage from "./components/testcheckout.jsx";
 import UserOrders from "./components/userorders.jsx";
 import AdminOrders from "./components/admin/ordersmanagement.jsx";
+import ProductSearch from "./components/searchproductdetail.jsx";
+import AdminOrderSearch from "./components/admin/adminsearchpage.jsx";
 // You'll need to create this
 
 // Layout component with header for all pages except auth
@@ -111,6 +113,23 @@ function App() {
             <ProtectedRoute>
               <AdminDashboard />
             </ProtectedRoute>
+          </MainLayout>
+        } />
+
+        <Route path="/searchpage" element={
+          <MainLayout>
+            <ProtectedRoute>
+              <AdminOrderSearch />
+            </ProtectedRoute>
+          </MainLayout>
+        } />
+
+
+        <Route path="/ProductSearch" element={
+          <MainLayout>
+          
+              <ProductSearch />
+  
           </MainLayout>
         } />
 

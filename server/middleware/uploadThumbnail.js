@@ -2,32 +2,61 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
-const ensureDir = (dir) => {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-};
+/* ==================================
+   Ensure Folder Exists
+================================== */
 
-const thumbnailDir = path.join(process.cwd(), "server", "outputs", "thumbnail");
-ensureDir(thumbnailDir);
+const uploadPath = path.join(process.cwd(), "outputs", "thumbnail");
+
+if (!fs.existsSync(uploadPath)) {
+  fs.mkdirSync(uploadPath, { recursive: true });
+}
+
+/* ==================================
+   Multer Storage Config
+================================== */
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, thumbnailDir);
+  destination: function (req, file, cb) {
+    cb(null, uploadPath);
   },
-  filename: (req, file, cb) => {
+
+  filename: function (req, file, cb) {
     const ext = path.extname(file.originalname);
-    const name = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-    cb(null, name);
+    const nameWithoutExt = path
+      .basename(file.originalname, ext)
+      .replace(/\s+/g, "-");
+
+    const uniqueName = `${Date.now()}-${nameWithoutExt}${ext}`;
+
+    cb(null, uniqueName);
   },
 });
 
+/* ==================================
+   File Filter (Only Images Allowed)
+================================== */
+
 const fileFilter = (req, file, cb) => {
-  const ok = ["image/jpeg", "image/png", "image/webp"].includes(file.mimetype);
-  if (!ok) return cb(new Error("Only JPG, PNG, WEBP allowed"), false);
-  cb(null, true);
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only JPG, PNG, and WebP images are allowed"), false);
+  }
 };
 
-export const uploadThumbnail = multer({
+/* ==================================
+   Upload Instance
+================================== */
+
+const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 3 * 1024 * 1024 }, // 3MB
-}).single("thumbnail");
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+  },
+});
+
+export default upload;

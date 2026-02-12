@@ -879,7 +879,19 @@ const zonesForActiveView = useMemo(() => {
 
   useEffect(() => {
     if (!renderer?.canvas) return;
-    setCanvasSize({ width: renderer.canvas.width, height: renderer.canvas.height });
+
+    const updateSize = () => {
+      if (!renderer?.canvas) return;
+      const rect = renderer.canvas.getBoundingClientRect();
+      setCanvasSize({ width: rect.width, height: rect.height });
+    };
+
+    updateSize();
+    window.addEventListener("resize", updateSize);
+
+    return () => {
+      window.removeEventListener("resize", updateSize);
+    };
   }, [renderer]);
 
   useImperativeHandle(
@@ -1503,6 +1515,14 @@ function DesignOverlay({ layer, canvasSize, setDesignLayers, isActive, setActive
   const overlayRef = useRef(null);
   const dragStateRef = useRef(null);
 
+  const zoneCandidates = useMemo(() => {
+    const uniqueKeys = new Set(zonesForView || []);
+    if (layer?.zone) uniqueKeys.add(layer.zone);
+    const inferred = getBoundaryKeyForLayer(layer);
+    if (inferred) uniqueKeys.add(inferred);
+    return Array.from(uniqueKeys);
+  }, [zonesForView, layer?.zone, layer?.viewCode]);
+
   const onPointerMove = useCallback(
   (e) => {
     const st = dragStateRef.current;
@@ -1520,8 +1540,9 @@ function DesignOverlay({ layer, canvasSize, setDesignLayers, isActive, setActive
     const currentZoneKey = getBoundaryKeyForLayer(initialLayer);
 
     // ✅ Detect which zone the center is inside
+    const zoneSource = zoneCandidates.length ? zoneCandidates : [currentZoneKey];
     const detectedZone =
-      pickZoneForPoint(nxRaw, nyRaw, zonesForView, boundaries) || currentZoneKey;
+      pickZoneForPoint(nxRaw, nyRaw, zoneSource, boundaries) || currentZoneKey;
 
     const zoneKey = detectedZone;
 
@@ -1535,11 +1556,14 @@ function DesignOverlay({ layer, canvasSize, setDesignLayers, isActive, setActive
     const aspect =
       (initialLayer.originalHeightPx / initialLayer.originalWidthPx) || 1;
 
-    const wPx = canvasSize.width * scale;
-    const hPx = wPx * aspect;
+    const baseWidth = canvasSize?.width || st.rectWidth || 0;
+    const baseHeight = canvasSize?.height || st.rectHeight || 0;
 
-    const halfW = (wPx / canvasSize.width) / 2;
-    const halfH = (hPx / canvasSize.height) / 2;
+    const widthPx = baseWidth * scale;
+    const heightPx = widthPx * aspect;
+
+    const halfW = baseWidth ? (widthPx / baseWidth) / 2 : 0;
+    const halfH = baseHeight ? (heightPx / baseHeight) / 2 : 0;
 
     // clamp center so full rect stays in boundary
     let constrainedX = Math.max(b.minX + halfW, Math.min(b.maxX - halfW, nxRaw));
@@ -1557,7 +1581,7 @@ function DesignOverlay({ layer, canvasSize, setDesignLayers, isActive, setActive
       )
     );
   },
-  [setDesignLayers, boundaries, canvasSize, zonesForView]
+  [setDesignLayers, boundaries, canvasSize, zoneCandidates]
 );
 
 
@@ -1588,16 +1612,21 @@ function DesignOverlay({ layer, canvasSize, setDesignLayers, isActive, setActive
     setActiveDesignId(layer.id);
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
+    e.currentTarget?.setPointerCapture?.(e.pointerId);
   };
 
   const left = `${layer.x * 100}%`;
   const top = `${layer.y * 100}%`;
 
-  const widthPx = canvasSize.width * layer.scale;
+  const widthPx = canvasSize?.width ? canvasSize.width * layer.scale : 0;
   const heightPx = widthPx * ((layer.originalHeightPx / layer.originalWidthPx) || 1);
 
   return (
-    <div ref={overlayRef} className="pointer-events-none absolute inset-0 z-10">
+    <div
+      ref={overlayRef}
+      className="pointer-events-none absolute inset-0 z-10"
+      style={{ touchAction: "none" }}
+    >
       <div
         style={{
           left,

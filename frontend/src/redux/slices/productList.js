@@ -394,11 +394,16 @@ const productListSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchAllProducts.fulfilled, (state, action) => {
-        state.loading = false;
-        state.availableProducts = action.payload || [];
-        state.products = action.payload || [];
-        state.pagination.total = action.payload?.length || 0;
+      console.log("Fetched Products Payload:", action.payload);
+
+      state.loading = false;
+      state.availableProducts = action.payload || [];
+      state.products = action.payload || [];
+      state.pagination.total = action.payload?.length || 0;
+
+      console.log("State Products After Update:", state.products);
       })
+
       .addCase(fetchAllProducts.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;

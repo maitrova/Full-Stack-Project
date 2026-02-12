@@ -1502,10 +1502,10 @@ const handleDesignUpload = async (e) => {
   const maskUrl = currentView?.maskUrl;
 
   return (
-    <div className="flex h-screen flex-col bg-neutral-100 text-slate-900">
+    <div className="flex min-h-screen flex-col bg-neutral-100 text-slate-900">
       {/* Top bar */}
-      <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-6">
-        <div className="flex items-center gap-4">
+      <header className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:gap-4">
           <div className="flex items-center gap-3">
             <div className="text-lg font-extrabold tracking-wide text-orange-500">
               MYPRINT
@@ -1528,33 +1528,33 @@ const handleDesignUpload = async (e) => {
           </div>
         </div>
 
-        <div className="flex items-center gap-4 text-xs">
-          {isEditMode && (
-            <button onClick={handleBackToAdmin} className="text-sky-700 hover:underline">
-              Back to Admin
-            </button>
-          )}
+        <div className="flex flex-col gap-2 text-xs sm:flex-row sm:items-center sm:gap-4">
+          <div className="flex flex-wrap gap-2">
+            {isEditMode && (
+              <button onClick={handleBackToAdmin} className="text-sky-700 hover:underline">
+                Back to Admin
+              </button>
+            )}
 
-          {isEditMode && originalDesign && (
-            <button onClick={handleResetToOriginal} className="rounded-full border border-slate-300 px-3 py-1 text-slate-700 hover:bg-slate-50">
-              Reset to Original
-            </button>
-          )}
+            {isEditMode && originalDesign && (
+              <button onClick={handleResetToOriginal} className="rounded-full border border-slate-300 px-3 py-1 text-slate-700 hover:bg-slate-50">
+                Reset to Original
+              </button>
+            )}
+          </div>
 
-          <div className="flex items-center gap-3">
-            <div className="price-display text-right">
-              <div className="text-xs text-slate-500">Total Price</div>
-              <div className="text-xl font-bold text-green-600">
-                ₹{price.toFixed(2)}
-              </div>
-            </div>
+          <div className="flex flex-col items-end text-right">
+            <span className="text-xs text-slate-500">Total Price</span>
+            <span className="text-xl font-bold text-green-600">₹{price.toFixed(2)}</span>
+          </div>
 
+          <div className="flex flex-wrap items-center gap-2">
             <button
-                onClick={handleSaveDesign}
-                disabled={saving || addingToCart}
-                className="rounded-full border border-sky-600 bg-sky-600 px-4 py-1 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
-              >
-                {saving ? "Saving…" : isEditMode ? "Update Design" : "Save Design"}
+              onClick={handleSaveDesign}
+              disabled={saving || addingToCart}
+              className="rounded-full border border-sky-600 bg-sky-600 px-4 py-1 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+            >
+              {saving ? "Saving…" : isEditMode ? "Update Design" : "Save Design"}
             </button>
 
             <button
@@ -1568,16 +1568,15 @@ const handleDesignUpload = async (e) => {
                   ? "Add to Cart"
                   : "Save & Add to Cart"}
             </button>
-
-            
           </div>
         </div>
       </header>
 
       {/* Main area */}
-      <div className="flex flex-1 min-h-0 p-6 gap-6">
-        {/* Left sidebar - Controls */}
-        <aside className="w-80 rounded-lg border border-slate-200 bg-white p-4 shadow-sm flex flex-col gap-6">
+      <div className="flex flex-1 min-h-0 flex-col gap-6 px-4 pb-6 pt-3 sm:px-6">
+        <div className="flex flex-1 flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)_minmax(0,320px)] lg:items-start">
+          {/* Left sidebar - Controls */}
+          <aside className="w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm flex flex-col gap-6 min-h-0 lg:w-auto">
           {/* Edit mode indicator */}
           {isEditMode && (
             <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2">
@@ -2011,7 +2010,7 @@ const handleDesignUpload = async (e) => {
         </aside>
 
         {/* Center workspace */}
-        <main className="flex flex-1 flex-col overflow-auto">
+        <main className="flex min-h-0 flex-1 flex-col overflow-auto">
           <div className="flex-1 p-0">
             <div className="mx-auto flex max-w-4xl items-center justify-center rounded-md border border-slate-200 bg-slate-50 p-4 shadow-sm">
               <div className="w-full max-w-[650px]">
@@ -2045,10 +2044,11 @@ const handleDesignUpload = async (e) => {
         </main>
 
         {/* Right sidebar - Price Breakdown */}
-        <aside className="w-80 rounded-lg border border-slate-200 bg-white p-4 shadow-sm flex flex-col">
+        <aside className="w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm flex flex-col min-h-0 lg:w-auto">
           <div className="mb-4">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-green-800">Price Breakdown</h3>
+              
               <button onClick={() => calculatePrice()} disabled={calculatingPrice} className="text-xs text-green-600 hover:text-green-800">
                 {calculatingPrice ? "Calculating..." : "↻"}
               </button>
@@ -2186,10 +2186,11 @@ const handleDesignUpload = async (e) => {
           </div>
         </aside>
       </div>
+    </div>
 
-      {/* Bottom bar */}
-      <footer className="flex h-16 items-center justify-between border-t border-slate-200 bg-white px-6 text-xs">
-        <div className="flex flex-col">
+    {/* Bottom bar */}
+    <footer className="flex flex-col gap-2 border-t border-slate-200 bg-white px-4 py-3 text-xs sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="flex flex-col gap-1">
           <span className="font-semibold">{product?.name || "Custom Product"}</span>
           <span className="text-slate-500">
             Color: <span className="font-medium">{productColorName}</span>

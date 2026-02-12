@@ -1,88 +1,153 @@
+import jwt from "jsonwebtoken";
+import User from "../models/authmodel.js";
+import { OAuth2Client } from "google-auth-library";
 
-import jwt from 'jsonwebtoken';
-import User from '../models/authmodel.js';
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+// 🔐 Generate JWT
 const generateToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
-    expiresIn: '30d',
+    expiresIn: "30d",
   });
 };
 
-// 📌 Register
+
+
+// ================= REGISTER =================
 export const registerUser = async (req, res) => {
-  const { name, phone, email, password,role } = req.body;
   try {
-    const existingUser = await User.findOne({ phone });
-    if (existingUser) {
-      return res.status(400).json({ message: 'Phone already registered' });
+    const { name, phone, email, password } = req.body;
+
+    if (!phone || !password || !name) {
+      return res.status(400).json({ message: "Missing required fields" });
     }
 
-    const user = await User.create({ name, phone, email, password,role });
+    const existingUser = await User.findOne({ phone });
+    if (existingUser) {
+      return res.status(400).json({ message: "Phone already registered" });
+    }
+
+    const user = await User.create({
+      name,
+      phone,
+      email,
+      password,
+      role: "user",
+    });
+
     res.status(201).json({
       _id: user._id,
       name: user.name,
       phone: user.phone,
+      role: user.role,
       token: generateToken(user._id),
-      role: user.role
     });
   } catch (err) {
-    res.status(500).json({ message: 'Registration failed', error: err.message });
+    res.status(500).json({ message: "Registration failed" });
   }
 };
 
-// 📌 Login
+
+
+// ================= LOGIN =================
 export const loginUser = async (req, res) => {
-  const { phone, password } = req.body;
   try {
+    const { phone, password } = req.body;
+
     const user = await User.findOne({ phone });
-    if (!user || !(await user.matchPassword(password))) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+
+    if (!user || !user.password || !(await user.matchPassword(password))) {
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
     res.json({
       _id: user._id,
       name: user.name,
       phone: user.phone,
-      token: generateToken(user._id),
       role: user.role,
+      token: generateToken(user._id),
     });
   } catch (err) {
-    res.status(500).json({ message: 'Login failed', error: err.message });
+    res.status(500).json({ message: "Login failed" });
   }
 };
 
 
 
+// ================= GOOGLE LOGIN =================
+export const googleLogin = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { sub, name, email } = payload;
+
+    if (!email) {
+      return res.status(400).json({ message: "Google account has no email" });
+    }
+
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // Create new Google user
+      user = await User.create({
+        name,
+        email,
+        googleId: sub,
+        role: "user",
+      });
+    } else if (!user.googleId) {
+      // Link existing account to Google
+      user.googleId = sub;
+      await user.save();
+    }
+
+    res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      token: generateToken(user._id),
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(401).json({ message: "Google authentication failed" });
+  }
+};
 
 
-// ✅ GET: /api/auth/profile
+
+// ================= GET PROFILE =================
 export const getUserProfile = async (req, res) => {
   try {
-    // req.user is already set by protect middleware
     const user = await User.findById(req.user._id).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
 
     res.json(user);
   } catch (err) {
-    res.status(500).json({ message: "Failed to fetch profile", error: err.message });
+    res.status(500).json({ message: "Failed to fetch profile" });
   }
 };
 
-// ✅ PUT: /api/auth/profile
+
+
+// ================= UPDATE PROFILE =================
 export const updateUserProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // update only if sent
     if (req.body.name !== undefined) user.name = req.body.name;
     if (req.body.phone !== undefined) user.phone = req.body.phone;
     if (req.body.email !== undefined) user.email = req.body.email;
 
-    // If you do NOT want normal users to change role, remove this line:
-    if (req.body.role !== undefined) user.role = req.body.role;
+    // ❌ DO NOT allow role change here unless admin logic added
 
-    // password update (your model should hash in pre-save)
     if (req.body.password) user.password = req.body.password;
 
     const updated = await user.save();
@@ -93,9 +158,9 @@ export const updateUserProfile = async (req, res) => {
       phone: updated.phone,
       email: updated.email,
       role: updated.role,
-      token: generateToken(updated._id), // optional refresh token
+      token: generateToken(updated._id),
     });
   } catch (err) {
-    res.status(500).json({ message: "Profile update failed", error: err.message });
+    res.status(500).json({ message: "Profile update failed" });
   }
 };

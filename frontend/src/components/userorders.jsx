@@ -11,17 +11,32 @@ import {
   clearOrderErrors,
   clearMyPaidOrder
 } from '../redux/slices/orderSlice.js';
+import {
+  downloadInvoice,
+  selectInvoiceLoading,
+  selectInvoiceError,
+  selectDownloadingOrderId,
+  clearInvoiceError
+} from '../redux/slices/invoiceSlice.js';
 
 const UserOrders = () => {
   const dispatch = useDispatch();
+  
+  // Order selectors
   const orders = useSelector(selectMyPaidOrders);
   const loading = useSelector(selectMyPaidOrdersLoading);
   const error = useSelector(selectMyPaidOrdersError);
   const selectedOrder = useSelector(selectMyPaidOrder);
   const selectedOrderLoading = useSelector(selectMyPaidOrderLoading);
   
+  // Invoice selectors
+  const invoiceLoading = useSelector(selectInvoiceLoading);
+  const invoiceError = useSelector(selectInvoiceError);
+  const downloadingOrderId = useSelector(selectDownloadingOrderId);
+  
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const [showInvoiceError, setShowInvoiceError] = useState(false);
 
   // Get base URL from environment variables
   const BASE_URL = import.meta.env.VITE_IMAGE_URL || 'http://localhost:5000';
@@ -31,6 +46,7 @@ const UserOrders = () => {
     return () => {
       dispatch(clearOrderErrors());
       dispatch(clearMyPaidOrder());
+      dispatch(clearInvoiceError());
     };
   }, [dispatch]);
 
@@ -39,6 +55,17 @@ const UserOrders = () => {
       dispatch(fetchMyPaidOrderById(selectedOrderId));
     }
   }, [selectedOrderId, dispatch]);
+
+  useEffect(() => {
+    if (invoiceError) {
+      setShowInvoiceError(true);
+      const timer = setTimeout(() => {
+        setShowInvoiceError(false);
+        dispatch(clearInvoiceError());
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [invoiceError, dispatch]);
 
   const handleViewDetails = (orderId) => {
     setSelectedOrderId(orderId);
@@ -49,6 +76,10 @@ const UserOrders = () => {
     setShowOrderModal(false);
     setSelectedOrderId(null);
     dispatch(clearMyPaidOrder());
+  };
+
+  const handleDownloadInvoice = (orderId) => {
+    dispatch(downloadInvoice(orderId));
   };
 
   const formatDate = (dateString) => {
@@ -257,6 +288,37 @@ const UserOrders = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
+      {/* Invoice Download Error Toast */}
+      {showInvoiceError && invoiceError && (
+        <div className="fixed top-4 right-4 z-50 max-w-md">
+          <div className="bg-red-50 border border-red-200 rounded-lg shadow-lg p-4">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Invoice Download Failed</h3>
+                <p className="mt-1 text-sm text-red-700">{invoiceError}</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowInvoiceError(false);
+                  dispatch(clearInvoiceError());
+                }}
+                className="ml-auto -mx-1.5 -my-1.5 bg-red-50 text-red-500 rounded-lg focus:ring-2 focus:ring-red-400 p-1.5 hover:bg-red-100 inline-flex h-8 w-8"
+              >
+                <span className="sr-only">Close</span>
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
@@ -292,6 +354,7 @@ const UserOrders = () => {
             <ul className="divide-y divide-gray-200">
               {orders.map((order) => {
                 const progress = getOrderStatusProgress(order.orderStatus);
+                const isDownloadingThisInvoice = downloadingOrderId === order._id;
                 return (
                   <li key={order._id} className="p-6 hover:bg-gray-50">
                     <div className="flex flex-col md:flex-row md:items-center justify-between">
@@ -436,17 +499,29 @@ const UserOrders = () => {
                           View Details
                         </button>
                         {order.payment?.razorpayPaymentId && (
-                          <a
-                            href={`${BASE_URL}/api/orders/${order._id}/invoice`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                          <button
+                            onClick={() => handleDownloadInvoice(order._id)}
+                            disabled={invoiceLoading && isDownloadingThisInvoice}
+                            className={`inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
+                              invoiceLoading && isDownloadingThisInvoice
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                : 'text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
+                            }`}
                           >
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            Download Invoice
-                          </a>
+                            {invoiceLoading && isDownloadingThisInvoice ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600 mr-2"></div>
+                                Downloading...
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                Download Invoice
+                              </>
+                            )}
+                          </button>
                         )}
                       </div>
                     </div>
@@ -795,14 +870,29 @@ const UserOrders = () => {
                 </div>
                 <div className="flex space-x-3">
                   {selectedOrder?.payment?.razorpayPaymentId && (
-                    <a
-                      href={`${BASE_URL}/api/orders/${selectedOrder?._id}/invoice`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    <button
+                      onClick={() => handleDownloadInvoice(selectedOrder._id)}
+                      disabled={invoiceLoading && downloadingOrderId === selectedOrder._id}
+                      className={`inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium ${
+                        invoiceLoading && downloadingOrderId === selectedOrder._id
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
+                      }`}
                     >
-                      Download Invoice
-                    </a>
+                      {invoiceLoading && downloadingOrderId === selectedOrder._id ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600 mr-2"></div>
+                          Downloading Invoice...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          Download Invoice
+                        </>
+                      )}
+                    </button>
                   )}
                   <button
                     onClick={closeModal}

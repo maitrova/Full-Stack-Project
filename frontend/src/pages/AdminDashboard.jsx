@@ -7,7 +7,7 @@ import {
   Trash2, 
   Eye, 
   EyeOff,
-  Search,
+  Search as SearchIcon,
   Filter,
   Plus,
   ChevronLeft,
@@ -27,7 +27,10 @@ import {
   Download,
   Palette,
   Grid,
-  Tag
+  Tag,
+  ShoppingBag,
+  Home,
+  Search
 } from 'lucide-react';
 
 // Import Redux actions
@@ -71,9 +74,18 @@ import {
 } from '../redux/slices/adminSlice.js';
 
 // Import the ProductFormModal
+// Import the ProductFormModal
 import ProductFormModal from '../components/newproductadding.jsx';
 // Import DesignPublishModal
 import DesignPublishModal from '../components/DesignPublishModal.jsx';
+// Import DropproductAdmin
+import DropproductAdmin from '../components/dropproducts.jsx';
+// Import AdminOrders
+import AdminOrders from '../components/admin/ordersmanagement.jsx';
+// Import HomepageAdmin
+import HomepageAdmin from '../pages/setHomepage.jsx';
+// Import ProductSearch
+import ProductSearch from '../components/searchproductdetail.jsx';
 
 const AdminDashboard = () => {
   const dispatch = useDispatch();
@@ -92,6 +104,8 @@ const AdminDashboard = () => {
     currentSubCategory,
   } = useSelector((state) => state.productList);
   
+
+  console.log("Admin Dashboard - Products:", products);
   // Designs state
   const {
     designs,
@@ -123,7 +137,7 @@ const AdminDashboard = () => {
   const [activeSidebarItem, setActiveSidebarItem] = useState('dashboard');
   const [localCategory, setLocalCategory] = useState('');
   const [localSubCategory, setLocalSubCategory] = useState('');
-  const [viewMode, setViewMode] = useState('products'); // 'products' or 'designs'
+  const [viewMode, setViewMode] = useState('products'); // 'products', 'designs', 'dropproducts', 'orders', 'homepage', 'search'
   
   // Helper function to get full image URL
   const getImageUrl = (imagePath) => {
@@ -138,6 +152,10 @@ const AdminDashboard = () => {
     const baseUrl = import.meta.env.VITE_IMAGE_URL; 
     return `${baseUrl}/${imagePath.replace(/^\/+/, '')}`;
   };
+  
+  useEffect(() => {
+    console.log("Products updated:", products);
+  }, [products]);
 
   // Initialize on component mount
   useEffect(() => {
@@ -147,7 +165,12 @@ const AdminDashboard = () => {
 
   // Load products based on current filter
   useEffect(() => {
-    if (!isEditing && activeTab !== 'dashboard') {
+    if (!isEditing && 
+        activeTab !== 'dashboard' && 
+        activeTab !== 'dropproducts' && 
+        activeTab !== 'orders' && 
+        activeTab !== 'homepage' &&
+        activeTab !== 'search') {
       loadProducts();
     }
   }, [currentFilter, pagination.page, currentCategory, currentSubCategory, activeTab]);
@@ -231,6 +254,14 @@ const AdminDashboard = () => {
     if (tab === 'designs') {
       setViewMode('designs');
       loadDesigns();
+    } else if (tab === 'dropproducts') {
+      setViewMode('dropproducts');
+    } else if (tab === 'orders') {
+      setViewMode('orders');
+    } else if (tab === 'homepage') {
+      setViewMode('homepage');
+    } else if (tab === 'search') {
+      setViewMode('search');
     } else {
       setViewMode('products');
       loadProducts();
@@ -511,7 +542,7 @@ const AdminDashboard = () => {
           page: newPage,
           limit: pagination.limit,
         }));
-      } else {
+      } else if (viewMode === 'designs') {
         dispatch(listCatalogueDesigns({
           page: newPage,
           limit: pagination.limit,
@@ -545,6 +576,10 @@ const AdminDashboard = () => {
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: 'allProducts', label: 'All Products', icon: <Package className="w-5 h-5" /> },
     { id: 'designs', label: 'Designs', icon: <Palette className="w-5 h-5" /> },
+    { id: 'dropproducts', label: 'Drop Products', icon: <Tag className="w-5 h-5" /> },
+    { id: 'orders', label: 'Orders', icon: <ShoppingBag className="w-5 h-5" /> },
+    { id: 'homepage', label: 'Homepage', icon: <Home className="w-5 h-5" /> },
+    { id: 'search', label: 'Product Search', icon: <Search className="w-5 h-5" /> },
     { id: 'newArrival', label: 'New Arrivals', icon: <TrendingUp className="w-5 h-5" /> },
     { id: 'bestSeller', label: 'Best Sellers', icon: <BarChart3 className="w-5 h-5" /> },
     { id: 'prices', label: 'Prices', icon: <DollarSign className="w-5 h-5" /> },
@@ -911,6 +946,10 @@ const AdminDashboard = () => {
                 {activeSidebarItem === 'dashboard' && 'Dashboard'}
                 {activeSidebarItem === 'allProducts' && 'All Products'}
                 {activeSidebarItem === 'designs' && 'Designs'}
+                {activeSidebarItem === 'dropproducts' && 'Drop Products'}
+                {activeSidebarItem === 'orders' && 'Order Management'}
+                {activeSidebarItem === 'homepage' && 'Homepage Management'}
+                {activeSidebarItem === 'search' && 'Product Search'}
                 {activeSidebarItem === 'newArrival' && 'New Arrivals'}
                 {activeSidebarItem === 'bestSeller' && 'Best Sellers'}
                 {activeSidebarItem === 'prices' && 'Price Management'}
@@ -922,6 +961,10 @@ const AdminDashboard = () => {
                 {activeSidebarItem === 'dashboard' && 'Overview of your store performance'}
                 {activeSidebarItem === 'allProducts' && 'Manage all products in your store'}
                 {activeSidebarItem === 'designs' && 'Manage user-created designs'}
+                {activeSidebarItem === 'dropproducts' && 'Manage drop products inventory'}
+                {activeSidebarItem === 'orders' && 'Manage and update customer orders'}
+                {activeSidebarItem === 'homepage' && 'Manage featured content displayed on the homepage'}
+                {activeSidebarItem === 'search' && 'Search for products by their unique ID'}
                 {activeSidebarItem === 'newArrival' && 'Manage new arrival products'}
                 {activeSidebarItem === 'bestSeller' && 'Manage best selling products'}
                 {activeSidebarItem === 'prices' && 'Manage product pricing and discounts'}
@@ -1011,13 +1054,33 @@ const AdminDashboard = () => {
             </div>
           )}
 
+          {/* Drop Products Component */}
+          {activeSidebarItem === 'dropproducts' && (
+            <DropproductAdmin />
+          )}
+
+          {/* Orders Component */}
+          {activeSidebarItem === 'orders' && (
+            <AdminOrders />
+          )}
+
+          {/* Homepage Component */}
+          {activeSidebarItem === 'homepage' && (
+            <HomepageAdmin />
+          )}
+
+          {/* Product Search Component */}
+          {activeSidebarItem === 'search' && (
+            <ProductSearch />
+          )}
+
           {/* Search and Filters for Products */}
           {(activeSidebarItem === 'allProducts' || activeSidebarItem === 'newArrival' || activeSidebarItem === 'bestSeller') && !isEditing && viewMode === 'products' && (
             <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0">
                 <div className="flex-1 max-w-md">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <input
                       type="text"
                       placeholder="Search products..."
@@ -1061,7 +1124,7 @@ const AdminDashboard = () => {
               <div className="flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0">
                 <div className="flex-1 max-w-md">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <input
                       type="text"
                       placeholder="Search designs by title or description..."
@@ -1576,8 +1639,8 @@ const AdminDashboard = () => {
                 </>
               )}
             </div>
-          ) : (
-            /* View Mode for Products */
+          ) : activeSidebarItem !== 'dropproducts' && activeSidebarItem !== 'orders' && activeSidebarItem !== 'homepage' && activeSidebarItem !== 'search' ? (
+            /* View Mode for Products (excluding dropproducts, orders, homepage, and search) */
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
               {productsLoading ? (
                 <div className="flex justify-center items-center h-64">
@@ -1642,154 +1705,184 @@ const AdminDashboard = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {products.map(product => (
-                          <tr key={product._id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4">
-                              <div className="flex items-center">
-                                <div className="h-10 w-10 flex-shrink-0">
-                                  {product.images && product.images.length > 0 ? (
-                                    <img
-                                      src={getImageUrl(product.images[0])}
-                                      alt={product.title}
-                                      className="h-10 w-10 rounded object-cover"
-                                      onError={(e) => {
-                                        e.target.onerror = null;
-                                        e.target.src = 'https://via.placeholder.com/40x40?text=No+Image';
-                                      }}
-                                    />
-                                  ) : (
-                                    <div className="h-10 w-10 bg-gray-100 rounded flex items-center justify-center">
-                                      <Package className="w-5 h-5 text-gray-400" />
+                        {products.map(product => {
+                          return (
+                            <tr key={product._id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4">
+                                <div className="flex items-center">
+                                  <div className="h-10 w-10 flex-shrink-0">
+                                    {product.images && product.images.length > 0 ? (
+                                      <img
+                                        src={getImageUrl(product.images[0])}
+                                        alt={product.title}
+                                        className="h-10 w-10 rounded object-cover"
+                                        onError={(e) => {
+                                          e.target.onerror = null;
+                                          e.target.src = "https://via.placeholder.com/40x40?text=No+Image";
+                                        }}
+                                      />
+                                    ) : (
+                                      <div className="h-10 w-10 bg-gray-100 rounded flex items-center justify-center">
+                                        <Package className="w-5 h-5 text-gray-400" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="ml-4">
+                                    <div className="text-sm font-medium text-gray-900">
+                                      {product.title}
                                     </div>
+                                    <div className="flex space-x-2 mt-1">
+                                      {product.newArrival && (
+                                        <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                                          New
+                                        </span>
+                                      )}
+                                      {product.bestSeller && (
+                                        <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
+                                          Best Seller
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td className="px-6 py-4">
+                                <div className="text-sm text-gray-900">{product.category}</div>
+                                <div className="text-sm text-gray-500">{product.subCategory}</div>
+                              </td>
+
+                              <td className="px-6 py-4">
+                                {product.variants && product.variants.length > 0 ? (
+                                  <div>
+                                    <div className="text-sm font-medium text-gray-900">
+                                      {product.variants.map((v) => v.size).join(", ")}
+                                    </div>
+                                    <div className="text-sm text-gray-600">
+                                      ₹{Math.min(...product.variants.map((v) => v.price))} - ₹
+                                      {Math.max(...product.variants.map((v) => v.price))}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="text-sm font-medium text-gray-900">
+                                    ₹{product.price || 0}
+                                  </div>
+                                )}
+                              </td>
+
+                              <td className="px-6 py-4">
+                                {product.variants && product.variants.length > 0 ? (
+                                  <div>
+                                    <span
+                                      className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                        product.variants.reduce(
+                                          (sum, v) => sum + (v.stock || 0),
+                                          0
+                                        ) > 10
+                                          ? "bg-green-100 text-green-800"
+                                          : product.variants.reduce(
+                                              (sum, v) => sum + (v.stock || 0),
+                                              0
+                                            ) > 0
+                                          ? "bg-yellow-100 text-yellow-800"
+                                          : "bg-red-100 text-red-800"
+                                      }`}
+                                    >
+                                      {product.variants.reduce(
+                                        (sum, v) => sum + (v.stock || 0),
+                                        0
+                                      )}{" "}
+                                      units
+                                    </span>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      {product.variants.filter((v) => v.stock > 0).length} sizes
+                                      available
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span
+                                    className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                      product.stock > 10
+                                        ? "bg-green-100 text-green-800"
+                                        : product.stock > 0
+                                        ? "bg-yellow-100 text-yellow-800"
+                                        : "bg-red-100 text-red-800"
+                                    }`}
+                                  >
+                                    {product.stock || 0} units
+                                  </span>
+                                )}
+                              </td>
+
+                              <td className="px-6 py-4">
+                                <span
+                                  className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                    product.isActive
+                                      ? "bg-green-100 text-green-800"
+                                      : "bg-red-100 text-red-800"
+                                  }`}
+                                >
+                                  {product.isActive ? "Active" : "Inactive"}
+                                </span>
+                              </td>
+
+                              <td className="px-6 py-4">
+                                <div className="flex space-x-2">
+                                  <button
+                                    onClick={() => handleViewProduct(product)}
+                                    className="text-blue-600 hover:text-blue-900"
+                                    title="View"
+                                  >
+                                    <Eye className="w-5 h-5" />
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleEditProduct(product)}
+                                    className="text-green-600 hover:text-green-900"
+                                    title="Edit"
+                                  >
+                                    <Edit2 className="w-5 h-5" />
+                                  </button>
+
+                                  <button
+                                    onClick={() => handleToggleStatus(product._id)}
+                                    className={`${
+                                      product.isActive
+                                        ? "text-yellow-600 hover:text-yellow-900"
+                                        : "text-green-600 hover:text-green-900"
+                                    }`}
+                                    title={product.isActive ? "Deactivate" : "Activate"}
+                                  >
+                                    {product.isActive ? (
+                                      <EyeOff className="w-5 h-5" />
+                                    ) : (
+                                      <Eye className="w-5 h-5" />
+                                    )}
+                                  </button>
+
+                                  {activeSidebarItem === "newArrival" ||
+                                  activeSidebarItem === "bestSeller" ? (
+                                    <button
+                                      onClick={() => handleRemoveProduct(product._id)}
+                                      className="text-red-600 hover:text-red-900"
+                                      title="Remove"
+                                    >
+                                      <Trash2 className="w-5 h-5" />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleDeleteProduct(product)}
+                                      className="text-red-600 hover:text-red-900"
+                                      title="Delete"
+                                    >
+                                      <Trash2 className="w-5 h-5" />
+                                    </button>
                                   )}
                                 </div>
-                                <div className="ml-4">
-                                  <div className="text-sm font-medium text-gray-900">
-                                    {product.title}
-                                  </div>
-                                  <div className="flex space-x-2 mt-1">
-                                    {product.newArrival && (
-                                      <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-                                        New
-                                      </span>
-                                    )}
-                                    {product.bestSeller && (
-                                      <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
-                                        Best Seller
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="text-sm text-gray-900">{product.category}</div>
-                              <div className="text-sm text-gray-500">{product.subCategory}</div>
-                            </td>
-                            <td className="px-6 py-4">
-                              {product.variants && product.variants.length > 0 ? (
-                                <div>
-                                  <div className="text-sm font-medium text-gray-900">
-                                    {product.variants.map(v => v.size).join(', ')}
-                                  </div>
-                                  <div className="text-sm text-gray-600">
-                                    ₹{Math.min(...product.variants.map(v => v.price))} - 
-                                    ₹{Math.max(...product.variants.map(v => v.price))}
-                                  </div>
-                                </div>
-                              ) : (
-                                // Fallback for old products
-                                <div className="text-sm font-medium text-gray-900">
-                                  ₹{product.price || 0}
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-6 py-4">
-                              {product.variants && product.variants.length > 0 ? (
-                                <div>
-                                  <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                    product.variants.reduce((sum, v) => sum + (v.stock || 0), 0) > 10 
-                                      ? 'bg-green-100 text-green-800'
-                                      : product.variants.reduce((sum, v) => sum + (v.stock || 0), 0) > 0
-                                      ? 'bg-yellow-100 text-yellow-800'
-                                      : 'bg-red-100 text-red-800'
-                                  }`}>
-                                    {product.variants.reduce((sum, v) => sum + (v.stock || 0), 0)} units
-                                  </span>
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    {product.variants.filter(v => v.stock > 0).length} sizes available
-                                  </div>
-                                </div>
-                              ) : (
-                                // Fallback for old products
-                                <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                  product.stock > 10 
-                                    ? 'bg-green-100 text-green-800'
-                                    : product.stock > 0
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : 'bg-red-100 text-red-800'
-                                }`}>
-                                  {product.stock || 0} units
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                product.isActive
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-red-100 text-red-800'
-                              }`}>
-                                {product.isActive ? 'Active' : 'Inactive'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex space-x-2">
-                                <button
-                                  onClick={() => handleViewProduct(product)}
-                                  className="text-blue-600 hover:text-blue-900"
-                                  title="View"
-                                >
-                                  <Eye className="w-5 h-5" />
-                                </button>
-                                <button
-                                  onClick={() => handleEditProduct(product)}
-                                  className="text-green-600 hover:text-green-900"
-                                  title="Edit"
-                                >
-                                  <Edit2 className="w-5 h-5" />
-                                </button>
-                                <button
-                                  onClick={() => handleToggleStatus(product._id)}
-                                  className={`${
-                                    product.isActive
-                                      ? 'text-yellow-600 hover:text-yellow-900'
-                                      : 'text-green-600 hover:text-green-900'
-                                  }`}
-                                  title={product.isActive ? 'Deactivate' : 'Activate'}
-                                >
-                                  {product.isActive ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                                </button>
-                                {activeSidebarItem === 'newArrival' || activeSidebarItem === 'bestSeller' ? (
-                                  <button
-                                    onClick={() => handleRemoveProduct(product._id)}
-                                    className="text-red-600 hover:text-red-900"
-                                    title="Remove"
-                                  >
-                                    <Trash2 className="w-5 h-5" />
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => handleDeleteProduct(product)}
-                                    className="text-red-600 hover:text-red-900"
-                                    title="Delete"
-                                  >
-                                    <Trash2 className="w-5 h-5" />
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -1859,12 +1952,11 @@ const AdminDashboard = () => {
                 </>
               )}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
   );
 };
-
 
 export default AdminDashboard;

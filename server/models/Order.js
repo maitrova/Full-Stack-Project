@@ -2,7 +2,12 @@ import mongoose from "mongoose";
 
 const orderItemSchema = new mongoose.Schema(
   {
-    kind: { type: String, enum: ["READYMADE", "DESIGN"], required: true },
+    kind: { 
+  type: String, 
+  enum: ["READYMADE", "DESIGN", "DROPPRODUCT"], 
+  required: true 
+},
+
     readymadeProduct: { type: mongoose.Schema.Types.ObjectId, ref: "ReadymadeProduct" },
     design: { type: mongoose.Schema.Types.ObjectId, ref: "Design" },
     dropproduct: { type: mongoose.Schema.Types.ObjectId, ref: "Dropproduct" },
@@ -62,7 +67,12 @@ const orderSchema = new mongoose.Schema(
       razorpaySignature: String,
       status: { type: String, default: "CREATED" },
     },
-  },
+
+    invoiceNumber: { type: String, unique: true },
+    invoiceDate: Date,
+    invoicePdfUrl: String,
+
+      },
   { timestamps: true }
 );
 

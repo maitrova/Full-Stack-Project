@@ -18,7 +18,17 @@ import homeCategoryTilesSliceReducer from "./slices/Homepagecategorylist.js";
 import productCategoriesSliceReducer from "./slices/productcategories.js";
 import productSizeSelectionReducer from "./slices/productsizeselection.js";
 import addressSliceReducer from "./slices/address.js"
-import ordersReducer from "./slices/orderSlice.js"
+import ordersReducer from "./slices/orderSlice.js";
+import categoryReducer from "./slices/category.js";
+import orderExportReducer from "./slices/orderExportSlice.js";
+import orderStatusSliceReducer from "./slices/orderStatusSlice.js";
+import productDetailsReducer from "./slices/productsearchDetailsSlice.js";
+import invoiceReducer from "./slices/invoiceSlice.js";
+import googleAuthReducer from "./slices/googleAuthSlice.js";
+import  brandSliceReducer from "./slices/brandSlice.js";
+import adminSearchSliceReducer from "./slices/adminSearchSlice.js";
+import exportOrdersSliceReducer from "./slices/exportorders.js";
+import colorReducer from "./slices/colorSlice.js";
 // Persist configuration for user slice only
 const persistConfig = {
   key: 'user', // key for localStorage
@@ -49,7 +59,17 @@ export const store = configureStore({
     productCategories : productCategoriesSliceReducer,
     productSizeSelection: productSizeSelectionReducer,
     address  : addressSliceReducer,
-    orders: ordersReducer, // Use persisted reducer instead of regular one
+    orders: ordersReducer,
+    category: categoryReducer,
+    orderExport: orderExportReducer,
+    orderStatus: orderStatusSliceReducer,
+    productDetails: productDetailsReducer,
+    invoice: invoiceReducer,
+    googleAuth: googleAuthReducer,
+    brand : brandSliceReducer,
+    adminSearch : adminSearchSliceReducer,
+    exportOrders : exportOrdersSliceReducer,
+    colors: colorReducer,// Use persisted reducer instead of regular one
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

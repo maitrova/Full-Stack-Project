@@ -24,6 +24,26 @@ const computeDesignUnitPrice = (designDoc) => {
   return price;
 };
 
+const parsePositiveNumber = (value) => {
+  if (value === undefined || value === null) return 0;
+  const num = Number(value);
+  return Number.isFinite(num) && num > 0 ? num : 0;
+};
+
+const parsePriceDetails = (value) => {
+  if (!value) return null;
+  if (typeof value === "object") return value;
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch (err) {
+      console.warn("Invalid priceDetails payload:", err);
+      return null;
+    }
+  }
+  return null;
+};
+
 export const addToCart = async (req, res) => {
   try {
     const userId = req.user?._id;
@@ -37,6 +57,11 @@ export const addToCart = async (req, res) => {
       designId,
       size,
     } = req.body;
+
+    const requestedUnitPrice = parsePositiveNumber(req.body.unitPrice);
+    const requestedBasePrice = parsePositiveNumber(req.body.basePrice);
+    const priceDetailsPayload = parsePriceDetails(req.body.priceDetails);
+    let designPriceSnapshot = null;
 
     const parsedQty = Number(qty);
     if (!Number.isInteger(parsedQty) || parsedQty < 1) {
@@ -122,6 +147,8 @@ export const addToCart = async (req, res) => {
         qty: parsedQty,
         size: finalSize,
         unitPrice,
+        basePrice: unitPrice,
+        priceDetails: null,
         currency: product.currency || "INR",
         previewImage: product.images?.[0] || null,
         signature,
@@ -139,13 +166,25 @@ export const addToCart = async (req, res) => {
       const design = await Design.findById(designId).lean();
       if (!design) return res.status(404).json({ message: "Design not found" });
 
-      const unitPrice = computeDesignUnitPrice(design);
-      if (!(unitPrice > 0)) {
+      const fallbackUnitPrice = computeDesignUnitPrice(design);
+      const finalDesignUnitPrice =
+        requestedUnitPrice > 0 ? requestedUnitPrice : fallbackUnitPrice;
+
+      if (!(finalDesignUnitPrice > 0)) {
         return res.status(400).json({ message: "Design price is not valid" });
       }
 
       const finalSize = (normalizedSize || "M").toUpperCase();
       signature = `DESIGN:${design._id.toString()}:SIZE:${finalSize}`;
+
+      const finalDesignBasePrice =
+        requestedBasePrice > 0 ? requestedBasePrice : finalDesignUnitPrice;
+
+      designPriceSnapshot = {
+        unitPrice: finalDesignUnitPrice,
+        basePrice: finalDesignBasePrice,
+        priceDetails: priceDetailsPayload,
+      };
 
       itemToInsert = {
         kind: "DESIGN",
@@ -155,7 +194,9 @@ export const addToCart = async (req, res) => {
         product: design.product || null,
         qty: parsedQty,
         size: finalSize,
-        unitPrice,
+        unitPrice: finalDesignUnitPrice,
+        basePrice: finalDesignBasePrice,
+        priceDetails: priceDetailsPayload,
         currency: "INR",
         previewImage: design.previewImage || null,
         signature,
@@ -212,10 +253,18 @@ export const addToCart = async (req, res) => {
 
         cart.items[idx].currency = p.currency || cart.items[idx].currency;
         cart.items[idx].previewImage = p.images?.[0] || cart.items[idx].previewImage;
+        cart.items[idx].basePrice = cart.items[idx].unitPrice;
+        cart.items[idx].priceDetails = null;
       }
 
       cart.items[idx].qty = nextQty;
       cart.items[idx].size = String(cart.items[idx].size || "M").toUpperCase();
+
+      if (kind === "DESIGN" && designPriceSnapshot) {
+        cart.items[idx].unitPrice = designPriceSnapshot.unitPrice;
+        cart.items[idx].basePrice = designPriceSnapshot.basePrice;
+        cart.items[idx].priceDetails = designPriceSnapshot.priceDetails;
+      }
 
       await cart.save();
       return res.status(200).json({ message: "Cart updated", cart });
@@ -242,8 +291,14 @@ export const getCart = async (req, res) => {
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     const cart = await Cart.findOne({ user: userId, status: "ACTIVE" })
-      .populate("items.readymadeProduct")
-      .populate("items.dropproduct") // ✅ NEW
+      .populate({
+        path: "items.readymadeProduct",
+        populate: [
+          { path: "category", select: "name" },
+          { path: "subCategory", select: "name" },
+        ],
+      })
+      .populate("items.dropproduct")
       .populate("items.design")
       .populate("items.product")
       .lean();
@@ -252,29 +307,50 @@ export const getCart = async (req, res) => {
       return res.status(200).json({ message: "Cart is empty", cart: null });
     }
 
-    // ✅ Optional enrichment for UI (readymade variant support)
     const enrichedItems = (cart.items || []).map((it) => {
+      let updatedItem = { ...it };
+
+      // ✅ Convert populated category/subCategory to string name
+      if (it.readymadeProduct) {
+        updatedItem.readymadeProduct = {
+          ...it.readymadeProduct,
+          category:
+            it.readymadeProduct.category?.name ||
+            it.readymadeProduct.category,
+          subCategory:
+            it.readymadeProduct.subCategory?.name ||
+            it.readymadeProduct.subCategory,
+        };
+      }
+
+      // ✅ Variant support (existing logic)
       if (
         it.kind === "READYMADE" &&
         it.readymadeProduct &&
         Array.isArray(it.readymadeProduct.variants)
       ) {
         const v = it.readymadeProduct.variants.find(
-          (x) => String(x.size).toUpperCase() === String(it.size || "M").toUpperCase()
+          (x) =>
+            String(x.size).toUpperCase() ===
+            String(it.size || "M").toUpperCase()
         );
-        return { ...it, activeVariant: v || null };
+
+        updatedItem.activeVariant = v || null;
       }
-      return it;
+
+      return updatedItem;
     });
 
     return res.status(200).json({
       cart: { ...cart, items: enrichedItems },
     });
+
   } catch (err) {
     console.error("getCart error:", err);
     return res.status(500).json({ message: "Server error" });
   }
 };
+
 
 
 
@@ -291,6 +367,12 @@ export const updateCartItemQty = async (req, res) => {
 
     const { qty } = req.body;
     const parsedQty = Number(qty);
+    const requestedUnitPrice = parsePositiveNumber(req.body.unitPrice);
+    const requestedBasePrice = parsePositiveNumber(req.body.basePrice);
+    const hasPriceDetailsField = Object.prototype.hasOwnProperty.call(req.body, "priceDetails");
+    const priceDetailsPayload = hasPriceDetailsField
+      ? parsePriceDetails(req.body.priceDetails)
+      : undefined;
     if (!Number.isInteger(parsedQty) || parsedQty < 1) {
       return res.status(400).json({ message: "qty must be an integer >= 1" });
     }
@@ -347,6 +429,8 @@ export const updateCartItemQty = async (req, res) => {
         item.unitPrice = unitPrice;
         item.currency = p.currency || "INR";
         item.previewImage = p.images?.[0] || null;
+        item.basePrice = unitPrice;
+        item.priceDetails = null;
 
         // ensure ids are consistent
         item.size = cartSize;
@@ -384,6 +468,8 @@ export const updateCartItemQty = async (req, res) => {
         item.unitPrice = unitPrice;
         item.currency = p.currency || "INR";
         item.previewImage = p.images?.[0] || null;
+        item.basePrice = unitPrice;
+        item.priceDetails = null;
 
         item.size = cartSize;
       }
@@ -402,12 +488,26 @@ export const updateCartItemQty = async (req, res) => {
         return res.status(403).json({ message: "You cannot update this design item" });
       }
 
-      const unitPrice = computeDesignUnitPrice(d);
-      if (!(unitPrice > 0)) return res.status(400).json({ message: "Design price invalid" });
+      if (requestedUnitPrice > 0) {
+        item.unitPrice = requestedUnitPrice;
+      }
 
-      item.unitPrice = unitPrice;
+      if (requestedBasePrice > 0) {
+        item.basePrice = requestedBasePrice;
+      } else if (!item.basePrice) {
+        item.basePrice = item.unitPrice;
+      }
+
+      if (!(item.unitPrice > 0)) {
+        return res.status(400).json({ message: "Design price invalid" });
+      }
+
+      if (hasPriceDetailsField) {
+        item.priceDetails = priceDetailsPayload;
+      }
+
       item.currency = "INR";
-      item.previewImage = d.previewImage || null;
+      item.previewImage = d.previewImage || item.previewImage;
       item.product = d.product || item.product;
       item.size = cartSize;
     }

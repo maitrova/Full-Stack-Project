@@ -14,6 +14,8 @@ import {
   selectAddressSuccess,
   selectAddressMessage,
 } from "../redux/slices/address.js";
+import { selectCurrentToken } from "../redux/slices/Userslice.js";
+import RazorpayPayNow from "../components/RazorpayPayNow.jsx";
 
 const emptyAddress = {
   fullName: "",
@@ -107,7 +109,8 @@ function AddressSummary({ title, addr, onEdit, onMakeDefault, loading }) {
 
 export default function CheckoutAddresses() {
   const dispatch = useDispatch();
-
+  
+  const token = useSelector(selectCurrentToken);
   const deliverySaved = useSelector(selectDeliveryAddress);
   const billingSaved = useSelector(selectBillingAddress);
   const loading = useSelector(selectAddressLoading);
@@ -117,9 +120,7 @@ export default function CheckoutAddresses() {
 
   const [sameAsDelivery, setSameAsDelivery] = useState(true);
   const [setAsDefault, setSetAsDefault] = useState(true);
-
   const [mode, setMode] = useState("create"); // create | edit-delivery | edit-billing
-
   const [delivery, setDelivery] = useState(emptyAddress);
   const [billing, setBilling] = useState(emptyAddress);
 
@@ -236,6 +237,12 @@ export default function CheckoutAddresses() {
   const onMakeDefault = async (addrId) => {
     await dispatch(setDefaultAddress(addrId));
     dispatch(fetchMyAddresses());
+  };
+
+  const handlePaymentSuccess = ({ orderId }) => {
+    // You can redirect to a success page or show a success message
+    console.log("Paid order:", orderId);
+    // Example: navigate(`/order-success/${orderId}`);
   };
 
   const headerTitle =
@@ -373,7 +380,6 @@ export default function CheckoutAddresses() {
                   value={billing.fullName}
                   onChange={(v) => handleChange("billing", "fullName", v)}
                   placeholder="Enter full name"
-                  // lock when same
                 />
                 <Input
                   label="Mobile Number"
@@ -465,9 +471,27 @@ export default function CheckoutAddresses() {
           </div>
         </div>
 
+        {/* Payment Section */}
+        <div className="mt-8">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 className="text-lg font-bold text-slate-900">Payment</h3>
+            <p className="mt-1 text-sm text-slate-600">
+              Pay securely using Razorpay after saving your addresses.
+            </p>
+
+            <div className="mt-5">
+              <RazorpayPayNow
+                token={token}
+                onSuccess={handlePaymentSuccess}
+                disabled={!deliverySaved || !billingSaved}
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Small note */}
         <div className="mt-4 text-xs text-slate-500">
-          Tip: After saving, use the “Make default” button in the summary cards if you want to switch defaults quickly.
+          Tip: After saving addresses, use the "Make default" button in the summary cards if you want to switch defaults quickly.
         </div>
       </div>
     </div>

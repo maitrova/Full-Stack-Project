@@ -80,6 +80,23 @@ export const fetchUserProfile = createAsyncThunk(
   }
 );
 
+// Google Login
+export const googleLogin = createAsyncThunk(
+  "user/googleLogin",
+  async (googleToken, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(`${API_URL}/google`, {
+        token: googleToken,
+      });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data || { message: "Google login failed" }
+      );
+    }
+  }
+);
+
 // PUT Update Profile
 export const updateUserProfile = createAsyncThunk(
   "user/updateProfile",
@@ -177,6 +194,31 @@ const userSlice = createSlice({
         state.status = "failed";
         state.error = action.payload?.message || "Login failed";
       })
+
+            // --------------------
+      // Google Login
+      // --------------------
+      .addCase(googleLogin.pending, (state) => {
+        state.status = "loading";
+      })
+      .addCase(googleLogin.fulfilled, (state, action) => {
+        state.status = "succeeded";
+        state.userInfo = action.payload;
+        state.error = null;
+
+        state.profile = {
+          _id: action.payload?._id,
+          name: action.payload?.name,
+          phone: action.payload?.phone,
+          email: action.payload?.email,
+          role: action.payload?.role,
+        };
+      })
+      .addCase(googleLogin.rejected, (state, action) => {
+        state.status = "failed";
+        state.error = action.payload?.message || "Google login failed";
+      })
+
 
       // --------------------
       // Logout thunk

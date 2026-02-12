@@ -2,16 +2,20 @@ import mongoose from "mongoose";
 
 const categorySchema = new mongoose.Schema(
   {
-    name: { type: String, required: true, trim: true, unique: true },
-    slug: { type: String, required: true, trim: true, unique: true, lowercase: true },
-
-    thumbnail: {
-      url: { type: String, required: true }, // /outputs/thumbnail/xxxx.png
-      filename: { type: String, required: true },
+    name: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
     },
-
-    isActive: { type: Boolean, default: true },
-    sortOrder: { type: Number, default: 0 },
+    thumbnail: {
+      type: String,
+      required: true, // will store: /outputs/thumbnail/filename.png
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
   },
   { timestamps: true }
 );

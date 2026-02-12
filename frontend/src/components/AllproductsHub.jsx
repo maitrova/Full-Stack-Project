@@ -516,32 +516,32 @@ export default function AllProductsHub() {
     return Array.from(categories.entries()).map(([name, count]) => ({ name, count }));
   }, [commonSavedData]);
   
- const getCommonSubcategories = useMemo(() => {
-  if (selectedCommonCategory === 'all') return [];
+const getCommonSubcategories = useMemo(() => {
+  if (selectedCommonCategory === "all") return [];
 
   const map = new Map();
 
   commonSavedData.forEach((item) => {
-    if (item.category === selectedCommonCategory && item.subCategory) {
+    if (
+      item.category === selectedCommonCategory &&
+      item.subCategory
+    ) {
       if (!map.has(item.subCategory)) {
         map.set(item.subCategory, {
           name: item.subCategory,
           count: 0,
-          thumb: item.raw.thumbnail || null, // pick first product image as thumbnail
+          thumb: item.subCategoryThumbnail || null, // ✅ FIXED
         });
       }
+
       const entry = map.get(item.subCategory);
       entry.count += 1;
-
-      // If no thumbnail yet, try to fill it from later items
-      if (!entry.thumb && item.previewImage) {
-        entry.thumb = item.previewImage;
-      }
     }
   });
 
   return Array.from(map.values());
 }, [commonSavedData, selectedCommonCategory]);
+
 
   
   const applyQuickPriceRange = (range) => {

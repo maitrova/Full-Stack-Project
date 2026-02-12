@@ -37,6 +37,8 @@ const cartItemSchema = new mongoose.Schema(
     qty: { type: Number, required: true, min: 1, default: 1 },
 
     unitPrice: { type: Number, required: true, min: 0 },
+    basePrice: { type: Number, min: 0, default: 0 },
+    priceDetails: { type: mongoose.Schema.Types.Mixed, default: null },
     currency: { type: String, default: "INR" },
 
     previewImage: { type: String, default: null },

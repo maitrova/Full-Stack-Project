@@ -16,6 +16,8 @@ import {
   clearOrderErrors,
   clearAdminOrder
 } from '../../redux/slices/orderSlice.js';
+import { updateOrderStatus, resetOrderStatusState } from '../../redux/slices/orderStatusSlice.js';
+import { exportOrders, resetExportState } from '../../redux/slices/exportorders.js';
 
 const AdminOrders = () => {
   const dispatch = useDispatch();
@@ -27,6 +29,19 @@ const AdminOrders = () => {
   const updateLoading = useSelector(selectUpdateStatusLoading);
   const bulkUpdateLoading = useSelector(selectBulkUpdateLoading);
   const lastBulkResult = useSelector(selectLastBulkResult);
+  
+  // Get order status slice state
+  const orderStatusState = useSelector((state) => state.orderStatus);
+  const orderStatusLoading = orderStatusState.loading;
+  const orderStatusError = orderStatusState.error;
+  const orderStatusSuccess = orderStatusState.success;
+  const orderStatusSummary = orderStatusState.summary;
+  
+  // Get export slice state
+  const exportState = useSelector((state) => state.exportOrders || { loading: false, success: false, error: null });
+  const exportLoading = exportState.loading;
+  const exportError = exportState.error;
+  const exportSuccess = exportState.success;
   
   const [filters, setFilters] = useState({
     paymentStatus: '',
@@ -41,18 +56,24 @@ const AdminOrders = () => {
   const [editOrderId, setEditOrderId] = useState(null);
   const [editOrderStatus, setEditOrderStatus] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('details'); // 'details', 'design', 'price'
+  const [activeTab, setActiveTab] = useState('details');
   const [selectedItemIndex, setSelectedItemIndex] = useState(0);
   const [selectedViewIndex, setSelectedViewIndex] = useState(0);
+  const [showSuccessNotification, setShowSuccessNotification] = useState(false);
+  const [showExportNotification, setShowExportNotification] = useState(false);
 
   // Get base URL from environment variables
   const BASE_URL = import.meta.env.VITE_IMAGE_URL || 'http://localhost:5000';
 
   useEffect(() => {
     dispatch(adminFetchOrders(filters));
+    dispatch(resetOrderStatusState());
+    dispatch(resetExportState());
     return () => {
       dispatch(clearOrderErrors());
       dispatch(clearAdminOrder());
+      dispatch(resetOrderStatusState());
+      dispatch(resetExportState());
     };
   }, [dispatch, filters]);
 
@@ -61,6 +82,41 @@ const AdminOrders = () => {
       dispatch(adminFetchOrderById(editOrderId));
     }
   }, [editOrderId, dispatch]);
+
+  // Effect to show success notification
+  useEffect(() => {
+    if (orderStatusSuccess && orderStatusSummary) {
+      dispatch(adminFetchOrders(filters));
+      setShowSuccessNotification(true);
+      if (selectedOrders.length > 0) {
+        setSelectedOrders([]);
+      }
+      const timer = setTimeout(() => {
+        setShowSuccessNotification(false);
+        dispatch(resetOrderStatusState());
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [orderStatusSuccess, orderStatusSummary, dispatch, filters, selectedOrders.length]);
+
+  // Effect to show export success notification
+  useEffect(() => {
+    if (exportSuccess) {
+      setShowExportNotification(true);
+      const timer = setTimeout(() => {
+        setShowExportNotification(false);
+        dispatch(resetExportState());
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [exportSuccess, dispatch]);
+
+  // Close modals when order status update is successful
+  useEffect(() => {
+    if (orderStatusSuccess) {
+      setShowBulkUpdateModal(false);
+    }
+  }, [orderStatusSuccess]);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -97,9 +153,26 @@ const AdminOrders = () => {
     }
   };
 
+  const handleExportOrders = async () => {
+    if (selectedOrders.length === 0) {
+      alert('Please select at least one order to export');
+      return;
+    }
+    
+    try {
+      await dispatch(exportOrders(selectedOrders)).unwrap();
+      // Don't clear selection automatically - let user decide
+    } catch (err) {
+      console.error('Failed to export orders:', err);
+    }
+  };
+
   const handleStatusUpdate = async (orderId, newStatus) => {
     try {
-      await dispatch(adminUpdateOrderStatus({ orderId, orderStatus: newStatus })).unwrap();
+      await dispatch(updateOrderStatus({ 
+        orderId, 
+        orderStatus: newStatus 
+      })).unwrap();
       dispatch(adminFetchOrders(filters));
     } catch (err) {
       console.error('Failed to update status:', err);
@@ -117,7 +190,7 @@ const AdminOrders = () => {
     if (!editOrderId || !editOrderStatus) return;
     
     try {
-      await dispatch(adminUpdateOrderStatus({ 
+      await dispatch(updateOrderStatus({ 
         orderId: editOrderId, 
         orderStatus: editOrderStatus 
       })).unwrap();
@@ -134,7 +207,7 @@ const AdminOrders = () => {
     if (selectedOrders.length === 0) return;
     
     try {
-      await dispatch(adminBulkUpdateOrderStatus({
+      await dispatch(updateOrderStatus({
         orderIds: selectedOrders,
         orderStatus: bulkStatus
       })).unwrap();
@@ -206,59 +279,63 @@ const AdminOrders = () => {
   };
 
   const getProductDetails = (item) => {
-    if (item.kind === "READYMADE" && item.readymadeProduct) {
-      return {
-        isDesign: false,
-        category: item.readymadeProduct.category,
-        subCategory: item.readymadeProduct.subCategory,
-        brand: item.readymadeProduct.brand,
-        description: item.readymadeProduct.description
-      };
-    } else if (item.kind === "DESIGN" && item.design) {
-      return {
-        isDesign: true,
-        category: item.product?.category || 'Custom Design',
-        subCategory: item.product?.subCategory || 'User Designed',
-        brand: 'Custom Design',
-        description: item.design.description || 'User custom design'
-      };
-    } else if (item.dropproduct) {
-      return {
-        isDesign: false,
-        category: item.dropproduct.category || 'Drop Product',
-        subCategory: item.dropproduct.subCategory || '',
-        brand: item.dropproduct.brand || '',
-        description: item.dropproduct.description || ''
-      };
-    } else if (item.product) {
-      return {
-        isDesign: false,
-        category: item.product.category || 'Product',
-        subCategory: item.product.subCategory || '',
-        brand: item.product.brand || '',
-        description: item.product.description || ''
-      };
-    }
-    
-    return {
+  let result;
+
+  if (item.kind === "READYMADE" && item.readymadeProduct) {
+    result = {
+      isDesign: false,
+      category: item.readymadeProduct.category,
+      subCategory: item.readymadeProduct.subCategory,
+      brand: item.readymadeProduct.brand,
+      description: item.readymadeProduct.description
+    };
+  } else if (item.kind === "DESIGN" && item.design) {
+    result = {
+      isDesign: true,
+      category: item.product?.category || 'Custom Design',
+      subCategory: item.product?.subCategory || 'User Designed',
+      brand: 'Custom Design',
+      description: item.design.description || 'User custom design'
+    };
+  } else if (item.dropproduct) {
+    result = {
+      isDesign: false,
+      category: item.dropproduct.category || 'Drop Product',
+      subCategory: item.dropproduct.subCategory || '',
+      brand: item.dropproduct.brand || '',
+      description: item.dropproduct.description || ''
+    };
+  } else if (item.product) {
+    result = {
+      isDesign: false,
+      category: item.product.category || 'Product',
+      subCategory: item.product.subCategory || '',
+      brand: item.product.brand || '',
+      description: item.product.description || ''
+    };
+  } else {
+    result = {
       isDesign: false,
       category: '',
       subCategory: '',
       brand: '',
       description: ''
     };
-  };
+  }
+
+  console.log("Product Details:", result);
+  return result;
+};
+
 
   const getItemImage = (item) => {
-    // Check previewImage first (from order item)
     if (item.previewImage) {
       if (item.previewImage.startsWith('data:')) {
-        return item.previewImage; // Base64 image
+        return item.previewImage;
       }
       return `${BASE_URL}/${item.previewImage}`;
     }
     
-    // Check for product images based on kind
     if (item.kind === "READYMADE" && item.readymadeProduct) {
       if (item.readymadeProduct.thumbnail) {
         return `${BASE_URL}/${item.readymadeProduct.thumbnail}`;
@@ -267,7 +344,6 @@ const AdminOrders = () => {
         return `${BASE_URL}/${item.readymadeProduct.images[0]}`;
       }
     } else if (item.kind === "DESIGN" && item.design) {
-      // Check for base64 preview image
       if (item.design.previewImage && item.design.previewImage.startsWith('data:')) {
         return item.design.previewImage;
       }
@@ -279,7 +355,6 @@ const AdminOrders = () => {
       }
     }
     
-    // Return a placeholder image if no image found
     return 'https://via.placeholder.com/100x100?text=No+Image';
   };
 
@@ -288,18 +363,6 @@ const AdminOrders = () => {
       return view.previewImage;
     }
     return 'https://via.placeholder.com/400x400?text=No+Preview';
-  };
-
-  const getDesignLayerImages = (designLayers) => {
-    if (!designLayers || designLayers.length === 0) return [];
-    
-    return designLayers.map(layer => ({
-      url: layer.imageUrl,
-      id: layer.id,
-      zone: layer.zone,
-      dimensions: `${layer.widthInches}" × ${layer.heightInches}"`,
-      area: `${layer.areaInches?.toFixed(2) || '0.00'}"²`
-    }));
   };
 
   const downloadImage = (url, filename) => {
@@ -353,6 +416,26 @@ const AdminOrders = () => {
     delivered: orders.filter(o => o.orderStatus === 'DELIVERED').length
   };
 
+  const getProductId = (item) => {
+    return (
+      item.readymadeProduct?._id ||
+      item.dropproduct?._id ||
+      item.design?._id ||
+      item.product?._id ||
+      "N/A"
+    );
+  };
+
+  const getDesignColor = (item) => {
+    if (item.kind !== "DESIGN") return null;
+    return (
+      item.design?.productColorName ||
+      item.design?.productColor ||
+      item.color ||
+      "N/A"
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 py-8 flex justify-center items-center">
@@ -367,31 +450,161 @@ const AdminOrders = () => {
         {/* Header */}
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between">
+            {/* Left Section */}
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Order Management</h1>
-              <p className="mt-2 text-gray-600">Manage and update customer orders</p>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Order Management
+              </h1>
+              <p className="mt-2 text-gray-600">
+                Manage and update customer orders
+              </p>
             </div>
-            {selectedOrders.length > 0 && (
-              <div className="mt-4 md:mt-0 flex items-center space-x-3">
-                <span className="text-sm text-gray-600">
-                  {selectedOrders.length} order{selectedOrders.length !== 1 ? 's' : ''} selected
-                </span>
-                <button
-                  onClick={() => setShowBulkUpdateModal(true)}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  Bulk Update Status
-                </button>
-                <button
-                  onClick={() => setSelectedOrders([])}
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  Clear Selection
-                </button>
-              </div>
-            )}
+
+            {/* Right Section */}
+            <div className="mt-4 md:mt-0 flex flex-wrap items-center gap-3">
+              {/* Export Button */}
+              <button
+                onClick={handleExportOrders}
+                disabled={selectedOrders.length === 0 || exportLoading}
+                className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-md shadow-sm text-white 
+                  ${selectedOrders.length > 0 && !exportLoading
+                    ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500' 
+                    : 'bg-gray-400 cursor-not-allowed'
+                  } focus:outline-none focus:ring-2 focus:ring-offset-2 transition`}
+              >
+                {exportLoading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <svg className="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export to Excel ({selectedOrders.length})
+                  </>
+                )}
+              </button>
+
+              {selectedOrders.length > 0 && (
+                <>
+                  <span className="text-sm text-gray-600">
+                    {selectedOrders.length} order
+                    {selectedOrders.length !== 1 ? "s" : ""} selected
+                  </span>
+
+                  <button
+                    onClick={() => setShowBulkUpdateModal(true)}
+                    className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition"
+                  >
+                    Bulk Update Status
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedOrders([])}
+                    className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition"
+                  >
+                    Clear Selection
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
+
+        {/* Success Notification */}
+        {showSuccessNotification && (
+          <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-green-700">
+                  ✅ Order status updated successfully! {orderStatusSummary}
+                </p>
+              </div>
+              <div className="ml-auto pl-3">
+                <button
+                  onClick={() => {
+                    setShowSuccessNotification(false);
+                    dispatch(resetOrderStatusState());
+                  }}
+                  className="text-green-700 hover:text-green-800"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Export Success Notification */}
+        {showExportNotification && (
+          <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-green-700">
+                  ✅ Orders exported successfully! Your download should start shortly.
+                </p>
+              </div>
+              <div className="ml-auto pl-3">
+                <button
+                  onClick={() => {
+                    setShowExportNotification(false);
+                    dispatch(resetExportState());
+                  }}
+                  className="text-green-700 hover:text-green-800"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Export Error Notification */}
+        {exportError && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700">
+                  ❌ Export failed: {exportError}
+                </p>
+              </div>
+              <div className="ml-auto pl-3">
+                <button
+                  onClick={() => dispatch(resetExportState())}
+                  className="text-red-700 hover:text-red-800"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -571,7 +784,23 @@ const AdminOrders = () => {
           </div>
         )}
 
-        {/* Bulk Result Notification */}
+        {/* Order Status Error Display */}
+        {orderStatusError && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700">{orderStatusError}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Legacy Bulk Result Notification */}
         {lastBulkResult && (
           <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
             <div className="flex">
@@ -687,7 +916,7 @@ const AdminOrders = () => {
                         <select
                           value={order.orderStatus}
                           onChange={(e) => handleStatusUpdate(order._id, e.target.value)}
-                          disabled={updateLoading}
+                          disabled={orderStatusLoading || updateLoading}
                           className="block w-32 pl-3 pr-8 py-1 text-xs border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md disabled:opacity-50"
                         >
                           <option value="PROCESSING">Processing</option>
@@ -730,21 +959,40 @@ const AdminOrders = () => {
 
         {/* Pagination Info */}
         {filteredOrders.length > 0 && (
-          <div className="mt-4 flex items-center justify-between text-sm text-gray-700">
+          <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between gap-4 text-sm text-gray-700">
             <div>
               Showing {filteredOrders.length} orders
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-gray-600">
                 {selectedOrders.length} selected
               </span>
               {selectedOrders.length > 0 && (
-                <button
-                  onClick={() => setShowBulkUpdateModal(true)}
-                  className="px-3 py-1 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-                >
-                  Bulk Update ({selectedOrders.length})
-                </button>
+                <>
+                  <button
+                    onClick={handleExportOrders}
+                    disabled={exportLoading}
+                    className="px-3 py-1 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  >
+                    {exportLoading ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-1 h-3 w-3 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Exporting...
+                      </>
+                    ) : (
+                      'Export Excel'
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setShowBulkUpdateModal(true)}
+                    className="px-3 py-1 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                  >
+                    Bulk Update
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -783,10 +1031,10 @@ const AdminOrders = () => {
               </button>
               <button
                 onClick={handleBulkStatusUpdate}
-                disabled={bulkUpdateLoading}
+                disabled={orderStatusLoading || bulkUpdateLoading}
                 className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {bulkUpdateLoading ? (
+                {orderStatusLoading || bulkUpdateLoading ? (
                   <span className="flex items-center">
                     <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -911,10 +1159,10 @@ const AdminOrders = () => {
                         <div className="mt-4 flex justify-end">
                           <button
                             onClick={handleSaveIndividualEdit}
-                            disabled={!editOrderStatus || updateLoading}
+                            disabled={!editOrderStatus || orderStatusLoading || updateLoading}
                             className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
                           >
-                            {updateLoading ? 'Updating...' : 'Update Status'}
+                            {orderStatusLoading || updateLoading ? 'Updating...' : 'Update Status'}
                           </button>
                         </div>
                       </div>
@@ -991,6 +1239,18 @@ const AdminOrders = () => {
                                         <h5 className="text-sm font-medium text-gray-900">
                                           {getItemName(item)}
                                         </h5>
+
+                                        <p className="text-xs text-gray-500 mt-1 break-all">
+                                          Product ID: {getProductId(item)}
+                                        </p>
+
+                                      {item.kind === "DESIGN" && (
+                                      <p className="text-xs text-gray-500 mt-1">
+                                        <span className="font-medium text-gray-600">Color:</span>{" "}
+                                        {getDesignColor(item)}
+                                      </p>
+                                      )}
+
                                         <div className="flex items-center space-x-2 mt-1">
                                           <span className="text-xs px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded">
                                             {getItemType(item)}

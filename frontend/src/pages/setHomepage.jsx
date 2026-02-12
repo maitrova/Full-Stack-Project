@@ -43,7 +43,6 @@ import {
   // Common selectors
   selectOperationStatus,
 } from '../redux/slices/HomepageSlice.js';
-import AdminLayout from '../components/AdminLayout.jsx';
 
 const HomepageAdmin = () => {
   const dispatch = useDispatch();
@@ -437,7 +436,7 @@ const HomepageAdmin = () => {
   );
 
   return (
-    <AdminLayout>
+    <div className="min-h-screen bg-gray-50 p-6">
       {/* Success Toast Notification */}
       {showSuccess && (
         <div className="fixed top-4 right-4 z-50 animate-slide-in">
@@ -568,7 +567,7 @@ const HomepageAdmin = () => {
 
       {/* Main Content */}
       {activeTab === 'selection' ? renderSelectionTab() : renderPreviewTab()}
-    </AdminLayout>
+    </div>
   );
 };
 

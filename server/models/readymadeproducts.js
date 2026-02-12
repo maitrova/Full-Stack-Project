@@ -28,7 +28,13 @@ const readymadeProductSchema = new mongoose.Schema(
     category: { type: mongoose.Schema.Types.ObjectId, ref: "Category", required: true, index: true },
     subCategory: { type: mongoose.Schema.Types.ObjectId, ref: "SubCategory", index: true },
 
-    brand: { type: String, default: "" },
+    brand: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Brand",
+      required: true,
+      index: true,
+    },
+
 
     stock: { type: Number, default: 0, min: 0 },
 

@@ -91,67 +91,101 @@ export const adminGetAllOrders = async (req, res) => {
       .populate("user", "name email")
       .populate("deliveryAddress")
       .populate("billingAddress")
-      // ✅ populate DESIGN with views/textLayers/designLayers(imageUrl)
+
+      // ✅ DESIGN populate (unchanged)
       .populate({ path: "items.design", select: DESIGN_SELECT })
-      .populate("items.readymadeProduct")
+
+      // ✅ READYMADE populate with nested category/subCategory/brand
+      .populate({
+        path: "items.readymadeProduct",
+        populate: [
+          { path: "category", select: "name" },
+          { path: "subCategory", select: "name" },
+          { path: "brand", select: "name" },
+        ],
+      })
+
       .populate("items.dropproduct")
       .populate("items.product")
       .sort({ createdAt: -1 })
       .lean();
 
-    // ✅ optional: shape each item to include only needed design data
+    // ==============================
+    // Shape Response
+    // ==============================
     const shaped = orders.map((o) => ({
       ...o,
       items: (o.items || []).map((it) => {
-        if (it.kind !== "DESIGN" || !it.design) return it;
+        // ==========================
+        // HANDLE DESIGN (UNCHANGED)
+        // ==========================
+        if (it.kind === "DESIGN" && it.design) {
+          const d = it.design;
 
-        const d = it.design;
-
-        return {
-          ...it,
-          design: {
-            _id: d._id,
-            previewImage: d.previewImage,
-            product: d.product,
-            productSlug: d.productSlug,
-            productName: d.productName,
-            productColor: d.productColor,
-            productColorName: d.productColorName,
-            calculatedPrice: d.calculatedPrice,
-            priceBreakdown: d.priceBreakdown,
-            title: d.title,
-            description: d.description,
-            salePrice: d.salePrice,
-
-            // ✅ this contains textLayers + designLayers + designLayers.imageUrl
-            views: (d.views || []).map((v) => ({
-              code: v.code,
-              previewImage: v.previewImage,
-              textLayers: v.textLayers || [],
-              designLayers: (v.designLayers || []).map((dl) => ({
-                id: dl.id,
-                imageUrl: dl.imageUrl, // ✅ image URL you asked for
-                hasBgRemoved: dl.hasBgRemoved,
-                x: dl.x,
-                y: dl.y,
-                scale: dl.scale,
-                rotation: dl.rotation,
-                zone: dl.zone,
-                insideSafeArea: dl.insideSafeArea,
-                originalWidthPx: dl.originalWidthPx,
-                originalHeightPx: dl.originalHeightPx,
-                renderedWidthPx: dl.renderedWidthPx,
-                renderedHeightPx: dl.renderedHeightPx,
-                widthInches: dl.widthInches,
-                heightInches: dl.heightInches,
-                areaInches: dl.areaInches,
-                rawPrintWidthInches: dl.rawPrintWidthInches,
-                rawPrintHeightInches: dl.rawPrintHeightInches,
-                rawPrintAreaInches: dl.rawPrintAreaInches,
+          return {
+            ...it,
+            design: {
+              _id: d._id,
+              previewImage: d.previewImage,
+              product: d.product,
+              productSlug: d.productSlug,
+              productName: d.productName,
+              productColor: d.productColor,
+              productColorName: d.productColorName,
+              calculatedPrice: d.calculatedPrice,
+              priceBreakdown: d.priceBreakdown,
+              title: d.title,
+              description: d.description,
+              salePrice: d.salePrice,
+              views: (d.views || []).map((v) => ({
+                code: v.code,
+                previewImage: v.previewImage,
+                textLayers: v.textLayers || [],
+                designLayers: (v.designLayers || []).map((dl) => ({
+                  id: dl.id,
+                  imageUrl: dl.imageUrl,
+                  hasBgRemoved: dl.hasBgRemoved,
+                  x: dl.x,
+                  y: dl.y,
+                  scale: dl.scale,
+                  rotation: dl.rotation,
+                  zone: dl.zone,
+                  insideSafeArea: dl.insideSafeArea,
+                  originalWidthPx: dl.originalWidthPx,
+                  originalHeightPx: dl.originalHeightPx,
+                  renderedWidthPx: dl.renderedWidthPx,
+                  renderedHeightPx: dl.renderedHeightPx,
+                  widthInches: dl.widthInches,
+                  heightInches: dl.heightInches,
+                  areaInches: dl.areaInches,
+                  rawPrintWidthInches: dl.rawPrintWidthInches,
+                  rawPrintHeightInches: dl.rawPrintHeightInches,
+                  rawPrintAreaInches: dl.rawPrintAreaInches,
+                })),
               })),
-            })),
-          },
-        };
+            },
+          };
+        }
+
+        // ==========================
+        // HANDLE READYMADE PRODUCT
+        // Convert populated objects → string names
+        // ==========================
+        if (it.readymadeProduct) {
+          const rp = it.readymadeProduct;
+
+          return {
+            ...it,
+            readymadeProduct: {
+              ...rp,
+              category: rp.category?.name || "",
+              subCategory: rp.subCategory?.name || "",
+              brand: rp.brand?.name || "",
+            },
+          };
+        }
+
+        return it;
       }),
     }));
 
@@ -162,6 +196,7 @@ export const adminGetAllOrders = async (req, res) => {
   }
 };
 
+
 /**
  * ADMIN: Get single order by id
  * GET /api/admin/orders/:orderId
@@ -169,6 +204,7 @@ export const adminGetAllOrders = async (req, res) => {
 export const adminGetOrderById = async (req, res) => {
   try {
     const { orderId } = req.params;
+
     if (!isValidObjectId(orderId)) {
       return res.status(400).json({ message: "Invalid orderId" });
     }
@@ -177,65 +213,105 @@ export const adminGetOrderById = async (req, res) => {
       .populate("user", "name email")
       .populate("deliveryAddress")
       .populate("billingAddress")
-      .populate("items.readymadeProduct")
+
+      // ✅ READYMADE populate with nested fields
+      .populate({
+        path: "items.readymadeProduct",
+        populate: [
+          { path: "category", select: "name" },
+          { path: "subCategory", select: "name" },
+          { path: "brand", select: "name" },
+        ],
+      })
+
       .populate("items.dropproduct")
-      .populate({ path: "items.design", select: DESIGN_SELECT }) // ✅ key line
+
+      // ✅ DESIGN populate (unchanged)
+      .populate({ path: "items.design", select: DESIGN_SELECT })
+
       .populate("items.product")
       .lean();
 
-    if (!order) return res.status(404).json({ message: "Order not found" });
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
 
-    // ✅ same shaping for single order
+    // ==============================
+    // Shape Single Order
+    // ==============================
     const shaped = {
       ...order,
       items: (order.items || []).map((it) => {
-        if (it.kind !== "DESIGN" || !it.design) return it;
+        // ==========================
+        // HANDLE DESIGN (UNCHANGED)
+        // ==========================
+        if (it.kind === "DESIGN" && it.design) {
+          const d = it.design;
 
-        const d = it.design;
-
-        return {
-          ...it,
-          design: {
-            _id: d._id,
-            previewImage: d.previewImage,
-            product: d.product,
-            productSlug: d.productSlug,
-            productName: d.productName,
-            productColor: d.productColor,
-            productColorName: d.productColorName,
-            calculatedPrice: d.calculatedPrice,
-            priceBreakdown: d.priceBreakdown,
-            title: d.title,
-            description: d.description,
-            salePrice: d.salePrice,
-            views: (d.views || []).map((v) => ({
-              code: v.code,
-              previewImage: v.previewImage,
-              textLayers: v.textLayers || [],
-              designLayers: (v.designLayers || []).map((dl) => ({
-                id: dl.id,
-                imageUrl: dl.imageUrl, // ✅ image URL
-                hasBgRemoved: dl.hasBgRemoved,
-                x: dl.x,
-                y: dl.y,
-                scale: dl.scale,
-                rotation: dl.rotation,
-                zone: dl.zone,
-                insideSafeArea: dl.insideSafeArea,
-                originalWidthPx: dl.originalWidthPx,
-                originalHeightPx: dl.originalHeightPx,
-                renderedWidthPx: dl.renderedWidthPx,
-                renderedHeightPx: dl.renderedHeightPx,
-                widthInches: dl.widthInches,
-                heightInches: dl.heightInches,
-                areaInches: dl.areaInches,
-                rawPrintWidthInches: dl.rawPrintWidthInches,
-                rawPrintHeightInches: dl.rawPrintHeightInches,
-                rawPrintAreaInches: dl.rawPrintAreaInches,
+          return {
+            ...it,
+            design: {
+              _id: d._id,
+              previewImage: d.previewImage,
+              product: d.product,
+              productSlug: d.productSlug,
+              productName: d.productName,
+              productColor: d.productColor,
+              productColorName: d.productColorName,
+              calculatedPrice: d.calculatedPrice,
+              priceBreakdown: d.priceBreakdown,
+              title: d.title,
+              description: d.description,
+              salePrice: d.salePrice,
+              views: (d.views || []).map((v) => ({
+                code: v.code,
+                previewImage: v.previewImage,
+                textLayers: v.textLayers || [],
+                designLayers: (v.designLayers || []).map((dl) => ({
+                  id: dl.id,
+                  imageUrl: dl.imageUrl,
+                  hasBgRemoved: dl.hasBgRemoved,
+                  x: dl.x,
+                  y: dl.y,
+                  scale: dl.scale,
+                  rotation: dl.rotation,
+                  zone: dl.zone,
+                  insideSafeArea: dl.insideSafeArea,
+                  originalWidthPx: dl.originalWidthPx,
+                  originalHeightPx: dl.originalHeightPx,
+                  renderedWidthPx: dl.renderedWidthPx,
+                  renderedHeightPx: dl.renderedHeightPx,
+                  widthInches: dl.widthInches,
+                  heightInches: dl.heightInches,
+                  areaInches: dl.areaInches,
+                  rawPrintWidthInches: dl.rawPrintWidthInches,
+                  rawPrintHeightInches: dl.rawPrintHeightInches,
+                  rawPrintAreaInches: dl.rawPrintAreaInches,
+                })),
               })),
-            })),
-          },
-        };
+            },
+          };
+        }
+
+        // ==========================
+        // HANDLE READYMADE PRODUCT
+        // Convert populated objects → string names
+        // ==========================
+        if (it.readymadeProduct) {
+          const rp = it.readymadeProduct;
+
+          return {
+            ...it,
+            readymadeProduct: {
+              ...rp,
+              category: rp.category?.name || "",
+              subCategory: rp.subCategory?.name || "",
+              brand: rp.brand?.name || "",
+            },
+          };
+        }
+
+        return it;
       }),
     };
 
@@ -245,6 +321,7 @@ export const adminGetOrderById = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+
 
 
 /**

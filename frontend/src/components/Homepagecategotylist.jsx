@@ -22,11 +22,23 @@ const CategoryTilesHorizontal = ({ limit = 12, onlyActive = true }) => {
   }, [dispatch, limit, onlyActive]);
 
   const formatImageUrl = (imagePath) => {
-    if (!imagePath) return null;
-    if (imagePath.startsWith("http")) return imagePath;
-    if (imagePath.startsWith("/uploads/")) return `${IMAGE_URL}${imagePath}`;
-    return `${IMAGE_URL}/${imagePath}`;
-  };
+  if (!imagePath) return null;
+
+  // already absolute
+  if (imagePath.startsWith("http")) return imagePath;
+
+  // backend-served static paths
+  if (
+    imagePath.startsWith("/uploads/") ||
+    imagePath.startsWith("/outputs/")
+  ) {
+    return `${IMAGE_URL}${imagePath}`;
+  }
+
+  // fallback
+  return `${IMAGE_URL}/${imagePath}`;
+};
+
 
   const titleCase = (str = "") =>
     str ? str.charAt(0).toUpperCase() + str.slice(1) : "";

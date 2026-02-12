@@ -3,6 +3,7 @@ import { razorpay } from "../utils/razorpay.js";
 import Order from "../models/Order.js";
 import { Cart } from "../models/Cart.js";
 import Address from "../models/address.js";
+import { sendOrderStatusEmail } from "../services/orderEmailService.js";
 
 const toPaise = (rupees) => Math.round(Number(rupees) * 100);
 
@@ -89,7 +90,12 @@ export const verifyRazorpayPayment = async (req, res) => {
     const userId = req.user?.id || req.user?._id;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    const { orderId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    const {
+      orderId,
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+    } = req.body;
 
     if (!orderId || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return res.status(400).json({ message: "Missing payment fields" });
@@ -102,7 +108,7 @@ export const verifyRazorpayPayment = async (req, res) => {
       return res.status(400).json({ message: "Razorpay order mismatch" });
     }
 
-    // ✅ Verify signature
+    // 🔐 Verify signature
     const body = `${razorpay_order_id}|${razorpay_payment_id}`;
     const expected = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
@@ -122,19 +128,25 @@ export const verifyRazorpayPayment = async (req, res) => {
     // ✅ Mark order as PAID
     orderDoc.status = "PAID";
     orderDoc.payment.status = "PAID";
-    orderDoc.orderStatus = "PROCESSING"; 
+    orderDoc.orderStatus = "PROCESSING";
     orderDoc.payment.razorpayPaymentId = razorpay_payment_id;
     orderDoc.payment.razorpaySignature = razorpay_signature;
+
     await orderDoc.save();
 
-    // ✅ Close current ACTIVE cart (make it ORDERED)
+    // 🔥🔥🔥 SEND CONFIRMATION EMAIL
+    const populatedOrder = await Order.findById(orderDoc._id).populate("user");
+
+    await sendOrderStatusEmail(populatedOrder, populatedOrder.user);
+
+    // ✅ Close ACTIVE cart
     await Cart.findOneAndUpdate(
       { _id: orderDoc.cart, user: userId, status: "ACTIVE" },
       { $set: { status: "ORDERED" } },
       { new: true }
     );
 
-    // ✅ Ensure a new empty ACTIVE cart exists for the user
+    // ✅ Ensure new ACTIVE cart
     const newActiveCart = await Cart.findOneAndUpdate(
       { user: userId, status: "ACTIVE" },
       { $setOnInsert: { user: userId, status: "ACTIVE", items: [] } },
@@ -144,13 +156,15 @@ export const verifyRazorpayPayment = async (req, res) => {
     return res.status(200).json({
       message: "Payment verified",
       order: orderDoc,
-      cart: newActiveCart, // ✅ returns empty active cart
+      cart: newActiveCart,
     });
+
   } catch (err) {
     console.error("verifyRazorpayPayment error:", err);
     return res.status(500).json({ message: "Server error" });
   }
 };
+
 
 
 
