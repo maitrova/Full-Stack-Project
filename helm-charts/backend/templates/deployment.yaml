@@ -17,7 +17,6 @@ spec:
       labels:
         {{- include "backend.selectorLabels" . | nindent 8 }}
         env: {{ .Values.env }}
-        image: {{ .Values.image.repository | quote }}
         tag: {{ .Values.image.tag | quote }}
     spec:
       imagePullSecrets:
