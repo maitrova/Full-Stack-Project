@@ -107,6 +107,7 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
+            set -e
             helm upgrade --install backend /tmp/backend \
               --namespace production \
               --create-namespace \
@@ -154,7 +155,8 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
-            helm upgrade --install fontend /tmp/frontend \
+            set -e
+            helm upgrade --install frontend /tmp/frontend \
               --namespace production \
               --create-namespace \
               --history-max 3 \
