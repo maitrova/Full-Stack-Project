@@ -13,6 +13,8 @@ env:
 jobs:
   build_and_push:
     runs-on: ubuntu-latest
+    outputs:
+      version_tag: ${{ steps.version.outputs.tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -66,3 +68,60 @@ jobs:
           echo "Backend: ${{ env.BACKEND_IMAGE }}:${{ steps.version.outputs.tag }}"
           echo "Frontend: ${{ env.FRONTEND_IMAGE }}:latest"
           echo "Frontend: ${{ env.FRONTEND_IMAGE }}:${{ steps.version.outputs.tag }}"
+
+  deploy_to_vps:
+    needs: build_and_push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Copy Helm charts to VPS
+        run: |
+          scp -r helm-charts/backend ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/
+          scp -r helm-charts/frontend ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/
+
+      - name: Deploy Backend to VPS
+        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            # Delete existing backend release
+            helm uninstall backend --namespace production --ignore-not-found
+            
+            # Install new backend release
+            helm install backend /tmp/backend \
+              --namespace production \
+              --create-namespace \
+              --set image.tag=${{ needs.build_and_push.outputs.version_tag }} \
+              --wait
+            
+            echo "✅ Backend deployed successfully with tag ${{ needs.build_and_push.outputs.version_tag }}"
+          EOF
+
+      - name: Deploy Frontend to VPS
+        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            # Delete existing frontend release
+            helm uninstall frontend --namespace production --ignore-not-found
+            
+            # Install new frontend release
+            helm install frontend /tmp/frontend \
+              --namespace production \
+              --create-namespace \
+              --set image.tag=${{ needs.build_and_push.outputs.version_tag }} \
+              --wait
+            
+            echo "✅ Frontend deployed successfully with tag ${{ needs.build_and_push.outputs.version_tag }}"
+          EOF
+
+      - name: Cleanup temporary files
+        run: |
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            rm -rf /tmp/backend /tmp/frontend
+          EOF
