@@ -154,7 +154,7 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
-            helm upgrade --install frontend /tmp/frontend \
+            helm upgrade --install fontend /tmp/frontend \
               --namespace production \
               --create-namespace \
               --history-max 3 \
