@@ -435,7 +435,7 @@ export default function DesignerPage() {
       const formData = new FormData();
       formData.append("designImage", file);
 
-      const res = await fetch(`${API_URL}/api/upload-design`, {
+      const res = await fetch(`${API_URL}/upload-design`, {
         method: "POST",
         body: formData,
       });
@@ -813,7 +813,7 @@ export default function DesignerPage() {
       formData.append("image", fileToUse);
       
       console.log("Sending to remove-bg API...");
-      const res = await fetch(`${API_URL}/api/remove-bg`, {
+      const res = await fetch(`${API_URL}/remove-bg`, {
         method: "POST",
         body: formData,
       });

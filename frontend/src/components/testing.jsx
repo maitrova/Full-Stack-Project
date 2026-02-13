@@ -105,7 +105,7 @@ export default function DesignerPage() {
       const formData = new FormData();
       formData.append("designImage", file);
 
-      const res = await fetch(`${API_URL}/api/upload-design`, {
+      const res = await fetch(`${API_URL}/upload-design`, {
         method: "POST",
         body: formData,
       });
@@ -396,13 +396,18 @@ export default function DesignerPage() {
       const formData = new FormData();
       formData.append("image", fileToUse);
 
-      const res = await fetch(`${API_URL}/api/remove-bg`, {
+      const res = await fetch(`${API_URL}/remove-bg`, {
         method: "POST",
         body: formData,
       });
 
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.log("Error response body:", errorText);
+        throw new Error(errorText || "Background removal failed");
+      }
+
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Background removal failed");
 
       // Use the server URL from background removal
       const updatedLayers = designLayers.map((d) =>

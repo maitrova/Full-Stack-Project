@@ -2,7 +2,7 @@ name: Build and Push Docker Images
 
 on:
   push:
-    branches: [ deploy-ment ]
+    branches: [ remove-bg ]
   workflow_dispatch:
 
 env:
