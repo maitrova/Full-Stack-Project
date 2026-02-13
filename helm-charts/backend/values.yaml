@@ -29,8 +29,8 @@ envSecrets:
   JWT_SECRET: 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
   GOOGLE_CLIENT_ID: 777795975212-0kfni6fgt4036k9rplvf1l7n70hukngo.apps.googleusercontent.com
   MONGOOSE_PASSWORD: "Saigollapalli@122"
- # MONGOOSE_URL: "mongodb://maitrova:Saigollapalli%40122@mongodb:27017/appdb?authSource=admin"
-  MONGOOSE_URL: "mongodb+srv://hemanthnagala876_db_user:VRYnuUeDAbgNzdpp@cluster0.ru99jrx.mongodb.net/"
+  MONGOOSE_URL: "mongodb://maitrova:Saigollapalli%40122@mongodb:27017/appdb?authSource=admin"
+  # MONGOOSE_URL: "mongodb+srv://hemanthnagala876_db_user:VRYnuUeDAbgNzdpp@cluster0.ru99jrx.mongodb.net/"
   API_URL: "https://maitrova.in/api"
   BREVO_API_KEY: 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
   RAZORPAY_KEY_ID: rzp_live_SBONFp6WLKiUm2
