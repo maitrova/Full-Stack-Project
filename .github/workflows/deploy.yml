@@ -76,52 +76,55 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+      - name: Cleanup old Helm charts on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            rm -rf /tmp/backend /tmp/frontend
+            echo "✅ Cleaned up old helm charts"
 
       - name: Copy Helm charts to VPS
-        run: |
-          scp -r helm-charts/backend ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/
-          scp -r helm-charts/frontend ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          source: "helm-charts/backend,helm-charts/frontend"
+          target: "/tmp/"
+          strip_components: 1
 
-      - name: Deploy Backend to VPS
-        run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            # Delete existing backend release
-            helm uninstall backend --namespace production --ignore-not-found
-            
-            # Install new backend release
-            helm install backend /tmp/backend \
+      - name: Deploy Backend and Frontend to VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            # Deploy backend with helm upgrade --install
+            helm upgrade --install backend /tmp/backend \
               --namespace production \
               --create-namespace \
+              --history-max 3 \
               --set image.tag=${{ needs.build_and_push.outputs.version_tag }} \
-              --wait
+              --wait \
+              --atomic
             
             echo "✅ Backend deployed successfully with tag ${{ needs.build_and_push.outputs.version_tag }}"
-          EOF
-
-      - name: Deploy Frontend to VPS
-        run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            # Delete existing frontend release
-            helm uninstall frontend --namespace production --ignore-not-found
             
-            # Install new frontend release
-            helm install frontend /tmp/frontend \
+            # Deploy frontend with helm upgrade --install
+            helm upgrade --install frontend /tmp/frontend \
               --namespace production \
               --create-namespace \
+              --history-max 3 \
               --set image.tag=${{ needs.build_and_push.outputs.version_tag }} \
-              --wait
+              --wait \
+              --atomic
             
             echo "✅ Frontend deployed successfully with tag ${{ needs.build_and_push.outputs.version_tag }}"
-          EOF
 
-      - name: Cleanup temporary files
-        run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            rm -rf /tmp/backend /tmp/frontend
-          EOF
