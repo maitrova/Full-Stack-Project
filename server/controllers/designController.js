@@ -660,24 +660,67 @@ export const publishDesign = async (req, res) => {
     }
 
     const { id } = req.params;
-    const { title = "", description = "", salePrice = 0 } = req.body;
+
+    const {
+      productName,
+      description,
+      category,
+      subCategory,
+      brand,
+      stock,
+      priceBreakdown,
+      calculatedPrice
+    } = req.body;
 
     const design = await Design.findById(id);
-    if (!design) return res.status(404).json({ error: "Design not found" });
 
+    if (!design)
+      return res.status(404).json({ error: "Design not found" });
+
+    // required fields validation
+    if (!productName || !description || !category || !brand) {
+      return res.status(400).json({
+        error: "productName, description, category and brand required"
+      });
+    }
+
+    // UPDATE BASIC INFO
+    design.productName = productName;
+    design.description = description;
+    design.category = category;
+    design.subCategory = subCategory || null;
+    design.brand = brand;
+    design.stock = stock || 0;
+
+    // SAVE PRICE BREAKDOWN AS IS (NO CALCULATION)
+    if (priceBreakdown) {
+      design.priceBreakdown = priceBreakdown;
+    }
+
+    // SAVE CALCULATED PRICE DIRECTLY
+    if (calculatedPrice !== undefined) {
+      design.calculatedPrice = calculatedPrice;
+    }
+
+    // PUBLISH
     design.isPublished = true;
     design.publishedAt = new Date();
-    design.title = title;
-    design.description = description;
-    design.salePrice = salePrice || design.salePrice;
 
     const updated = await design.save();
-    return res.json(updated);
+
+    return res.json({
+      success: true,
+      data: updated
+    });
+
   } catch (err) {
     console.error("Publish design error:", err);
-    return res.status(500).json({ error: "Failed to publish design" });
+    return res.status(500).json({
+      error: "Failed to publish design"
+    });
   }
 };
+
 
 
 export const listCatalogueDesigns = async (req, res) => {

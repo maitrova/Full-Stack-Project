@@ -16,6 +16,11 @@ const subCategorySchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    altText: {
+      type: String,
+      required: true,
+      trim: true,
+    },
     isActive: {
       type: Boolean,
       default: true,

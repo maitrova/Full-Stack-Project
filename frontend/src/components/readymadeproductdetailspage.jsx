@@ -479,7 +479,7 @@ if (quantity > maxStock) {
     price: resolvedPrice,              // ✅ variant price after selection
     originalPrice: itemData.originalPrice,
     currency: itemData.currency || 'INR',
-    images: itemData.images || [],
+    images: Array.isArray(itemData.images) ? itemData.images : [],
     stock: resolvedStock,              // ✅ variant stock after selection
     isActive: itemData.isActive,
     category: itemData.category,
@@ -589,7 +589,9 @@ if (quantity > maxStock) {
   }
 
   const mainImage = images[selectedImageIndex];
-  const imageUrl = getImageUrl(mainImage);
+  const imageUrl = getImageUrl(mainImage?.url);
+  const imageAlt = mainImage?.altText || displayData.title;
+
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -747,7 +749,7 @@ if (quantity > maxStock) {
                   {imageUrl ? (
                     <img
                       src={imageUrl}
-                      alt={displayData.title}
+                      alt={imageAlt}
                       className="w-full h-full object-contain"
                       onError={(e) => {
                         e.target.style.display = 'none';
@@ -819,8 +821,8 @@ if (quantity > maxStock) {
                           }`}
                         >
                           <img
-                            src={getImageUrl(image)}
-                            alt={`${displayData.title} - view ${index + 1}`}
+                            src={getImageUrl(image.url)}
+                            alt={image.altText || `${displayData.title} view ${index + 1}`}
                             className="w-full h-full object-cover"
                           />
                         </button>

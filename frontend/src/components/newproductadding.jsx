@@ -80,16 +80,18 @@ const ProductFormModal = ({
   
   // Form state
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    currency: 'INR',
-    category: '',
-    subCategory: '',
-    brand: '',
-    isActive: true,
-    bestSeller: false,
-    newArrival: false,
+  title: '',
+  description: '',
+  currency: 'INR',
+  category: '',
+  subCategory: '',
+  brand: '',
+  isActive: true,
+  bestSeller: false,
+  newArrival: false,
+  altText: '', // ✅ NEW
   });
+
   
   // Variants state
   const [variants, setVariants] = useState([
@@ -114,7 +116,11 @@ const ProductFormModal = ({
   const [editingBrand, setEditingBrand] = useState(null);
   
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryAltText, setNewCategoryAltText] = useState('');
+
   const [newSubCategoryName, setNewSubCategoryName] = useState('');
+  const [newSubCategoryAltText, setNewSubCategoryAltText] = useState('');
+
   const [newBrandName, setNewBrandName] = useState('');
   
   const [newCategoryThumbnail, setNewCategoryThumbnail] = useState(null);
@@ -239,7 +245,9 @@ const ProductFormModal = ({
         isActive: product.isActive ?? true,
         bestSeller: product.bestSeller || false,
         newArrival: product.newArrival || false,
+        altText: product.altText || '', // ✅ NEW
       });
+
       
       if (product.variants && product.variants.length > 0) {
         setVariants(product.variants.map(v => ({
@@ -298,6 +306,7 @@ const ProductFormModal = ({
       isActive: true,
       bestSeller: false,
       newArrival: false,
+      altText: '', // ✅ NEW
     });
     setVariants([{ size: '', price: '', stock: '', sku: '' }]);
     setImages([]);
@@ -323,20 +332,24 @@ const ProductFormModal = ({
   };
 
   const resetCategoryForm = () => {
-    setNewCategoryName('');
-    setNewCategoryThumbnail(null);
-    setNewCategoryThumbnailPreview(null);
-    setCategoryErrors({});
-    setEditingCategory(null);
-  };
+  setNewCategoryName('');
+  setNewCategoryAltText(''); // ✅ add
+  setNewCategoryThumbnail(null);
+  setNewCategoryThumbnailPreview(null);
+  setCategoryErrors({});
+  setEditingCategory(null);
+};
+
 
   const resetSubCategoryForm = () => {
-    setNewSubCategoryName('');
-    setNewSubCategoryThumbnail(null);
-    setNewSubCategoryThumbnailPreview(null);
-    setSubCategoryErrors({});
-    setEditingSubCategory(null);
-  };
+  setNewSubCategoryName('');
+  setNewSubCategoryAltText(''); // ✅ add
+  setNewSubCategoryThumbnail(null);
+  setNewSubCategoryThumbnailPreview(null);
+  setSubCategoryErrors({});
+  setEditingSubCategory(null);
+};
+
 
   const resetBrandForm = () => {
     setNewBrandName('');
@@ -531,56 +544,47 @@ const ProductFormModal = ({
   };
 
   const handleImageUpload = (e) => {
-    const files = Array.from(e.target.files);
-    
-    if (images.length + files.length > 4) {
-      setErrors(prev => ({
-        ...prev,
-        images: 'Maximum 4 images allowed'
-      }));
-      return;
-    }
-    
-    const validFiles = files.filter(file => {
-      const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-      const maxSize = 5 * 1024 * 1024;
-      
-      if (!validTypes.includes(file.type)) {
-        setErrors(prev => ({
-          ...prev,
-          images: 'Only JPG, PNG, and WebP images are allowed'
-        }));
-        return false;
-      }
-      
-      if (file.size > maxSize) {
-        setErrors(prev => ({
-          ...prev,
-          images: 'Image size should be less than 5MB'
-        }));
-        return false;
-      }
-      
-      return true;
-    });
-    
-    setImages(prev => [...prev, ...validFiles]);
-    
-    validFiles.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreviews(prev => [...prev, reader.result]);
-      };
-      reader.readAsDataURL(file);
-    });
-    
-    if (errors.images) {
-      setErrors(prev => ({ ...prev, images: null }));
-    }
-  };
+  const files = Array.from(e.target.files);
+
+  if (images.length + files.length > 4) {
+    setErrors(prev => ({
+      ...prev,
+      images: "Maximum 4 images allowed",
+    }));
+    return;
+  }
+
+  const validFiles = files.filter(file => {
+    const validTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
+    const maxSize = 5 * 1024 * 1024;
+
+    if (!validTypes.includes(file.type)) return false;
+    if (file.size > maxSize) return false;
+
+    return true;
+  });
+
+  const newImages = validFiles.map(file => ({
+    file,
+    altText: "",
+  }));
+
+  setImages(prev => [...prev, ...newImages]);
+
+  validFiles.forEach(file => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreviews(prev => [...prev, reader.result]);
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
 
   const removeImage = (index) => {
     setImages(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+
     setImagePreviews(prev => prev.filter((_, i) => i !== index));
   };
 
@@ -639,6 +643,8 @@ const ProductFormModal = ({
     
     setEditingCategory(category);
     setNewCategoryName(category.name || '');
+    setNewCategoryAltText(category.altText || '');
+
     setNewCategoryThumbnail(null);
     
     if (category.thumbnail) {
@@ -672,6 +678,8 @@ const ProductFormModal = ({
     try {
       const categoryFormData = new FormData();
       categoryFormData.append('name', newCategoryName.trim());
+      categoryFormData.append('altText', newCategoryAltText.trim());
+
       categoryFormData.append('thumbnail', newCategoryThumbnail);
       
       const newCategory = await dispatch(createCategory(categoryFormData)).unwrap();
@@ -731,7 +739,8 @@ const ProductFormModal = ({
     try {
       const categoryFormData = new FormData();
       categoryFormData.append('name', newCategoryName.trim());
-      
+      categoryFormData.append('altText', newCategoryAltText.trim());
+
       if (newCategoryThumbnail) {
         categoryFormData.append('thumbnail', newCategoryThumbnail);
       }
@@ -842,6 +851,8 @@ const ProductFormModal = ({
     
     setEditingSubCategory(subCategory);
     setNewSubCategoryName(subCategory.name || '');
+    setNewSubCategoryAltText(subCategory.altText || '');
+
     setNewSubCategoryThumbnail(null);
     
     if (subCategory.thumbnail) {
@@ -895,6 +906,8 @@ const ProductFormModal = ({
     try {
       const subCategoryFormData = new FormData();
       subCategoryFormData.append('name', newSubCategoryName.trim());
+      subCategoryFormData.append('altText', newSubCategoryAltText.trim());
+
       subCategoryFormData.append('category', categoryId);
       subCategoryFormData.append('thumbnail', newSubCategoryThumbnail);
       
@@ -968,7 +981,8 @@ const ProductFormModal = ({
     try {
       const subCategoryFormData = new FormData();
       subCategoryFormData.append('name', newSubCategoryName.trim());
-      
+      subCategoryFormData.append('altText', newSubCategoryAltText.trim());
+
       let categoryId = null;
       
       if (editingSubCategory.category) {
@@ -1453,9 +1467,15 @@ const ProductFormModal = ({
       data.append('stock', totalStock);
       data.append('variants', JSON.stringify(normalizedVariants));
       
-      images.forEach(image => {
-        data.append('images', image);
+      images.forEach((img) => {
+        data.append("images", img.file);
       });
+
+      data.append(
+        "imageAltTexts",
+        JSON.stringify(images.map(img => img.altText || ""))
+      );
+
       
       if (thumbnail) {
         data.append('thumbnail', thumbnail);
@@ -1984,6 +2004,26 @@ const ProductFormModal = ({
                         </p>
                       )}
                     </div>
+
+                    <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Alt Text *
+        </label>
+
+        <input
+          type="text"
+          value={newCategoryAltText}
+          onChange={(e) => setNewCategoryAltText(e.target.value)}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+          placeholder="Example: Hoodie category thumbnail"
+          disabled={categoryLoading}
+        />
+
+        <p className="text-xs text-gray-500 mt-1">
+          Describe the category thumbnail image for SEO & accessibility.
+        </p>
+                    </div>
+
                     
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2241,6 +2281,27 @@ const ProductFormModal = ({
                       )}
                     </div>
                     
+                    
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Alt Text *
+                      </label>
+
+                      <input
+                        type="text"
+                        value={newSubCategoryAltText}
+                        onChange={(e) => setNewSubCategoryAltText(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                        placeholder="Example: Oversized hoodie subcategory thumbnail"
+                        disabled={subCategoryLoading}
+                      />
+
+                      <p className="text-xs text-gray-500 mt-1">
+                        Describe the sub-category thumbnail image.
+                      </p>
+                    </div>
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Sub-category Thumbnail *
@@ -2608,6 +2669,33 @@ const ProductFormModal = ({
               </div>
             </div>
 
+
+{/* Alt Text Field */}
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Thumbnail Alt Text
+                <span className="text-xs text-gray-500 ml-2">
+                  (Used for SEO & accessibility)
+                </span>
+              </label>
+
+              <input
+                type="text"
+                name="altText"
+                value={formData.altText}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Example: Black oversized hoodie front view"
+                disabled={loading}
+              />
+
+              <p className="mt-1 text-xs text-gray-500">
+                Describe what is shown in the thumbnail image.
+              </p>
+            </div>
+
+
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Description *
@@ -2867,22 +2955,39 @@ const ProductFormModal = ({
                     </h4>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       {imagePreviews.map((preview, index) => (
-                        <div key={index} className="relative group">
-                          <img
-                            src={preview}
-                            alt={`Preview ${index + 1}`}
-                            className="w-full h-32 object-cover rounded-lg"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeImage(index)}
-                            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                            disabled={loading}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+  <div key={index} className="relative group border rounded-lg p-2">
+    
+    <img
+      src={preview}
+      alt={`Preview ${index + 1}`}
+      className="w-full h-32 object-cover rounded-lg"
+    />
+
+    {/* REMOVE BUTTON */}
+    <button
+      type="button"
+      onClick={() => removeImage(index)}
+      className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100"
+    >
+      <Trash2 className="w-4 h-4" />
+    </button>
+
+    {/* ALT TEXT INPUT */}
+    <input
+      type="text"
+      placeholder="Enter alt text"
+      value={images[index]?.altText || ""}
+      onChange={(e) => {
+        const updated = [...images];
+        updated[index].altText = e.target.value;
+        setImages(updated);
+      }}
+      className="mt-2 w-full px-2 py-1 border rounded text-sm"
+    />
+
+  </div>
                       ))}
+
                     </div>
                   </div>
                 )}

@@ -12,6 +12,11 @@ const BestSellers = () => {
   const dispatch = useDispatch();
   
   const items = useSelector(selectBestSellersSelectedItemsFull);
+  useEffect(() => {
+  console.log("====================================");
+  console.log("Best Sellers Items:", items);
+  console.log("====================================");
+}, [items]);
   const loading = useSelector(selectBestSellersSelectedLoading);
   const error = useSelector(selectBestSellersSelectedError);
 
@@ -24,26 +29,53 @@ const BestSellers = () => {
   }, [dispatch]);
 
   // Image normalization
-  const getItemImages = (item) => {
-    let imgs = Array.isArray(item.previewImages) ? item.previewImages.filter(Boolean) : [];
+  // Image normalization with altText support
+const getItemImages = (item) => {
+  let imgs = Array.isArray(item.previewImages)
+    ? item.previewImages.filter(Boolean)
+    : [];
 
-    if (!imgs.length) {
-      if (item.previewImage) imgs = [item.previewImage];
-      else if (item.imageUrl) imgs = [item.imageUrl];
-    }
+  // fallback
+  if (!imgs.length) {
+    if (item.previewImage) imgs = [item.previewImage];
+    else if (item.imageUrl)
+      imgs = [{ url: item.imageUrl, altText: item.title }];
+  }
 
-    if (item.type === "readymade") {
-      imgs = imgs.map((src) => {
-        if (!src) return "";
-        if (src.startsWith("http://") || src.startsWith("https://")) return src;
-        const cleanSrc = src.startsWith("/") ? src : `/${src}`;
-        return `${import.meta.env.VITE_IMAGE_URL}${cleanSrc}`;
+  // normalize readymade URLs + altText
+  if (item.type === "readymade") {
+    imgs = imgs.map((imgObj) => {
+      if (!imgObj) return null;
 
-      });
-    }
+      let url = "";
+      let altText = "";
 
-    return imgs.filter(img => img && img.trim() !== "");
-  };
+      if (typeof imgObj === "object") {
+        url = imgObj.url || "";
+        altText = imgObj.altText || item.title || "Product image";
+      } else {
+        url = String(imgObj);
+        altText = item.title || "Product image";
+      }
+
+      if (!url) return null;
+
+      // add base URL if not absolute
+      if (!url.startsWith("http")) {
+        const cleanSrc = url.startsWith("/") ? url : `/${url}`;
+        url = `${import.meta.env.VITE_IMAGE_URL}${cleanSrc}`;
+      }
+
+      return {
+        url,
+        altText,
+      };
+    });
+  }
+
+  return imgs.filter(Boolean);
+};
+
 
   // Image Slider Component - Simplified
   const ImageSlider = ({ images = [], alt = "", autoScrollInterval = 4000 }) => {
@@ -113,7 +145,8 @@ const BestSellers = () => {
       >
         {/* Main Image */}
         <div className="relative w-full h-full">
-          {images.map((img, index) => (
+        {images.map((imgObj, index) => (
+              
             <div
               key={index}
               className={`absolute inset-0 transition-opacity duration-300 ${
@@ -121,15 +154,23 @@ const BestSellers = () => {
               }`}
             >
               <img
-                src={img}
-                alt={`${alt} - ${index + 1}`}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23f3f4f6'/%3E%3Cpath d='M35 40l15 15 15-15' stroke='%239ca3af' stroke-width='2' fill='none'/%3E%3C/svg%3E";
-                }}
-                loading="lazy"
-              />
+  src={imgObj.url}
+  alt={imgObj.altText}
+  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+  loading="lazy"
+  onLoad={() =>
+    console.log("Image loaded:", {
+      src: imgObj.url,
+      alt: imgObj.altText,
+    })
+  }
+  onError={(e) => {
+    e.target.onerror = null;
+    e.target.src =
+      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%23f3f4f6'/%3E%3Ctext x='50' y='50' font-size='12' text-anchor='middle' fill='%239ca3af'%3ENo Image%3C/text%3E%3C/svg%3E";
+  }}
+/>
+
             </div>
           ))}
         </div>

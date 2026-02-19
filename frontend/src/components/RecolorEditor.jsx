@@ -375,6 +375,9 @@ function CalibrationOverlay({
   onClose,
 }) {
   const overlayRef = useRef(null);
+  const panelRef = useRef(null);
+  const dragPanelRef = useRef(null);
+  const [panelPos, setPanelPos] = useState({ x: 12, y: 12 });
 
   const [zones, setZones] = useState(() => zonesList || []);
   const [zoneMeta, setZoneMeta] = useState(() => calibratedConfig?.zoneMeta || {});
@@ -561,13 +564,69 @@ function CalibrationOverlay({
     }));
   };
 
+
+  const onPanelMove = (e) => {
+  const st = dragPanelRef.current;
+  if (!st) return;
+
+  const dx = e.clientX - st.startX;
+  const dy = e.clientY - st.startY;
+
+  let newX = st.startLeft + dx;
+  let newY = st.startTop + dy;
+
+  const panel = panelRef.current;
+  if (panel) {
+    const rect = panel.getBoundingClientRect();
+    const maxX = window.innerWidth - rect.width;
+    const maxY = window.innerHeight - rect.height;
+
+    newX = Math.max(0, Math.min(maxX, newX));
+    newY = Math.max(0, Math.min(maxY, newY));
+  }
+
+  setPanelPos({ x: newX, y: newY });
+};
+
+const onPanelUp = () => {
+  dragPanelRef.current = null;
+  window.removeEventListener("pointermove", onPanelMove);
+  window.removeEventListener("pointerup", onPanelUp);
+};
+
+const startPanelDrag = (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+
+  dragPanelRef.current = {
+    startX: e.clientX,
+    startY: e.clientY,
+    startLeft: panelPos.x,
+    startTop: panelPos.y,
+  };
+
+  window.addEventListener("pointermove", onPanelMove);
+  window.addEventListener("pointerup", onPanelUp);
+};
+
   return (
     <div className="absolute inset-0 z-[999]">
       <div className="absolute inset-0 bg-black/30 pointer-events-none" />
 
       {/* Panel */}
-      <div className="absolute top-3 left-3 z-[2000] bg-white rounded-lg shadow-lg border border-slate-200 w-[360px] pointer-events-auto">
-        <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
+<div
+  ref={panelRef}
+  className="absolute z-[2000] bg-white rounded-lg shadow-lg border border-slate-200 w-[360px] pointer-events-auto"
+  style={{
+    left: panelPos.x,
+    top: panelPos.y,
+  }}
+>
+        <div
+  onPointerDown={startPanelDrag}
+  className="px-3 py-2 border-b border-slate-200 flex items-center justify-between cursor-move bg-slate-50"
+>
+
           <div className="text-sm font-semibold text-slate-900">
             Calibration Mode • {view.toUpperCase()}
           </div>
@@ -1667,5 +1726,3 @@ function DesignOverlay({ layer, canvasSize, setDesignLayers, isActive, setActive
 }
 
 export default RecolorEditor;
-
-

@@ -84,6 +84,7 @@ const CategoryTilesHorizontal = ({ limit = 12, onlyActive = true }) => {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
           {categories.map((category) => {
             const imageUrl = formatImageUrl(category.thumbnail);
+            console.log("Formatted image URL for category", categories);
             const label = titleCase(category.category);
 
             return (
@@ -95,14 +96,17 @@ const CategoryTilesHorizontal = ({ limit = 12, onlyActive = true }) => {
                 <div className="bg-white border border-gray-100 rounded-xl overflow-hidden hover:border-gray-300 transition-all duration-200 hover:shadow-md">
                   {/* Image + overlay name */}
                   <div className="relative aspect-square w-full overflow-hidden">
-                    {imageUrl ? (
-                      <img
-                        src={imageUrl}
-                        alt={label}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                        loading="lazy"
-                      />
-                    ) : (
+                                    {imageUrl ? (
+                  <>
+                    {console.log("Alt text:", category.image.altText)}
+                    <img
+                      src={imageUrl}
+                      alt={category.image.altText || "hebu"}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      loading="lazy"
+                    />
+                  </>
+                ) : (
                       <div className="w-full h-full flex items-center justify-center bg-gray-100">
                         <span className="text-gray-400 text-2xl font-semibold">
                           {label?.charAt(0) || "C"}

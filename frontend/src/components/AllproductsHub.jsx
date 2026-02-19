@@ -428,17 +428,27 @@ export default function AllProductsHub() {
   
   // Helper functions
   const getImageUrl = useCallback((imagePath) => {
-    if (!imagePath) return "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&h=600&fit=crop&q=80";
-    
-    if (imagePath.startsWith('http') || imagePath.startsWith('data:')) {
-      return imagePath;
-    }
-    
-    const baseUrl = IMAGE_URL.replace('/backend', '');
-    console.log("Base URL:", baseUrl);
-    console.log("IMAGE_URL:", IMAGE_URL); 
-    return `${baseUrl}${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
-  }, []);
+  if (!imagePath)
+    return "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800";
+
+  // ✅ HANDLE OBJECT CASE
+  if (typeof imagePath === "object") {
+    imagePath = imagePath.url;
+  }
+
+  // safety check
+  if (!imagePath || typeof imagePath !== "string")
+    return "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800";
+
+  if (imagePath.startsWith("http") || imagePath.startsWith("data:")) {
+    return imagePath;
+  }
+
+  const baseUrl = IMAGE_URL.replace("/backend", "");
+
+  return `${baseUrl}${imagePath.startsWith("/") ? "" : "/"}${imagePath}`;
+}, []);
+
   
   const getCartQuantityForCommon = (item) => {
     if (item.type === 'design') {
@@ -530,7 +540,10 @@ const getCommonSubcategories = useMemo(() => {
         map.set(item.subCategory, {
           name: item.subCategory,
           count: 0,
-          thumb: item.subCategoryThumbnail || null, // ✅ FIXED
+          // thumb: item.subCategoryThumbnail || null, // ✅ FIXED
+          thumb: item.subCategoryThumbnail || null,
+          altText: item.subCategoryAltText || item.subCategory || "",
+
         });
       }
 
@@ -1058,12 +1071,11 @@ const getCommonSubcategories = useMemo(() => {
             <div className="relative aspect-square bg-white flex items-center justify-center overflow-hidden">
               <img
                 src={getImageUrl(sub.thumb)}
-                alt={sub.name}
+                alt={sub.altText || sub.name}
                 className="max-h-[85%] max-w-[85%] object-contain transition-transform duration-300 group-hover:scale-105"
               />
               <div className="absolute inset-0 ring-1 ring-gray-200" />
             </div>
-
             <div className="p-3">
               <h3 className="text-sm font-medium text-gray-900 line-clamp-1">
                 {sub.name}
@@ -1123,12 +1135,32 @@ const getCommonSubcategories = useMemo(() => {
             className="group bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden"
           >
             {/* ===== Premium Square Image Block ===== */}
+            <Link
+                  to={
+                    product.type === "readymade"
+                      ? `/readymade/${product._id}`
+                      : `/catalogue/${product._id}`
+                  }
+                  className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                >
+                
+                 
+               
             <div className="relative aspect-square bg-white flex items-center justify-center overflow-hidden rounded-t-xl">
               <img
-                src={getImageUrl(product.previewImage)}
-                alt={product.title}
-                className="max-h-[85%] max-w-[85%] object-contain transition-transform duration-300 group-hover:scale-105"
+                src={getImageUrl(
+                  product.previewImage ||
+                  product.raw?.images?.[0]
+                )}
+                alt={
+                  product.raw?.images?.[0]?.altText ||
+                  product.title ||
+                  "Product image"
+                }
+                className="max-h-[85%] max-w-[85%] object-contain"
               />
+
+
 
               {/* subtle border like ecommerce */}
               <div className="absolute inset-0 ring-1 ring-gray-200" />
@@ -1161,7 +1193,7 @@ const getCommonSubcategories = useMemo(() => {
                 </span>
               )}
             </div>
-
+ </Link>
             {/* Product Info */}
             <div className="p-3">
               <div className="mb-2">

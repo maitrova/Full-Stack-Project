@@ -150,7 +150,7 @@ export const addToCart = async (req, res) => {
         basePrice: unitPrice,
         priceDetails: null,
         currency: product.currency || "INR",
-        previewImage: product.images?.[0] || null,
+        previewImage: product.images?.[0]?.url || null,
         signature,
       };
     }
@@ -252,7 +252,9 @@ export const addToCart = async (req, res) => {
         }
 
         cart.items[idx].currency = p.currency || cart.items[idx].currency;
-        cart.items[idx].previewImage = p.images?.[0] || cart.items[idx].previewImage;
+        cart.items[idx].previewImage =
+  p.images?.[0]?.url || cart.items[idx].previewImage;
+
         cart.items[idx].basePrice = cart.items[idx].unitPrice;
         cart.items[idx].priceDetails = null;
       }
@@ -288,7 +290,9 @@ export const addToCart = async (req, res) => {
 export const getCart = async (req, res) => {
   try {
     const userId = req.user?._id;
-    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    if (!userId)
+      return res.status(401).json({ message: "Unauthorized" });
 
     const cart = await Cart.findOne({ user: userId, status: "ACTIVE" })
       .populate({
@@ -296,6 +300,7 @@ export const getCart = async (req, res) => {
         populate: [
           { path: "category", select: "name" },
           { path: "subCategory", select: "name" },
+          { path: "brand", select: "name" }, // ✅ brand populate
         ],
       })
       .populate("items.dropproduct")
@@ -304,30 +309,36 @@ export const getCart = async (req, res) => {
       .lean();
 
     if (!cart) {
-      return res.status(200).json({ message: "Cart is empty", cart: null });
+      return res.status(200).json({
+        message: "Cart is empty",
+        cart: null,
+      });
     }
 
     const enrichedItems = (cart.items || []).map((it) => {
       let updatedItem = { ...it };
 
-      // ✅ Convert populated category/subCategory to string name
       if (it.readymadeProduct) {
         updatedItem.readymadeProduct = {
           ...it.readymadeProduct,
+
           category:
             it.readymadeProduct.category?.name ||
             it.readymadeProduct.category,
+
           subCategory:
             it.readymadeProduct.subCategory?.name ||
             it.readymadeProduct.subCategory,
+
+          brand:
+            it.readymadeProduct.brand?.name ||
+            it.readymadeProduct.brand,
         };
       }
 
-      // ✅ Variant support (existing logic)
       if (
         it.kind === "READYMADE" &&
-        it.readymadeProduct &&
-        Array.isArray(it.readymadeProduct.variants)
+        it.readymadeProduct?.variants
       ) {
         const v = it.readymadeProduct.variants.find(
           (x) =>
@@ -342,14 +353,20 @@ export const getCart = async (req, res) => {
     });
 
     return res.status(200).json({
-      cart: { ...cart, items: enrichedItems },
+      cart: {
+        ...cart,
+        items: enrichedItems,
+      },
     });
 
   } catch (err) {
     console.error("getCart error:", err);
-    return res.status(500).json({ message: "Server error" });
+    return res.status(500).json({
+      message: "Server error",
+    });
   }
 };
+
 
 
 
@@ -428,7 +445,8 @@ export const updateCartItemQty = async (req, res) => {
         // refresh snapshot fields
         item.unitPrice = unitPrice;
         item.currency = p.currency || "INR";
-        item.previewImage = p.images?.[0] || null;
+        item.previewImage = p.images?.[0]?.url || null;
+
         item.basePrice = unitPrice;
         item.priceDetails = null;
 
@@ -467,7 +485,8 @@ export const updateCartItemQty = async (req, res) => {
 
         item.unitPrice = unitPrice;
         item.currency = p.currency || "INR";
-        item.previewImage = p.images?.[0] || null;
+        item.previewImage = p.images?.[0]?.url || null;
+
         item.basePrice = unitPrice;
         item.priceDetails = null;
 

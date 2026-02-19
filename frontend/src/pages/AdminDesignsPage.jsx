@@ -3,6 +3,9 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { selectCurrentToken } from "../redux/slices/Userslice";
 import { useSelector, useDispatch } from "react-redux";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
+
 // Import product pricing slice actions and selectors
 import {
   getProductPricing,
@@ -43,7 +46,61 @@ export default function AdminDesignsPage() {
   // Delete state
   const [deletingId, setDeletingId] = useState(null);
   const [deleteError, setDeleteError] = useState("");
-  
+  const handleDownloadAllPreviews = async () => {
+  if (!selectedDesign) return;
+
+  try {
+    const zip = new JSZip();
+    const folder = zip.folder(
+      selectedDesign.productName?.replace(/\s+/g, "_") || "design_previews"
+    );
+
+    const imageUrls = [];
+
+    // Main preview
+    if (selectedDesign.previewImage) {
+      imageUrls.push({
+        url: selectedDesign.previewImage,
+        name: "main_preview.png",
+      });
+    }
+
+    // View previews
+    if (selectedDesign.views && selectedDesign.views.length > 0) {
+      selectedDesign.views.forEach((view) => {
+        if (view.previewImage) {
+          imageUrls.push({
+            url: view.previewImage,
+            name: `${view.code || "view"}.png`,
+          });
+        }
+      });
+    }
+
+    // Fetch and add images to zip
+    await Promise.all(
+      imageUrls.map(async (image, index) => {
+        const response = await fetch(image.url);
+        const blob = await response.blob();
+
+        folder.file(image.name || `preview_${index}.png`, blob);
+      })
+    );
+
+    // Generate zip
+    const zipBlob = await zip.generateAsync({ type: "blob" });
+
+    saveAs(
+      zipBlob,
+      `${selectedDesign.productName || "design"}_previews.zip`
+    );
+
+  } catch (error) {
+    console.error("Download failed:", error);
+    alert("Failed to download previews");
+  }
+};
+
   // Pricing states
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [pricingMode, setPricingMode] = useState("normal"); // "normal" or "unlimited"
@@ -540,6 +597,29 @@ export default function AdminDesignsPage() {
                         >
                           Manage Pricing
                         </button>
+                       <button
+  onClick={handleDownloadAllPreviews}
+  className="px-3 py-1 text-xs bg-indigo-600 text-white border border-indigo-600 rounded hover:bg-indigo-700 hover:border-indigo-700 transition-colors shadow-sm flex items-center gap-1"
+  title="Download all preview images as ZIP"
+>
+  {/* Download Icon */}
+  <svg
+    className="w-3.5 h-3.5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      d="M12 16v-8m0 8l-3-3m3 3l3-3M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+    />
+  </svg>
+
+  Download Previews
+</button>
+
                         <button
                           onClick={() => handleEditDesign(selectedDesign)}
                           className="px-3 py-1 text-xs bg-sky-600 text-white border border-sky-600 rounded hover:bg-sky-700 transition-colors"
@@ -1080,6 +1160,8 @@ export default function AdminDesignsPage() {
                 >
                   {pricingLoading ? "Saving..." : "Save All Pricing Settings"}
                 </button>
+
+                
               </div>
             </div>
           </div>

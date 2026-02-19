@@ -74,7 +74,6 @@ import {
 } from '../redux/slices/adminSlice.js';
 
 // Import the ProductFormModal
-// Import the ProductFormModal
 import ProductFormModal from '../components/newproductadding.jsx';
 // Import DesignPublishModal
 import DesignPublishModal from '../components/DesignPublishModal.jsx';
@@ -86,6 +85,9 @@ import AdminOrders from '../components/admin/ordersmanagement.jsx';
 import HomepageAdmin from '../pages/setHomepage.jsx';
 // Import ProductSearch
 import ProductSearch from '../components/searchproductdetail.jsx';
+// Import Admin Designs component
+ // Adjust the import path as needed
+import AdminDesignsPage from './AdminDesignsPage.jsx';
 
 const AdminDashboard = () => {
   const dispatch = useDispatch();
@@ -137,21 +139,32 @@ const AdminDashboard = () => {
   const [activeSidebarItem, setActiveSidebarItem] = useState('dashboard');
   const [localCategory, setLocalCategory] = useState('');
   const [localSubCategory, setLocalSubCategory] = useState('');
-  const [viewMode, setViewMode] = useState('products'); // 'products', 'designs', 'dropproducts', 'orders', 'homepage', 'search'
+  const [viewMode, setViewMode] = useState('products'); // 'products', 'designs', 'dropproducts', 'orders', 'homepage', 'search', 'adminDesigns'
   
   // Helper function to get full image URL
-  const getImageUrl = (imagePath) => {
+  const getImageUrl = (image) => {
+    if (!image) return null;
+
+    // NEW: handle object
+    let imagePath = image;
+
+    if (typeof image === "object") {
+      imagePath = image.url;
+    }
+
     if (!imagePath) return null;
-    
-    // Check if it's already a full URL
-    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+
+    if (
+      imagePath.startsWith("http://") ||
+      imagePath.startsWith("https://")
+    ) {
       return imagePath;
     }
-    
-    // Prepend base URL for relative paths
-    const baseUrl = import.meta.env.VITE_IMAGE_URL; 
-    return `${baseUrl}/${imagePath.replace(/^\/+/, '')}`;
+
+    const baseUrl = import.meta.env.VITE_IMAGE_URL;
+    return `${baseUrl}/${imagePath.replace(/^\/+/, "")}`;
   };
+
   
   useEffect(() => {
     console.log("Products updated:", products);
@@ -170,7 +183,8 @@ const AdminDashboard = () => {
         activeTab !== 'dropproducts' && 
         activeTab !== 'orders' && 
         activeTab !== 'homepage' &&
-        activeTab !== 'search') {
+        activeTab !== 'search' &&
+        activeTab !== 'adminDesigns') {
       loadProducts();
     }
   }, [currentFilter, pagination.page, currentCategory, currentSubCategory, activeTab]);
@@ -254,6 +268,8 @@ const AdminDashboard = () => {
     if (tab === 'designs') {
       setViewMode('designs');
       loadDesigns();
+    } else if (tab === 'adminDesigns') {
+      setViewMode('adminDesigns');
     } else if (tab === 'dropproducts') {
       setViewMode('dropproducts');
     } else if (tab === 'orders') {
@@ -576,6 +592,7 @@ const AdminDashboard = () => {
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: 'allProducts', label: 'All Products', icon: <Package className="w-5 h-5" /> },
     { id: 'designs', label: 'Designs', icon: <Palette className="w-5 h-5" /> },
+    { id: 'adminDesigns', label: 'Admin Designs', icon: <Palette className="w-5 h-5" /> }, // Added admin designs item
     { id: 'dropproducts', label: 'Drop Products', icon: <Tag className="w-5 h-5" /> },
     { id: 'orders', label: 'Orders', icon: <ShoppingBag className="w-5 h-5" /> },
     { id: 'homepage', label: 'Homepage', icon: <Home className="w-5 h-5" /> },
@@ -946,6 +963,7 @@ const AdminDashboard = () => {
                 {activeSidebarItem === 'dashboard' && 'Dashboard'}
                 {activeSidebarItem === 'allProducts' && 'All Products'}
                 {activeSidebarItem === 'designs' && 'Designs'}
+                {activeSidebarItem === 'adminDesigns' && 'Admin Designs'}
                 {activeSidebarItem === 'dropproducts' && 'Drop Products'}
                 {activeSidebarItem === 'orders' && 'Order Management'}
                 {activeSidebarItem === 'homepage' && 'Homepage Management'}
@@ -961,6 +979,7 @@ const AdminDashboard = () => {
                 {activeSidebarItem === 'dashboard' && 'Overview of your store performance'}
                 {activeSidebarItem === 'allProducts' && 'Manage all products in your store'}
                 {activeSidebarItem === 'designs' && 'Manage user-created designs'}
+                {activeSidebarItem === 'adminDesigns' && 'Manage admin-created designs'}
                 {activeSidebarItem === 'dropproducts' && 'Manage drop products inventory'}
                 {activeSidebarItem === 'orders' && 'Manage and update customer orders'}
                 {activeSidebarItem === 'homepage' && 'Manage featured content displayed on the homepage'}
@@ -1072,6 +1091,11 @@ const AdminDashboard = () => {
           {/* Product Search Component */}
           {activeSidebarItem === 'search' && (
             <ProductSearch />
+          )}
+
+          {/* Admin Designs Component */}
+          {activeSidebarItem === 'adminDesigns' && (
+            <AdminDesignsPage />
           )}
 
           {/* Search and Filters for Products */}
@@ -1639,8 +1663,8 @@ const AdminDashboard = () => {
                 </>
               )}
             </div>
-          ) : activeSidebarItem !== 'dropproducts' && activeSidebarItem !== 'orders' && activeSidebarItem !== 'homepage' && activeSidebarItem !== 'search' ? (
-            /* View Mode for Products (excluding dropproducts, orders, homepage, and search) */
+          ) : activeSidebarItem !== 'dropproducts' && activeSidebarItem !== 'orders' && activeSidebarItem !== 'homepage' && activeSidebarItem !== 'search' && activeSidebarItem !== 'adminDesigns' ? (
+            /* View Mode for Products (excluding dropproducts, orders, homepage, search, and adminDesigns) */
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
               {productsLoading ? (
                 <div className="flex justify-center items-center h-64">

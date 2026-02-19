@@ -850,6 +850,13 @@ export default function CatalogueDetailPage() {
                   </div>
                 </div>
 
+<div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-gray-700 tracking-tight">Description</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 tracking-tight">{design.description}</span>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-5 gap-2">
                   {SIZES.map((s) => {
                     const active = selectedSize === s;

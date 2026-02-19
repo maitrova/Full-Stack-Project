@@ -37,6 +37,7 @@ import UserOrders from "./components/userorders.jsx";
 import AdminOrders from "./components/admin/ordersmanagement.jsx";
 import ProductSearch from "./components/searchproductdetail.jsx";
 import AdminOrderSearch from "./components/admin/adminsearchpage.jsx";
+import PublishDesignModal from "./components/PublishDesignModal.jsx";
 // You'll need to create this
 
 // Layout component with header for all pages except auth
@@ -113,6 +114,15 @@ function App() {
             <ProtectedRoute>
               <AdminDashboard />
             </ProtectedRoute>
+          </MainLayout>
+        } />
+
+
+        <Route path="/publish-design" element={
+          <MainLayout>
+        
+              <PublishDesignModal />
+            
           </MainLayout>
         } />
 

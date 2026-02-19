@@ -10,7 +10,23 @@ const variantSchema = new mongoose.Schema(
     },
     price: { type: Number, required: true, min: 0 },
     stock: { type: Number, default: 0, min: 0 },
-    sku: { type: String, default: "" }, // optional
+    sku: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
+// NEW: image schema with altText per image
+const imageSchema = new mongoose.Schema(
+  {
+    url: {
+      type: String,
+      required: true,
+    },
+    altText: {
+      type: String,
+      required: true,
+      default: "",
+    },
   },
   { _id: false }
 );
@@ -20,13 +36,21 @@ const readymadeProductSchema = new mongoose.Schema(
     title: { type: String, required: true, trim: true },
     description: { type: String, required: true },
 
-    // Keep price/stock for filtering/sorting (optional)
-    // We'll auto-fill these from variants in controller.
     price: { type: Number, required: true, min: 0 },
     currency: { type: String, default: "INR" },
 
-    category: { type: mongoose.Schema.Types.ObjectId, ref: "Category", required: true, index: true },
-    subCategory: { type: mongoose.Schema.Types.ObjectId, ref: "SubCategory", index: true },
+    category: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
+      required: true,
+      index: true,
+    },
+
+    subCategory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SubCategory",
+      index: true,
+    },
 
     brand: {
       type: mongoose.Schema.Types.ObjectId,
@@ -35,10 +59,8 @@ const readymadeProductSchema = new mongoose.Schema(
       index: true,
     },
 
-
     stock: { type: Number, default: 0, min: 0 },
 
-    // NEW: size-wise price/stock
     variants: {
       type: [variantSchema],
       required: true,
@@ -46,7 +68,7 @@ const readymadeProductSchema = new mongoose.Schema(
         validator: function (arr) {
           if (!arr || !arr.length) return false;
           const sizes = arr.map((v) => v.size);
-          return new Set(sizes).size === sizes.length; // no duplicates
+          return new Set(sizes).size === sizes.length;
         },
         message: "Variants must be present and sizes must be unique",
       },
@@ -54,12 +76,12 @@ const readymadeProductSchema = new mongoose.Schema(
     },
 
     isActive: { type: Boolean, default: true },
-
     bestSeller: { type: Boolean, default: false },
     newArrival: { type: Boolean, default: false },
 
+    // ✅ FIXED: images with altText per image
     images: {
-      type: [String],
+      type: [imageSchema],
       validate: {
         validator: (arr) => arr.length <= 4,
         message: "Maximum 4 images allowed",

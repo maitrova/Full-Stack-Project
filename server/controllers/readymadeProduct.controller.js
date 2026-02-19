@@ -121,22 +121,39 @@ export const getAllReadymadeProductsPublic = async (req, res) => {
 // Get product by ID
 export const getReadymadeProductById = async (req, res) => {
   try {
-    const product = await ReadymadeProduct.findById(req.params.id).select('-__v');
-    if (!product) return res.status(404).json({ 
-      success: false, 
-      message: "Product not found" 
-    });
-    return res.status(200).json({ 
+
+    const product = await ReadymadeProduct.findById(req.params.id)
+      .populate("category", "name")
+      .populate("subCategory", "name")
+      .populate("brand", "name")
+      .select("-__v")
+      .lean(); // important
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found"
+      });
+    }
+
+    // ✅ Convert populated objects → only name
+    product.category = product.category?.name || null;
+    product.subCategory = product.subCategory?.name || null;
+    product.brand = product.brand?.name || null;
+
+    return res.status(200).json({
       success: true,
-      data: product 
+      data: product
     });
+
   } catch (error) {
-    return res.status(500).json({ 
-      success: false, 
-      message: error.message 
+    return res.status(500).json({
+      success: false,
+      message: error.message
     });
   }
 };
+
 
 // Get best seller products
 export const getBestSellerProducts = async (req, res) => {
@@ -503,6 +520,7 @@ export const getProductFilters = async (req, res) => {
 
 // Create product
 // controllers/readymadeProductController.js
+// CREATE PRODUCT
 export const createReadymadeProduct = async (req, res) => {
   try {
     const {
@@ -515,151 +533,125 @@ export const createReadymadeProduct = async (req, res) => {
       isActive,
       bestSeller,
       newArrival,
-      variants, // <-- NEW (array or JSON string)
-
-      // OPTIONAL: allow passing thumbnail URL as text too
+      variants,
       thumbnail: thumbnailFromBody,
+      imageAltTexts, // ✅ correct field
     } = req.body;
 
-    if (!title || !description) {
+    if (!title || !description)
       return res.status(400).json({
         success: false,
         message: "Title and description are required",
       });
+
+    if (!category || !brand)
+      return res.status(400).json({
+        success: false,
+        message: "Category and Brand are required",
+      });
+
+    // ✅ parse alt texts
+    let parsedAltTexts = [];
+    if (imageAltTexts) {
+      try {
+        parsedAltTexts = JSON.parse(imageAltTexts);
+      } catch {
+        return res.status(400).json({
+          success: false,
+          message: "imageAltTexts must be valid JSON array",
+        });
+      }
     }
 
-    // images/video/thumbnail
+    // ✅ create image objects
     const images =
-      req.files?.images?.map((f) => f.path.replace(/\\/g, "/")) || [];
+      (req.files?.images || []).map((file, index) => ({
+        url: file.path.replace(/\\/g, "/"),
+        altText: parsedAltTexts[index] || "",
+      })) || [];
 
-    const video = req.files?.video?.[0]?.path.replace(/\\/g, "/") || null;
-
-    // ✅ NEW: thumbnail file (multipart)
-    const thumbnailFromFile =
-      req.files?.thumbnail?.[0]?.path.replace(/\\/g, "/") || null;
-
-    if (images.length > 4) {
+    if (images.length > 4)
       return res.status(400).json({
         success: false,
         message: "Maximum 4 images allowed",
       });
-    }
 
-    // ✅ Decide thumbnail priority:
-    // 1) uploaded thumbnail file
-    // 2) thumbnail url from body
-    // 3) fallback to first image (if exists)
+    // video
+    const video =
+      req.files?.video?.[0]?.path.replace(/\\/g, "/") || null;
+
+    // thumbnail
+    const thumbnailFromFile =
+      req.files?.thumbnail?.[0]?.path.replace(/\\/g, "/") || null;
+
     const thumbnail =
-      thumbnailFromFile || thumbnailFromBody || images[0] || null;
+      thumbnailFromFile ||
+      thumbnailFromBody ||
+      images[0]?.url ||
+      null;
 
-    // Parse variants (because multipart/form-data sends it as string usually)
-    let parsedVariants = variants;
+    // variants
+    let parsedVariants =
+      typeof variants === "string" ? JSON.parse(variants) : variants;
 
-    if (!parsedVariants) {
+    if (!Array.isArray(parsedVariants) || parsedVariants.length === 0)
       return res.status(400).json({
         success: false,
-        message: "Variants are required (size-wise price & stock).",
+        message: "At least one variant required",
       });
-    }
 
-    if (typeof parsedVariants === "string") {
-      try {
-        parsedVariants = JSON.parse(parsedVariants);
-      } catch (e) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid variants JSON format",
-        });
-      }
-    }
+    const ALLOWED_SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
 
-    if (!Array.isArray(parsedVariants) || parsedVariants.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "At least one variant is required",
-      });
-    }
-
-    const ALLOWED_SIZES = new Set(["XS", "S", "M", "L", "XL", "XXL"]);
-
-    // Normalize + validate variants
     const normalizedVariants = parsedVariants.map((v) => {
-      const size = String(v.size || "").toUpperCase().trim();
-      const price = Number(v.price);
-      const stock = Number(v.stock ?? 0);
-
-      if (!ALLOWED_SIZES.has(size)) {
-        throw new Error(`Invalid size: ${v.size}`);
-      }
-      if (!Number.isFinite(price) || price < 0) {
-        throw new Error(`Invalid price for size ${size}`);
-      }
-      if (!Number.isFinite(stock) || stock < 0) {
-        throw new Error(`Invalid stock for size ${size}`);
-      }
+      const size = v.size.toUpperCase();
+      if (!ALLOWED_SIZES.includes(size))
+        throw new Error(`Invalid size ${size}`);
 
       return {
         size,
-        price,
-        stock,
-        sku: v.sku ? String(v.sku).trim() : "",
+        price: Number(v.price),
+        stock: Number(v.stock || 0),
+        sku: v.sku || "",
       };
     });
 
-    // No duplicate sizes
-    const sizeSet = new Set();
-    for (const v of normalizedVariants) {
-      if (sizeSet.has(v.size)) {
-        return res.status(400).json({
-          success: false,
-          message: `Duplicate size found: ${v.size}`,
-        });
-      }
-      sizeSet.add(v.size);
-    }
+    const totalStock = normalizedVariants.reduce(
+      (sum, v) => sum + v.stock,
+      0
+    );
 
-    // Optional: calculate total stock / default price (use smallest size price as base)
-    const totalStock = normalizedVariants.reduce((sum, v) => sum + v.stock, 0);
-    const basePrice = Math.min(...normalizedVariants.map((v) => v.price));
+    const basePrice = Math.min(
+      ...normalizedVariants.map((v) => v.price)
+    );
 
     const product = await ReadymadeProduct.create({
       title,
       description,
-
-      // Keep these for compatibility (optional but useful)
       price: basePrice,
       stock: totalStock,
-
       currency: currency || "INR",
-      category: category || "",
-      subCategory: subCategory || "",
-      brand: brand || "",
+
+      category,
+      subCategory,
+      brand,
 
       variants: normalizedVariants,
 
-      isActive:
-        isActive !== undefined ? String(isActive).toLowerCase() === "true" : true,
-      bestSeller:
-        bestSeller !== undefined
-          ? String(bestSeller).toLowerCase() === "true"
-          : false,
-      newArrival:
-        newArrival !== undefined
-          ? String(newArrival).toLowerCase() === "true"
-          : false,
+      isActive: isActive === "true",
+      bestSeller: bestSeller === "true",
+      newArrival: newArrival === "true",
 
-      images,
-      thumbnail, // ✅ NEW FIELD
+      images, // ✅ correct format
+      thumbnail,
       video,
     });
 
-    return res.status(201).json({
+    res.status(201).json({
       success: true,
-      message: "Product created successfully",
       data: product,
     });
   } catch (err) {
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       message: err.message,
     });
@@ -668,230 +660,103 @@ export const createReadymadeProduct = async (req, res) => {
 
 
 
+
+
 // Update product
 export const updateReadymadeProduct = async (req, res) => {
   try {
     const product = await ReadymadeProduct.findById(req.params.id);
-    if (!product) {
+
+    if (!product)
       return res.status(404).json({
         success: false,
         message: "Product not found",
       });
+
+    // parse alt texts
+    let parsedAltTexts = [];
+    if (req.body.imageAltTexts) {
+      parsedAltTexts = JSON.parse(req.body.imageAltTexts);
     }
 
-    // ---------- helpers ----------
-    const toBool = (v) => {
-      if (v === undefined || v === null) return undefined;
-      if (typeof v === "boolean") return v;
-      if (typeof v === "string") return v.toLowerCase() === "true";
-      return Boolean(v);
-    };
+    // new images
+    const newImages =
+      (req.files?.images || []).map((file, index) => ({
+        url: file.path.replace(/\\/g, "/"),
+        altText: parsedAltTexts[index] || "",
+      })) || [];
 
-    // ---------- update normal fields ----------
-    // NOTE: price/stock will be auto-calculated from variants if variants is provided
-    const updatableFields = [
-      "title",
-      "description",
-      "currency",
-      "category",
-      "subCategory",
-      "brand",
-      "isActive",
-      "bestSeller",
-      "newArrival",
-      // OPTIONAL: allow thumbnail url update via body
-      "thumbnail",
-    ];
-
-    for (const key of updatableFields) {
-      if (req.body[key] !== undefined) {
-        if (key === "isActive" || key === "bestSeller" || key === "newArrival") {
-          const b = toBool(req.body[key]);
-          if (b !== undefined) product[key] = b;
-        } else {
-          product[key] = req.body[key];
-        }
-      }
-    }
-
-    // ---------- update variants (NEW) ----------
-    // Frontend can send variants as:
-    // 1) JSON array (application/json)
-    // 2) stringified JSON (multipart/form-data)
-    if (req.body.variants !== undefined) {
-      let parsedVariants = req.body.variants;
-
-      if (typeof parsedVariants === "string") {
-        try {
-          parsedVariants = JSON.parse(parsedVariants);
-        } catch {
-          return res.status(400).json({
-            success: false,
-            message: "variants must be valid JSON array",
-          });
-        }
-      }
-
-      if (!Array.isArray(parsedVariants) || parsedVariants.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: "At least one variant is required",
-        });
-      }
-
-      const ALLOWED_SIZES = new Set(["XS", "S", "M", "L", "XL", "XXL"]);
-
-      const normalizedVariants = parsedVariants.map((v) => {
-        const size = String(v.size || "").toUpperCase().trim();
-        const price = Number(v.price);
-        const stock = Number(v.stock ?? 0);
-
-        if (!ALLOWED_SIZES.has(size)) {
-          throw new Error(`Invalid size: ${v.size}`);
-        }
-        if (!Number.isFinite(price) || price < 0) {
-          throw new Error(`Invalid price for size ${size}`);
-        }
-        if (!Number.isFinite(stock) || stock < 0) {
-          throw new Error(`Invalid stock for size ${size}`);
-        }
-
-        return {
-          size,
-          price,
-          stock,
-          sku: v.sku ? String(v.sku).trim() : "",
-        };
-      });
-
-      // prevent duplicate sizes
-      const sizeSet = new Set();
-      for (const v of normalizedVariants) {
-        if (sizeSet.has(v.size)) {
-          return res.status(400).json({
-            success: false,
-            message: `Duplicate size found: ${v.size}`,
-          });
-        }
-        sizeSet.add(v.size);
-      }
-
-      product.variants = normalizedVariants;
-
-      // keep compatibility fields updated automatically
-      product.stock = normalizedVariants.reduce((sum, v) => sum + v.stock, 0);
-      product.price = Math.min(...normalizedVariants.map((v) => v.price));
-    } else {
-      // If variants NOT provided, allow legacy updates for price/stock (optional)
-      if (req.body.price !== undefined) product.price = Number(req.body.price);
-      if (req.body.stock !== undefined) product.stock = Number(req.body.stock);
-    }
-
-    // ---------- Remove selected images ----------
-    let removeImages = [];
-    if (req.body.removeImages) {
-      try {
-        removeImages = JSON.parse(req.body.removeImages);
-        if (!Array.isArray(removeImages)) removeImages = [];
-      } catch {
-        return res.status(400).json({
-          success: false,
-          message: "removeImages must be valid JSON array",
-        });
-      }
-    }
-
-    if (removeImages.length) {
-      await Promise.all(removeImages.map((p) => safeDeleteFile(p)));
-      product.images = (product.images || []).filter((p) => !removeImages.includes(p));
-
-      // ✅ If thumbnail was one of the removed images, clear it
-      if (product.thumbnail && removeImages.includes(product.thumbnail)) {
-        product.thumbnail = null;
-      }
-    }
-
-    // ---------- Remove thumbnail if requested ----------
-    const removeThumbnail = String(req.body.removeThumbnail) === "true";
-    if (removeThumbnail && product.thumbnail) {
-      await safeDeleteFile(product.thumbnail);
-      product.thumbnail = null;
-    }
-
-    // ---------- Remove video if requested ----------
-    const removeVideo = String(req.body.removeVideo) === "true";
-    if (removeVideo && product.video) {
-      await safeDeleteFile(product.video);
-      product.video = null;
-    }
-
-    // ---------- Handle new uploads ----------
-    const newImages = (req.files?.images || []).map((f) => f.path.replace(/\\/g, "/"));
-    const newVideo = req.files?.video?.[0]?.path
-      ? req.files.video[0].path.replace(/\\/g, "/")
-      : null;
-
-    // ✅ NEW: thumbnail file upload
-    const newThumbnail = req.files?.thumbnail?.[0]?.path
-      ? req.files.thumbnail[0].path.replace(/\\/g, "/")
-      : null;
-
-    const replaceImages = String(req.body.replaceImages) === "true";
+    const replaceImages = req.body.replaceImages === "true";
 
     if (newImages.length) {
       if (replaceImages) {
-        // if thumbnail is pointing to an existing image that is about to be deleted, clear it first
-        if (product.thumbnail && (product.images || []).includes(product.thumbnail)) {
-          product.thumbnail = null;
-        }
-
-        await Promise.all((product.images || []).map((p) => safeDeleteFile(p)));
+        await Promise.all(
+          (product.images || []).map((img) =>
+            safeDeleteFile(img.url)
+          )
+        );
         product.images = [];
       }
 
-      const merged = [...(product.images || []), ...newImages];
+      const merged = [...product.images, ...newImages];
 
-      if (merged.length > 4) {
-        await Promise.all(newImages.map((p) => safeDeleteFile(p)));
+      if (merged.length > 4)
         return res.status(400).json({
           success: false,
-          message: "Maximum 4 images allowed total",
+          message: "Maximum 4 images allowed",
         });
-      }
 
       product.images = merged;
     }
 
-    if (newVideo) {
-      if (product.video) await safeDeleteFile(product.video);
-      product.video = newVideo;
+    // remove images
+    if (req.body.removeImages) {
+      const removeImages = JSON.parse(req.body.removeImages);
+
+      await Promise.all(
+        removeImages.map((url) => safeDeleteFile(url))
+      );
+
+      product.images = product.images.filter(
+        (img) => !removeImages.includes(img.url)
+      );
     }
 
-    // ✅ If a new thumbnail uploaded, replace old thumbnail file
-    if (newThumbnail) {
-      if (product.thumbnail) await safeDeleteFile(product.thumbnail);
-      product.thumbnail = newThumbnail;
+    // video
+    if (req.files?.video?.[0]) {
+      if (product.video)
+        await safeDeleteFile(product.video);
+
+      product.video =
+        req.files.video[0].path.replace(/\\/g, "/");
     }
 
-    // ✅ Final fallback: if thumbnail is empty but images exist, set first image
-    if (!product.thumbnail && product.images && product.images.length > 0) {
-      product.thumbnail = product.images[0];
+    // thumbnail
+    if (req.files?.thumbnail?.[0]) {
+      if (product.thumbnail)
+        await safeDeleteFile(product.thumbnail);
+
+      product.thumbnail =
+        req.files.thumbnail[0].path.replace(/\\/g, "/");
     }
+
+    if (!product.thumbnail && product.images.length)
+      product.thumbnail = product.images[0].url;
 
     await product.save();
 
-    return res.status(200).json({
+    res.json({
       success: true,
-      message: "Product updated successfully",
       data: product,
     });
-  } catch (error) {
-    return res.status(500).json({
+  } catch (err) {
+    res.status(500).json({
       success: false,
-      message: error.message,
+      message: err.message,
     });
   }
 };
+
 
 
 

@@ -8,10 +8,19 @@ const categorySchema = new mongoose.Schema(
       unique: true,
       trim: true,
     },
+
     thumbnail: {
       type: String,
-      required: true, // will store: /outputs/thumbnail/filename.png
+      required: true,
     },
+
+    // ✅ NEW FIELD
+    altText: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
     isActive: {
       type: Boolean,
       default: true,

@@ -10,27 +10,47 @@ import path from "path";
 // CREATE CATEGORY
 export const createCategory = async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, altText } = req.body;
 
-    if (!req.file) {
+    if (!name)
+      return res.status(400).json({
+        success: false,
+        message: "Category name is required",
+      });
+
+    if (!req.file)
       return res.status(400).json({
         success: false,
         message: "Thumbnail is required",
       });
-    }
+
+    if (!altText)
+      return res.status(400).json({
+        success: false,
+        message: "Alt text is required",
+      });
 
     const thumbnailPath = `/outputs/thumbnail/${req.file.filename}`;
 
     const category = await Category.create({
       name,
       thumbnail: thumbnailPath,
+      altText, // ✅ save alt text
     });
 
-    res.status(201).json({ success: true, data: category });
+    res.status(201).json({
+      success: true,
+      data: category,
+    });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
+
 
 // GET ALL CATEGORIES
 export const getCategories = async (req, res) => {
@@ -83,12 +103,19 @@ export const deleteCategory = async (req, res) => {
 // CREATE SUBCATEGORY
 export const createSubCategory = async (req, res) => {
   try {
-    const { name, category } = req.body;
+    const { name, category, altText } = req.body;
 
     if (!req.file) {
       return res.status(400).json({
         success: false,
         message: "Thumbnail is required",
+      });
+    }
+
+    if (!altText) {
+      return res.status(400).json({
+        success: false,
+        message: "Alt text is required",
       });
     }
 
@@ -98,13 +125,22 @@ export const createSubCategory = async (req, res) => {
       name,
       category,
       thumbnail: thumbnailPath,
+      altText: altText.trim(), // ✅ NEW
     });
 
-    res.status(201).json({ success: true, data: subCategory });
+    res.status(201).json({
+      success: true,
+      data: subCategory,
+    });
+
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
+
 
 // GET ALL SUBCATEGORIES
 export const getSubCategories = async (req, res) => {
@@ -154,41 +190,36 @@ export const deleteSubCategory = async (req, res) => {
 export const updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name } = req.body;
+    const { name, altText } = req.body;
 
     const category = await Category.findById(id);
 
-    if (!category) {
+    if (!category)
       return res.status(404).json({
         success: false,
         message: "Category not found",
       });
-    }
 
-    // Update name if provided
-    if (name) {
-      category.name = name;
-    }
+    if (name) category.name = name;
+    if (altText) category.altText = altText;
 
-    // If new thumbnail uploaded
     if (req.file) {
-      // Delete old thumbnail
-      const oldFilePath = path.join(process.cwd(), category.thumbnail);
-      if (fs.existsSync(oldFilePath)) {
-        fs.unlinkSync(oldFilePath);
-      }
+      // delete old thumbnail
+      const oldPath = path.join(process.cwd(), category.thumbnail);
 
-      // Set new thumbnail path
+      if (fs.existsSync(oldPath))
+        fs.unlinkSync(oldPath);
+
       category.thumbnail = `/outputs/thumbnail/${req.file.filename}`;
     }
 
     await category.save();
 
-    res.status(200).json({
+    res.json({
       success: true,
-      message: "Category updated successfully",
       data: category,
     });
+
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -198,11 +229,12 @@ export const updateCategory = async (req, res) => {
 };
 
 
+
 // UPDATE SUBCATEGORY
 export const updateSubCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, category } = req.body;
+    const { name, category, altText } = req.body;
 
     const subCategory = await SubCategory.findById(id);
 
@@ -213,19 +245,21 @@ export const updateSubCategory = async (req, res) => {
       });
     }
 
-    // Update fields if provided
+    // update fields
     if (name) subCategory.name = name;
     if (category) subCategory.category = category;
+    if (altText) subCategory.altText = altText.trim(); // ✅ NEW
 
-    // If new thumbnail uploaded
+    // update thumbnail if uploaded
     if (req.file) {
-      // Delete old thumbnail
+
+      // delete old thumbnail
       const oldFilePath = path.join(process.cwd(), subCategory.thumbnail);
+
       if (fs.existsSync(oldFilePath)) {
         fs.unlinkSync(oldFilePath);
       }
 
-      // Set new thumbnail path
       subCategory.thumbnail = `/outputs/thumbnail/${req.file.filename}`;
     }
 
@@ -236,6 +270,7 @@ export const updateSubCategory = async (req, res) => {
       message: "SubCategory updated successfully",
       data: subCategory,
     });
+
   } catch (error) {
     res.status(500).json({
       success: false,
