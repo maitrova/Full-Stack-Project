@@ -817,16 +817,32 @@ export const updateProductList = async (req, res) => {
 // Delete product
 export const deleteReadymadeProduct = async (req, res) => {
   try {
+
     const product = await ReadymadeProduct.findById(req.params.id);
+
     if (!product) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "Product not found" 
+        message: "Product not found",
       });
     }
 
-    await Promise.all((product.images || []).map((img) => safeDeleteFile(img)));
-    await safeDeleteFile(product.video);
+    // delete images safely
+    await Promise.all(
+      (product.images || []).map((img) =>
+        safeDeleteFile(typeof img === "string" ? img : img.url)
+      )
+    );
+
+    // delete thumbnail
+    if (product.thumbnail) {
+      await safeDeleteFile(product.thumbnail);
+    }
+
+    // delete video
+    if (product.video) {
+      await safeDeleteFile(product.video);
+    }
 
     await ReadymadeProduct.findByIdAndDelete(req.params.id);
 
@@ -834,11 +850,16 @@ export const deleteReadymadeProduct = async (req, res) => {
       success: true,
       message: "Product and media files deleted successfully",
     });
+
   } catch (err) {
-    res.status(500).json({ 
+
+    console.error(err);
+
+    res.status(500).json({
       success: false,
-      message: err.message 
+      message: err.message,
     });
+
   }
 };
 

@@ -1146,7 +1146,7 @@ if (quantity > maxStock) {
                     <p className="text-sm text-gray-500">Category</p>
                     <p className="font-medium">{displayData.category || 'Not specified'}</p>
                   </div>
-                  <div>
+                  {/* <div>
                     <p className="text-sm text-gray-500">Material</p>
                     <p className="font-medium">{displayData.material || 'Not specified'}</p>
                   </div>
@@ -1157,7 +1157,7 @@ if (quantity > maxStock) {
                   <div>
                     <p className="text-sm text-gray-500">Dimensions</p>
                     <p className="font-medium">{displayData.dimensions || 'Not specified'}</p>
-                  </div>
+                  </div> */}
                 </div>
               </div>
             </div>

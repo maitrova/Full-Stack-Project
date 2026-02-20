@@ -268,12 +268,31 @@ const ProductFormModal = ({
       }
       
       if (product.images && product.images.length > 0) {
-        const previews = product.images.map(image => {
-          if (image.startsWith('http')) return image;
-          return `${baseUrl}${image.startsWith('/') ? image : '/' + image}`;
-        });
-        setImagePreviews(previews);
-      }
+  const previews = product.images.map(image => {
+    
+    // handle both string and object formats safely
+    const imageUrl =
+      typeof image === "string"
+        ? image
+        : image.url || image.path || image.image || "";
+
+    if (!imageUrl) return "";
+
+    if (imageUrl.startsWith("http")) return imageUrl;
+
+    return `${baseUrl}${imageUrl.startsWith("/") ? imageUrl : "/" + imageUrl}`;
+  });
+
+  setImagePreviews(previews);
+
+  // ALSO set images state with altText if editing
+  const imageObjects = product.images.map(image => ({
+    file: null,
+    altText: typeof image === "object" ? image.altText || "" : ""
+  }));
+
+  setImages(imageObjects);
+}
       
       if (product.thumbnail) {
         const thumbUrl = product.thumbnail.startsWith("http")
