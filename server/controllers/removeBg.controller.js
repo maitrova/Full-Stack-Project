@@ -35,7 +35,8 @@ export const removeBgController = async (req, res) => {
     console.log("Output path:", outputPath);
     console.log("Script path:", scriptPath);
 
-    const python = spawn("python", [scriptPath, inputPath, outputPath]);
+    const pythonCmd = process.platform === "win32" ? "py" : "python";
+    const python = spawn(pythonCmd, [scriptPath, inputPath, outputPath]);
 
     let stdout = "";
     let stderr = "";

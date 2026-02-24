@@ -27,6 +27,7 @@ const productUpload = upload.fields([
   { name: "images", maxCount: 4 },
   { name: "video", maxCount: 1 },
   { name: "thumbnail", maxCount: 1 },
+  { name: "sizeChart", maxCount: 1 },
 ]);
 
 // ==================== PUBLIC ROUTES ====================

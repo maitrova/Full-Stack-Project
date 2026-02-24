@@ -95,6 +95,13 @@ const readymadeProductSchema = new mongoose.Schema(
     },
 
     video: { type: String, default: null },
+    
+    
+    sizeChart: {
+    type: String,
+    default: null,
+    },
+
   },
   { timestamps: true }
 );

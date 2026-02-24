@@ -31,6 +31,7 @@ import invoicerouter from './routes/invoiceroutes.js';
 import brandroute from './routes/brandroute.js';
 
 import colorselection from './routes/adminColorRoutes.js';
+import companypdfs from './routes/companyPdfRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -90,7 +91,7 @@ app.use('/api/designuploads', designuploadsrouter);
 app.use('/api/dropproducts', droprouter);
 app.use("/api/mockup-calibrations", caliberateroutes);
 app.use("/api/brands", brandroute);
-
+app.use("/api/company-pdfs", companypdfs);
 // Error handling
 app.use((err, req, res, next) => {
   console.error("Server error:", err);

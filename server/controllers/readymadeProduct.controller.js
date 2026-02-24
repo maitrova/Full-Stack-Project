@@ -590,6 +590,12 @@ export const createReadymadeProduct = async (req, res) => {
       images[0]?.url ||
       null;
 
+
+    const sizeChart =
+      req.files?.sizeChart?.[0]?.path.replace(/\\/g, "/") || null;
+      
+      
+
     // variants
     let parsedVariants =
       typeof variants === "string" ? JSON.parse(variants) : variants;
@@ -644,6 +650,7 @@ export const createReadymadeProduct = async (req, res) => {
       images, // ✅ correct format
       thumbnail,
       video,
+      sizeChart,
     });
 
     res.status(201).json({

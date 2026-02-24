@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+
 import { 
   X, 
   Upload, 
@@ -45,6 +46,7 @@ import {
   deleteBrand,
   clearBrands
 } from '../redux/slices/brandSlice.js';
+import RichTextEditor from './RichTextEditor.jsx';
 
 const ProductFormModal = ({ 
   isOpen, 
@@ -89,7 +91,7 @@ const ProductFormModal = ({
   isActive: true,
   bestSeller: false,
   newArrival: false,
-  altText: '', // ✅ NEW
+  
   });
 
   
@@ -97,14 +99,14 @@ const ProductFormModal = ({
   const [variants, setVariants] = useState([
     { size: '', price: '', stock: '', sku: '' }
   ]);
-  
+  const [sizeChart, setSizeChart] = useState(null);
+  const [sizeChartPreview, setSizeChartPreview] = useState(null);
   const [images, setImages] = useState([]);
   const [video, setVideo] = useState(null);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [videoPreview, setVideoPreview] = useState(null);
   const [errors, setErrors] = useState({});
-  const [thumbnail, setThumbnail] = useState(null);
-  const [thumbnailPreview, setThumbnailPreview] = useState(null);
+  
   
   // New/Edit category/sub-category/brand state
   const [showNewCategory, setShowNewCategory] = useState(false);
@@ -234,85 +236,100 @@ const ProductFormModal = ({
 
   // Populate form for editing
   useEffect(() => {
-    if (isEdit && product) {
-      setFormData({
-        title: product.title || '',
-        description: product.description || '',
-        currency: product.currency || 'INR',
-        category: product.category?._id || product.category || '',
-        subCategory: product.subCategory?._id || product.subCategory || '',
-        brand: product.brand?._id || product.brand || '',
-        isActive: product.isActive ?? true,
-        bestSeller: product.bestSeller || false,
-        newArrival: product.newArrival || false,
-        altText: product.altText || '', // ✅ NEW
-      });
+  if (isEdit && product) {
 
-      
-      if (product.variants && product.variants.length > 0) {
-        setVariants(product.variants.map(v => ({
+    setFormData({
+      title: product.title || '',
+      description: product.description || '',
+      currency: product.currency || 'INR',
+      category: product.category?._id || product.category || '',
+      subCategory: product.subCategory?._id || product.subCategory || '',
+      brand: product.brand?._id || product.brand || '',
+      isActive: product.isActive ?? true,
+      bestSeller: product.bestSeller || false,
+      newArrival: product.newArrival || false,
+    });
+
+    // ✅ Variants
+    if (product.variants && product.variants.length > 0) {
+      setVariants(
+        product.variants.map(v => ({
           size: v.size || '',
           price: v.price?.toString() || '',
           stock: v.stock?.toString() || '',
           sku: v.sku || ''
-        })));
-      } else {
-        setVariants([
-          {
-            size: '',
-            price: product.price?.toString() || '',
-            stock: product.stock?.toString() || '',
-            sku: ''
-          }
-        ]);
-      }
-      
-      if (product.images && product.images.length > 0) {
-  const previews = product.images.map(image => {
-    
-    // handle both string and object formats safely
-    const imageUrl =
-      typeof image === "string"
-        ? image
-        : image.url || image.path || image.image || "";
-
-    if (!imageUrl) return "";
-
-    if (imageUrl.startsWith("http")) return imageUrl;
-
-    return `${baseUrl}${imageUrl.startsWith("/") ? imageUrl : "/" + imageUrl}`;
-  });
-
-  setImagePreviews(previews);
-
-  // ALSO set images state with altText if editing
-  const imageObjects = product.images.map(image => ({
-    file: null,
-    altText: typeof image === "object" ? image.altText || "" : ""
-  }));
-
-  setImages(imageObjects);
-}
-      
-      if (product.thumbnail) {
-        const thumbUrl = product.thumbnail.startsWith("http")
-          ? product.thumbnail
-          : `${baseUrl}${product.thumbnail.startsWith("/") ? product.thumbnail : "/" + product.thumbnail}`;
-        setThumbnailPreview(thumbUrl);
-      }
-
-      if (product.video) {
-        const videoUrl = product.video.startsWith('http') 
-          ? product.video 
-          : `${baseUrl}${product.video.startsWith('/') ? product.video : '/' + product.video}`;
-        setVideoPreview(videoUrl);
-      }
-      
-      setCurrentStep(4);
+        }))
+      );
     } else {
-      resetForm();
+      setVariants([
+        {
+          size: '',
+          price: product.price?.toString() || '',
+          stock: product.stock?.toString() || '',
+          sku: ''
+        }
+      ]);
     }
-  }, [product, isEdit, baseUrl]);
+
+    // ✅ Images preview
+    if (product.images && product.images.length > 0) {
+
+      const previews = product.images.map(image => {
+
+        const imageUrl =
+          typeof image === "string"
+            ? image
+            : image.url || "";
+
+        if (!imageUrl) return "";
+
+        if (imageUrl.startsWith("http")) return imageUrl;
+
+        return `${baseUrl}${imageUrl.startsWith("/") ? imageUrl : "/" + imageUrl}`;
+
+      });
+
+      setImagePreviews(previews);
+
+      // preserve altText
+      const imageObjects = product.images.map(image => ({
+        file: null,
+        altText: typeof image === "object" ? image.altText || "" : ""
+      }));
+
+      setImages(imageObjects);
+    }
+
+    // ✅ Video preview
+    if (product.video) {
+
+      const videoUrl = product.video.startsWith("http")
+        ? product.video
+        : `${baseUrl}${product.video.startsWith("/") ? product.video : "/" + product.video}`;
+
+      setVideoPreview(videoUrl);
+    }
+
+    // ✅ NEW: Size Chart preview
+    if (product.sizeChart) {
+
+      const sizeChartUrl = product.sizeChart.startsWith("http")
+        ? product.sizeChart
+        : `${baseUrl}${product.sizeChart.startsWith("/") ? product.sizeChart : "/" + product.sizeChart}`;
+
+      setSizeChartPreview(sizeChartUrl);
+
+    }
+
+    setCurrentStep(4);
+
+  } else {
+
+    resetForm();
+
+  }
+
+}, [product, isEdit, baseUrl]);
 
   const resetForm = () => {
     setFormData({
@@ -325,15 +342,15 @@ const ProductFormModal = ({
       isActive: true,
       bestSeller: false,
       newArrival: false,
-      altText: '', // ✅ NEW
+      
+      // ✅ NEW
     });
     setVariants([{ size: '', price: '', stock: '', sku: '' }]);
     setImages([]);
     setVideo(null);
     setImagePreviews([]);
     setVideoPreview(null);
-    setThumbnail(null);
-    setThumbnailPreview(null);
+    
     setErrors({});
     resetCategoryForm();
     resetSubCategoryForm();
@@ -348,6 +365,8 @@ const ProductFormModal = ({
     setShowSubCategoryActions(null);
     setShowBrandActions(null);
     setCurrentStep(1);
+    setSizeChart(null);
+    setSizeChartPreview(null);
   };
 
   const resetCategoryForm = () => {
@@ -375,7 +394,41 @@ const ProductFormModal = ({
     setBrandErrors({});
     setEditingBrand(null);
   };
+const handleSizeChartUpload = (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
 
+  const validTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
+  const maxSize = 5 * 1024 * 1024;
+
+  if (!validTypes.includes(file.type)) {
+    setErrors(prev => ({
+      ...prev,
+      sizeChart: "Only JPG, PNG, WebP allowed",
+    }));
+    return;
+  }
+
+  if (file.size > maxSize) {
+    setErrors(prev => ({
+      ...prev,
+      sizeChart: "Size chart must be under 5MB",
+    }));
+    return;
+  }
+
+  setSizeChart(file);
+
+  const reader = new FileReader();
+  reader.onloadend = () => setSizeChartPreview(reader.result);
+  reader.readAsDataURL(file);
+};
+
+
+const removeSizeChart = () => {
+  setSizeChart(null);
+  setSizeChartPreview(null);
+};
   // Step navigation handlers
   const goToNextStep = () => {
     if (currentStep === 1) {
@@ -529,38 +582,38 @@ const ProductFormModal = ({
     setNewSubCategoryThumbnailPreview(null);
   };
 
-  const handleThumbnailUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // const handleThumbnailUpload = (e) => {
+  //   const file = e.target.files?.[0];
+  //   if (!file) return;
 
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-    const maxSize = 5 * 1024 * 1024;
+  //   const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+  //   const maxSize = 5 * 1024 * 1024;
 
-    if (!validTypes.includes(file.type)) {
-      setErrors(prev => ({ ...prev, thumbnail: 'Only JPG, PNG, and WebP images are allowed' }));
-      return;
-    }
+  //   if (!validTypes.includes(file.type)) {
+  //     setErrors(prev => ({ ...prev, thumbnail: 'Only JPG, PNG, and WebP images are allowed' }));
+  //     return;
+  //   }
 
-    if (file.size > maxSize) {
-      setErrors(prev => ({ ...prev, thumbnail: 'Thumbnail size should be less than 5MB' }));
-      return;
-    }
+  //   if (file.size > maxSize) {
+  //     setErrors(prev => ({ ...prev, thumbnail: 'Thumbnail size should be less than 5MB' }));
+  //     return;
+  //   }
 
-    setThumbnail(file);
+  //   setThumbnail(file);
 
-    const reader = new FileReader();
-    reader.onloadend = () => setThumbnailPreview(reader.result);
-    reader.readAsDataURL(file);
+  //   const reader = new FileReader();
+  //   reader.onloadend = () => setThumbnailPreview(reader.result);
+  //   reader.readAsDataURL(file);
 
-    if (errors.thumbnail) {
-      setErrors(prev => ({ ...prev, thumbnail: null }));
-    }
-  };
+  //   if (errors.thumbnail) {
+  //     setErrors(prev => ({ ...prev, thumbnail: null }));
+  //   }
+  // };
 
-  const removeThumbnail = () => {
-    setThumbnail(null);
-    setThumbnailPreview(null);
-  };
+  // const removeThumbnail = () => {
+  //   setThumbnail(null);
+  //   setThumbnailPreview(null);
+  // };
 
   const handleImageUpload = (e) => {
   const files = Array.from(e.target.files);
@@ -1411,50 +1464,66 @@ const ProductFormModal = ({
       .sort((a, b) => a.name.localeCompare(b.name));
   };
 
-  const validateForm = () => {
-    const newErrors = {};
-    
-    if (!formData.title.trim()) newErrors.title = 'Title is required';
-    if (!formData.description.trim()) newErrors.description = 'Description is required';
-    if (!formData.category) newErrors.category = 'Category is required';
-    
-    const variantErrors = [];
-    const usedSizes = new Set();
-    
-    variants.forEach((variant, index) => {
-      if (!variant.size) {
-        variantErrors.push(`Size is required for variant ${index + 1}`);
-      } else if (!sizeOptions.includes(variant.size)) {
-        variantErrors.push(`Invalid size "${variant.size}" for variant ${index + 1}`);
-      } else if (usedSizes.has(variant.size)) {
-        variantErrors.push(`Duplicate size "${variant.size}" found`);
-      } else {
-        usedSizes.add(variant.size);
-      }
-      
-      if (!variant.price || isNaN(variant.price) || Number(variant.price) <= 0) {
-        variantErrors.push(`Valid price is required for size ${variant.size || index + 1}`);
-      }
-      
-      if (variant.stock === '' || isNaN(variant.stock) || Number(variant.stock) < 0) {
-        variantErrors.push(`Valid stock is required for size ${variant.size || index + 1}`);
-      }
-    });
-    
-    if (variantErrors.length > 0) {
-      newErrors.variants = variantErrors;
-    }
-    
-    if (!isEdit && images.length === 0) {
-      newErrors.images = 'At least one image is required';
-    }
-    if (!isEdit && !thumbnail) {
-      newErrors.thumbnail = 'Thumbnail is required';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+const validateForm = () => {
+  const newErrors = {};   // ✅ define it FIRST
+
+  const isRichTextEmpty = (html) => {
+    const text = (html || "")
+      .replace(/<(.|\n)*?>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .trim();
+    return text.length === 0;
   };
+
+  // Title validation
+  if (!formData.title.trim()) {
+    newErrors.title = "Title is required";
+  }
+
+  // Rich text description validation
+  if (isRichTextEmpty(formData.description)) {
+    newErrors.description = "Description is required";
+  }
+
+  // Category validation
+  if (!formData.category) {
+    newErrors.category = "Category is required";
+  }
+
+  // Keep your existing variant validation below this
+  const variantErrors = [];
+  const usedSizes = new Set();
+
+  variants.forEach((variant, index) => {
+    if (!variant.size) {
+      variantErrors.push(`Size is required for variant ${index + 1}`);
+    } else if (usedSizes.has(variant.size)) {
+      variantErrors.push(`Duplicate size "${variant.size}" found`);
+    } else {
+      usedSizes.add(variant.size);
+    }
+
+    if (!variant.price || isNaN(variant.price) || Number(variant.price) <= 0) {
+      variantErrors.push(`Valid price is required for size ${variant.size || index + 1}`);
+    }
+
+    if (variant.stock === "" || isNaN(variant.stock) || Number(variant.stock) < 0) {
+      variantErrors.push(`Valid stock is required for size ${variant.size || index + 1}`);
+    }
+  });
+
+  if (variantErrors.length > 0) {
+    newErrors.variants = variantErrors;
+  }
+
+  if (!isEdit && images.length === 0) {
+    newErrors.images = "At least one image is required";
+  }
+
+  setErrors(newErrors);
+
+  return Object.keys(newErrors).length === 0;
+};
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1496,12 +1565,14 @@ const ProductFormModal = ({
       );
 
       
-      if (thumbnail) {
-        data.append('thumbnail', thumbnail);
-      }
+      
 
       if (video) {
         data.append('video', video);
+      }
+
+      if (sizeChart) {
+        data.append("sizeChart", sizeChart);
       }
       
       if (isEdit && product) {
@@ -2690,53 +2761,31 @@ const ProductFormModal = ({
 
 
 {/* Alt Text Field */}
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Thumbnail Alt Text
-                <span className="text-xs text-gray-500 ml-2">
-                  (Used for SEO & accessibility)
-                </span>
-              </label>
-
-              <input
-                type="text"
-                name="altText"
-                value={formData.altText}
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Example: Black oversized hoodie front view"
-                disabled={loading}
-              />
-
-              <p className="mt-1 text-xs text-gray-500">
-                Describe what is shown in the thumbnail image.
-              </p>
-            </div>
+           
 
 
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Description *
-              </label>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleTextareaChange}
-                rows="4"
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  errors.description ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="Enter product description"
-                disabled={loading}
-              />
-              {errors.description && (
-                <p className="mt-1 text-sm text-red-600 flex items-center">
-                  <AlertCircle className="w-4 h-4 mr-1" />
-                  {errors.description}
-                </p>
-              )}
-            </div>
+           <div>
+  <label className="block text-sm font-medium text-gray-700 mb-2">
+    Description *
+  </label>
+
+  <RichTextEditor
+    value={formData.description}
+    onChange={(html) => {
+      setFormData((prev) => ({ ...prev, description: html }));
+      if (errors.description) setErrors((p) => ({ ...p, description: null }));
+    }}
+    error={errors.description}
+  />
+
+  {errors.description && (
+    <p className="mt-1 text-sm text-red-600 flex items-center">
+      <AlertCircle className="w-4 h-4 mr-1" />
+      {errors.description}
+    </p>
+  )}
+          </div>
 
             {/* Variants Section */}
             <div className="border rounded-lg p-6">
@@ -2867,66 +2916,7 @@ const ProductFormModal = ({
             </div>
 
             {/* Thumbnail Upload */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Thumbnail Image
-                <span className="text-xs text-gray-500 ml-2">(Recommended, 1 image, max 5MB)</span>
-              </label>
-
-              <div className={`border-2 border-dashed rounded-lg p-6 ${
-                errors.thumbnail ? 'border-red-500 bg-red-50' : 'border-gray-300'
-              }`}>
-                {thumbnailPreview ? (
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-medium text-gray-700">Thumbnail Preview</h4>
-                      <button
-                        type="button"
-                        onClick={removeThumbnail}
-                        className="text-red-600 hover:text-red-800 text-sm font-medium"
-                        disabled={loading}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                    <img
-                      src={thumbnailPreview}
-                      alt="Thumbnail Preview"
-                      className="w-full max-w-xs h-40 object-cover rounded-lg"
-                    />
-                  </div>
-                ) : (
-                  <div className="text-center">
-                    <ImageIcon className="mx-auto h-12 w-12 text-gray-400" />
-                    <div className="mt-4">
-                      <label className="cursor-pointer">
-                        <span className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium inline-flex items-center">
-                          <Upload className="w-4 h-4 mr-2" />
-                          Upload Thumbnail
-                        </span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleThumbnailUpload}
-                          className="hidden"
-                          disabled={loading}
-                        />
-                      </label>
-                      <p className="text-xs text-gray-500 mt-2">
-                        PNG, JPG, WebP up to 5MB
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {errors.thumbnail && (
-                  <p className="mt-2 text-sm text-red-600 flex items-center justify-center">
-                    <AlertCircle className="w-4 h-4 mr-1" />
-                    {errors.thumbnail}
-                  </p>
-                )}
-              </div>
-            </div>
+           
 
             {/* Images Upload */}
             <div>
@@ -3012,6 +3002,74 @@ const ProductFormModal = ({
                 )}
               </div>
             </div>
+
+              {/* Size Chart Upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Size Chart
+                  <span className="text-xs text-gray-500 ml-2">(Optional, max 5MB)</span>
+                </label>
+
+                <div className={`border-2 border-dashed rounded-lg p-6 ${
+                  errors.sizeChart ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                }`}>
+
+                  {sizeChartPreview ? (
+                    <div>
+
+                      <div className="flex justify-between mb-3">
+                        <h4 className="text-sm font-medium text-gray-700">
+                          Size Chart Preview
+                        </h4>
+
+                        <button
+                          type="button"
+                          onClick={removeSizeChart}
+                          className="text-red-600 hover:text-red-800 text-sm font-medium"
+                        >
+                          Remove
+                        </button>
+
+                      </div>
+
+                      <img
+                        src={sizeChartPreview}
+                        alt="Size Chart Preview"
+                        className="w-full max-w-md rounded-lg border"
+                      />
+
+                    </div>
+                  ) : (
+
+                    <div className="text-center">
+
+                      <Upload className="mx-auto h-12 w-12 text-gray-400" />
+
+                      <label className="cursor-pointer">
+
+                        <span className="mt-2 px-4 py-2 bg-indigo-600 text-white rounded-lg inline-flex items-center">
+                          Upload Size Chart
+                        </span>
+
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleSizeChartUpload}
+                          className="hidden"
+                        />
+
+                      </label>
+
+                    </div>
+
+                  )}
+
+                  {errors.sizeChart && (
+                    <p className="text-red-600 text-sm mt-2">{errors.sizeChart}</p>
+                  )}
+
+                </div>
+              </div>
 
             {/* Video Upload */}
             <div>

@@ -36,6 +36,9 @@ const PRINT_DPI = 300;
 const IMAGE_FIXED_INCH = 4;
 const IMAGE_PRICE_SMALL = 40;   // <= 4x4
 const IMAGE_PRICE_LARGE = 100; 
+
+
+
 const getFixedImageLayerPrice = (wIn, hIn) => {
   const w = Number(wIn || 0);
   const h = Number(hIn || 0);
@@ -243,44 +246,130 @@ const getSizeBasePrice = (prod, size) => {
       img.src = url;
     });
 
-  const updateDesignLayerDimensions = (layer, scale = null) => {
-  const currentScale = scale !== null ? scale : layer.scale;
+const updateDesignLayerDimensions = (layer, opts = {}) => {
+  // Supports:
+  // - legacy uniform scale: opts.scale
+  // - new independent scaling: opts.scaleX / opts.scaleY
+  // Falls back cleanly if some values missing.
 
-  const currentDisplayWidthInches = layer.displayWidthInches * currentScale;
-  const currentDisplayHeightInches = layer.displayHeightInches * currentScale;
+  const nextScaleX =
+    typeof opts.scaleX === "number"
+      ? opts.scaleX
+      : typeof opts.scale === "number"
+        ? opts.scale
+        : (layer.scaleX ?? layer.scale ?? 0.35);
 
-  const currentPrintWidthInches = layer.printWidthInches * currentScale;
-  const currentPrintHeightInches = layer.printHeightInches * currentScale;
+  const nextScaleY =
+    typeof opts.scaleY === "number"
+      ? opts.scaleY
+      : typeof opts.scale === "number"
+        ? opts.scale
+        : (layer.scaleY ?? layer.scale ?? 0.35);
 
-  // ✅ inches that must come from RecolorEditor (preferred)
-  const widthIn = Number(layer.renderedWidthInches ?? currentPrintWidthInches ?? 0);
-  const heightIn = Number(layer.renderedHeightInches ?? currentPrintHeightInches ?? 0);
+  // Keep legacy `scale` for backward compatibility
+  // (use avg so old places still work)
+  const nextScale = (nextScaleX + nextScaleY) / 2;
+
+  // Inches should be derived from PRINT inches * scale
+  const currentDisplayWidthInches = (layer.displayWidthInches || 0) * nextScaleX;
+  const currentDisplayHeightInches = (layer.displayHeightInches || 0) * nextScaleY;
+
+  const currentPrintWidthInches = (layer.printWidthInches || 0) * nextScaleX;
+  const currentPrintHeightInches = (layer.printHeightInches || 0) * nextScaleY;
+
+  // Pixels
+  const renderedWidthPx = (layer.originalWidthPx || 0) * nextScaleX;
+  const renderedHeightPx = (layer.originalHeightPx || 0) * nextScaleY;
+
+  // ✅ ALWAYS recompute inches from print inches so it updates immediately
+  const widthIn = Number(currentPrintWidthInches || 0);
+  const heightIn = Number(currentPrintHeightInches || 0);
 
   const layerPrice = getFixedImageLayerPrice(widthIn, heightIn);
 
   return {
     ...layer,
-    scale: currentScale,
+
+    // legacy
+    scale: nextScale,
+
+    // new
+    scaleX: nextScaleX,
+    scaleY: nextScaleY,
 
     currentDisplayWidthInches,
     currentDisplayHeightInches,
-
     currentPrintWidthInches,
     currentPrintHeightInches,
 
-    renderedWidthPx: layer.originalWidthPx * currentScale,
-    renderedHeightPx: layer.originalHeightPx * currentScale,
+    renderedWidthPx,
+    renderedHeightPx,
 
     renderedWidthInches: widthIn,
     renderedHeightInches: heightIn,
 
     layerPrice,
     minimumChargeApplied: layerPrice === IMAGE_PRICE_SMALL,
-    currentAdditionalArea: 0, // not used anymore for image pricing
+
+    currentAdditionalArea: 0,
   };
 };
 
+const _num = (v, fallback = 0) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+};
 
+const restoreDesignLayerFromSaved = (d) => {
+  // 1) restore scaleX/scaleY safely (support legacy scale)
+  const scaleX = typeof d.scaleX === "number" ? d.scaleX : (typeof d.scale === "number" ? d.scale : 0.35);
+  const scaleY = typeof d.scaleY === "number" ? d.scaleY : (typeof d.scale === "number" ? d.scale : 0.35);
+
+  // IMPORTANT: legacy "scale" should represent the UI slider (avg of X/Y)
+  const scale = (scaleX + scaleY) / 2;
+
+  // 2) figure out original pixel dimensions (best effort)
+  let originalWidthPx = _num(d.originalWidthPx, 0);
+  let originalHeightPx = _num(d.originalHeightPx, 0);
+
+  // If original px missing, infer from saved inches (most reliable if you saved them)
+  if ((!originalWidthPx || !originalHeightPx) && (d.renderedWidthInches || d.renderedHeightInches)) {
+    const rwIn = _num(d.renderedWidthInches, 0);
+    const rhIn = _num(d.renderedHeightInches, 0);
+
+    // rendered inches = (originalPx / PRINT_DPI) * scaleX
+    // => originalPx = (renderedInches * PRINT_DPI) / scaleX
+    if (rwIn && scaleX) originalWidthPx = (rwIn * PRINT_DPI) / scaleX;
+    if (rhIn && scaleY) originalHeightPx = (rhIn * PRINT_DPI) / scaleY;
+  }
+
+  // If still missing, infer from rendered px (legacy saves)
+  if ((!originalWidthPx || !originalHeightPx) && (d.renderedWidthPx || d.renderedHeightPx)) {
+    const rwp = _num(d.renderedWidthPx, 0);
+    const rhp = _num(d.renderedHeightPx, 0);
+    if (rwp && scaleX) originalWidthPx = rwp / scaleX;
+    if (rhp && scaleY) originalHeightPx = rhp / scaleY;
+  }
+
+  // 3) rebuild base layer (no derived fields trusted yet)
+  const baseLayer = {
+    ...d,
+    scale,
+    scaleX,
+    scaleY,
+    originalWidthPx,
+    originalHeightPx,
+
+    // keep these if present (but we will recompute in updateDesignLayerDimensions)
+    displayWidthInches: originalWidthPx / DISPLAY_DPI,
+    displayHeightInches: originalHeightPx / DISPLAY_DPI,
+    printWidthInches: originalWidthPx / PRINT_DPI,
+    printHeightInches: originalHeightPx / PRINT_DPI,
+  };
+
+  // 4) recompute all dependent fields in ONE place
+  return updateDesignLayerDimensions(baseLayer, { scaleX, scaleY });
+};
 
   // -------- PRICE CALCULATION --------
   const calculatePrice = async (updateUI = true) => {
@@ -609,49 +698,27 @@ setPriceBreakdown((prev) => ({
               id: t.id || `text-${Date.now()}-${Math.random().toString(36).slice(2)}`
             })) || [],
             activeTextId: view.textLayers?.[0]?.id || null,
-            designLayers: view.designLayers?.map(d => {
-              const widthPx = d.originalWidthPx || d.renderedWidthPx / (d.scale || 0.35);
-              const heightPx = d.originalHeightPx || d.renderedHeightPx / (d.scale || 0.35);
-              
-              const displayWidthInches = widthPx / DISPLAY_DPI;
-              const displayHeightInches = heightPx / DISPLAY_DPI;
-              const displayAreaInches = displayWidthInches * displayHeightInches;
-              
-              const printWidthInches = widthPx / PRINT_DPI;
-              const printHeightInches = heightPx / PRINT_DPI;
-              const printAreaInches = printWidthInches * printHeightInches;
-              
-              const scale = d.scale || 0.35;
-              
-              return {
-                ...d,
-                id: d.id || `design-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                imageUrl: d.imageUrl?.startsWith('http') || d.imageUrl?.startsWith('blob:') || d.imageUrl?.startsWith('data:')
-                  ? d.imageUrl 
-                  : d.imageUrl?.startsWith('/') 
-                    ? `${API_URL}${d.imageUrl}`
-                    : d.imageUrl,
-                file: null,
-                originalFile: null,
-                isFromLibrary: false,
-                originalWidthPx: widthPx,
-                originalHeightPx: heightPx,
-                displayWidthInches: displayWidthInches,
-                displayHeightInches: displayHeightInches,
-                displayAreaInches: displayAreaInches,
-                printWidthInches: printWidthInches,
-                printHeightInches: printHeightInches,
-                printAreaInches: printAreaInches,
-                scale: scale,
-                currentDisplayWidthInches: displayWidthInches * scale,
-                currentDisplayHeightInches: displayHeightInches * scale,
-                currentPrintWidthInches: printWidthInches * scale,
-                currentPrintHeightInches: printHeightInches * scale,
-                currentPrintAreaInches: printAreaInches * scale * scale,
-                renderedWidthPx: widthPx * scale,
-                renderedHeightPx: heightPx * scale
-              };
-            }) || [],
+            designLayers: (view.designLayers || []).map((d) => {
+  const fixedUrl =
+    d.imageUrl?.startsWith("http") ||
+    d.imageUrl?.startsWith("blob:") ||
+    d.imageUrl?.startsWith("data:")
+      ? d.imageUrl
+      : d.imageUrl?.startsWith("/")
+        ? `${API_URL}${d.imageUrl}`
+        : d.imageUrl;
+
+  const restored = restoreDesignLayerFromSaved({
+    ...d,
+    id: d.id || `design-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    imageUrl: fixedUrl,
+    file: null,
+    originalFile: null,
+    isFromLibrary: d.isFromLibrary || false,
+  });
+
+  return restored;
+              }) || [],
             activeDesignId: view.designLayers?.[0]?.id || null,
           };
         });
@@ -1018,19 +1085,50 @@ const handleDesignUpload = async (e) => {
   };
 
   const handleDesignScaleChange = (value) => {
-    if (!activeDesign) return;
-    const v = parseFloat(value);
-    
-    const updated = designLayers.map((d) => {
-      if (d.id === activeDesign.id) {
-        return updateDesignLayerDimensions(d, v);
-      }
-      return d;
-    });
-    
-    updateCurrentViewState({ designLayers: updated });
-    calculatePrice();
-  };
+  // legacy uniform slider (kept)
+  if (!activeDesign) return;
+  const v = Math.max(0.05, parseFloat(value) || 0.35);
+
+  const updated = designLayers.map((d) => {
+    if (d.id === activeDesign.id) {
+      return updateDesignLayerDimensions(d, { scale: v });
+    }
+    return d;
+  });
+
+  updateCurrentViewState({ designLayers: updated });
+  calculatePrice();
+};
+
+const handleDesignScaleXChange = (value) => {
+  if (!activeDesign) return;
+  const v = Math.max(0.05, parseFloat(value) || 0.35);
+
+  const updated = designLayers.map((d) => {
+    if (d.id === activeDesign.id) {
+      return updateDesignLayerDimensions(d, { scaleX: v });
+    }
+    return d;
+  });
+
+  updateCurrentViewState({ designLayers: updated });
+  calculatePrice();
+};
+
+const handleDesignScaleYChange = (value) => {
+  if (!activeDesign) return;
+  const v = Math.max(0.05, parseFloat(value) || 0.35);
+
+  const updated = designLayers.map((d) => {
+    if (d.id === activeDesign.id) {
+      return updateDesignLayerDimensions(d, { scaleY: v });
+    }
+    return d;
+  });
+
+  updateCurrentViewState({ designLayers: updated });
+  calculatePrice();
+};
 
   const handleSetTextLayers = (updater) => {
     setViewStates((prev) => {
@@ -1397,59 +1495,24 @@ const handleDesignUpload = async (e) => {
           id: t.id || `text-${Date.now()}-${Math.random().toString(36).slice(2)}`
         })) || [],
         activeTextId: view.textLayers?.[0]?.id || null,
-        designLayers: view.designLayers?.map(d => {
-          const widthPx = d.originalWidthPx || d.renderedWidthPx / (d.scale || 0.35);
-          const heightPx = d.originalHeightPx || d.renderedHeightPx / (d.scale || 0.35);
-          
-          const displayWidthInches = widthPx / DISPLAY_DPI;
-          const displayHeightInches = heightPx / DISPLAY_DPI;
-          const displayAreaInches = displayWidthInches * displayHeightInches;
-          
-          const printWidthInches = widthPx / PRINT_DPI;
-          const printHeightInches = heightPx / PRINT_DPI;
-          const printAreaInches = printWidthInches * printHeightInches;
-          
-          const scale = d.scale || 0.35;
-          
-          return {
-  ...d,
-  id: d.id || `design-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-  imageUrl: d.imageUrl?.startsWith('http') || d.imageUrl?.startsWith('blob:') || d.imageUrl?.startsWith('data:')
-    ? d.imageUrl 
-    : d.imageUrl?.startsWith('/') 
-      ? `${API_URL}${d.imageUrl}`
-      : d.imageUrl,
-  file: null,
-  originalFile: null,
-  isFromLibrary: d.isFromLibrary || false,
+        designLayers: (view.designLayers || []).map((d) => {
+  const fixedUrl =
+    d.imageUrl?.startsWith("http") ||
+    d.imageUrl?.startsWith("blob:") ||
+    d.imageUrl?.startsWith("data:")
+      ? d.imageUrl
+      : d.imageUrl?.startsWith("/")
+        ? `${API_URL}${d.imageUrl}`
+        : d.imageUrl;
 
-  originalWidthPx: widthPx,
-  originalHeightPx: heightPx,
-
-  displayWidthInches,
-  displayHeightInches,
-  displayAreaInches,
-
-  printWidthInches,
-  printHeightInches,
-  printAreaInches,
-
-  scale,
-
-  currentDisplayWidthInches: displayWidthInches * scale,
-  currentDisplayHeightInches: displayHeightInches * scale,
-  currentPrintWidthInches: printWidthInches * scale,
-  currentPrintHeightInches: printHeightInches * scale,
-  currentPrintAreaInches: printAreaInches * scale * scale,
-
-  renderedWidthPx: widthPx * scale,
-  renderedHeightPx: heightPx * scale,
-
-  // ✅ ADD THESE (CRITICAL FOR EDIT/UPDATE PRICE)
-  renderedWidthInches: d.renderedWidthInches ?? (printWidthInches * scale),
-  renderedHeightInches: d.renderedHeightInches ?? (printHeightInches * scale),
-};
-
+  return restoreDesignLayerFromSaved({
+    ...d,
+    id: d.id || `design-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    imageUrl: fixedUrl,
+    file: null,
+    originalFile: null,
+    isFromLibrary: d.isFromLibrary || false,
+  });
         }) || [],
         activeDesignId: view.designLayers?.[0]?.id || null,
       };
@@ -1575,6 +1638,38 @@ const handleDesignUpload = async (e) => {
       {/* Main area */}
       <div className="flex flex-1 min-h-0 flex-col gap-6 px-4 pb-6 pt-3 sm:px-6">
         <div className="flex flex-1 flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)_minmax(0,320px)] lg:items-start">
+          {/* Mobile helper card */}
+          <div className="lg:hidden">
+            <div className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 text-[11px] text-slate-600 shadow-sm">
+              <p className="mb-1 font-semibold text-slate-800">Design tips</p>
+              <p className="text-[11px] leading-tight text-slate-600">
+                Tap anywhere on the mockup to select the canvas, then drag the handles to reposition elements. Use the tabs below to change colors, add designs, or edit text.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(TABS.DESIGNS)}
+                  className="rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                >
+                  Open designs
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(TABS.TEXT)}
+                  className="rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                >
+                  Add text
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(TABS.PRODUCT_COLORS)}
+                  className="rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                >
+                  Pick colors
+                </button>
+              </div>
+            </div>
+          </div>
           {/* Left sidebar - Controls */}
           <aside className="w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm flex flex-col gap-6 min-h-0 lg:w-auto">
           {/* Edit mode indicator */}
@@ -1593,34 +1688,34 @@ const handleDesignUpload = async (e) => {
           )}
 
           {/* Tab navigation */}
-          <div className="flex border-b border-slate-200">
+          <div className="flex gap-1 overflow-x-auto border-b border-slate-200 pb-2 text-[10px] sm:gap-2">
             <button
               onClick={() => setActiveTab(TABS.PRODUCT_COLORS)}
-              className={`px-3 py-2 text-xs font-medium ${activeTab === TABS.PRODUCT_COLORS ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-shrink-0 whitespace-nowrap px-3 py-2 text-xs font-medium ${activeTab === TABS.PRODUCT_COLORS ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
             >
               Product Colors
             </button>
             <button
               onClick={() => setActiveTab(TABS.DESIGNS)}
-              className={`px-3 py-2 text-xs font-medium ${activeTab === TABS.DESIGNS ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-shrink-0 whitespace-nowrap px-3 py-2 text-xs font-medium ${activeTab === TABS.DESIGNS ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
             >
               Designs
             </button>
             <button
               onClick={() => setActiveTab(TABS.TEXT)}
-              className={`px-3 py-2 text-xs font-medium ${activeTab === TABS.TEXT ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-shrink-0 whitespace-nowrap px-3 py-2 text-xs font-medium ${activeTab === TABS.TEXT ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
             >
               Text
             </button>
             <button
               onClick={() => setActiveTab(TABS.VIEWS)}
-              className={`px-3 py-2 text-xs font-medium ${activeTab === TABS.VIEWS ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-shrink-0 whitespace-nowrap px-3 py-2 text-xs font-medium ${activeTab === TABS.VIEWS ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
             >
               Views
             </button>
             <button
               onClick={() => setActiveTab(TABS.DESIGN_LIBRARY)}
-              className={`px-3 py-2 text-xs font-medium ${activeTab === TABS.DESIGN_LIBRARY ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-shrink-0 whitespace-nowrap px-3 py-2 text-xs font-medium ${activeTab === TABS.DESIGN_LIBRARY ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
             >
               Design Library
             </button>
@@ -1792,6 +1887,43 @@ const handleDesignUpload = async (e) => {
                           <div>Print: {activeDesign.currentPrintWidthInches?.toFixed(2)}" × {activeDesign.currentPrintHeightInches?.toFixed(2)}"</div>
                         </div>
                       </div>
+
+
+                      <div className="mb-4">
+  <label className="mb-2 block text-xs font-medium">Scale X (Width)</label>
+  <div className="flex items-center gap-2">
+    <input
+      type="range"
+      min={0.1}
+      max={1.6}
+      step={0.02}
+      value={activeDesign.scaleX ?? activeDesign.scale ?? 0.35}
+      onChange={(e) => handleDesignScaleXChange(e.target.value)}
+      className="flex-1"
+    />
+    <span className="w-10 text-right text-xs text-slate-600">
+      {Math.round((activeDesign.scaleX ?? activeDesign.scale ?? 0.35) * 100)}%
+    </span>
+  </div>
+</div>
+
+<div className="mb-4">
+  <label className="mb-2 block text-xs font-medium">Scale Y (Height)</label>
+  <div className="flex items-center gap-2">
+    <input
+      type="range"
+      min={0.1}
+      max={1.6}
+      step={0.02}
+      value={activeDesign.scaleY ?? activeDesign.scale ?? 0.35}
+      onChange={(e) => handleDesignScaleYChange(e.target.value)}
+      className="flex-1"
+    />
+    <span className="w-10 text-right text-xs text-slate-600">
+      {Math.round((activeDesign.scaleY ?? activeDesign.scale ?? 0.35) * 100)}%
+    </span>
+  </div>
+</div>
 
                       <div className="text-xs text-slate-600 space-y-1">
                         <p>• Click on a design in the editor to select it</p>
@@ -2201,6 +2333,33 @@ const handleDesignUpload = async (e) => {
         <span className="text-slate-400">
           {isEditMode ? "Editing existing design. Changes will update the original when you click 'Update Design'." : "Drag, resize, and customize elements. Click tabs on the left to switch between tools."}
         </span>
+        <div className="flex flex-col gap-2 pt-2 lg:hidden">
+          <div className="text-[11px] text-slate-500">
+            Quick actions keep the workspace readable while you design on the go.
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleSaveDesign}
+              disabled={saving || addingToCart}
+              className="flex-1 rounded-full border border-sky-600 bg-sky-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-sky-700 disabled:opacity-60 lg:flex-initial"
+            >
+              {saving ? "Saving…" : isEditMode ? "Update design" : "Save design"}
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveAndAddToCart}
+              disabled={saving || addingToCart}
+              className="flex-1 rounded-full border border-emerald-600 bg-emerald-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 lg:flex-initial"
+            >
+              {addingToCart
+                ? "Adding…"
+                : savedDesignId
+                  ? "Add to cart"
+                  : "Save & add to cart"}
+            </button>
+          </div>
+        </div>
       </footer>
     </div>
   );

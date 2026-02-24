@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { getProductById as fetchReadymadeProductById } from '../redux/slices/productList.js';
+import DOMPurify from "dompurify";
 import { 
   addToCart, 
   getCart,
@@ -535,6 +536,9 @@ if (quantity > maxStock) {
   const displayData = getDisplayData();
   const isOutOfStock = displayData?.isOutOfStock || false;
   const images = displayData?.images || [];
+  const sizeChartUrl = itemData?.sizeChart
+  ? getImageUrl(itemData.sizeChart)
+  : null;
   
   // Loading state
   if (loading) {
@@ -807,6 +811,7 @@ if (quantity > maxStock) {
 
                 {/* Image Thumbnails */}
                 {images.length > 1 && (
+                  
                   <div className="mt-6">
                     <p className="text-sm font-medium text-gray-700 mb-3">
                       Images ({images.length})
@@ -874,6 +879,7 @@ if (quantity > maxStock) {
 
             {/* Action Buttons */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              
               <button
                 onClick={handleAddToCart}
                 disabled={isOutOfStock || isAddingToCart || cartLoading || !isLoggedIn || (hasVariants && !selectedSize)}
@@ -918,7 +924,41 @@ if (quantity > maxStock) {
                 <CreditCard className="w-5 h-5" />
                 {!isLoggedIn ? 'Login to Buy Now' : 'Buy Now'}
               </button>
+              
             </div>
+            {/* ✅ Size Chart below Add to Cart */}
+{isReadymade && sizeChartUrl && (
+  <div className="mt-6 bg-white rounded-2xl shadow-lg border border-gray-100 p-5">
+
+    {/* Header */}
+    <div className="flex items-center justify-between mb-3">
+      <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+        📏 Size Chart
+      </h3>
+
+      {/* <button
+        onClick={() => window.open(sizeChartUrl, "_blank")}
+        className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+      >
+       
+          View Full Size
+      </button> */}
+    </div>
+
+    {/* Image */}
+    <div className="border rounded-xl bg-gray-50 p-3 hover:shadow-md transition">
+
+      <img
+        src={sizeChartUrl}
+        alt="Size Chart"
+        className="w-full max-h-[400px] object-contain cursor-zoom-in transition hover:scale-[1.02]"
+        onClick={() => window.open(sizeChartUrl, "_blank")}
+      />
+
+    </div>
+
+  </div>
+)}
           </div>
 
           {/* Right Column - Details */}
@@ -1001,10 +1041,24 @@ if (quantity > maxStock) {
               </div>
 
               {/* Description */}
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Description</h3>
-                <p className="text-gray-600 whitespace-pre-line">{displayData.description}</p>
-              </div>
+              {/* Description */}
+<div className="mb-6">
+  <h3 className="text-lg font-semibold text-gray-900 mb-3">Description</h3>
+
+  <div
+    className="text-gray-600 leading-relaxed
+      [&_p]:mb-3
+      [&_strong]:font-semibold
+      [&_em]:italic
+      [&_blockquote]:border-l-4 [&_blockquote]:border-gray-300 [&_blockquote]:pl-4 [&_blockquote]:text-gray-700
+      [&_ul]:list-disc [&_ul]:pl-6
+      [&_ol]:list-decimal [&_ol]:pl-6
+      [&_li]:mb-1"
+    dangerouslySetInnerHTML={{
+      __html: DOMPurify.sanitize(displayData.description || ""),
+    }}
+  />
+</div>
 
               {/* Size Selection (only for readymade products) */}
               {isReadymade && hasVariants && (

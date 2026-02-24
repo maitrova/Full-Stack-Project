@@ -88,6 +88,7 @@ import ProductSearch from '../components/searchproductdetail.jsx';
 // Import Admin Designs component
  // Adjust the import path as needed
 import AdminDesignsPage from './AdminDesignsPage.jsx';
+import DesignUploadsManager from '../components/admindesignuploads.jsx';
 
 const AdminDashboard = () => {
   const dispatch = useDispatch();
@@ -256,33 +257,35 @@ const AdminDashboard = () => {
   };
 
   const handleTabChange = (tab) => {
-    setActiveSidebarItem(tab);
-    dispatch(setActiveTab(tab));
-    dispatch(setCurrentFilter(tab));
-    dispatch(setCurrentCategory(''));
-    dispatch(setCurrentSubCategory(''));
-    dispatch(deselectAllProducts());
-    setLocalCategory('');
-    setLocalSubCategory('');
-    
-    if (tab === 'designs') {
-      setViewMode('designs');
-      loadDesigns();
-    } else if (tab === 'adminDesigns') {
-      setViewMode('adminDesigns');
-    } else if (tab === 'dropproducts') {
-      setViewMode('dropproducts');
-    } else if (tab === 'orders') {
-      setViewMode('orders');
-    } else if (tab === 'homepage') {
-      setViewMode('homepage');
-    } else if (tab === 'search') {
-      setViewMode('search');
-    } else {
-      setViewMode('products');
-      loadProducts();
-    }
-  };
+  setActiveSidebarItem(tab);
+  dispatch(setActiveTab(tab));
+  dispatch(setCurrentFilter(tab));
+  dispatch(setCurrentCategory(''));
+  dispatch(setCurrentSubCategory(''));
+  dispatch(deselectAllProducts());
+  setLocalCategory('');
+  setLocalSubCategory('');
+
+  if (tab === 'designs') {
+    setViewMode('designs');
+    loadDesigns();
+  } else if (tab === 'adminDesigns') {
+    setViewMode('adminDesigns');
+  } else if (tab === 'adminUploads') {
+    setViewMode('adminUploads'); // ✅ NEW
+  } else if (tab === 'dropproducts') {
+    setViewMode('dropproducts');
+  } else if (tab === 'orders') {
+    setViewMode('orders');
+  } else if (tab === 'homepage') {
+    setViewMode('homepage');
+  } else if (tab === 'search') {
+    setViewMode('search');
+  } else {
+    setViewMode('products');
+    loadProducts();
+  }
+};
 
   const handleEditClick = () => {
     dispatch(setIsEditing(true));
@@ -597,6 +600,7 @@ const AdminDashboard = () => {
     { id: 'orders', label: 'Orders', icon: <ShoppingBag className="w-5 h-5" /> },
     { id: 'homepage', label: 'Homepage', icon: <Home className="w-5 h-5" /> },
     { id: 'search', label: 'Product Search', icon: <Search className="w-5 h-5" /> },
+    { id: 'adminUploads', label: 'Admin Uploads', icon: <Upload className="w-5 h-5" /> },
     { id: 'newArrival', label: 'New Arrivals', icon: <TrendingUp className="w-5 h-5" /> },
     { id: 'bestSeller', label: 'Best Sellers', icon: <BarChart3 className="w-5 h-5" /> },
     { id: 'prices', label: 'Prices', icon: <DollarSign className="w-5 h-5" /> },
@@ -974,6 +978,7 @@ const AdminDashboard = () => {
                 {activeSidebarItem === 'users' && 'User Management'}
                 {activeSidebarItem === 'analytics' && 'Analytics'}
                 {activeSidebarItem === 'settings' && 'Settings'}
+                {activeSidebarItem === 'adminUploads' && 'Admin Uploads'}
               </h1>
               <p className="text-gray-600 mt-2">
                 {activeSidebarItem === 'dashboard' && 'Overview of your store performance'}
@@ -990,6 +995,7 @@ const AdminDashboard = () => {
                 {activeSidebarItem === 'users' && 'Manage customers and administrators'}
                 {activeSidebarItem === 'analytics' && 'View sales and performance analytics'}
                 {activeSidebarItem === 'settings' && 'Configure store settings'}
+                {activeSidebarItem === 'adminUploads' && 'Upload and manage admin files'}
               </p>
             </div>
             
@@ -1096,6 +1102,11 @@ const AdminDashboard = () => {
           {/* Admin Designs Component */}
           {activeSidebarItem === 'adminDesigns' && (
             <AdminDesignsPage />
+          )}
+
+          {/* Admin Uploads Component */}
+          {activeSidebarItem === 'adminUploads' && (
+            <DesignUploadsManager />
           )}
 
           {/* Search and Filters for Products */}
@@ -1663,8 +1674,12 @@ const AdminDashboard = () => {
                 </>
               )}
             </div>
-          ) : activeSidebarItem !== 'dropproducts' && activeSidebarItem !== 'orders' && activeSidebarItem !== 'homepage' && activeSidebarItem !== 'search' && activeSidebarItem !== 'adminDesigns' ? (
-            /* View Mode for Products (excluding dropproducts, orders, homepage, search, and adminDesigns) */
+) : activeSidebarItem !== 'dropproducts' && 
+     activeSidebarItem !== 'orders' && 
+     activeSidebarItem !== 'homepage' && 
+     activeSidebarItem !== 'search' && 
+     activeSidebarItem !== 'adminDesigns' &&
+     activeSidebarItem !== 'adminUploads' ? (            /* View Mode for Products (excluding dropproducts, orders, homepage, search, and adminDesigns) */
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
               {productsLoading ? (
                 <div className="flex justify-center items-center h-64">
