@@ -68,9 +68,16 @@ const DesignUploadsManager = () => {
 
   // Handle file selection
   const handleFileSelect = (e) => {
-    const files = Array.from(e.target.files);
-    setSelectedFiles(files);
-  };
+
+  const files = Array.from(e.target.files);
+
+  const imageFiles = files.filter(file =>
+    file.type.startsWith("image/")
+  );
+
+  setSelectedFiles(imageFiles);
+
+};
 
   // Handle drag and drop
   const handleDragEnter = (e) => {
@@ -104,13 +111,20 @@ const DesignUploadsManager = () => {
 
   // Handle upload
   const handleUpload = () => {
-    if (currentFolder && selectedFiles.length > 0) {
-      dispatch(uploadImages({ folder: currentFolder, images: selectedFiles }));
-      setSelectedFiles([]);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
+
+    if (!currentFolder) return;
+
+    const formData = new FormData();
+
+    selectedFiles.forEach(file => {
+      formData.append("images", file);
+    });
+
+    dispatch(uploadImages({
+      folder: currentFolder,
+      images: formData
+    }));
+
   };
 
   // Handle image deletion
@@ -386,7 +400,8 @@ const DesignUploadsManager = () => {
                     ref={fileInputRef}
                     type="file"
                     multiple
-                    accept="image/*"
+                    webkitdirectory="true"
+                    directory="true"
                     onChange={handleFileSelect}
                     className="hidden"
                     id="file-upload"

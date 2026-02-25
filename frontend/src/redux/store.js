@@ -29,6 +29,7 @@ import  brandSliceReducer from "./slices/brandSlice.js";
 import adminSearchSliceReducer from "./slices/adminSearchSlice.js";
 import exportOrdersSliceReducer from "./slices/exportorders.js";
 import colorReducer from "./slices/colorSlice.js";
+import companyPdfSliceReducer from "./slices/companyPdfSlice.js";
 // Persist configuration for user slice only
 const persistConfig = {
   key: 'user', // key for localStorage
@@ -69,7 +70,8 @@ export const store = configureStore({
     brand : brandSliceReducer,
     adminSearch : adminSearchSliceReducer,
     exportOrders : exportOrdersSliceReducer,
-    colors: colorReducer,// Use persisted reducer instead of regular one
+    colors: colorReducer,
+    companyPdf: companyPdfSliceReducer,// Use persisted reducer instead of regular one
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

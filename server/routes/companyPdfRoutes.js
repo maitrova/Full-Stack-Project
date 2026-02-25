@@ -2,6 +2,8 @@ import express from "express";
 import {
   uploadCompanyPdfMiddleware,
   uploadCompanyPdf,
+  getCompanyDocuments,
+  getCompanyDocumentByName,
 } from "../controllers/companyPdfController.js";
 
 const companypdfs = express.Router();
@@ -13,5 +15,11 @@ companypdfs.post("/upload", (req, res, next) => {
     return uploadCompanyPdf(req, res);
   });
 });
+
+
+
+companypdfs.get("/company-documents", getCompanyDocuments);
+
+companypdfs.get("/company-documents/:name", getCompanyDocumentByName);
 
 export default companypdfs;

@@ -2,7 +2,8 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-
+// Controller
+import CompanyDocument from "../models/filenames.js";
 // ESM dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -36,17 +37,87 @@ export const uploadCompanyPdfMiddleware = multer({
   limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
 }).single("file");  // 🔥 changed field name
 
-// Controller
-export const uploadCompanyPdf = (req, res) => {
-  if (!req.file)
-    return res.status(400).json({ error: "No file uploaded" });
+export const uploadCompanyPdf = async (req, res) => {
 
-  return res.status(200).json({
-    message: "File uploaded successfully",
-    filename: req.file.filename,
-    originalname: req.file.originalname,
-    mimetype: req.file.mimetype,
-    publicUrl: `/api/outputs/company_pdfs/${req.file.filename}`,
-    savedPath: `outputs/company_pdfs/${req.file.filename}`,
-  });
+  try {
+
+    if (!req.file)
+      return res.status(400).json({ error: "No file uploaded" });
+
+    const { name } = req.body;
+
+    if (!name)
+      return res.status(400).json({ error: "Document name required" });
+
+    // relative path to save in DB
+    const filePath = `outputs/company_pdfs/${req.file.filename}`;
+
+    // save in DB
+    const document = await CompanyDocument.create({
+      name,
+      filePath,
+    });
+
+    res.status(200).json({
+      message: "Document uploaded successfully",
+      document,
+      publicUrl: `/api/${filePath}`,
+    });
+
+  } catch (error) {
+
+    res.status(500).json({
+      error: error.message,
+    });
+
+  }
+
+};
+
+
+export const getCompanyDocuments = async (req, res) => {
+
+  try {
+
+    const documents = await CompanyDocument.find().sort({ createdAt: -1 });
+
+    res.status(200).json(documents);
+
+  } catch (error) {
+
+    res.status(500).json({
+      error: error.message,
+    });
+
+  }
+
+};
+
+
+export const getCompanyDocumentByName = async (req, res) => {
+
+  try {
+
+    const { name } = req.params;
+
+    const document = await CompanyDocument.findOne({ name });
+
+    if (!document) {
+
+      return res.status(404).json({
+        error: "Document not found",
+      });
+
+    }
+
+    res.status(200).json(document);
+
+  } catch (error) {
+
+    res.status(500).json({
+      error: error.message,
+    });
+
+  }
+
 };

@@ -41,10 +41,9 @@ import {
 } from "../redux/slices/Cartslice.js";
 import { selectCurrentToken } from "../redux/slices/Userslice.js";
 
-
-
 const API_URL = import.meta.env.VITE_API_URL;        
 const IMAGE_URL = import.meta.env.VITE_IMAGE_URL || "https://maitrova.in/backend";
+
 // All products specific color palette - More muted, professional colors
 const ALL_PRODUCTS_COLORS = {
   primary: {
@@ -117,10 +116,19 @@ export default function AllProductsHub() {
   const [addedProductName, setAddedProductName] = useState('');
   const [addingToCartId, setAddingToCartId] = useState(null);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  
+  // Determine what to show
+  const showCategoryTiles = 
+    selectedCommonCategory === "all" &&
+    selectedCommonSubCategory === "all" &&
+    !searchQuery?.trim() &&
+    !urlFilter;
+
   const showSubCategoryTiles =
-  selectedCommonCategory !== "all" &&
-  selectedCommonSubCategory === "all" &&
-  !searchQuery?.trim();   // optional: if user searches, show products directly
+    selectedCommonCategory !== "all" &&
+    selectedCommonSubCategory === "all" &&
+    !searchQuery?.trim() &&
+    !urlFilter;
 
   // Redux state
   const commonSavedData = useSelector(selectCommonSavedData);
@@ -428,27 +436,54 @@ export default function AllProductsHub() {
   
   // Helper functions
   const getImageUrl = useCallback((imagePath) => {
-  if (!imagePath)
-    return "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800";
+    if (!imagePath)
+      return "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800";
 
-  // ✅ HANDLE OBJECT CASE
-  if (typeof imagePath === "object") {
-    imagePath = imagePath.url;
-  }
+    // ✅ HANDLE OBJECT CASE
+    if (typeof imagePath === "object") {
+      imagePath = imagePath.url;
+    }
 
-  // safety check
-  if (!imagePath || typeof imagePath !== "string")
-    return "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800";
+    // safety check
+    if (!imagePath || typeof imagePath !== "string")
+      return "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800";
 
-  if (imagePath.startsWith("http") || imagePath.startsWith("data:")) {
-    return imagePath;
-  }
+    if (imagePath.startsWith("http") || imagePath.startsWith("data:")) {
+      return imagePath;
+    }
 
-  const baseUrl = IMAGE_URL.replace("/backend", "");
+    const baseUrl = IMAGE_URL.replace("/backend", "");
 
-  return `${baseUrl}${imagePath.startsWith("/") ? "" : "/"}${imagePath}`;
-}, []);
+    return `${baseUrl}${imagePath.startsWith("/") ? "" : "/"}${imagePath}`;
+  }, []);
 
+  // Get categories with thumbnails
+  const getCategoriesWithThumbnails = useMemo(() => {
+    const categoryMap = new Map();
+    
+    commonSavedData.forEach((item) => {
+      if (item.category) {
+        if (!categoryMap.has(item.category)) {
+          categoryMap.set(item.category, {
+            name: item.category,
+            count: 0,
+            thumbnail: item.categoryThumbnail || item.raw?.categoryThumbnail || null,
+            altText: item.categoryAltText || item.category,
+          });
+        }
+        
+        const entry = categoryMap.get(item.category);
+        entry.count += 1;
+        
+        // Prefer first item's thumbnail if no category thumbnail exists
+        if (!entry.thumbnail && (item.previewImage || item.raw?.images?.[0])) {
+          entry.thumbnail = item.previewImage || item.raw?.images?.[0];
+        }
+      }
+    });
+    
+    return Array.from(categoryMap.values());
+  }, [commonSavedData]);
   
   const getCartQuantityForCommon = (item) => {
     if (item.type === 'design') {
@@ -526,36 +561,32 @@ export default function AllProductsHub() {
     return Array.from(categories.entries()).map(([name, count]) => ({ name, count }));
   }, [commonSavedData]);
   
-const getCommonSubcategories = useMemo(() => {
-  if (selectedCommonCategory === "all") return [];
+  const getCommonSubcategories = useMemo(() => {
+    if (selectedCommonCategory === "all") return [];
 
-  const map = new Map();
+    const map = new Map();
 
-  commonSavedData.forEach((item) => {
-    if (
-      item.category === selectedCommonCategory &&
-      item.subCategory
-    ) {
-      if (!map.has(item.subCategory)) {
-        map.set(item.subCategory, {
-          name: item.subCategory,
-          count: 0,
-          // thumb: item.subCategoryThumbnail || null, // ✅ FIXED
-          thumb: item.subCategoryThumbnail || null,
-          altText: item.subCategoryAltText || item.subCategory || "",
+    commonSavedData.forEach((item) => {
+      if (
+        item.category === selectedCommonCategory &&
+        item.subCategory
+      ) {
+        if (!map.has(item.subCategory)) {
+          map.set(item.subCategory, {
+            name: item.subCategory,
+            count: 0,
+            thumb: item.subCategoryThumbnail || null,
+            altText: item.subCategoryAltText || item.subCategory || "",
+          });
+        }
 
-        });
+        const entry = map.get(item.subCategory);
+        entry.count += 1;
       }
+    });
 
-      const entry = map.get(item.subCategory);
-      entry.count += 1;
-    }
-  });
-
-  return Array.from(map.values());
-}, [commonSavedData, selectedCommonCategory]);
-
-
+    return Array.from(map.values());
+  }, [commonSavedData, selectedCommonCategory]);
   
   const applyQuickPriceRange = (range) => {
     setQuickPriceRange(range.label);
@@ -660,138 +691,137 @@ const getCommonSubcategories = useMemo(() => {
       
       {/* Mobile Filter Drawer */}
       {showMobileFilters && (
-  <div className="lg:hidden fixed inset-0 z-50">
-    <div
-      className="absolute inset-0 bg-black/50"
-      onClick={() => setShowMobileFilters(false)}
-    />
+        <div className="lg:hidden fixed inset-0 z-50">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowMobileFilters(false)}
+          />
 
-    <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-xl">
-      <div className="h-full flex flex-col">
-        
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="font-medium text-gray-900">Filters</h3>
-          <button onClick={() => setShowMobileFilters(false)} className="p-1">
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-4">
-
-          {/* Category Filter */}
-          <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">
-              Categories
-            </h3>
-
-            <div className="space-y-2">
-              <button
-                onClick={() => selectCategory('all', true)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm ${
-                  selectedCommonCategory === 'all'
-                    ? 'bg-gray-900 text-white'
-                    : 'text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                <span>All Categories</span>
-              </button>
-
-              {getCommonCategories.map((category) => (
-                <button
-                  key={category.name}
-                  onClick={() => selectCategory(category.name, true)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm ${
-                    selectedCommonCategory === category.name
-                      ? 'bg-gray-900 text-white'
-                      : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  <span>{category.name}</span>
+          <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-xl">
+            <div className="h-full flex flex-col">
+              
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 border-b">
+                <h3 className="font-medium text-gray-900">Filters</h3>
+                <button onClick={() => setShowMobileFilters(false)} className="p-1">
+                  <X className="w-5 h-5 text-gray-500" />
                 </button>
-              ))}
-            </div>
+              </div>
 
-            {selectedCommonCategory !== 'all' &&
-              getCommonSubcategories.length > 0 && (
-                <div className="mt-3">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                    Subcategories
-                  </p>
+              {/* Body */}
+              <div className="flex-1 overflow-y-auto p-4">
 
-                  <div className="space-y-1">
+                {/* Category Filter */}
+                <div className="mb-6">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">
+                    Categories
+                  </h3>
+
+                  <div className="space-y-2">
                     <button
-                      onClick={() => selectSubCategory('all', true)}
-                      className={`w-full text-left px-3 py-2 rounded text-sm ${
-                        selectedCommonSubCategory === 'all'
+                      onClick={() => selectCategory('all', true)}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm ${
+                        selectedCommonCategory === 'all'
                           ? 'bg-gray-900 text-white'
                           : 'text-gray-600 hover:bg-gray-50'
                       }`}
                     >
-                      All Subcategories
+                      <span>All Categories</span>
                     </button>
 
-                    {getCommonSubcategories.map((sub) => (
+                    {getCommonCategories.map((category) => (
                       <button
-                        key={sub.name}
-                        onClick={() => selectSubCategory(sub.name, true)}
+                        key={category.name}
+                        onClick={() => selectCategory(category.name, true)}
                         className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm ${
-                          selectedCommonSubCategory === sub.name
+                          selectedCommonCategory === category.name
                             ? 'bg-gray-900 text-white'
                             : 'text-gray-600 hover:bg-gray-50'
                         }`}
                       >
-                        <span>{sub.name}</span>
+                        <span>{category.name}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {selectedCommonCategory !== 'all' &&
+                    getCommonSubcategories.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                          Subcategories
+                        </p>
+
+                        <div className="space-y-1">
+                          <button
+                            onClick={() => selectSubCategory('all', true)}
+                            className={`w-full text-left px-3 py-2 rounded text-sm ${
+                              selectedCommonSubCategory === 'all'
+                                ? 'bg-gray-900 text-white'
+                                : 'text-gray-600 hover:bg-gray-50'
+                            }`}
+                          >
+                            All Subcategories
+                          </button>
+
+                          {getCommonSubcategories.map((sub) => (
+                            <button
+                              key={sub.name}
+                              onClick={() => selectSubCategory(sub.name, true)}
+                              className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm ${
+                                selectedCommonSubCategory === sub.name
+                                  ? 'bg-gray-900 text-white'
+                                  : 'text-gray-600 hover:bg-gray-50'
+                              }`}
+                            >
+                              <span>{sub.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                </div>
+
+                {/* Price Range */}
+                <div className="mb-6">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">
+                    Price Range
+                  </h3>
+
+                  <div className="space-y-2">
+                    {ALL_PRODUCTS_PRICE_RANGES.map((range) => (
+                      <button
+                        key={range.label}
+                        onClick={() => {
+                          applyQuickPriceRange(range);
+                          setShowMobileFilters(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded text-sm ${
+                          quickPriceRange === range.label
+                            ? 'bg-gray-900 text-white'
+                            : 'text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {range.label}
                       </button>
                     ))}
                   </div>
                 </div>
-              )}
-          </div>
 
-          {/* Price Range */}
-          <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">
-              Price Range
-            </h3>
-
-            <div className="space-y-2">
-              {ALL_PRODUCTS_PRICE_RANGES.map((range) => (
+                {/* Clear Filters */}
                 <button
-                  key={range.label}
                   onClick={() => {
-                    applyQuickPriceRange(range);
+                    handleClearFilters();
                     setShowMobileFilters(false);
                   }}
-                  className={`w-full text-left px-3 py-2 rounded text-sm ${
-                    quickPriceRange === range.label
-                      ? 'bg-gray-900 text-white'
-                      : 'text-gray-600 hover:bg-gray-50'
-                  }`}
+                  className="w-full py-2.5 border border-gray-300 text-gray-700 rounded font-medium text-sm hover:bg-gray-50"
                 >
-                  {range.label}
+                  Clear All Filters
                 </button>
-              ))}
+              </div>
             </div>
           </div>
-
-          {/* Clear Filters */}
-          <button
-            onClick={() => {
-              handleClearFilters();
-              setShowMobileFilters(false);
-            }}
-            className="w-full py-2.5 border border-gray-300 text-gray-700 rounded font-medium text-sm hover:bg-gray-50"
-          >
-            Clear All Filters
-          </button>
         </div>
-      </div>
-    </div>
-  </div>
-)}
-
+      )}
       
       {/* Header */}
       <div className="sticky top-0 z-40 bg-white border-b border-gray-200">
@@ -826,7 +856,6 @@ const getCommonSubcategories = useMemo(() => {
           <div className="hidden lg:block w-64 shrink-0">
             <div className="bg-white rounded-lg border border-gray-200 p-4 sticky top-20">
               
-              
               {/* Category Filter */}
               <div className="mb-6">
                 <h3 className="text-sm font-medium text-gray-700 mb-3">Categories</h3>
@@ -840,9 +869,6 @@ const getCommonSubcategories = useMemo(() => {
                     }`}
                   >
                     <span>All Categories</span>
-                    {/* <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-gray-800 text-gray-100">
-                      {commonSavedData.length}
-                    </span> */}
                   </button>
                   {getCommonCategories.map((category) => (
                     <button
@@ -855,9 +881,6 @@ const getCommonSubcategories = useMemo(() => {
                       }`}
                     >
                       <span>{category.name}</span>
-                      {/* <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-gray-800 text-gray-100">
-                        {category.count}
-                      </span> */}
                     </button>
                   ))}
                 </div>
@@ -887,9 +910,6 @@ const getCommonSubcategories = useMemo(() => {
                           }`}
                         >
                           <span>{sub.name}</span>
-                          {/* <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-gray-800 text-gray-100">
-                            {sub.count}
-                          </span> */}
                         </button>
                       ))}
                     </div>
@@ -1038,242 +1058,298 @@ const getCommonSubcategories = useMemo(() => {
               </div>
             )}
             
-            {/* Products Grid OR Subcategory Tiles */}
-{showSubCategoryTiles ? (
-  // ✅ Subcategory tiles view
-  <div>
-    <div className="flex items-center justify-between mb-4">
-      <h2 className="text-lg font-semibold text-gray-900">
-        {selectedCommonCategory} Subcategories
-      </h2>
-      <p className="text-sm text-gray-600">
-        {getCommonSubcategories.length} subcategories
-      </p>
-    </div>
-
-    {getCommonSubcategories.length === 0 ? (
-      <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-        <h3 className="text-lg font-medium text-gray-800 mb-2">
-          No subcategories found
-        </h3>
-        <p className="text-sm text-gray-600">
-          This category does not have subcategories yet.
-        </p>
-      </div>
-    ) : (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {getCommonSubcategories.map((sub) => (
-          <button
-            key={sub.name}
-            onClick={() => selectSubCategory(sub.name)}
-            className="group bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden text-left"
-          >
-            <div className="relative aspect-square bg-white flex items-center justify-center overflow-hidden">
-              <img
-                src={getImageUrl(sub.thumb)}
-                alt={sub.altText || sub.name}
-                className="max-h-[85%] max-w-[85%] object-contain transition-transform duration-300 group-hover:scale-105"
-              />
-              <div className="absolute inset-0 ring-1 ring-gray-200" />
-            </div>
-            <div className="p-3">
-              <h3 className="text-sm font-medium text-gray-900 line-clamp-1">
-                {sub.name}
-              </h3>
-              <p className="text-xs text-gray-500 mt-1">
-                {sub.count} products
-              </p>
-
-              <div className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-gray-700 group-hover:text-gray-900">
-                View products
-                <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
-              </div>
-            </div>
-          </button>
-        ))}
-      </div>
-    )}
-  </div>
-) : (
-  // ✅ Products view (your existing product list)
-  filteredProducts.length === 0 ? (
-    <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-      <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-        <Search className="w-6 h-6 text-gray-400" />
-      </div>
-      <h3 className="text-lg font-medium text-gray-800 mb-2">No products found</h3>
-      <p className="text-gray-600 mb-6 text-sm">
-        Try adjusting your search or filter criteria
-      </p>
-      <button
-        onClick={handleClearFilters}
-        className="px-5 py-2 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors font-medium text-sm"
-      >
-        Reset All Filters
-      </button>
-    </div>
-  ) : (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {filteredProducts.map((product) => {
-        const isInCart = getCartQuantityForCommon(product) > 0;
-        const isAdding = addingToCartId === product._id;
-
-        const discountPercent =
-          product.type === "readymade" &&
-          product.raw?.originalPrice &&
-          product.raw.originalPrice > (product.price || 0)
-            ? Math.round(
-                ((product.raw.originalPrice - (product.price || 0)) /
-                  product.raw.originalPrice) *
-                  100
-              )
-            : 0;
-
-        return (
-          <div
-            key={product._id}
-            className="group bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden"
-          >
-            {/* ===== Premium Square Image Block ===== */}
-            <Link
-                  to={
-                    product.type === "readymade"
-                      ? `/readymade/${product._id}`
-                      : `/catalogue/${product._id}`
-                  }
-                  className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
-                >
-                
-                 
-               
-            <div className="relative aspect-square bg-white flex items-center justify-center overflow-hidden rounded-t-xl">
-              <img
-                src={getImageUrl(
-                  product.previewImage ||
-                  product.raw?.images?.[0]
-                )}
-                alt={
-                  product.raw?.images?.[0]?.altText ||
-                  product.title ||
-                  "Product image"
-                }
-                className="max-h-[85%] max-w-[85%] object-contain"
-              />
-
-
-
-              {/* subtle border like ecommerce */}
-              <div className="absolute inset-0 ring-1 ring-gray-200" />
-
-              {/* ===== Badges ===== */}
-              <div className="absolute top-2 left-2 flex flex-col gap-2 z-10">
-                {product.bestSeller && (
-                  <span className="px-2 py-1 text-[11px] font-semibold bg-orange-500 text-white rounded-md">
-                    Best Seller
-                  </span>
-                )}
-
-                {product.customerFave && (
-                  <span className="px-2 py-1 text-[11px] font-semibold bg-pink-500 text-white rounded-md">
-                    Customer Fave
-                  </span>
-                )}
-
-                {product.staffPick && (
-                  <span className="px-2 py-1 text-[11px] font-semibold bg-indigo-500 text-white rounded-md">
-                    Staff Pick
-                  </span>
-                )}
-              </div>
-
-              {/* Eco Friendly badge bottom */}
-              {product.ecoFriendly && (
-                <span className="absolute bottom-2 right-2 px-2 py-1 text-[11px] font-medium bg-green-100 text-green-700 rounded-md">
-                  🌿 Eco-friendly
-                </span>
-              )}
-            </div>
- </Link>
-            {/* Product Info */}
-            <div className="p-3">
-              <div className="mb-2">
-                <p className="text-xs text-gray-500 mb-1">
-                  {product.category || "Uncategorized"}
-                </p>
-                <h3 className="text-sm font-medium text-gray-900 line-clamp-1">
-                  {product.title || "Unnamed Product"}
-                </h3>
-              </div>
-
-              {/* Price and Action */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-sm font-semibold text-gray-900">
-                      ₹{(product.price || 0).toLocaleString()}
-                    </span>
-
-                    {discountPercent > 0 && (
-                      <span className="text-xs text-gray-400 line-through">
-                        ₹{product.raw?.originalPrice?.toLocaleString()}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-gray-500 mt-0.5">
-                    incl. taxes
+            {/* Products Grid OR Category Tiles OR Subcategory Tiles */}
+            {showCategoryTiles ? (
+              // ✅ Category tiles view (similar to subcategory tiles design)
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    Browse Categories
+                  </h2>
+                  <p className="text-sm text-gray-600">
+                    {getCategoriesWithThumbnails.length} categories
                   </p>
                 </div>
 
-                <button
-                  onClick={() => handleAddToCart(product)}
-                  disabled={isAdding || cartLoading}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1.5 ${
-                    isInCart
-                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                      : "bg-gray-900 text-white hover:bg-black"
-                  } ${isAdding ? "opacity-70 cursor-not-allowed" : ""}`}
-                >
-                  {isAdding ? (
-                    <>
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      Adding
-                    </>
-                  ) : isInCart ? (
-                    <>
-                      <CheckCircle className="w-3 h-3" />
-                      Added
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingCart className="w-3 h-3" />
-                      Add
-                    </>
-                  )}
-                </button>
-              </div>
+                {getCategoriesWithThumbnails.length === 0 ? (
+                  <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+                    <h3 className="text-lg font-medium text-gray-800 mb-2">
+                      No categories found
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Categories will appear here once products are added.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {getCategoriesWithThumbnails.map((category) => (
+                      <button
+                        key={category.name}
+                        onClick={() => selectCategory(category.name)}
+                        className="group bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden text-left"
+                      >
+                        <div className="relative aspect-square bg-white flex items-center justify-center overflow-hidden">
+                          {category.thumbnail ? (
+                            <img
+                              src={getImageUrl(category.thumbnail)}
+                              alt={category.altText || category.name}
+                              className="max-h-[85%] max-w-[85%] object-contain transition-transform duration-300 group-hover:scale-105"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.style.display = 'none';
+                                const parent = e.target.parentElement;
+                                const fallback = document.createElement('div');
+                                fallback.className = 'w-full h-full flex items-center justify-center bg-gray-100';
+                                fallback.innerHTML = `<span class="text-4xl text-gray-400 font-medium">${category.name.charAt(0).toUpperCase()}</span>`;
+                                parent.appendChild(fallback);
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                              <span className="text-4xl text-gray-400 font-medium">
+                                {category.name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                          )}
+                          <div className="absolute inset-0 ring-1 ring-gray-200" />
+                        </div>
+                        <div className="p-3">
+                          <h3 className="text-sm font-medium text-gray-900 line-clamp-1">
+                            {category.name}
+                          </h3>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {category.count} products
+                          </p>
 
-              {/* View Details Link */}
-              <div className="mt-3">
-                <Link
-                  to={
-                    product.type === "readymade"
-                      ? `/readymade/${product._id}`
-                      : `/catalogue/${product._id}`
-                  }
-                  className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
-                >
-                  View Details
-                  <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
-                </Link>
+                          <div className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-gray-700 group-hover:text-gray-900">
+                            Browse category
+                            <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  )
-)}
+            ) : showSubCategoryTiles ? (
+              // ✅ Subcategory tiles view
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    {selectedCommonCategory} Subcategories
+                  </h2>
+                  <p className="text-sm text-gray-600">
+                    {getCommonSubcategories.length} subcategories
+                  </p>
+                </div>
 
+                {getCommonSubcategories.length === 0 ? (
+                  <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+                    <h3 className="text-lg font-medium text-gray-800 mb-2">
+                      No subcategories found
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      This category does not have subcategories yet.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {getCommonSubcategories.map((sub) => (
+                      <button
+                        key={sub.name}
+                        onClick={() => selectSubCategory(sub.name)}
+                        className="group bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden text-left"
+                      >
+                        <div className="relative aspect-square bg-white flex items-center justify-center overflow-hidden">
+                          {sub.thumb ? (
+                            <img
+                              src={getImageUrl(sub.thumb)}
+                              alt={sub.altText || sub.name}
+                              className="max-h-[85%] max-w-[85%] object-contain transition-transform duration-300 group-hover:scale-105"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.style.display = 'none';
+                                const parent = e.target.parentElement;
+                                const fallback = document.createElement('div');
+                                fallback.className = 'w-full h-full flex items-center justify-center bg-gray-100';
+                                fallback.innerHTML = `<span class="text-4xl text-gray-400 font-medium">${sub.name.charAt(0).toUpperCase()}</span>`;
+                                parent.appendChild(fallback);
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                              <span className="text-4xl text-gray-400 font-medium">
+                                {sub.name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                          )}
+                          <div className="absolute inset-0 ring-1 ring-gray-200" />
+                        </div>
+                        <div className="p-3">
+                          <h3 className="text-sm font-medium text-gray-900 line-clamp-1">
+                            {sub.name}
+                          </h3>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {sub.count} products
+                          </p>
+
+                          <div className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-gray-700 group-hover:text-gray-900">
+                            View products
+                            <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              // ✅ Products view (your existing product list)
+              filteredProducts.length === 0 ? (
+                <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Search className="w-6 h-6 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-800 mb-2">No products found</h3>
+                  <p className="text-gray-600 mb-6 text-sm">
+                    Try adjusting your search or filter criteria
+                  </p>
+                  <button
+                    onClick={handleClearFilters}
+                    className="px-5 py-2 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors font-medium text-sm"
+                  >
+                    Reset All Filters
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {filteredProducts.map((product) => {
+                    const isInCart = getCartQuantityForCommon(product) > 0;
+                    const isAdding = addingToCartId === product._id;
+
+                    const discountPercent =
+                      product.type === "readymade" &&
+                      product.raw?.originalPrice &&
+                      product.raw.originalPrice > (product.price || 0)
+                        ? Math.round(
+                            ((product.raw.originalPrice - (product.price || 0)) /
+                              product.raw.originalPrice) *
+                              100
+                          )
+                        : 0;
+
+                    return (
+                      <div
+                        key={product._id}
+                        className="group bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden"
+                      >
+                        {/* ===== Premium Square Image Block ===== */}
+                        <Link
+                          to={
+                            product.type === "readymade"
+                              ? `/readymade/${product._id}`
+                              : `/catalogue/${product._id}`
+                          }
+                          className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                        >
+                          <div className="relative aspect-square bg-white flex items-center justify-center overflow-hidden rounded-t-xl">
+                            <img
+                              src={getImageUrl(
+                                product.previewImage ||
+                                product.raw?.images?.[0]
+                              )}
+                              alt={
+                                product.raw?.images?.[0]?.altText ||
+                                product.title ||
+                                "Product image"
+                              }
+                              className="max-h-[85%] max-w-[85%] object-contain"
+                            />
+
+                            {/* subtle border like ecommerce */}
+                            <div className="absolute inset-0 ring-1 ring-gray-200" />
+
+                            {/* ===== Badges ===== */}
+                            <div className="absolute top-2 left-2 flex flex-col gap-2 z-10">
+                              {product.bestSeller && (
+                                <span className="px-2 py-1 text-[11px] font-semibold bg-orange-500 text-white rounded-md">
+                                  Best Seller
+                                </span>
+                              )}
+
+                              {product.customerFave && (
+                                <span className="px-2 py-1 text-[11px] font-semibold bg-pink-500 text-white rounded-md">
+                                  Customer Fave
+                                </span>
+                              )}
+
+                              {product.staffPick && (
+                                <span className="px-2 py-1 text-[11px] font-semibold bg-indigo-500 text-white rounded-md">
+                                  Staff Pick
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Eco Friendly badge bottom */}
+                            {product.ecoFriendly && (
+                              <span className="absolute bottom-2 right-2 px-2 py-1 text-[11px] font-medium bg-green-100 text-green-700 rounded-md">
+                                🌿 Eco-friendly
+                              </span>
+                            )}
+                          </div>
+                        </Link>
+                        {/* Product Info */}
+                        <div className="p-3">
+                          <div className="mb-2">
+                            <p className="text-xs text-gray-500 mb-1">
+                              {product.category || "Uncategorized"}
+                            </p>
+                            <h3 className="text-sm font-medium text-gray-900 line-clamp-1">
+                              {product.title || "Unnamed Product"}
+                            </h3>
+                          </div>
+
+                          {/* Price and Action */}
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="flex items-baseline gap-1">
+                                <span className="text-sm font-semibold text-gray-900">
+                                  ₹{(product.price || 0).toLocaleString()}
+                                </span>
+
+                                {discountPercent > 0 && (
+                                  <span className="text-xs text-gray-400 line-through">
+                                    ₹{product.raw?.originalPrice?.toLocaleString()}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-gray-500 mt-0.5">
+                                incl. taxes
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* View Details Link */}
+                          <div className="mt-3">
+                            <Link
+                              to={
+                                product.type === "readymade"
+                                  ? `/readymade/${product._id}`
+                                  : `/catalogue/${product._id}`
+                              }
+                              className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                            >
+                              View Details
+                              <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            )}
           </div>
         </div>
       </div>
