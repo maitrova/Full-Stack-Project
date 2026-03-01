@@ -35,8 +35,8 @@ export const loginUser = createAsyncThunk(
   "user/login",
   async (credentials, { rejectWithValue }) => {
     try {
-      const { phone, password } = credentials;
-      const response = await axios.post(`${API_URL}/login`, { phone, password });
+      const { identifier, password } = credentials;
+      const response = await axios.post(`${API_URL}/login`, { identifier, password });
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data || { message: "Login failed" });
@@ -120,6 +120,46 @@ export const updateUserProfile = createAsyncThunk(
   }
 );
 
+// --------------------
+// Forgot Password
+// --------------------
+export const forgotPassword = createAsyncThunk(
+  "user/forgotPassword",
+  async (email, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(`${API_URL}/forgot-password`, {
+        email,
+      });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data || { message: "Failed to send OTP" }
+      );
+    }
+  }
+);
+
+// --------------------
+// Reset Password
+// --------------------
+export const resetPassword = createAsyncThunk(
+  "user/resetPassword",
+  async ({ email, otp, newPassword }, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(`${API_URL}/reset-password`, {
+        email,
+        otp,
+        newPassword,
+      });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data || { message: "Password reset failed" }
+      );
+    }
+  }
+);
+
 const userSlice = createSlice({
   name: "user",
   initialState: {
@@ -131,6 +171,13 @@ const userSlice = createSlice({
     profile: null,
     profileStatus: "idle",
     profileError: null,
+
+    forgotStatus: "idle",
+    forgotError: null,
+
+    resetStatus: "idle",
+    resetError: null,
+    resetSuccess: null,
   },
   reducers: {
     logout: (state) => {
@@ -257,6 +304,40 @@ const userSlice = createSlice({
         state.profileError = action.payload?.message || "Failed to fetch profile";
       })
 
+      .addCase(forgotPassword.pending, (state) => {
+        state.forgotStatus = "loading";
+        state.forgotError = null;
+      })
+      .addCase(forgotPassword.fulfilled, (state, action) => {
+        state.forgotStatus = "succeeded";
+        state.forgotError = null;
+      })
+      .addCase(forgotPassword.rejected, (state, action) => {
+        state.forgotStatus = "failed";
+        state.forgotError =
+          action.payload?.message || "Failed to send OTP";
+      })
+
+
+      // --------------------
+// Reset Password
+// --------------------
+    .addCase(resetPassword.pending, (state) => {
+      state.resetStatus = "loading";
+      state.resetError = null;
+      state.resetSuccess = null;
+    })
+    .addCase(resetPassword.fulfilled, (state, action) => {
+      state.resetStatus = "succeeded";
+      state.resetError = null;
+      state.resetSuccess = action.payload?.message;
+    })
+    .addCase(resetPassword.rejected, (state, action) => {
+      state.resetStatus = "failed";
+      state.resetError =
+        action.payload?.message || "Password reset failed";
+    })
+
       // --------------------
       // Update Profile
       // --------------------
@@ -304,3 +385,9 @@ export const selectAuthError = (state) => state.user.error;
 export const selectUserProfile = (state) => state.user.profile;
 export const selectProfileStatus = (state) => state.user.profileStatus;
 export const selectProfileError = (state) => state.user.profileError;
+export const selectForgotStatus = (state) => state.user.forgotStatus;
+export const selectForgotError = (state) => state.user.forgotError;
+
+export const selectResetStatus = (state) => state.user.resetStatus;
+export const selectResetError = (state) => state.user.resetError;
+export const selectResetSuccess = (state) => state.user.resetSuccess;

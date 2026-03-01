@@ -1,6 +1,8 @@
 import jwt from "jsonwebtoken";
 import User from "../models/authmodel.js";
 import { OAuth2Client } from "google-auth-library";
+import crypto from "crypto";
+import apiInstance from "../config/brevo.js";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -52,23 +54,42 @@ export const registerUser = async (req, res) => {
 // ================= LOGIN =================
 export const loginUser = async (req, res) => {
   try {
-    const { phone, password } = req.body;
+    const { identifier, password } = req.body;
 
-    const user = await User.findOne({ phone });
+    if (!identifier || !password) {
+      return res.status(400).json({
+        message: "Phone/Email and password are required",
+      });
+    }
+
+    // 🔎 Check by email OR phone
+    const user = await User.findOne({
+      $or: [
+        { phone: identifier },
+        { email: identifier.toLowerCase() },
+      ],
+    });
 
     if (!user || !user.password || !(await user.matchPassword(password))) {
-      return res.status(401).json({ message: "Invalid credentials" });
+      return res.status(401).json({
+        message: "Invalid credentials",
+      });
     }
 
     res.json({
       _id: user._id,
       name: user.name,
       phone: user.phone,
+      email: user.email,
       role: user.role,
       token: generateToken(user._id),
     });
+
   } catch (err) {
-    res.status(500).json({ message: "Login failed" });
+    console.error(err);
+    res.status(500).json({
+      message: "Login failed",
+    });
   }
 };
 
@@ -146,7 +167,7 @@ export const updateUserProfile = async (req, res) => {
     if (req.body.phone !== undefined) user.phone = req.body.phone;
     if (req.body.email !== undefined) user.email = req.body.email;
 
-    // ❌ DO NOT allow role change here unless admin logic added
+    
 
     if (req.body.password) user.password = req.body.password;
 
@@ -162,5 +183,76 @@ export const updateUserProfile = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: "Profile update failed" });
+  }
+};
+
+
+
+
+// ================= FORGOT PASSWORD =================
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Generate 6 digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    user.otp = otp;
+    user.otpExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+    await user.save();
+
+    // Send Email via Brevo
+    await apiInstance.sendTransacEmail({
+      sender: {
+        name: "Maitrova",
+        email: "maitrova122@gmail.com", // must be verified in Brevo
+      },
+      to: [{ email: user.email }],
+      subject: "Password Reset OTP",
+      htmlContent: `
+        <h2>Password Reset OTP</h2>
+        <p>Your OTP is:</p>
+        <h1>${otp}</h1>
+        <p>This OTP expires in 10 minutes.</p>
+      `,
+    });
+
+    res.json({ message: "OTP sent to email" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to send OTP" });
+  }
+};
+
+
+// ================= RESET PASSWORD =================
+export const resetPassword = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    const user = await User.findOne({ email });
+
+    if (
+      !user ||
+      user.otp !== otp ||
+      user.otpExpire < Date.now()
+    ) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    user.password = newPassword;
+    user.otp = undefined;
+    user.otpExpire = undefined;
+
+    await user.save();
+
+    res.json({ message: "Password reset successful" });
+  } catch (error) {
+    res.status(500).json({ message: "Password reset failed" });
   }
 };

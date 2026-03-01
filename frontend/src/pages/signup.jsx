@@ -13,6 +13,9 @@ const SignupPage = () => {
     password: "",
     role: "user",
   });
+  
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsError, setTermsError] = useState("");
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -31,8 +34,22 @@ const SignupPage = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleTermsChange = (e) => {
+    setTermsAccepted(e.target.checked);
+    if (e.target.checked) {
+      setTermsError("");
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!termsAccepted) {
+      setTermsError("Please accept the terms and conditions to continue");
+      return;
+    }
+    
+    setTermsError("");
     dispatch(registerUser(formData));
   };
 
@@ -70,6 +87,12 @@ const SignupPage = () => {
           {error && (
             <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">
               {error}
+            </div>
+          )}
+
+          {termsError && (
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">
+              {termsError}
             </div>
           )}
 
@@ -152,10 +175,32 @@ const SignupPage = () => {
               </div>
             </div>
 
+            {/* Terms and Conditions Checkbox */}
+            <div className="flex items-start space-x-2">
+              <input
+                type="checkbox"
+                id="terms"
+                checked={termsAccepted}
+                onChange={handleTermsChange}
+                className="mt-1 h-4 w-4 text-violet-600 focus:ring-violet-500 border-gray-300 rounded"
+              />
+              <label htmlFor="terms" className="text-sm text-gray-600">
+                I accept the{" "}
+                <Link 
+                  to="/company/terms-and-conditions" 
+                  className="text-violet-600 hover:text-violet-800 font-medium"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Terms and Conditions
+                </Link>
+              </label>
+            </div>
+
             <button
               type="submit"
               disabled={status === "loading"}
-              className="w-full bg-gradient-to-r from-violet-700 to-violet-500 text-white py-3 rounded-lg"
+              className="w-full bg-gradient-to-r from-violet-700 to-violet-500 text-white py-3 rounded-lg hover:from-violet-800 hover:to-violet-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {status === "loading" ? "Creating..." : "Create Account"}
             </button>
@@ -182,7 +227,7 @@ const SignupPage = () => {
 
           <div className="text-center text-sm text-gray-600 mt-6">
             Already have an account?{" "}
-            <Link to="/login" className="text-violet-600 font-medium">
+            <Link to="/login" className="text-violet-600 font-medium hover:text-violet-800">
               Log in
             </Link>
           </div>

@@ -33,6 +33,9 @@ const DesignUploadsManager = () => {
   const fileInputRef = useRef(null);
   const dropZoneRef = useRef(null);
 
+  // Get base URL from env
+  const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
   // Fetch folders on mount
   useEffect(() => {
     dispatch(fetchFolders());
@@ -161,6 +164,14 @@ const DesignUploadsManager = () => {
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  // Construct image URL
+  const getImageUrl = (filename) => {
+    // Remove /api from baseURL if it exists, then add the path
+    const baseUrlWithoutApi = baseURL
+    console.log("Constructed image URL:", `${baseUrlWithoutApi}/outputs/adminuploadeddesigns/${currentFolder}/${filename}`);
+    return `${baseUrlWithoutApi}/outputs/adminuploadeddesigns/${currentFolder}/${filename}`;
   };
 
   // Simple SVG Icons
@@ -499,7 +510,7 @@ const DesignUploadsManager = () => {
                       >
                         <div className="relative aspect-video bg-gray-100">
                           <img
-                            src={image.url}
+                            src={getImageUrl(image.filename)}
                             alt={image.filename}
                             className="w-full h-full object-cover"
                             onError={(e) => {

@@ -20,7 +20,7 @@ designuploadsrouter.post("/folders", createCategoryFolder);
 designuploadsrouter.get("/folders", listCategoryFolders);
 
 // Upload single/multiple images to a folder (field name: "images")
-designuploadsrouter.post("/:folder/upload", adminDesignUpload.array("images", 50), uploadImagesToFolder);
+designuploadsrouter.post("/:folder/upload", adminDesignUpload.array("images", 2000), uploadImagesToFolder);
 
 // List images inside folder
 designuploadsrouter.get("/:folder/files", listImagesInFolder);

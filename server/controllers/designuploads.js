@@ -329,57 +329,28 @@ export const deleteImageFromFolder = async (req, res) => {
  * DELETE FOLDER
  */
 export const deleteCategoryFolder = async (req, res) => {
-
   try {
-
     const { clean, full } = safeJoinFolder(req.params.folder);
 
     if (!fs.existsSync(full)) {
-
       return res.status(404).json({
-
         success: false,
-
         message: "Folder not found",
-
       });
-
     }
 
-    const content = fs.readdirSync(full);
-
-    if (content.length > 0) {
-
-      return res.status(400).json({
-
-        success: false,
-
-        message: "Folder not empty",
-
-      });
-
-    }
-
-    fs.rmdirSync(full);
+    // 🔥 Delete folder with all contents
+    fs.rmSync(full, { recursive: true, force: true });
 
     res.json({
-
       success: true,
-
-      message: "Folder deleted",
-
+      message: "Folder and all files deleted successfully",
     });
 
   } catch (err) {
-
     res.status(500).json({
-
       success: false,
-
       message: err.message,
-
     });
-
   }
-
 };

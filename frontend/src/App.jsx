@@ -39,6 +39,8 @@ import ProductSearch from "./components/searchproductdetail.jsx";
 import AdminOrderSearch from "./components/admin/adminsearchpage.jsx";
 import PublishDesignModal from "./components/PublishDesignModal.jsx";
 import CompanyDocumentManager from "./components/admin/CompanyDocumentManager.jsx";
+import Shipping from "./companypdfs/Shipping.jsx";
+import AdminRoute from "./components/AdminRoute.jsx";
 // You'll need to create this
 
 // Layout component with header for all pages except auth
@@ -112,9 +114,9 @@ function App() {
 
         <Route path="/adminpage" element={
           <MainLayout>
-            <ProtectedRoute>
+            <AdminRoute>
               <AdminDashboard />
-            </ProtectedRoute>
+            </AdminRoute>
           </MainLayout>
         } />
 
@@ -293,6 +295,14 @@ function App() {
             <Designdetailspage />
           </MainLayout>
         } />
+
+
+          <Route path="/company/:name" element={
+          <MainLayout>
+            <Shipping />
+          </MainLayout>
+        } />
+
 
         <Route path="/price" element={
           <MainLayout>

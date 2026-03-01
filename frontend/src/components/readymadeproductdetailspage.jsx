@@ -45,7 +45,8 @@ import {
   X,
   AlertCircle,
   Info,
-  Ruler
+  Ruler,
+  LogIn
 } from 'lucide-react';
 import Footer from './Footer.jsx';
 
@@ -73,6 +74,7 @@ export default function ProductDetailPage() {
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState('specifications');
   const [sizeError, setSizeError] = useState('');
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false); // New state for login prompt
 
   // Redux state
   const token = useSelector(selectCurrentToken);
@@ -203,6 +205,15 @@ export default function ProductDetailPage() {
   const cartQuantity = cartItemDetails?.quantity || 0;
   const totalInCart = cartItemDetails?.total || 0;
 
+  // New function to handle login prompt
+  const handleLoginPrompt = () => {
+    setShowLoginPrompt(true);
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+      setShowLoginPrompt(false);
+    }, 5000);
+  };
+
   const handleAddToCart = async () => {
     if (!itemData) {
       setNotification({
@@ -214,14 +225,8 @@ export default function ProductDetailPage() {
     }
 
     if (!isLoggedIn) {
-      setNotification({
-        show: true,
-        message: 'Please login to add items to cart',
-        type: 'warning'
-      });
-      setTimeout(() => {
-        navigate('/login', { state: { from: window.location.pathname } });
-      }, 1500);
+      // Show login prompt modal instead of just a notification
+      handleLoginPrompt();
       return;
     }
 
@@ -343,6 +348,11 @@ export default function ProductDetailPage() {
   };
 
   const handleBuyNow = async () => {
+    if (!isLoggedIn) {
+      handleLoginPrompt();
+      return;
+    }
+
     if (hasVariants && !selectedSize) {
       setSizeError('Please select a size');
       setNotification({
@@ -726,8 +736,52 @@ export default function ProductDetailPage() {
         </div>
       )}
 
+      {/* Login Prompt Modal */}
+      {showLoginPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl transform animate-slide-up">
+            <div className="text-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <LogIn className="w-10 h-10 text-purple-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Login Required</h3>
+              <p className="text-gray-600 mb-6">
+                Please login to your account to add items to cart and make purchases.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => {
+                    setShowLoginPrompt(false);
+                    navigate('/login', { state: { from: window.location.pathname } });
+                  }}
+                  className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:opacity-90 transition-all font-medium"
+                >
+                  Login Now
+                </button>
+                <button
+                  onClick={() => setShowLoginPrompt(false)}
+                  className="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-medium"
+                >
+                  Continue Browsing
+                </button>
+              </div>
+              <p className="text-sm text-gray-500 mt-4">
+                Don't have an account?{' '}
+                <Link 
+                  to="/register" 
+                  className="text-purple-600 font-medium hover:underline"
+                  onClick={() => setShowLoginPrompt(false)}
+                >
+                  Sign up
+                </Link>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sticky Header */}
-      <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100">
+      <div className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <button
@@ -840,6 +894,24 @@ export default function ProductDetailPage() {
                     )}
                   </div>
                 </div>
+
+                {/* Login required overlay for non-logged in users */}
+                {!isLoggedIn && (
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-black/5 backdrop-blur-[2px] z-10 rounded-xl flex items-center justify-center">
+                      <div className="bg-white/90 p-4 rounded-xl shadow-lg text-center max-w-xs mx-4">
+                        <LogIn className="w-8 h-8 text-purple-600 mx-auto mb-2" />
+                        <p className="text-gray-800 font-medium mb-3">Login to add items to cart</p>
+                        <button
+                          onClick={() => navigate('/login', { state: { from: window.location.pathname } })}
+                          className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                        >
+                          Login Now
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Main Media Display */}
                 <div className="relative h-[300px] sm:h-[400px] md:h-[500px] bg-gradient-to-br from-gray-50 to-white rounded-xl overflow-hidden">
@@ -1145,9 +1217,9 @@ export default function ProductDetailPage() {
                   <div className="flex items-center">
                     <button
                       onClick={() => handleQuantityChange(-1)}
-                      disabled={quantity <= 1}
+                      disabled={quantity <= 1 || !isLoggedIn}
                       className={`w-10 h-10 flex items-center justify-center border border-gray-300 rounded-l-lg ${
-                        quantity <= 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
+                        quantity <= 1 || !isLoggedIn ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
                       }`}
                     >
                       <span className="text-lg">-</span>
@@ -1157,9 +1229,9 @@ export default function ProductDetailPage() {
                     </div>
                     <button
                       onClick={() => handleQuantityChange(1)}
-                      disabled={quantity >= displayData.stock}
+                      disabled={quantity >= displayData.stock || !isLoggedIn}
                       className={`w-10 h-10 flex items-center justify-center border border-gray-300 rounded-r-lg ${
-                        quantity >= displayData.stock ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
+                        quantity >= displayData.stock || !isLoggedIn ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
                       }`}
                     >
                       <span className="text-lg">+</span>
@@ -1168,105 +1240,84 @@ export default function ProductDetailPage() {
                 </div>
               )}
 
-              {/* Action Buttons (desktop) */}
-              <div className="grid grid-cols-2 gap-4 mt-6">
-                <button
-                  onClick={handleAddToCart}
-                  disabled={isOutOfStock || isAddingToCart || cartLoading || !isLoggedIn || (hasVariants && !selectedSize)}
-                  className={`h-14 rounded-xl font-semibold transition-all flex items-center justify-center gap-3 ${
-                    isOutOfStock || !isLoggedIn || (hasVariants && !selectedSize)
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : isInCart
-                      ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:opacity-90'
-                      : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-90'
-                  }`}
-                >
-                  {isAddingToCart || cartLoading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      {isInCart ? 'Updating...' : 'Adding...'}
-                    </>
-                  ) : isInCart ? (
-                    <>
-                      <Check className="w-5 h-5" />
-                      {isReadymade && cartQuantity === quantity ? 'In Cart' : `In Cart (${cartQuantity})`}
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingCart className="w-5 h-5" />
-                      Add to Cart
-                    </>
-                  )}
-                </button>
-                
-                <button
-                  onClick={handleBuyNow}
-                  disabled={isOutOfStock || !isLoggedIn || (hasVariants && !selectedSize)}
-                  className={`h-14 rounded-xl font-semibold transition-all flex items-center justify-center gap-3 ${
-                    isOutOfStock || !isLoggedIn || (hasVariants && !selectedSize)
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-green-600 to-teal-600 text-white hover:opacity-90'
-                  }`}
-                >
-                  <CreditCard className="w-5 h-5" />
-                  Buy Now
-                </button>
-              </div>
+              {/* Login required message for non-logged in users */}
+              {!isLoggedIn && (
+                <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-purple-100">
+                  <div className="flex items-start gap-3">
+                    <LogIn className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-purple-800 font-medium mb-2">Login to purchase</p>
+                      <p className="text-sm text-purple-600 mb-3">
+                        You need to be logged in to add items to cart and make purchases.
+                      </p>
+                      <button
+                        onClick={() => navigate('/login', { state: { from: window.location.pathname } })}
+                        className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                      >
+                        Login Now
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons (desktop) - Only show if logged in */}
+              {isLoggedIn ? (
+                <div className="grid grid-cols-2 gap-4 mt-6">
+                  <button
+                    onClick={handleAddToCart}
+                    disabled={isOutOfStock || isAddingToCart || cartLoading || (hasVariants && !selectedSize)}
+                    className={`h-14 rounded-xl font-semibold transition-all flex items-center justify-center gap-3 ${
+                      isOutOfStock || (hasVariants && !selectedSize)
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : isInCart
+                        ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:opacity-90'
+                        : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-90'
+                    }`}
+                  >
+                    {isAddingToCart || cartLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        {isInCart ? 'Updating...' : 'Adding...'}
+                      </>
+                    ) : isInCart ? (
+                      <>
+                        <Check className="w-5 h-5" />
+                        {isReadymade && cartQuantity === quantity ? 'In Cart' : `In Cart (${cartQuantity})`}
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingCart className="w-5 h-5" />
+                        Add to Cart
+                      </>
+                    )}
+                  </button>
+                  
+                  <button
+                    onClick={handleBuyNow}
+                    disabled={isOutOfStock || (hasVariants && !selectedSize)}
+                    className={`h-14 rounded-xl font-semibold transition-all flex items-center justify-center gap-3 ${
+                      isOutOfStock || (hasVariants && !selectedSize)
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-green-600 to-teal-600 text-white hover:opacity-90'
+                    }`}
+                  >
+                    <CreditCard className="w-5 h-5" />
+                    Buy Now
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-6">
+                  <button
+                    onClick={() => navigate('/login', { state: { from: window.location.pathname } })}
+                    className="w-full h-14 rounded-xl font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:opacity-90 transition-all flex items-center justify-center gap-3"
+                  >
+                    <LogIn className="w-5 h-5" />
+                    Login to Add to Cart
+                  </button>
+                </div>
+              )}
             </div>
-
-            {/* Shipping & Support */}
-            {/* <div className="space-y-6">
-              <div className="bg-white rounded-2xl shadow-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Shipping & Delivery</h3>
-                <div className="space-y-4">
-                  <div className="flex items-start">
-                    <div className="bg-green-100 p-2 rounded-lg mr-3">
-                      <Truck className="w-5 h-5 text-green-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Free Shipping</p>
-                      <p className="text-sm text-gray-600">On orders above ₹999</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start">
-                    <div className="bg-blue-100 p-2 rounded-lg mr-3">
-                      <span className="text-lg">🚚</span>
-                    </div>
-                    <div>
-                      <p className="font-medium">Estimated Delivery</p>
-                      <p className="text-sm text-gray-600">3-5 business days</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl shadow-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Need Help?</h3>
-                <div className="space-y-4">
-                  <button className="w-full py-3 px-4 border-2 border-gray-300 text-gray-700 hover:bg-gray-50 rounded-xl font-medium transition duration-200 flex items-center justify-center">
-                    <MessageCircle className="w-5 h-5 mr-2" />
-                    Chat with Us
-                  </button>
-                  <button className="w-full py-3 px-4 border-2 border-gray-300 text-gray-700 hover:bg-gray-50 rounded-xl font-medium transition duration-200 flex items-center justify-center">
-                    <Phone className="w-5 h-5 mr-2" />
-                    Call Support
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl shadow-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Return Policy</h3>
-                <div className="flex items-start">
-                  <div className="bg-purple-100 p-2 rounded-lg mr-3">
-                    <RefreshCw className="w-5 h-5 text-purple-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium">30-Day Returns</p>
-                    <p className="text-sm text-gray-600">Easy returns within 30 days of purchase</p>
-                  </div>
-                </div>
-              </div>
-            </div> */}
           </div>
         </div>
 
@@ -1280,9 +1331,18 @@ export default function ProductDetailPage() {
               </div>
             )}
 
+            {/* Login required message for mobile */}
+            {!isLoggedIn && (
+              <div className="mb-2 p-2 bg-purple-50 rounded-lg border border-purple-100">
+                <p className="text-xs text-purple-700 text-center">
+                  Please login to add items to cart
+                </p>
+              </div>
+            )}
+
             {/* Quantity and Action Buttons (Mobile) */}
             <div className="space-y-3">
-              {isReadymade && (
+              {isReadymade && isLoggedIn && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-gray-700">Quantity:</span>
                   <div className="flex items-center">
@@ -1312,47 +1372,59 @@ export default function ProductDetailPage() {
               )}
 
               <div className="flex gap-2">
-                <button
-                  onClick={handleAddToCart}
-                  disabled={isOutOfStock || isAddingToCart || cartLoading || !isLoggedIn || (hasVariants && !selectedSize)}
-                  className={`flex-1 h-12 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
-                    isOutOfStock || !isLoggedIn || (hasVariants && !selectedSize)
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : isInCart
-                      ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:opacity-90'
-                      : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-90'
-                  }`}
-                >
-                  {isAddingToCart || cartLoading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span className="text-sm">Adding...</span>
-                    </>
-                  ) : isInCart ? (
-                    <>
-                      <Check className="w-4 h-4" />
-                      <span className="text-sm">In Cart</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingCart className="w-4 h-4" />
-                      <span className="text-sm">Add</span>
-                    </>
-                  )}
-                </button>
-                
-                <button
-                  onClick={handleBuyNow}
-                  disabled={isOutOfStock || !isLoggedIn || (hasVariants && !selectedSize)}
-                  className={`flex-1 h-12 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
-                    isOutOfStock || !isLoggedIn || (hasVariants && !selectedSize)
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-green-600 to-teal-600 text-white hover:opacity-90'
-                  }`}
-                >
-                  <CreditCard className="w-4 h-4" />
-                  <span className="text-sm">Buy</span>
-                </button>
+                {isLoggedIn ? (
+                  <>
+                    <button
+                      onClick={handleAddToCart}
+                      disabled={isOutOfStock || isAddingToCart || cartLoading || (hasVariants && !selectedSize)}
+                      className={`flex-1 h-12 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
+                        isOutOfStock || (hasVariants && !selectedSize)
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : isInCart
+                          ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:opacity-90'
+                          : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-90'
+                      }`}
+                    >
+                      {isAddingToCart || cartLoading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          <span className="text-sm">Adding...</span>
+                        </>
+                      ) : isInCart ? (
+                        <>
+                          <Check className="w-4 h-4" />
+                          <span className="text-sm">In Cart</span>
+                        </>
+                      ) : (
+                        <>
+                          <ShoppingCart className="w-4 h-4" />
+                          <span className="text-sm">Add</span>
+                        </>
+                      )}
+                    </button>
+                    
+                    <button
+                      onClick={handleBuyNow}
+                      disabled={isOutOfStock || (hasVariants && !selectedSize)}
+                      className={`flex-1 h-12 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
+                        isOutOfStock || (hasVariants && !selectedSize)
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-gradient-to-r from-green-600 to-teal-600 text-white hover:opacity-90'
+                      }`}
+                    >
+                      <CreditCard className="w-4 h-4" />
+                      <span className="text-sm">Buy</span>
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => navigate('/login', { state: { from: window.location.pathname } })}
+                    className="flex-1 h-12 rounded-xl font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    <span className="text-sm">Login to Add</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -1438,131 +1510,6 @@ export default function ProductDetailPage() {
             <SizeChart />
           )}
         </div>
-
-        {/* Tabs Section (Desktop) */}
-        {/* <div className="hidden lg:block mt-8">
-          <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-            <div className="border-b border-gray-200">
-              <nav className="flex">
-                <button
-                  onClick={() => setActiveTab('specifications')}
-                  className={`px-6 py-4 text-lg font-medium border-b-2 transition-colors ${
-                    activeTab === 'specifications' 
-                      ? 'border-blue-600 text-blue-600' 
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  Specifications
-                </button>
-                <button
-                  onClick={() => setActiveTab('reviews')}
-                  className={`px-6 py-4 text-lg font-medium border-b-2 transition-colors ${
-                    activeTab === 'reviews' 
-                      ? 'border-blue-600 text-blue-600' 
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  Reviews ({displayData.reviewCount})
-                </button>
-                <button
-                  onClick={() => setActiveTab('shipping')}
-                  className={`px-6 py-4 text-lg font-medium border-b-2 transition-colors ${
-                    activeTab === 'shipping' 
-                      ? 'border-blue-600 text-blue-600' 
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  Shipping & Returns
-                </button>
-              </nav>
-            </div>
-
-            <div className="p-8">
-              {activeTab === 'specifications' && (
-                <div className="space-y-6">
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Product Specifications</h4>
-                    <div className="bg-gray-50 rounded-lg p-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {displayData.specifications?.map((spec, index) => (
-                          <div key={index}>
-                            <p className="text-sm text-gray-500">{spec.key}</p>
-                            <p className="font-medium">{spec.value}</p>
-                          </div>
-                        )) || (
-                          <>
-                            <div>
-                              <p className="text-sm text-gray-500">Manufacturer</p>
-                              <p className="font-medium">{displayData.manufacturer || 'Not specified'}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm text-gray-500">Warranty</p>
-                              <p className="font-medium">{displayData.warranty || 'Not specified'}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm text-gray-500">Care Instructions</p>
-                              <p className="font-medium">{displayData.careInstructions || 'Not specified'}</p>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'reviews' && (
-                <div className="text-center py-12">
-                  <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <MessageCircle className="w-8 h-8 text-gray-400" />
-                  </div>
-                  <h4 className="text-xl font-semibold text-gray-900 mb-2">Customer Reviews</h4>
-                  <p className="text-gray-600">No reviews yet. Be the first to review this product!</p>
-                </div>
-              )}
-
-              {activeTab === 'shipping' && (
-                <div className="space-y-6">
-                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-6">
-                    <h4 className="font-semibold text-gray-900 mb-4">Shipping Policy</h4>
-                    <ul className="space-y-3 text-gray-600">
-                      <li className="flex items-start gap-3">
-                        <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-                        <span>Free standard shipping on orders over ₹999</span>
-                      </li>
-                      <li className="flex items-start gap-3">
-                        <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-                        <span>Express shipping available at additional cost</span>
-                      </li>
-                      <li className="flex items-start gap-3">
-                        <Check className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-                        <span>Delivery within 3-5 business days for metro cities</span>
-                      </li>
-                    </ul>
-                  </div>
-
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6">
-                    <h4 className="font-semibold text-gray-900 mb-4">Return & Exchange Policy</h4>
-                    <ul className="space-y-3 text-gray-600">
-                      <li className="flex items-start gap-3">
-                        <RefreshCw className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                        <span>30-day return policy from date of delivery</span>
-                      </li>
-                      <li className="flex items-start gap-3">
-                        <RefreshCw className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                        <span>Products must be in original condition with tags</span>
-                      </li>
-                      <li className="flex items-start gap-3">
-                        <RefreshCw className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                        <span>Free return shipping for defective items</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div> */}
       </div>
       <Footer/>
     </div>
