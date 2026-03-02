@@ -1089,10 +1089,13 @@ export default function AllProductsHub() {
                         className="group bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden text-left"
                       >
                         <div className="relative aspect-square bg-white flex items-center justify-center overflow-hidden">
-                          {category.thumbnail ? (
+                            {category.thumbnail ? (
                             <img
                               src={getImageUrl(category.thumbnail)}
                               alt={category.altText || category.name}
+                              loading="lazy"
+                              decoding="async"
+                              fetchPriority="low"
                               className="max-h-[85%] max-w-[85%] object-contain transition-transform duration-300 group-hover:scale-105"
                               onError={(e) => {
                                 e.target.onerror = null;
@@ -1165,6 +1168,9 @@ export default function AllProductsHub() {
                             <img
                               src={getImageUrl(sub.thumb)}
                               alt={sub.altText || sub.name}
+                              loading="lazy"
+                              decoding="async"
+                              fetchPriority="low"
                               className="max-h-[85%] max-w-[85%] object-contain transition-transform duration-300 group-hover:scale-105"
                               onError={(e) => {
                                 e.target.onerror = null;
@@ -1253,7 +1259,7 @@ export default function AllProductsHub() {
                           className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
                         >
                           <div className="relative aspect-square bg-white flex items-center justify-center overflow-hidden rounded-t-xl">
-                            <img
+                          <img
                               src={getImageUrl(
                                 product.previewImage ||
                                 product.raw?.images?.[0]
@@ -1263,6 +1269,9 @@ export default function AllProductsHub() {
                                 product.title ||
                                 "Product image"
                               }
+                              loading="lazy"
+                              decoding="async"
+                              fetchPriority="auto"
                               className="max-h-[85%] max-w-[85%] object-contain"
                             />
 

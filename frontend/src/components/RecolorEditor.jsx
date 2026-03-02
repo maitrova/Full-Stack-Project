@@ -8,6 +8,7 @@ import React, {
   useImperativeHandle,
   useMemo,
 } from "react";
+import { motion } from "framer-motion";
 import CanvasRenderer from "./CanvasRenderer.jsx";
 
 /* =========================
@@ -1398,6 +1399,10 @@ function TextOverlay({
 
   const overlayRef = useRef(null);
   const dragStateRef = useRef(null);
+  const designMoveRafRef = useRef(null);
+  const pendingDesignEventRef = useRef(null);
+  const textMoveRafRef = useRef(null);
+  const pendingTextEventRef = useRef(null);
 
 
 function measureTextBoxPx({ text, fontSize, fontFamily }) {
@@ -1460,124 +1465,133 @@ function clampFontSizeToBoundary({
 }
 
 
- const onPointerMove = useCallback(
-  (e) => {
-    const dragState = dragStateRef.current;
-    if (!dragState) return;
+  const handlePointerMove = useCallback(
+    (e) => {
+      const dragState = dragStateRef.current;
+      if (!dragState) return;
 
-    const { mode, id, startX, startY, rectWidth, rectHeight, initialLayer, handle } = dragState;
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
+      const { mode, id, startX, startY, rectWidth, rectHeight, initialLayer, handle } = dragState;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
 
-   if (mode === "drag") {
-  const nxRaw = initialLayer.x + dx / rectWidth;
-  const nyRaw = initialLayer.y + dy / rectHeight;
+      if (mode === "drag") {
+        const nxRaw = initialLayer.x + dx / rectWidth;
+        const nyRaw = initialLayer.y + dy / rectHeight;
 
-  const textLayer = textLayers.find((l) => l.id === id);
-  if (!textLayer || !canvasSize) return;
+        const textLayer = textLayers.find((l) => l.id === id);
+        if (!textLayer || !canvasSize) return;
 
-  // ✅ detect which zone the center is inside (pocket/front-full etc.)
-  const currentZoneKey = getBoundaryKeyForTextLayer(textLayer);
-  const detectedZone =
-    pickZoneForPoint(nxRaw, nyRaw, zonesForView, boundaries) || currentZoneKey;
+        const currentZoneKey = getBoundaryKeyForTextLayer(textLayer);
+        const detectedZone = pickZoneForPoint(nxRaw, nyRaw, zonesForView, boundaries) || currentZoneKey;
 
-  const zoneKey = detectedZone;
+        const zoneKey = detectedZone;
+        const b =
+          boundaries?.[zoneKey] ||
+          FALLBACK_BOUNDARIES?.[zoneKey] ||
+          FALLBACK_BOUNDARIES["front-full"];
 
-  const b =
-    boundaries?.[zoneKey] ||
-    FALLBACK_BOUNDARIES?.[zoneKey] ||
-    FALLBACK_BOUNDARIES["front-full"];
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        const fontSize = textLayer.fontSize || 20;
+        const fontFamily = textLayer.fontFamily || "Impact, sans-serif";
+        ctx.font = `700 ${fontSize}px ${fontFamily}`;
 
-  // measure text size in px
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  const fontSize = textLayer.fontSize || 20;
-  const fontFamily = textLayer.fontFamily || "Impact, sans-serif";
-  ctx.font = `700 ${fontSize}px ${fontFamily}`;
+        const text = textLayer.text || "";
+        const sx = textLayer.scaleX ?? 1;
+        const sy = textLayer.scaleY ?? 1;
 
-  const text = textLayer.text || "";
-  const sx = textLayer.scaleX ?? 1;
-  const sy = textLayer.scaleY ?? 1;
+        const textWidthPx = (ctx.measureText(text).width || 0) * sx;
+        const textHeightPx = (fontSize || 20) * 1.2 * sy;
 
-  const textWidthPx = (ctx.measureText(text).width || 0) * sx;
-  const textHeightPx = (fontSize || 20) * 1.2 * sy;
+        const halfW = (textWidthPx / canvasSize.width) / 2;
+        const halfH = (textHeightPx / canvasSize.height) / 2;
 
-  const halfW = (textWidthPx / canvasSize.width) / 2;
-  const halfH = (textHeightPx / canvasSize.height) / 2;
+        const constrainedX = Math.max(b.minX + halfW, Math.min(b.maxX - halfW, nxRaw));
+        const constrainedY = Math.max(b.minY + halfH, Math.min(b.maxY - halfH, nyRaw));
 
-  // clamp CENTER so the full text box stays inside boundary
-  const constrainedX = Math.max(b.minX + halfW, Math.min(b.maxX - halfW, nxRaw));
-  const constrainedY = Math.max(b.minY + halfH, Math.min(b.maxY - halfH, nyRaw));
+        const measurementPatch =
+          buildTextMeasurementPatch(textLayer, { x: constrainedX, y: constrainedY, zone: zoneKey }) || {};
 
-  const measurementPatch =
-    buildTextMeasurementPatch(textLayer, { x: constrainedX, y: constrainedY, zone: zoneKey }) || {};
+        setTextLayers((prev) =>
+          prev.map((layer) =>
+            layer.id === id
+              ? { ...layer, x: constrainedX, y: constrainedY, zone: zoneKey, ...measurementPatch }
+              : layer
+          )
+        );
+      } else if (mode === "resize") {
+        const layerNow = textLayers.find((l) => l.id === id);
+        if (!layerNow || !canvasSize) return;
 
-  setTextLayers((prev) =>
-    prev.map((layer) =>
-      layer.id === id
-        ? { ...layer, x: constrainedX, y: constrainedY, zone: zoneKey, ...measurementPatch }
-        : layer
-    )
-  );
+        const baseScaleX = initialLayer.scaleX ?? 1;
+        const baseScaleY = initialLayer.scaleY ?? 1;
 
-} else if (mode === "resize") {
-  const layerNow = textLayers.find((l) => l.id === id);
-  if (!layerNow || !canvasSize) return;
+        const kx = 1 / rectWidth;
+        const ky = 1 / rectHeight;
 
-  const handle = dragState.handle;
+        let nextScaleX = baseScaleX;
+        let nextScaleY = baseScaleY;
 
-  const baseScaleX = initialLayer.scaleX ?? 1;
-  const baseScaleY = initialLayer.scaleY ?? 1;
+        if (handle === "right") nextScaleX = baseScaleX + dx * kx;
+        if (handle === "left") nextScaleX = baseScaleX - dx * kx;
 
-  // sensitivity
-  const kx = 1 / rectWidth;
-  const ky = 1 / rectHeight;
+        if (handle === "bottom") nextScaleY = baseScaleY + dy * ky;
+        if (handle === "top") nextScaleY = baseScaleY - dy * ky;
 
-  let nextScaleX = baseScaleX;
-  let nextScaleY = baseScaleY;
+        nextScaleX = Math.max(0.2, Math.min(5, nextScaleX));
+        nextScaleY = Math.max(0.2, Math.min(5, nextScaleY));
 
-  if (handle === "right") nextScaleX = baseScaleX + dx * kx;
-  if (handle === "left")  nextScaleX = baseScaleX - dx * kx;
-
-  if (handle === "bottom") nextScaleY = baseScaleY + dy * ky;
-  if (handle === "top")    nextScaleY = baseScaleY - dy * ky;
-
-  // clamp min/max
-  nextScaleX = Math.max(0.2, Math.min(5, nextScaleX));
-  nextScaleY = Math.max(0.2, Math.min(5, nextScaleY));
-
-  const zoneKeyForResize =
-    layerNow.zone || getBoundaryKeyForTextLayer(layerNow);
-  const measurementPatchResize =
-    buildTextMeasurementPatch(layerNow, {
-      scaleX: nextScaleX,
-      scaleY: nextScaleY,
-      zone: zoneKeyForResize,
-    }) || {};
-
-  setTextLayers((prev) =>
-    prev.map((layer) =>
-      layer.id === id
-        ? {
-            ...layer,
+        const zoneKeyForResize = layerNow.zone || getBoundaryKeyForTextLayer(layerNow);
+        const measurementPatchResize =
+          buildTextMeasurementPatch(layerNow, {
             scaleX: nextScaleX,
             scaleY: nextScaleY,
-            scale: Math.min(nextScaleX, nextScaleY),
-            ...measurementPatchResize,
-          }
-        : layer
-    )
+            zone: zoneKeyForResize,
+          }) || {};
+
+        setTextLayers((prev) =>
+          prev.map((layer) =>
+            layer.id === id
+              ? {
+                  ...layer,
+                  scaleX: nextScaleX,
+                  scaleY: nextScaleY,
+                  scale: Math.min(nextScaleX, nextScaleY),
+                  ...measurementPatchResize,
+                }
+              : layer
+          )
+        );
+      }
+    },
+    [setTextLayers, textLayers, canvasSize, boundaries, zonesForView, buildTextMeasurementPatch]
   );
-}
 
+  const onPointerMove = useCallback(
+    (e) => {
+      pendingTextEventRef.current = e;
+      if (textMoveRafRef.current) return;
 
-  },
-  [setTextLayers, textLayers, canvasSize, boundaries]
-);
+      textMoveRafRef.current = requestAnimationFrame(() => {
+        textMoveRafRef.current = null;
+        const event = pendingTextEventRef.current;
+        pendingTextEventRef.current = null;
+        if (event) {
+          handlePointerMove(event);
+        }
+      });
+    },
+    [handlePointerMove]
+  );
 
 
   const onPointerUp = useCallback(() => {
     dragStateRef.current = null;
+    if (textMoveRafRef.current) {
+      cancelAnimationFrame(textMoveRafRef.current);
+      textMoveRafRef.current = null;
+    }
+    pendingTextEventRef.current = null;
     window.removeEventListener("pointermove", onPointerMove);
     window.removeEventListener("pointerup", onPointerUp);
   }, [onPointerMove]);
@@ -1608,10 +1622,21 @@ function clampFontSizeToBoundary({
 
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
+    e.currentTarget?.setPointerCapture?.(e.pointerId);
   };
 
+  useEffect(() => {
+    return () => {
+      if (textMoveRafRef.current) {
+        cancelAnimationFrame(textMoveRafRef.current);
+        textMoveRafRef.current = null;
+      }
+      pendingTextEventRef.current = null;
+    };
+  }, []);
+
   return (
-    <div ref={overlayRef} className="pointer-events-none absolute inset-0 z-20">
+    <div ref={overlayRef} className="pointer-events-none absolute inset-0 z-20" style={{ touchAction: "none" }}>
       {(textLayers || []).map((layer) => {
         const isActive = layer.id === activeTextId;
         const left = `${layer.x * 100}%`;
@@ -1623,15 +1648,17 @@ function clampFontSizeToBoundary({
         const formattedMaxW = formatInches(layer.printableAreaWidthInches);
         const formattedMaxH = formatInches(layer.printableAreaHeightInches);
         return (
-          <div
+          <motion.div
             key={layer.id}
-            
-           style={{
-            left,
-            top,
-            transform: `translate(-50%, -50%) rotate(${layer.rotation}deg) scale(${sx}, ${sy})`,
-          }}
+            initial={false}
+            animate={{
+              left,
+              top,
+              transform: `translate(-50%, -50%) rotate(${layer.rotation}deg) scale(${sx}, ${sy})`,
+            }}
+            transition={{ type: "spring", stiffness: 450, damping: 45 }}
             className="pointer-events-auto absolute"
+            style={{ touchAction: "none", cursor: "move" }}
             onPointerDown={(e) => startDrag(e, layer.id, "drag")}
           >
             <div
@@ -1640,6 +1667,7 @@ function clampFontSizeToBoundary({
                 fontFamily: layer.fontFamily,
                 fontSize: layer.fontSize,
                 color: layer.color,
+                willChange: "transform",
                 whiteSpace: "nowrap",
                 cursor: "move",
                 userSelect: "none",
@@ -1679,7 +1707,7 @@ function clampFontSizeToBoundary({
                 {formattedWidth}″ × {formattedHeight}″ (max {formattedMaxW}″ × {formattedMaxH}″)
               </div>
             )}
-          </div>
+          </motion.div>
         );
       })}
     </div>
@@ -1702,6 +1730,8 @@ function DesignOverlay({
 }) {
   const overlayRef = useRef(null);
   const dragStateRef = useRef(null);
+  const designMoveRafRef = useRef(null);
+  const pendingDesignEventRef = useRef(null);
 
   const zoneCandidates = useMemo(() => {
     const uniqueKeys = new Set(zonesForView || []);
@@ -1711,7 +1741,7 @@ function DesignOverlay({
     return Array.from(uniqueKeys);
   }, [zonesForView, layer?.zone, layer?.viewCode]);
 
-  const onPointerMove = useCallback(
+  const handlePointerMove = useCallback(
     (e) => {
       const st = dragStateRef.current;
       if (!st) return;
@@ -1724,29 +1754,23 @@ function DesignOverlay({
       const baseW = canvasSize?.width || rectWidth || 0;
       const baseH = canvasSize?.height || rectHeight || 0;
 
-      // Zone selection (for move). For resize we keep zone as current.
       const currentZoneKey = getBoundaryKeyForLayer(initialLayer);
 
-      // Common boundary lookup
       const getBoundaryForZone = (zoneKey) =>
         boundaries?.[zoneKey] ||
         FALLBACK_BOUNDARIES?.[zoneKey] ||
         FALLBACK_BOUNDARIES["front-full"];
 
       if (mode === "move") {
-        // raw target center
         const nxRaw = (initialLayer.x ?? 0.5) + dxPx / rectWidth;
         const nyRaw = (initialLayer.y ?? 0.5) + dyPx / rectHeight;
 
-        // detect zone by center point
         const zoneSource = zoneCandidates.length ? zoneCandidates : [currentZoneKey];
-        const detectedZone =
-          pickZoneForPoint(nxRaw, nyRaw, zoneSource, boundaries) || currentZoneKey;
+        const detectedZone = pickZoneForPoint(nxRaw, nyRaw, zoneSource, boundaries) || currentZoneKey;
 
         const zoneKey = detectedZone;
         const b = getBoundaryForZone(zoneKey);
 
-        // ✅ use axis-aware size (normalized half extents = scale/2)
         const legacyScale = initialLayer.scale ?? 0.35;
         const scaleX = initialLayer.scaleX ?? legacyScale;
         const scaleY = initialLayer.scaleY ?? legacyScale;
@@ -1754,11 +1778,9 @@ function DesignOverlay({
         const halfW = scaleX / 2;
         const halfH = scaleY / 2;
 
-        // clamp center so full rect stays in boundary
         let constrainedX = Math.max(b.minX + halfW, Math.min(b.maxX - halfW, nxRaw));
         let constrainedY = Math.max(b.minY + halfH, Math.min(b.maxY - halfH, nyRaw));
 
-        // optional snap
         const snapped = snapToBoundaryCenter(constrainedX, constrainedY, b, halfW, halfH);
         constrainedX = snapped.x;
         constrainedY = snapped.y;
@@ -1778,33 +1800,29 @@ function DesignOverlay({
         const cx = initialLayer.x ?? 0.5;
         const cy = initialLayer.y ?? 0.5;
 
-        // legacy fallback
         const legacy = initialLayer.scale ?? 0.35;
         let nextScaleX = initialLayer.scaleX ?? legacy;
         let nextScaleY = initialLayer.scaleY ?? legacy;
 
-        // Max allowed scale so art stays inside boundary at current center
         const maxHalfWNorm = Math.max(0, Math.min(cx - b.minX, b.maxX - cx));
         const maxHalfHNorm = Math.max(0, Math.min(cy - b.minY, b.maxY - cy));
         const maxScaleX = Math.max(0.02, 2 * maxHalfWNorm);
         const maxScaleY = Math.max(0.02, 2 * maxHalfHNorm);
 
-        // Apply resize based on handle
         if (handle === "right") {
-          const newWpx = (baseW * nextScaleX) + dxPx;
-          nextScaleX = baseW ? (newWpx / baseW) : nextScaleX;
+          const newWpx = baseW * nextScaleX + dxPx;
+          nextScaleX = baseW ? newWpx / baseW : nextScaleX;
         } else if (handle === "left") {
-          const newWpx = (baseW * nextScaleX) - dxPx;
-          nextScaleX = baseW ? (newWpx / baseW) : nextScaleX;
+          const newWpx = baseW * nextScaleX - dxPx;
+          nextScaleX = baseW ? newWpx / baseW : nextScaleX;
         } else if (handle === "bottom") {
-          const newHpx = (baseH * nextScaleY) + dyPx;
-          nextScaleY = baseH ? (newHpx / baseH) : nextScaleY;
+          const newHpx = baseH * nextScaleY + dyPx;
+          nextScaleY = baseH ? newHpx / baseH : nextScaleY;
         } else if (handle === "top") {
-          const newHpx = (baseH * nextScaleY) - dyPx;
-          nextScaleY = baseH ? (newHpx / baseH) : nextScaleY;
+          const newHpx = baseH * nextScaleY - dyPx;
+          nextScaleY = baseH ? newHpx / baseH : nextScaleY;
         }
 
-        // Clamp min and boundary
         nextScaleX = Math.max(0.02, Math.min(nextScaleX, maxScaleX));
         nextScaleY = Math.max(0.02, Math.min(nextScaleY, maxScaleY));
 
@@ -1815,7 +1833,6 @@ function DesignOverlay({
                   ...d,
                   scaleX: nextScaleX,
                   scaleY: nextScaleY,
-                  // keep legacy for existing data until migration
                   scale: Math.min(nextScaleX, nextScaleY),
                 }
               : d
@@ -1826,8 +1843,30 @@ function DesignOverlay({
     [setDesignLayers, boundaries, canvasSize, zoneCandidates]
   );
 
+  const onPointerMove = useCallback(
+    (e) => {
+      pendingDesignEventRef.current = e;
+      if (designMoveRafRef.current) return;
+
+      designMoveRafRef.current = requestAnimationFrame(() => {
+        designMoveRafRef.current = null;
+        const event = pendingDesignEventRef.current;
+        pendingDesignEventRef.current = null;
+        if (event) {
+          handlePointerMove(event);
+        }
+      });
+    },
+    [handlePointerMove]
+  );
+
   const onPointerUp = useCallback(() => {
     dragStateRef.current = null;
+    if (designMoveRafRef.current) {
+      cancelAnimationFrame(designMoveRafRef.current);
+      designMoveRafRef.current = null;
+    }
+    pendingDesignEventRef.current = null;
     window.removeEventListener("pointermove", onPointerMove);
     window.removeEventListener("pointerup", onPointerUp);
   }, [onPointerMove]);
@@ -1858,6 +1897,16 @@ function DesignOverlay({
     e.currentTarget?.setPointerCapture?.(e.pointerId);
   };
 
+  useEffect(() => {
+    return () => {
+      if (designMoveRafRef.current) {
+        cancelAnimationFrame(designMoveRafRef.current);
+        designMoveRafRef.current = null;
+      }
+      pendingDesignEventRef.current = null;
+    };
+  }, []);
+
   const left = `${(layer.x ?? 0.5) * 100}%`;
   const top = `${(layer.y ?? 0.5) * 100}%`;
 
@@ -1875,14 +1924,20 @@ function DesignOverlay({
       className="pointer-events-none absolute inset-0 z-10"
       style={{ touchAction: "none" }}
     >
-      <div
-        style={{
+      <motion.div
+        initial={false}
+        animate={{
           left,
           top,
           transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)`,
-          cursor: disabled ? "default" : "grab",
         }}
+        transition={{ type: "spring", stiffness: 400, damping: 40 }}
         className="pointer-events-auto absolute"
+        style={{
+          cursor: disabled ? "default" : "grab",
+          touchAction: "none",
+          willChange: "transform",
+        }}
         onPointerDown={(e) => startDrag(e, "move")}
       >
         <div
@@ -1945,7 +2000,7 @@ function DesignOverlay({
             (max {layer.printableAreaWidthInches || "?"}″ × {layer.printableAreaHeightInches || "?"}″)
           </div>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }
