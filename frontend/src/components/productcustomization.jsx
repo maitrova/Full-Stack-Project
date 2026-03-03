@@ -180,6 +180,7 @@ const getSizeBasePrice = (prod, size) => {
   const [viewStates, setViewStates] = useState({});
   const [viewCode, setViewCode] = useState("front");
   const [bgRemovalLoading, setBgRemovalLoading] = useState(false);
+  const [uploadLoading, setUploadLoading] = useState(false);
   const [error, setError] = useState("");
   const [designRenderWidth, setDesignRenderWidth] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -546,12 +547,25 @@ const restoreDesignLayerFromSaved = (d) => {
     return { totalPrice, breakdown };
   };
 
+  // Debounced price calculation to avoid excessive calculations
+  const priceCalculationTimeoutRef = useRef(null);
+  
   useEffect(() => {
     if (Object.keys(viewStates).length > 0) {
-      const timeoutId = setTimeout(() => {
+      // Clear existing timeout
+      if (priceCalculationTimeoutRef.current) {
+        clearTimeout(priceCalculationTimeoutRef.current);
+      }
+      // Debounce price calculation - wait 500ms after last change
+      priceCalculationTimeoutRef.current = setTimeout(() => {
         calculatePrice();
-      }, 3000);
-      return () => clearTimeout(timeoutId);
+      }, 500);
+      
+      return () => {
+        if (priceCalculationTimeoutRef.current) {
+          clearTimeout(priceCalculationTimeoutRef.current);
+        }
+      };
     }
   }, [viewStates]);
 
@@ -871,29 +885,39 @@ const handleDesignUpload = async (e) => {
   if (!files.length) return;
 
   setError("");
+  setUploadLoading(true);
 
   try {
-    const newLayers = [];
+    // Process all uploads in parallel for better performance
+    const uploadPromises = files.map(async (file) => {
+      try {
+        // 1) Read size from local file
+        const { width, height } = await getImageSizeFromFile(file);
 
-    for (const file of files) {
-      // ✅ 1) Read size from local file (no CORS / no server dependency)
-      const { width, height } = await getImageSizeFromFile(file);
+        // 2) Upload to server
+        const serverUrl = await uploadDesignImage(file);
+        
+        if (!serverUrl || typeof serverUrl !== "string") {
+          console.warn("Upload returned invalid url:", file.name, serverUrl);
+          return null;
+        }
 
-      // ✅ 2) Upload to server (for persistence)
-      const serverUrl = await uploadDesignImage(file);
-      console.log("Uploaded file:", file.name, "to URL:", serverUrl);
-      if (!serverUrl || typeof serverUrl !== "string") {
-        console.warn("Upload returned invalid url:", file.name, serverUrl);
-        continue;
+        const id = `design-${crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+
+        console.log("Uploaded:", file.name, "Size:", width, "x", height);
+
+        return createDesignLayer(id, serverUrl, file, width, height, false);
+      } catch (error) {
+        console.error("Error uploading file:", file.name, error);
+        return null;
       }
+    });
 
-      const id = `design-${crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
-
-      console.log("Pixels source: local file", { filename: file.name, width, height });
-      console.log("Server URL:", serverUrl);
-
-      newLayers.push(createDesignLayer(id, serverUrl, file, width, height, false));
-    }
+    // Wait for all uploads to complete
+    const uploadedLayers = await Promise.all(uploadPromises);
+    
+    // Filter out failed uploads
+    const newLayers = uploadedLayers.filter(layer => layer !== null);
 
     if (!newLayers.length) {
       setError("No valid images were uploaded. Try JPG/PNG and smaller file sizes.");
@@ -903,6 +927,7 @@ const handleDesignUpload = async (e) => {
     const all = [...designLayers, ...newLayers];
     const lastId = newLayers[newLayers.length - 1].id;
 
+    // Batch state update - only triggers one re-render
     updateCurrentViewState({
       designLayers: all,
       activeDesignId: lastId,
@@ -912,6 +937,7 @@ const handleDesignUpload = async (e) => {
     console.error("Error uploading design images:", err);
     setError("Failed to upload images: " + (err?.message || String(err)));
   } finally {
+    setUploadLoading(false);
     e.target.value = "";
   }
 };
@@ -1828,7 +1854,23 @@ const handleDesignScaleYChange = (value) => {
                   <p className="mb-2 text-xs text-slate-600">Upload one or more images. They will be saved to the server automatically.</p>
 
                   <div className="mb-3 text-xs">
-                    <input type="file" accept="image/*" multiple onChange={handleDesignUpload} className="w-full text-xs border border-slate-300 rounded px-3 py-2" />
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      multiple 
+                      onChange={handleDesignUpload}
+                      disabled={uploadLoading}
+                      className="w-full text-xs border border-slate-300 rounded px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed" 
+                    />
+                    {uploadLoading && (
+                      <div className="mt-2 flex items-center gap-2 text-xs text-blue-600">
+                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Uploading images...</span>
+                      </div>
+                    )}
                   </div>
 
                   {activeDesign && (
