@@ -1036,11 +1036,16 @@ const handleDesignUpload = async (e) => {
         throw new Error("Background removal failed: no output URL");
       }
 
+      // Construct proper image URL - backend returns /outputs/..., we need to add base URL
+      const baseUrl = IMAGE_URL || API_URL;
+      const imageUrl = `${baseUrl}${data.outputUrl}?t=${Date.now()}`;
+      console.log("Constructed background removed image URL:", imageUrl);
+
       const updatedLayers = designLayers.map((d) =>
         d.id === activeDesign.id
           ? {
               ...d,
-              imageUrl: `${import.meta.env.VITE_API_URL}${data.outputUrl}?t=${Date.now()}`,
+              imageUrl: imageUrl,
               hasBgRemoved: true,
               originalFile: fileToUse, // Store the file for future use
               isFromLibrary: false, // Once processed, it's no longer a library image

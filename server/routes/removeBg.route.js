@@ -4,7 +4,22 @@ import { removeBgController } from "../controllers/removeBg.controller.js";
 
 
 const removebgrouter = express.Router();
-const upload = multer({ dest: "uploads/" }); // temp folder
+
+// Configure multer with file size limit and better error handling
+const upload = multer({ 
+  dest: "uploads/",
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept images only
+    if (!file.mimetype.startsWith('image/')) {
+      cb(new Error('Only image files are allowed'), false);
+      return;
+    }
+    cb(null, true);
+  }
+});
 
 removebgrouter.post("/remove-bg", upload.single("image"), removeBgController);
 

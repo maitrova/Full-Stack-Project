@@ -42,11 +42,11 @@ envSecrets:
 # Resource Limits
 resources:
   limits:
-    cpu: "1"
-    memory: 1Gi
+    cpu: "2"
+    memory: 3Gi
   requests:
-    cpu: "250m"
-    memory: 512Mi
+    cpu: "500m"
+    memory: 1.5Gi
 
 # Health Checks
 livenessProbe:

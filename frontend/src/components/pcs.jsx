@@ -905,11 +905,15 @@ setPriceBreakdown((prev) => ({
         throw new Error("Background removal failed: no output URL");
       }
 
+      // Construct proper image URL
+      const baseUrl = IMAGE_URL || API_URL;
+      const imageUrl = `${baseUrl}${data.outputUrl}?t=${Date.now()}`;
+
       const updatedLayers = designLayers.map((d) =>
         d.id === activeDesign.id
           ? {
               ...d,
-              imageUrl: `${import.meta.env.VITE_IMAGE_URL}${data.outputUrl.replace(/^\/api/, "")}?t=${Date.now()}`,
+              imageUrl: imageUrl,
               hasBgRemoved: true,
               originalFile: fileToUse, // Store the file for future use
               isFromLibrary: false, // Once processed, it's no longer a library image

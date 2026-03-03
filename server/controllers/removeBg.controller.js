@@ -119,7 +119,7 @@ export const removeBgController = async (req, res) => {
 
       return res.json({
         success: true,
-        outputUrl: `/api/outputs/${outputFileName}`,
+        outputUrl: `/outputs/${outputFileName}`,
       });
     });
 
