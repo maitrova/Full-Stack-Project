@@ -2,7 +2,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ .Values.name }}-ingress
+  name: {{ .Values.name }}-api-ingress
   labels:
     app: {{ .Values.name }}
     {{- include "backend.labels" . | nindent 4 }}
