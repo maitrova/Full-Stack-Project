@@ -2,7 +2,7 @@ name: Build and Push Docker Images
 
 on:
   push:
-    branches: [ image3 ]
+    branches: [ deploy-ment ]
   workflow_dispatch:
 
 env:
