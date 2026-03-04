@@ -147,6 +147,25 @@ const ProductFormModal = ({
   // Base URL for image paths
   const baseUrl = import.meta.env.VITE_IMAGE_URL || '';
 
+  const resolveReferenceId = (value, list = []) => {
+    if (!value) return '';
+    if (typeof value === 'object') {
+      return value._id || value.id || '';
+    }
+    const stringValue = String(value);
+    if (Array.isArray(list) && list.length > 0) {
+      const matchById = list.find(item => String(item._id) === stringValue);
+      if (matchById) return matchById._id;
+      const matchByName = list.find(
+        item =>
+          String(item.name || '') === stringValue ||
+          String(item.altText || '') === stringValue
+      );
+      if (matchByName) return matchByName._id;
+    }
+    return stringValue;
+  };
+
   // Load categories and subcategories when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -236,15 +255,17 @@ const ProductFormModal = ({
 
   // Populate form for editing
   useEffect(() => {
-  if (isEdit && product) {
+    if (!isEdit || !product) {
+      return;
+    }
 
     setFormData({
       title: product.title || '',
       description: product.description || '',
       currency: product.currency || 'INR',
-      category: product.category?._id || product.category || '',
-      subCategory: product.subCategory?._id || product.subCategory || '',
-      brand: product.brand?._id || product.brand || '',
+      category: resolveReferenceId(product.category, categories),
+      subCategory: resolveReferenceId(product.subCategory, subCategories),
+      brand: resolveReferenceId(product.brand, brands),
       isActive: product.isActive ?? true,
       bestSeller: product.bestSeller || false,
       newArrival: product.newArrival || false,
@@ -322,14 +343,13 @@ const ProductFormModal = ({
     }
 
     setCurrentStep(4);
+  }, [product, isEdit, baseUrl, categories, subCategories, brands]);
 
-  } else {
-
-    resetForm();
-
-  }
-
-}, [product, isEdit, baseUrl]);
+  useEffect(() => {
+    if (!isEdit && isOpen) {
+      resetForm();
+    }
+  }, [isEdit, isOpen]);
 
   const resetForm = () => {
     setFormData({
@@ -399,7 +419,7 @@ const handleSizeChartUpload = (e) => {
   if (!file) return;
 
   const validTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
-  const maxSize = 5 * 1024 * 1024;
+  const maxSize = 200 * 1024 * 1024;
 
   if (!validTypes.includes(file.type)) {
     setErrors(prev => ({
@@ -520,7 +540,7 @@ const removeSizeChart = () => {
     if (!file) return;
 
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-    const maxSize = 5 * 1024 * 1024;
+    const maxSize = 200 * 1024 * 1024;
 
     if (!validTypes.includes(file.type)) {
       setCategoryErrors(prev => ({ ...prev, thumbnail: 'Only JPG, PNG, and WebP images are allowed' }));
@@ -554,7 +574,7 @@ const removeSizeChart = () => {
     if (!file) return;
 
     const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-    const maxSize = 5 * 1024 * 1024;
+    const maxSize = 200 * 1024 * 1024;
 
     if (!validTypes.includes(file.type)) {
       setSubCategoryErrors(prev => ({ ...prev, thumbnail: 'Only JPG, PNG, and WebP images are allowed' }));
@@ -628,7 +648,7 @@ const removeSizeChart = () => {
 
   const validFiles = files.filter(file => {
     const validTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
-    const maxSize = 5 * 1024 * 1024;
+    const maxSize = 200 * 1024 * 1024;
 
     if (!validTypes.includes(file.type)) return false;
     if (file.size > maxSize) return false;
@@ -666,7 +686,7 @@ const removeSizeChart = () => {
     if (!file) return;
     
     const validTypes = ['video/mp4', 'video/webm', 'video/ogg'];
-    const maxSize = 50 * 1024 * 1024;
+    const maxSize = 200 * 1024 * 1024;
     
     if (!validTypes.includes(file.type)) {
       setErrors(prev => ({

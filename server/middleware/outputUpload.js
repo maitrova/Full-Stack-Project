@@ -145,12 +145,6 @@ export const adminDesignUpload = multer({
   storage,
 
   fileFilter,
-
-  limits: {
-
-   fileSize: 50 * 1024 * 1024, // 50MB per file
-    files: 2000,   // IMPORTANT: allow folder upload
-
-  },
+  
 
 });

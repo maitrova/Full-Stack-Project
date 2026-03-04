@@ -16,7 +16,7 @@ const Header = () => {
   
   // Social media URLs (configure these as needed)
   const socialMedia = {
-    whatsapp: 'https://wa.me/919876543210',
+    whatsapp: 'https://wa.me/919390319652',
     instagram: 'https://instagram.com/maitrova',
     facebook: 'https://facebook.com/maitrova',
     twitter: 'https://twitter.com/maitrova',

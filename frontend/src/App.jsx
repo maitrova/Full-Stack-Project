@@ -297,7 +297,7 @@ function App() {
         } />
 
 
-          <Route path="/company/:name" element={
+          <Route path="/:name" element={
           <MainLayout>
             <Shipping />
           </MainLayout>

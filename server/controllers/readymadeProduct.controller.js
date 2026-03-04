@@ -669,90 +669,152 @@ export const createReadymadeProduct = async (req, res) => {
 
 
 
-// Update product
+
+// update product
 export const updateReadymadeProduct = async (req, res) => {
   try {
     const product = await ReadymadeProduct.findById(req.params.id);
 
-    if (!product)
+    if (!product) {
       return res.status(404).json({
         success: false,
         message: "Product not found",
       });
-
-    // parse alt texts
-    let parsedAltTexts = [];
-    if (req.body.imageAltTexts) {
-      parsedAltTexts = JSON.parse(req.body.imageAltTexts);
     }
 
-    // new images
-    const newImages =
-      (req.files?.images || []).map((file, index) => ({
+    const {
+      title,
+      description,
+      currency,
+      category,
+      subCategory,
+      brand,
+      isActive,
+      bestSeller,
+      newArrival,
+      variants,
+      thumbnail: thumbnailFromBody,
+      imageAltTexts,
+    } = req.body;
+
+    // ✅ Update basic fields only if provided
+    if (title) product.title = title;
+    if (description) product.description = description;
+    if (currency) product.currency = currency;
+    if (category) product.category = category;
+    if (subCategory) product.subCategory = subCategory;
+    if (brand) product.brand = brand;
+
+    if (isActive !== undefined)
+      product.isActive = isActive === "true";
+
+    if (bestSeller !== undefined)
+      product.bestSeller = bestSeller === "true";
+
+    if (newArrival !== undefined)
+      product.newArrival = newArrival === "true";
+
+    // ✅ Parse alt texts
+    let parsedAltTexts = [];
+    if (imageAltTexts) {
+      try {
+        parsedAltTexts = JSON.parse(imageAltTexts);
+      } catch {
+        return res.status(400).json({
+          success: false,
+          message: "imageAltTexts must be valid JSON array",
+        });
+      }
+    }
+
+    // ✅ Update Images (if new ones uploaded)
+    if (req.files?.images) {
+      const newImages = req.files.images.map((file, index) => ({
         url: file.path.replace(/\\/g, "/"),
         altText: parsedAltTexts[index] || "",
-      })) || [];
+      }));
 
-    const replaceImages = req.body.replaceImages === "true";
-
-    if (newImages.length) {
-      if (replaceImages) {
-        await Promise.all(
-          (product.images || []).map((img) =>
-            safeDeleteFile(img.url)
-          )
-        );
-        product.images = [];
-      }
-
-      const merged = [...product.images, ...newImages];
-
-      if (merged.length > 4)
+      if (newImages.length > 4) {
         return res.status(400).json({
           success: false,
           message: "Maximum 4 images allowed",
         });
+      }
 
-      product.images = merged;
+      product.images = newImages;
     }
 
-    // remove images
-    if (req.body.removeImages) {
-      const removeImages = JSON.parse(req.body.removeImages);
-
-      await Promise.all(
-        removeImages.map((url) => safeDeleteFile(url))
-      );
-
-      product.images = product.images.filter(
-        (img) => !removeImages.includes(img.url)
-      );
-    }
-
-    // video
+    // ✅ Update video
     if (req.files?.video?.[0]) {
-      if (product.video)
-        await safeDeleteFile(product.video);
-
       product.video =
         req.files.video[0].path.replace(/\\/g, "/");
     }
 
-    // thumbnail
-    if (req.files?.thumbnail?.[0]) {
-      if (product.thumbnail)
-        await safeDeleteFile(product.thumbnail);
+    // ✅ Update thumbnail
+    const thumbnailFromFile =
+      req.files?.thumbnail?.[0]?.path.replace(/\\/g, "/");
 
-      product.thumbnail =
-        req.files.thumbnail[0].path.replace(/\\/g, "/");
+    if (thumbnailFromFile) {
+      product.thumbnail = thumbnailFromFile;
+    } else if (thumbnailFromBody) {
+      product.thumbnail = thumbnailFromBody;
+    } else if (!product.thumbnail && product.images?.length > 0) {
+      product.thumbnail = product.images[0].url;
     }
 
-    if (!product.thumbnail && product.images.length)
-      product.thumbnail = product.images[0].url;
+    // ✅ Update size chart
+    if (req.files?.sizeChart?.[0]) {
+      product.sizeChart =
+        req.files.sizeChart[0].path.replace(/\\/g, "/");
+    }
+
+    // ✅ Update variants (if provided)
+    if (variants) {
+      let parsedVariants =
+        typeof variants === "string"
+          ? JSON.parse(variants)
+          : variants;
+
+      if (!Array.isArray(parsedVariants) || parsedVariants.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "At least one variant required",
+        });
+      }
+
+      const ALLOWED_SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
+
+      const normalizedVariants = parsedVariants.map((v) => {
+        const size = v.size.toUpperCase();
+
+        if (!ALLOWED_SIZES.includes(size))
+          throw new Error(`Invalid size ${size}`);
+
+        return {
+          size,
+          price: Number(v.price),
+          stock: Number(v.stock || 0),
+          sku: v.sku || "",
+        };
+      });
+
+      const totalStock = normalizedVariants.reduce(
+        (sum, v) => sum + v.stock,
+        0
+      );
+
+      const basePrice = Math.min(
+        ...normalizedVariants.map((v) => v.price)
+      );
+
+      product.variants = normalizedVariants;
+      product.stock = totalStock;
+      product.price = basePrice;
+    }
 
     await product.save();
 
-    res.json({
+    res.status(200).json({
       success: true,
       data: product,
     });
@@ -763,7 +825,6 @@ export const updateReadymadeProduct = async (req, res) => {
     });
   }
 };
-
 
 
 

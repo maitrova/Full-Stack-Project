@@ -206,7 +206,7 @@ const getItemImages = (item) => {
     
     return (
       <Link
-        to={`/${item.type === "design" ? "catalogue" : "products"}/${item._id}`}
+        to={`/${item.type === "design" ? "catalogue" : "readymade"}/${item._id}`}
         className="group block bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-all duration-300"
       >
         {/* Image Section with name overlay */}
