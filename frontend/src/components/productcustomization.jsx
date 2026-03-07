@@ -26,6 +26,8 @@ const FONT_OPTIONS = [
   "'Comic Sans MS', cursive, sans-serif",
 ];
 
+
+
 // Pricing constants
 const FIXED_SIZE_INCHES = 4;
 const PRICE_PER_SQ_INCH = 6;
@@ -53,6 +55,14 @@ const TABS = {
   VIEWS: 'views',
   DESIGN_LIBRARY: 'designLibrary' // New tab
 };
+
+const MOBILE_TOOL_TABS = [
+  { key: TABS.PRODUCT_COLORS, label: "Color" },
+  { key: TABS.DESIGNS, label: "Design" },
+  { key: TABS.TEXT, label: "Text" },
+  { key: TABS.VIEWS, label: "View" },
+  { key: TABS.DESIGN_LIBRARY, label: "Library" },
+];
 
 const COLOR_OPTIONS = [
   { value: "#FFFFFF", label: "White" },
@@ -212,6 +222,7 @@ const getSizeBasePrice = (prod, size) => {
 
   // Active tab state
   const [activeTab, setActiveTab] = useState(TABS.PRODUCT_COLORS);
+  const [showMobilePriceDetails, setShowMobilePriceDetails] = useState(false);
 
   const editorRef = useRef(null);
 
@@ -838,6 +849,7 @@ setPriceBreakdown((prev) => ({
   const { textLayers, activeTextId, designLayers, activeDesignId } = getCurrentViewState();
   const activeTextLayer = textLayers.find((l) => l.id === activeTextId) || textLayers[0];
   const activeDesign = designLayers.find((d) => d.id === activeDesignId) || null;
+  const selectedOrLatestDesign = activeDesign || designLayers[designLayers.length - 1] || null;
 
   const updateActiveTextLayer = (patch) => {
     if (!activeTextLayer) return;
@@ -964,8 +976,10 @@ const handleDesignUpload = async (e) => {
   };
 
   const handleRemoveBackground = async () => {
-    if (!activeDesign) {
-      setError("Select a design first");
+    const targetDesign = selectedOrLatestDesign;
+
+    if (!targetDesign) {
+      setError("Upload or select a design first");
       console.log("No design selected");
       return;
     }
@@ -973,17 +987,17 @@ const handleDesignUpload = async (e) => {
     try {
       setBgRemovalLoading(true);
       setError("");
-      console.log("Starting background removal for:", activeDesign.id);
+      console.log("Starting background removal for:", targetDesign.id);
       
-      let fileToUse = activeDesign.originalFile || activeDesign.file;
+      let fileToUse = targetDesign.originalFile || targetDesign.file;
       
       // If no file object exists (design came from library or was previously loaded without file), fetch it
-      if (!fileToUse && activeDesign.imageUrl) {
+      if (!fileToUse && targetDesign.imageUrl) {
         console.log("No file object found, fetching image from URL...");
         
         try {
           // Fetch the image from the URL
-          const response = await fetch(activeDesign.imageUrl);
+          const response = await fetch(targetDesign.imageUrl);
           if (!response.ok) {
             throw new Error(`Failed to fetch image: ${response.statusText}`);
           }
@@ -992,7 +1006,7 @@ const handleDesignUpload = async (e) => {
           const blob = await response.blob();
           
           // Create a File object from the blob
-          const filename = activeDesign.imageUrl.split('/').pop() || 'design.png';
+          const filename = targetDesign.imageUrl.split('/').pop() || 'design.png';
           fileToUse = new File([blob], filename, { type: blob.type });
           console.log("Created file from image URL:", filename);
           
@@ -1042,7 +1056,7 @@ const handleDesignUpload = async (e) => {
       console.log("Constructed background removed image URL:", imageUrl);
 
       const updatedLayers = designLayers.map((d) =>
-        d.id === activeDesign.id
+        d.id === targetDesign.id
           ? {
               ...d,
               imageUrl: imageUrl,
@@ -1055,7 +1069,10 @@ const handleDesignUpload = async (e) => {
 
       console.log("Updated layers with background removed:", updatedLayers);
 
-      updateCurrentViewState({ designLayers: updatedLayers });
+      updateCurrentViewState({
+        designLayers: updatedLayers,
+        activeDesignId: targetDesign.id,
+      });
       
       // Clear the library image indicator since it's now a processed image
       setSelectedLibraryImage(null);
@@ -1570,9 +1587,9 @@ const handleDesignScaleYChange = (value) => {
   const maskUrl = currentView?.maskUrl;
 
   return (
-    <div className="flex min-h-screen flex-col bg-neutral-100 text-slate-900">
+    <div className="flex min-h-screen flex-col bg-gradient-to-b from-slate-100 via-white to-slate-100 text-slate-900">
       {/* Top bar */}
-      <header className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <header className="sticky top-0 z-20 flex flex-col gap-3 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:gap-4">
           <div className="flex items-center gap-3">
             <div className="text-lg font-extrabold tracking-wide text-orange-500">
@@ -1611,12 +1628,12 @@ const handleDesignScaleYChange = (value) => {
             )}
           </div>
 
-          <div className="flex flex-col items-end text-right">
+          <div className="flex flex-col text-left sm:items-end sm:text-right">
             <span className="text-xs text-slate-500">Total Price</span>
             <span className="text-xl font-bold text-green-600">₹{price.toFixed(2)}</span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="hidden flex-wrap items-center gap-2 sm:flex">
             <button
               onClick={handleSaveDesign}
               disabled={saving || addingToCart}
@@ -1641,10 +1658,10 @@ const handleDesignScaleYChange = (value) => {
       </header>
 
       {/* Main area */}
-      <div className="flex flex-1 min-h-0 flex-col gap-6 px-4 pb-6 pt-3 sm:px-6">
-        <div className="flex flex-1 flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)_minmax(0,320px)] lg:items-start">
+      <div className="flex flex-1 min-h-0 flex-col gap-4 px-2 pb-6 pt-2 sm:gap-6 sm:px-6 sm:pt-3">
+        <div className="flex flex-1 flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)_minmax(0,320px)] lg:items-start lg:gap-6">
           {/* Mobile helper card */}
-          <div className="lg:hidden">
+          <div className="hidden">
             <div className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 text-[11px] text-slate-600 shadow-sm">
               <p className="mb-1 font-semibold text-slate-800">Design tips</p>
               <p className="text-[11px] leading-tight text-slate-600">
@@ -1675,8 +1692,38 @@ const handleDesignScaleYChange = (value) => {
               </div>
             </div>
           </div>
+          <div className="hidden">
+            <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-3">
+              <div className="rounded-2xl bg-slate-50 px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Size</div>
+                <div className="mt-1 text-sm font-semibold text-slate-800">{selectedSize || "Default"}</div>
+                <div className="text-[11px] text-slate-500">Base Rs.{BASE_PRICE.toFixed(2)}</div>
+              </div>
+              <div className="rounded-2xl bg-slate-50 px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">View</div>
+                <div className="mt-1 text-sm font-semibold text-slate-800">
+                  {product?.views?.find((v) => v.code === viewCode)?.label || "Front"}
+                </div>
+                <div className="text-[11px] text-slate-500">
+                  {designLayers.length} design{designLayers.length !== 1 ? "s" : ""}, {textLayers.length} text
+                </div>
+              </div>
+              <div className="rounded-2xl bg-emerald-50 px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-500">Live total</div>
+                <div className="mt-1 text-lg font-bold text-emerald-700">Rs.{price.toFixed(2)}</div>
+                <button
+                  type="button"
+                  onClick={() => calculatePrice()}
+                  disabled={calculatingPrice}
+                  className="mt-1 text-[11px] font-medium text-emerald-700 disabled:opacity-60"
+                >
+                  {calculatingPrice ? "Refreshing..." : "Refresh price"}
+                </button>
+              </div>
+            </div>
+          </div>
           {/* Left sidebar - Controls */}
-          <aside className="w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm flex flex-col gap-6 min-h-0 lg:w-auto">
+          <aside className="order-2 w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col gap-4 min-h-0 lg:order-1 lg:w-auto lg:gap-6">
           {/* Edit mode indicator */}
           {isEditMode && (
             <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2">
@@ -1692,35 +1739,63 @@ const handleDesignScaleYChange = (value) => {
             </div>
           )}
 
+          <div className="sm:hidden">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800">Editing Tools</h3>
+                <p className="text-[11px] text-slate-500">Pick one tool and focus on that task.</p>
+              </div>
+              <div className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-600">
+                {MOBILE_TOOL_TABS.find((item) => item.key === activeTab)?.label || "Tool"}
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {MOBILE_TOOL_TABS.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setActiveTab(item.key)}
+                  className={`rounded-2xl px-3 py-2 text-[11px] font-semibold transition ${
+                    activeTab === item.key
+                      ? "bg-sky-600 text-white shadow-sm"
+                      : "border border-slate-200 bg-slate-50 text-slate-600"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Tab navigation */}
-          <div className="flex gap-1 overflow-x-auto border-b border-slate-200 pb-2 text-[10px] sm:gap-2">
+          <div className="hidden gap-1 overflow-x-auto border-b border-slate-200 pb-2 text-[10px] sm:flex sm:gap-2">
             <button
               onClick={() => setActiveTab(TABS.PRODUCT_COLORS)}
-              className={`flex-shrink-0 whitespace-nowrap px-3 py-2 text-xs font-medium ${activeTab === TABS.PRODUCT_COLORS ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium ${activeTab === TABS.PRODUCT_COLORS ? 'bg-sky-50 text-sky-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
             >
               Product Colors
             </button>
             <button
               onClick={() => setActiveTab(TABS.DESIGNS)}
-              className={`flex-shrink-0 whitespace-nowrap px-3 py-2 text-xs font-medium ${activeTab === TABS.DESIGNS ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium ${activeTab === TABS.DESIGNS ? 'bg-sky-50 text-sky-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
             >
               Designs
             </button>
             <button
               onClick={() => setActiveTab(TABS.TEXT)}
-              className={`flex-shrink-0 whitespace-nowrap px-3 py-2 text-xs font-medium ${activeTab === TABS.TEXT ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium ${activeTab === TABS.TEXT ? 'bg-sky-50 text-sky-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
             >
               Text
             </button>
             <button
               onClick={() => setActiveTab(TABS.VIEWS)}
-              className={`flex-shrink-0 whitespace-nowrap px-3 py-2 text-xs font-medium ${activeTab === TABS.VIEWS ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium ${activeTab === TABS.VIEWS ? 'bg-sky-50 text-sky-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
             >
               Views
             </button>
             <button
               onClick={() => setActiveTab(TABS.DESIGN_LIBRARY)}
-              className={`flex-shrink-0 whitespace-nowrap px-3 py-2 text-xs font-medium ${activeTab === TABS.DESIGN_LIBRARY ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium ${activeTab === TABS.DESIGN_LIBRARY ? 'bg-sky-50 text-sky-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
             >
               Design Library
             </button>
@@ -1754,7 +1829,7 @@ const handleDesignScaleYChange = (value) => {
                       <>
                         <label className="mb-2 block text-xs font-medium">Select Size</label>
 
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                           {availableSizes.map((size) => {
                             const isActive = selectedSize === size;
                             const sizePrice = getSizeBasePrice(product, size);
@@ -1792,7 +1867,7 @@ const handleDesignScaleYChange = (value) => {
                   {/* Quick Select */}
                   <div className="mb-2">
                     <label className="mb-2 block text-xs font-medium">Quick Select</label>
-                    <div className="grid grid-cols-6 gap-2">
+                    <div className="grid grid-cols-5 gap-2 sm:grid-cols-6">
                       {COLOR_OPTIONS.map((option) => {
                         const currentColorKey = productColor?.toLowerCase() || "";
                         const isActive = option.value.toLowerCase() === currentColorKey;
@@ -1811,7 +1886,7 @@ const handleDesignScaleYChange = (value) => {
 
                 </div>
 
-                <div className="text-xs text-slate-600 space-y-2">
+                <div className="hidden text-xs text-slate-600 space-y-2 sm:block">
                   <p className="font-medium">How to use:</p>
                   <p>• Select a color to change the product color</p>
                   <p>• Use the color picker for custom colors</p>
@@ -1930,7 +2005,7 @@ const handleDesignScaleYChange = (value) => {
   </div>
 </div>
 
-                      <div className="text-xs text-slate-600 space-y-1">
+                      <div className="hidden text-xs text-slate-600 space-y-1 sm:block">
                         <p>• Click on a design in the editor to select it</p>
                         <p>• Drag to reposition, or use the resize handle</p>
                         <p>• Click "Remove BG" for transparent background</p>
@@ -2050,7 +2125,7 @@ const handleDesignScaleYChange = (value) => {
                   </div>
                 </div>
 
-                <div className="text-xs text-slate-600 space-y-2">
+                <div className="hidden text-xs text-slate-600 space-y-2 sm:block">
                   <p className="font-medium">Current View: {product.views.find(v => v.code === viewCode)?.label}</p>
                   <p>• Front: Main design area</p>
                   <p>• Back: Back of the product</p>
@@ -2090,7 +2165,7 @@ const handleDesignScaleYChange = (value) => {
                       <div className="text-xs text-slate-500">Loading designs...</div>
                     </div>
                   ) : currentFolder && images.length > 0 ? (
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                       {images.map((image) => (
                         <div 
                           key={image.filename} 
@@ -2124,7 +2199,7 @@ const handleDesignScaleYChange = (value) => {
                     </div>
                   )}
 
-                  <div className="text-xs text-slate-600 space-y-2 mt-4">
+                  <div className="hidden text-xs text-slate-600 space-y-2 mt-4 sm:block">
                     <p className="font-medium">How to use:</p>
                     <p>• Select a folder to view available designs</p>
                     <p>• Click on any design to add it to your product</p>
@@ -2147,16 +2222,49 @@ const handleDesignScaleYChange = (value) => {
         </aside>
 
         {/* Center workspace */}
-        <main className="flex min-h-0 flex-1 flex-col overflow-auto">
+        <main className="order-1 flex min-h-0 flex-1 flex-col overflow-auto lg:order-2">
           <div className="flex-1 p-0">
-            <div className="mx-auto flex max-w-4xl items-center justify-center rounded-md border border-slate-200 bg-slate-50 p-4 shadow-sm">
-              <div className="w-full max-w-[650px]">
+            <div className="mx-auto overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-sm sm:rounded-[28px]">
+              <div className="hidden border-b border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.12),_transparent_40%),linear-gradient(180deg,_#ffffff,_#f8fafc)] p-5 sm:flex sm:flex-col sm:gap-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Live preview</p>
+                    <h2 className="text-base font-semibold text-slate-800">{product?.name || "Custom Product"}</h2>
+                    <p className="text-xs text-slate-500">
+                      {productColorName} • {product?.views?.find((v) => v.code === viewCode)?.label || "Front view"} • Size {selectedSize}
+                    </p>
+                  </div>
+                  <div className="hidden flex-wrap gap-2 sm:flex">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab(TABS.VIEWS)}
+                      className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Change view
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab(TABS.DESIGNS)}
+                      className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Edit layers
+                    </button>
+                  </div>
+                </div>
+                <div className="hidden gap-2 text-[11px] text-slate-600 sm:grid sm:grid-cols-3">
+                  <div className="rounded-2xl bg-white/80 px-3 py-2">Tap an element to select and edit it.</div>
+                  <div className="rounded-2xl bg-white/80 px-3 py-2">Drag handles to resize and move designs.</div>
+                  <div className="rounded-2xl bg-white/80 px-3 py-2">Price updates from your current size and layers.</div>
+                </div>
+              </div>
+              <div className="mx-auto flex w-full items-center justify-center bg-slate-50 p-1.5 sm:max-w-6xl sm:p-5 lg:p-6">
+                <div className="mx-auto w-full max-w-[960px]">
                 {mockupUrl && maskUrl ? (
                   <RecolorEditor
                     ref={editorRef}
                     mockupUrl={mockupUrl}
                     maskUrl={maskUrl}
-                    previewWidth={650}
+                    previewWidth={880}
                     productColor={productColor}
                     textLayers={textLayers}
                     setTextLayers={handleSetTextLayers}
@@ -2169,19 +2277,34 @@ const handleDesignScaleYChange = (value) => {
                     bgRemovalLoading={bgRemovalLoading}
                     onDesignRenderWidthChange={setDesignRenderWidth}
                     isAdmin={isAdmin}
-                    showMeasurements={true} 
                     selectedView={viewCode}
                   />
                 ) : (
                   <div className="text-sm text-slate-500 text-center">{product?.name ? `No view configuration found for ${product.name}` : "Product not loaded"}</div>
                 )}
+                </div>
+              </div>
+              <div className="border-t border-slate-200 bg-white px-4 py-4 sm:hidden">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">{product?.name || "Custom Product"}</h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Color: <span className="font-medium text-slate-700">{productColorName}</span>
+                      <span className="ml-2 font-mono text-[11px] text-slate-400">{productColor?.toUpperCase()}</span>
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 px-3 py-2 text-right">
+                    <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Total</div>
+                    <div className="mt-1 text-base font-semibold text-emerald-700">Rs.{price.toFixed(2)}</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </main>
 
         {/* Right sidebar - Price Breakdown */}
-        <aside className="w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm flex flex-col min-h-0 lg:w-auto">
+        <aside className="order-3 hidden w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm min-h-0 lg:sticky lg:top-24 lg:flex lg:w-auto lg:flex-col">
           <div className="mb-4">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-green-800">Price Breakdown</h3>
@@ -2192,8 +2315,29 @@ const handleDesignScaleYChange = (value) => {
             </div>
             <div className="text-xs text-slate-500 mt-1">Real-time price calculation</div>
           </div>
-          
-          <div className="flex-1 overflow-auto">
+          <div className="mb-4 grid grid-cols-2 gap-2">
+            <div className="rounded-2xl bg-slate-50 px-3 py-2">
+              <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Base</div>
+              <div className="mt-1 text-sm font-semibold text-slate-800">Rs.{BASE_PRICE.toFixed(2)}</div>
+            </div>
+            <div className="rounded-2xl bg-emerald-50 px-3 py-2">
+              <div className="text-[10px] uppercase tracking-[0.16em] text-emerald-500">Total</div>
+              <div className="mt-1 text-sm font-semibold text-emerald-700">Rs.{price.toFixed(2)}</div>
+            </div>
+          </div>
+
+          <div className="mb-4 flex items-center gap-2 lg:hidden">
+            <button
+              type="button"
+              onClick={() => setShowMobilePriceDetails((value) => !value)}
+              className="rounded-full border border-slate-300 px-3 py-1.5 text-[11px] font-semibold text-slate-700"
+            >
+              {showMobilePriceDetails ? "Hide price details" : "Show price details"}
+            </button>
+            <span className="text-[11px] text-slate-500">Keep this closed while designing.</span>
+          </div>
+
+          <div className={`${showMobilePriceDetails ? "block" : "hidden"} flex-1 overflow-auto lg:block`}>
             <div className="space-y-4">
               {/* Base Price */}
               <div className="pb-3 border-b border-slate-100">
@@ -2310,7 +2454,7 @@ const handleDesignScaleYChange = (value) => {
           </div>
           
           {/* Pricing Info */}
-          <div className="mt-6 pt-4 border-t border-slate-200">
+          <div className={`${showMobilePriceDetails ? "block" : "hidden"} mt-6 pt-4 border-t border-slate-200 lg:block`}>
             <div className="text-xs text-slate-600 space-y-1">
               <p className="font-medium mb-1">Pricing Information:</p>
               <p>• Base includes {FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}" design area</p>
@@ -2326,7 +2470,7 @@ const handleDesignScaleYChange = (value) => {
     </div>
 
     {/* Bottom bar */}
-    <footer className="flex flex-col gap-2 border-t border-slate-200 bg-white px-4 py-3 text-xs sm:flex-row sm:items-center sm:justify-between sm:px-6">
+    <footer className="sticky bottom-0 z-20 flex flex-col gap-2 border-t border-slate-200 bg-white/95 px-4 py-3 text-xs backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="flex flex-col gap-1">
           <span className="font-semibold">{product?.name || "Custom Product"}</span>
           <span className="text-slate-500">
@@ -2335,19 +2479,19 @@ const handleDesignScaleYChange = (value) => {
             {isEditMode && <span className="ml-3 text-amber-600">• Editing mode •</span>}
           </span>
         </div>
-        <span className="text-slate-400">
+        <span className="hidden text-slate-400 lg:inline">
           {isEditMode ? "Editing existing design. Changes will update the original when you click 'Update Design'." : "Drag, resize, and customize elements. Click tabs on the left to switch between tools."}
         </span>
-        <div className="flex flex-col gap-2 pt-2 lg:hidden">
-          <div className="text-[11px] text-slate-500">
-            Quick actions keep the workspace readable while you design on the go.
+        <div className="flex flex-col gap-2 pt-2 sm:pt-0">
+          <div className="text-[11px] text-slate-500 lg:hidden">
+            Total Rs.{price.toFixed(2)}. Save your work before adding it to cart.
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={handleSaveDesign}
               disabled={saving || addingToCart}
-              className="flex-1 rounded-full border border-sky-600 bg-sky-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-sky-700 disabled:opacity-60 lg:flex-initial"
+              className="flex-1 rounded-full border border-sky-600 bg-sky-600 px-4 py-2 text-[11px] font-semibold text-white hover:bg-sky-700 disabled:opacity-60 sm:flex-initial"
             >
               {saving ? "Saving…" : isEditMode ? "Update design" : "Save design"}
             </button>
@@ -2355,7 +2499,7 @@ const handleDesignScaleYChange = (value) => {
               type="button"
               onClick={handleSaveAndAddToCart}
               disabled={saving || addingToCart}
-              className="flex-1 rounded-full border border-emerald-600 bg-emerald-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 lg:flex-initial"
+              className="flex-1 rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 sm:flex-initial"
             >
               {addingToCart
                 ? "Adding…"

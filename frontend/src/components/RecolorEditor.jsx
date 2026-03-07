@@ -171,6 +171,104 @@ function boundaryToRect(boundary) {
   };
 }
 
+function isClearlyBrokenBoundary(zoneKey, boundary, fallback) {
+  if (!boundary) return true;
+
+  const width = boundary.maxX - boundary.minX;
+  const height = boundary.maxY - boundary.minY;
+  if (width <= 0.02 || height <= 0.02) return true;
+
+  if (zoneKey === "pocket") {
+    const centerY = (boundary.minY + boundary.maxY) / 2;
+    const fallbackCenterY = (fallback.minY + fallback.maxY) / 2;
+    if (centerY > 0.82 || centerY < 0.48) return true;
+    if (Math.abs(centerY - fallbackCenterY) > 0.12) return true;
+  }
+
+  if (zoneKey === "front-full") {
+    const centerY = (boundary.minY + boundary.maxY) / 2;
+    const fallbackCenterY = (fallback.minY + fallback.maxY) / 2;
+    if (centerY > 0.62 || centerY < 0.28) return true;
+    if (Math.abs(centerY - fallbackCenterY) > 0.12) return true;
+  }
+
+  return false;
+}
+
+function normalizeBoundary(boundary, fallback = FALLBACK_BOUNDARIES["front-full"], options = {}) {
+  const { previewMeta = null, zoneKey = null } = options;
+  if (!boundary || typeof boundary !== "object") return fallback;
+
+  const previewWidth = Number(previewMeta?.width || 0);
+  const previewHeight = Number(previewMeta?.height || 0);
+
+  const maybeNormalizePixels = (value, axis) => {
+    if (typeof value !== "number") return value;
+    if (value <= 1) return value;
+    const denom = axis === "x" ? previewWidth : previewHeight;
+    return denom > 0 ? value / denom : value;
+  };
+
+  if (
+    typeof boundary.minX === "number" &&
+    typeof boundary.minY === "number" &&
+    typeof boundary.maxX === "number" &&
+    typeof boundary.maxY === "number"
+  ) {
+    const normalized = {
+      minX: clamp01(maybeNormalizePixels(boundary.minX, "x")),
+      minY: clamp01(maybeNormalizePixels(boundary.minY, "y")),
+      maxX: clamp01(maybeNormalizePixels(boundary.maxX, "x")),
+      maxY: clamp01(maybeNormalizePixels(boundary.maxY, "y")),
+    };
+
+    return isClearlyBrokenBoundary(zoneKey, normalized, fallback) ? fallback : normalized;
+  }
+
+  if (
+    typeof boundary.left === "number" &&
+    typeof boundary.top === "number" &&
+    typeof boundary.width === "number" &&
+    typeof boundary.height === "number"
+  ) {
+    const normalized = rectToBoundary({
+      x: maybeNormalizePixels(boundary.left, "x"),
+      y: maybeNormalizePixels(boundary.top, "y"),
+      w: maybeNormalizePixels(boundary.width, "x"),
+      h: maybeNormalizePixels(boundary.height, "y"),
+    });
+    return isClearlyBrokenBoundary(zoneKey, normalized, fallback) ? fallback : normalized;
+  }
+
+  if (
+    typeof boundary.x === "number" &&
+    typeof boundary.y === "number" &&
+    typeof boundary.w === "number" &&
+    typeof boundary.h === "number"
+  ) {
+    const normalized = rectToBoundary({
+      x: maybeNormalizePixels(boundary.x, "x"),
+      y: maybeNormalizePixels(boundary.y, "y"),
+      w: maybeNormalizePixels(boundary.w, "x"),
+      h: maybeNormalizePixels(boundary.h, "y"),
+    });
+    return isClearlyBrokenBoundary(zoneKey, normalized, fallback) ? fallback : normalized;
+  }
+
+  return fallback;
+}
+
+function normalizeZonesMap(zones, previewMeta = null) {
+  if (!zones || typeof zones !== "object") return null;
+
+  const normalized = {};
+  Object.entries(zones).forEach(([key, value]) => {
+    const fallback = FALLBACK_BOUNDARIES[key] || FALLBACK_BOUNDARIES["front-full"];
+    normalized[key] = normalizeBoundary(value, fallback, { previewMeta, zoneKey: key });
+  });
+  return normalized;
+}
+
 function snapToBoundaryCenter(x, y, boundary, halfW, halfH, threshold = 0.02) {
   // x,y are CENTER coordinates. Keep snapping to the closest "valid center edges"
   const minCX = boundary.minX + halfW;
@@ -312,7 +410,9 @@ function MeasurementOverlay({ canvasSize, boundaries, specs, view, zonesList, ca
 
         const spec = getZoneSpec(zoneKey, specs, calibratedConfig);
         if (!spec) return null;
-
+        const compact = false;
+        const isTinyZone = false;
+        const compactLabel = "";
         const left = `${b.minX * 100}%`;
         const top = `${b.minY * 100}%`;
         const width = `${(b.maxX - b.minX) * 100}%`;
@@ -350,7 +450,9 @@ function MeasurementOverlay({ canvasSize, boundaries, specs, view, zonesList, ca
                 border: "1px solid rgba(59,130,246,0.4)",
               }}
             >
-              {getZoneLabel(zoneKey, calibratedConfig)} • {spec.maxW} × {spec.maxH} in
+              {compact
+                ? compactLabel
+                : `${getZoneLabel(zoneKey, calibratedConfig)} • ${spec.maxW} × ${spec.maxH} in`}
             </div>
           </div>
         );
@@ -393,6 +495,43 @@ function CalibrationOverlay({
   });
 
   const dragRef = useRef(null);
+  const activeRect = activeZone ? rects[activeZone] : null;
+
+  const setZoneRect = (zoneKey, patch) => {
+    setRects((prev) => {
+      const current = prev[zoneKey];
+      if (!current) return prev;
+
+      const next = {
+        x: typeof patch.x === "number" ? patch.x : current.x,
+        y: typeof patch.y === "number" ? patch.y : current.y,
+        w: typeof patch.w === "number" ? patch.w : current.w,
+        h: typeof patch.h === "number" ? patch.h : current.h,
+      };
+
+      next.w = Math.max(0.04, Math.min(1, next.w));
+      next.h = Math.max(0.04, Math.min(1, next.h));
+      next.x = clamp01(Math.min(next.x, 1 - next.w));
+      next.y = clamp01(Math.min(next.y, 1 - next.h));
+
+      return { ...prev, [zoneKey]: next };
+    });
+  };
+
+  const resetZoneToDefault = (zoneKey) => {
+    const fallback = FALLBACK_BOUNDARIES[zoneKey] || FALLBACK_BOUNDARIES["front-full"];
+    setRects((prev) => ({ ...prev, [zoneKey]: boundaryToRect(fallback) }));
+    setActiveZone(zoneKey);
+  };
+
+  const resetAllZonesToDefaults = () => {
+    const next = {};
+    zones.forEach((zoneKey) => {
+      const fallback = FALLBACK_BOUNDARIES[zoneKey] || FALLBACK_BOUNDARIES["front-full"];
+      next[zoneKey] = boundaryToRect(fallback);
+    });
+    setRects(next);
+  };
 
   const onMove = (e) => {
     const st = dragRef.current;
@@ -491,6 +630,10 @@ function CalibrationOverlay({
       zones: boundaryMap,
       zoneOrder: zones,
       zoneMeta,
+      previewMeta: {
+        width: overlayRef.current?.clientWidth || null,
+        height: overlayRef.current?.clientHeight || null,
+      },
       updatedAt: new Date().toISOString(),
     };
     navigator.clipboard?.writeText(JSON.stringify(payload, null, 2));
@@ -503,6 +646,10 @@ function CalibrationOverlay({
       zones: boundaryMap,
       zoneOrder: zones,
       zoneMeta,
+      previewMeta: {
+        width: overlayRef.current?.clientWidth || null,
+        height: overlayRef.current?.clientHeight || null,
+      },
       updatedAt: new Date().toISOString(),
     };
     onSave(payload);
@@ -617,7 +764,7 @@ const startPanelDrag = (e) => {
       {/* Panel */}
 <div
   ref={panelRef}
-  className="absolute z-[2000] bg-white rounded-lg shadow-lg border border-slate-200 w-[360px] pointer-events-auto"
+  className="absolute z-[2000] w-[min(92vw,360px)] bg-white rounded-lg shadow-lg border border-slate-200 pointer-events-auto"
   style={{
     left: panelPos.x,
     top: panelPos.y,
@@ -659,6 +806,24 @@ const startPanelDrag = (e) => {
               type="button"
             >
               Copy JSON
+            </button>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={resetAllZonesToDefaults}
+              className="flex-1 text-xs px-3 py-2 rounded border border-slate-200 text-slate-700 hover:bg-slate-50"
+              type="button"
+            >
+              Reset View
+            </button>
+            <button
+              onClick={() => activeZone && resetZoneToDefault(activeZone)}
+              disabled={!activeZone}
+              className="flex-1 text-xs px-3 py-2 rounded border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              type="button"
+            >
+              Reset Active
             </button>
           </div>
 
@@ -724,6 +889,67 @@ const startPanelDrag = (e) => {
               );
             })}
           </div>
+
+          {activeZone && activeRect && (
+            <div className="rounded border border-slate-200 bg-slate-50 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-xs font-semibold text-slate-800">
+                  Active Zone: {getZoneLabel(activeZone, { zoneMeta })}
+                </div>
+                <div className="text-[10px] text-slate-500">Values are % of preview</div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-[11px] text-slate-600">
+                  X
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={Math.round(activeRect.x * 100)}
+                    onChange={(e) => setZoneRect(activeZone, { x: Number(e.target.value || 0) / 100 })}
+                    className="mt-1 w-full rounded border border-slate-200 px-2 py-1 text-xs"
+                  />
+                </label>
+                <label className="text-[11px] text-slate-600">
+                  Y
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={Math.round(activeRect.y * 100)}
+                    onChange={(e) => setZoneRect(activeZone, { y: Number(e.target.value || 0) / 100 })}
+                    className="mt-1 w-full rounded border border-slate-200 px-2 py-1 text-xs"
+                  />
+                </label>
+                <label className="text-[11px] text-slate-600">
+                  Width
+                  <input
+                    type="number"
+                    min="4"
+                    max="100"
+                    step="1"
+                    value={Math.round(activeRect.w * 100)}
+                    onChange={(e) => setZoneRect(activeZone, { w: Number(e.target.value || 4) / 100 })}
+                    className="mt-1 w-full rounded border border-slate-200 px-2 py-1 text-xs"
+                  />
+                </label>
+                <label className="text-[11px] text-slate-600">
+                  Height
+                  <input
+                    type="number"
+                    min="4"
+                    max="100"
+                    step="1"
+                    value={Math.round(activeRect.h * 100)}
+                    onChange={(e) => setZoneRect(activeZone, { h: Number(e.target.value || 4) / 100 })}
+                    className="mt-1 w-full rounded border border-slate-200 px-2 py-1 text-xs"
+                  />
+                </label>
+              </div>
+            </div>
+          )}
 
           <button
             onClick={saveNow}
@@ -858,11 +1084,21 @@ const RecolorEditor = forwardRef(function RecolorEditor(
   },
   ref
 ) {
+  const rootRef = useRef(null);
   const [renderer, setRenderer] = useState(null);
   const [canvasSize, setCanvasSize] = useState(null);
+  const [renderCanvasSize, setRenderCanvasSize] = useState(null);
+  const [canvasFrame, setCanvasFrame] = useState(null);
+  const effectiveCanvasWidth = canvasSize?.width || previewWidth || 800;
+  const isCompactUI = effectiveCanvasWidth < 460;
+  const showMeasurementsByDefault = !isCompactUI && effectiveCanvasWidth >= 540;
 
-  const [showMeasurements, setShowMeasurements] = useState(true);
+  const [showMeasurements, setShowMeasurements] = useState(showMeasurementsByDefault);
   const [calibrationMode, setCalibrationMode] = useState(false);
+
+  useEffect(() => {
+    setShowMeasurements(showMeasurementsByDefault);
+  }, [showMeasurementsByDefault, mockupUrl, maskUrl, selectedView]);
 
   const specs = PRINT_SPECS[productKey] || PRINT_SPECS[DEFAULT_PRODUCT_KEY];
 
@@ -889,11 +1125,13 @@ useEffect(() => {
 
       // doc may already be in payload shape, but normalize safely
       if (doc?.zones) {
+        const normalizedZones = normalizeZonesMap(doc.zones, doc.previewMeta || null);
         setCalibratedConfig({
           view: doc.view || activeView,
-          zones: doc.zones,
+          zones: normalizedZones || doc.zones,
           zoneOrder: doc.zoneOrder || DEFAULT_ZONES_BY_VIEW[activeView] || [],
           zoneMeta: doc.zoneMeta || {},
+          previewMeta: doc.previewMeta || null,
           updatedAt: doc.updatedAtIso || doc.updatedAt || null,
         });
       } else {
@@ -915,11 +1153,22 @@ useEffect(() => {
   const merged = { ...FALLBACK_BOUNDARIES };
 
   if (calibratedConfig?.zones) {
-    Object.keys(calibratedConfig.zones).forEach((k) => (merged[k] = calibratedConfig.zones[k]));
+    Object.keys(calibratedConfig.zones).forEach((k) => {
+      const fallback = FALLBACK_BOUNDARIES[k] || FALLBACK_BOUNDARIES["front-full"];
+      merged[k] = normalizeBoundary(calibratedConfig.zones[k], fallback, {
+        previewMeta: calibratedConfig.previewMeta || null,
+        zoneKey: k,
+      });
+    });
   }
 
   if (calibrationOverride) {
-    Object.keys(calibrationOverride).forEach((k) => (merged[k] = calibrationOverride[k]));
+    Object.keys(calibrationOverride).forEach((k) => {
+      const fallback = FALLBACK_BOUNDARIES[k] || FALLBACK_BOUNDARIES["front-full"];
+      merged[k] = normalizeBoundary(calibrationOverride[k], fallback, {
+        zoneKey: k,
+      });
+    });
   }
 
   return merged;
@@ -931,26 +1180,53 @@ const zonesForActiveView = useMemo(() => {
   const handleRendererReady = useCallback((instance) => {
     setRenderer(instance || null);
     if (instance?.canvas) {
-      setCanvasSize({ width: instance.canvas.width, height: instance.canvas.height });
+      setRenderCanvasSize({ width: instance.canvas.width, height: instance.canvas.height });
     } else {
-      setCanvasSize(null);
+      setRenderCanvasSize(null);
     }
   }, []);
 
   useEffect(() => {
     if (!renderer?.canvas) return;
 
+    let animationFrameId = null;
+
     const updateSize = () => {
-      if (!renderer?.canvas) return;
+      if (!renderer?.canvas || !rootRef.current) return;
       const rect = renderer.canvas.getBoundingClientRect();
+      const rootRect = rootRef.current.getBoundingClientRect();
       setCanvasSize({ width: rect.width, height: rect.height });
+      setCanvasFrame({
+        left: rect.left - rootRect.left,
+        top: rect.top - rootRect.top,
+        width: rect.width,
+        height: rect.height,
+      });
     };
 
-    updateSize();
-    window.addEventListener("resize", updateSize);
+    const scheduleUpdate = () => {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      animationFrameId = requestAnimationFrame(updateSize);
+    };
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => {
+            scheduleUpdate();
+          })
+        : null;
+
+    scheduleUpdate();
+    window.addEventListener("resize", scheduleUpdate);
+    window.addEventListener("orientationchange", scheduleUpdate);
+    resizeObserver?.observe(renderer.canvas);
+    resizeObserver?.observe(rootRef.current);
 
     return () => {
-      window.removeEventListener("resize", updateSize);
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      window.removeEventListener("resize", scheduleUpdate);
+      window.removeEventListener("orientationchange", scheduleUpdate);
+      resizeObserver?.disconnect();
     };
   }, [renderer]);
 
@@ -1075,9 +1351,10 @@ async function drawAll() {
         const px = (layer.x ?? 0.5) * w;
         const py = (layer.y ?? 0.5) * h;
 
-        // Base canvas for measuring (screen size if available)
-        const baseCanvasW = canvasSize?.width || w;
-        const baseCanvasH = canvasSize?.height || h;
+        // Use the renderer canvas dimensions for texture drawing so
+        // mobile and desktop keep the same visual scale for a given layer size.
+        const baseCanvasW = w;
+        const baseCanvasH = h;
 
         // ✅ Legacy fallback: still supports old "scale"
         const legacyScale = layer.scale ?? 0.35;
@@ -1203,7 +1480,8 @@ return () => {
     onDesignRenderWidthChange,
   ]);
 
-  const handleBackgroundMouseDown = () => {
+  const handleBackgroundPointerDown = (e) => {
+    if (e.target !== e.currentTarget) return;
     setActiveDesignId(null);
     setActiveTextId(null);
   };
@@ -1238,7 +1516,24 @@ return () => {
 
 
   return (
-    <div className="relative w-full h-full" onMouseDown={handleBackgroundMouseDown}>
+    <div
+      ref={rootRef}
+      className={`w-full h-full ${isCompactUI ? "flex flex-col gap-2" : "relative"}`}
+      style={{ touchAction: "none" }}
+      onPointerDown={handleBackgroundPointerDown}
+    >
+      {isCompactUI && isAdmin && (
+        <div className="flex justify-end rounded-2xl bg-white px-2 py-2 shadow-sm">
+          <button
+            onClick={() => setCalibrationMode(true)}
+            className="rounded-xl bg-blue-600 px-3 py-1.5 text-[11px] font-medium text-white shadow-sm"
+            type="button"
+          >
+            Calibrate
+          </button>
+        </div>
+      )}
+      <div className="relative" style={{ touchAction: "none" }}>
       <CanvasRenderer
         mockupUrl={mockupUrl}
         maskUrl={maskUrl}
@@ -1247,21 +1542,32 @@ return () => {
         onRendererReady={handleRendererReady}
       />
 
-      {showMeasurements && canvasSize && (
-        <MeasurementOverlay
-  canvasSize={canvasSize}
-  boundaries={boundaries}
-  specs={specs}
-  view={activeView}
-  zonesList={zonesForActiveView}
-  calibratedConfig={calibratedConfig}
-/>
-      )}
+      {canvasFrame && (
+        <div
+          className="absolute"
+          style={{
+            left: `${canvasFrame.left}px`,
+            top: `${canvasFrame.top}px`,
+            width: `${canvasFrame.width}px`,
+            height: `${canvasFrame.height}px`,
+          }}
+        >
+          {showMeasurements && canvasSize && (
+            <MeasurementOverlay
+              canvasSize={canvasSize}
+              boundaries={boundaries}
+              specs={specs}
+              view={activeView}
+              zonesList={zonesForActiveView}
+              calibratedConfig={calibratedConfig}
+              compact={isCompactUI}
+            />
+          )}
 
-      <div className="absolute top-2 right-2 z-50 flex gap-2">
+      <div className={`absolute z-50 flex gap-2 ${isCompactUI ? "hidden" : "top-2 right-2"}`}>
         <button
           onClick={() => setShowMeasurements((s) => !s)}
-          className="bg-white/85 hover:bg-white text-xs px-2 py-1 rounded border border-slate-300 shadow-sm"
+          className="bg-white/90 hover:bg-white rounded border border-slate-300 shadow-sm px-2 py-1 text-xs"
           type="button"
         >
           {showMeasurements ? "Hide Measurements" : "Show Measurements"}
@@ -1269,7 +1575,7 @@ return () => {
         {isAdmin && (
         <button
           onClick={() => setCalibrationMode(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded shadow-sm"
+          className="bg-blue-600 hover:bg-blue-700 text-white rounded shadow-sm px-2 py-1 text-xs"
           type="button"
         >
           Calibrate Zones
@@ -1279,50 +1585,53 @@ return () => {
       
 
       {calibrationMode && canvasSize && (
-  <CalibrationOverlay
-    view={activeView}
-    specs={specs}
-    initialBoundaries={boundaries}
-    zonesList={zonesForActiveView}
-    calibratedConfig={calibratedConfig}
-    onSave={saveCalibratedZones}
-    onClose={() => setCalibrationMode(false)}
-  />
-)}
+        <CalibrationOverlay
+          view={activeView}
+          specs={specs}
+          initialBoundaries={boundaries}
+          zonesList={zonesForActiveView}
+          calibratedConfig={calibratedConfig}
+          onSave={saveCalibratedZones}
+          onClose={() => setCalibrationMode(false)}
+        />
+      )}
 
 
       {renderer && (
         <TextOverlay
-  textLayers={textLayers}
-  setTextLayers={setTextLayers}
-  activeTextId={activeTextId}
-  setActiveTextId={setActiveTextId}
-  onAnyTextClick={() => setActiveDesignId(null)}
-  canvasSize={canvasSize}
-  boundaries={boundaries}
-  zonesForView={zonesForActiveView}
-  specs={specs}
-  calibratedConfig={calibratedConfig}
-  
-/>
-
+          textLayers={textLayers}
+          setTextLayers={setTextLayers}
+          activeTextId={activeTextId}
+          setActiveTextId={setActiveTextId}
+          onAnyTextClick={() => setActiveDesignId(null)}
+          canvasSize={canvasSize}
+          boundaries={boundaries}
+          zonesForView={zonesForActiveView}
+          specs={specs}
+          calibratedConfig={calibratedConfig}
+        />
       )}
 
       {renderer &&
-  canvasSize &&
-  (designLayers || []).map((layer) => (
-    <DesignOverlay
-      key={layer.id}
-      layer={layer}
-      canvasSize={canvasSize}
-      setDesignLayers={setDesignLayers}
-      isActive={layer.id === activeDesignId}
-      setActiveDesignId={setActiveDesignId}
-      disabled={bgRemovalLoading}
-      boundaries={boundaries}
+        canvasSize &&
+        (designLayers || []).map((layer) => (
+          <><DesignOverlay
+            key={layer.id}
+            layer={layer}
+            canvasSize={canvasSize}
+            renderCanvasSize={renderCanvasSize}
+            setDesignLayers={setDesignLayers}
+            isActive={layer.id === activeDesignId}
+            setActiveDesignId={setActiveDesignId}
+            disabled={bgRemovalLoading}
+            boundaries={boundaries}
+            zonesForView={zonesForActiveView}
+          />{/*
       zonesForView={zonesForActiveView}   // ✅ ADD THIS
-    />
-  ))}
+          />*/}</>
+        ))}
+      </div>
+      )}
 
 
       {bgRemovalLoading && (
@@ -1333,6 +1642,7 @@ return () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 });
@@ -1721,6 +2031,7 @@ function clampFontSizeToBoundary({
 function DesignOverlay({
   layer,
   canvasSize,
+  renderCanvasSize,
   setDesignLayers,
   isActive,
   setActiveDesignId,
@@ -1915,8 +2226,25 @@ function DesignOverlay({
   const sx = layer.scaleX ?? legacyScale;
   const sy = layer.scaleY ?? legacyScale;
 
-  const widthPx = canvasSize?.width ? canvasSize.width * sx : 0;
-  const heightPx = canvasSize?.height ? canvasSize.height * sy : 0;
+  const widthRatio =
+    canvasSize?.width && renderCanvasSize?.width
+      ? canvasSize.width / renderCanvasSize.width
+      : 1;
+  const heightRatio =
+    canvasSize?.height && renderCanvasSize?.height
+      ? canvasSize.height / renderCanvasSize.height
+      : 1;
+
+  const widthPx = layer.renderedWidthPx
+    ? layer.renderedWidthPx * widthRatio
+    : canvasSize?.width
+      ? canvasSize.width * sx
+      : 0;
+  const heightPx = layer.renderedHeightPx
+    ? layer.renderedHeightPx * heightRatio
+    : canvasSize?.height
+      ? canvasSize.height * sy
+      : 0;
 
   return (
     <div
