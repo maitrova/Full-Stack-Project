@@ -1519,7 +1519,7 @@ return () => {
     <div
       ref={rootRef}
       className={`w-full h-full ${isCompactUI ? "flex flex-col gap-2" : "relative"}`}
-      style={{ touchAction: "none" }}
+      style={{ touchAction: isCompactUI ? "pan-y" : "none" }}
       onPointerDown={handleBackgroundPointerDown}
     >
       {isCompactUI && isAdmin && (
@@ -1533,7 +1533,7 @@ return () => {
           </button>
         </div>
       )}
-      <div className="relative" style={{ touchAction: "none" }}>
+      <div className="relative" style={{ touchAction: isCompactUI ? "pan-y" : "none" }}>
       <CanvasRenderer
         mockupUrl={mockupUrl}
         maskUrl={maskUrl}
@@ -1620,6 +1620,7 @@ return () => {
             layer={layer}
             canvasSize={canvasSize}
             renderCanvasSize={renderCanvasSize}
+            compact={isCompactUI}
             setDesignLayers={setDesignLayers}
             isActive={layer.id === activeDesignId}
             setActiveDesignId={setActiveDesignId}
@@ -2032,6 +2033,7 @@ function DesignOverlay({
   layer,
   canvasSize,
   renderCanvasSize,
+  compact = false,
   setDesignLayers,
   isActive,
   setActiveDesignId,
@@ -2245,6 +2247,7 @@ function DesignOverlay({
     : canvasSize?.height
       ? canvasSize.height * sy
       : 0;
+  const compactHitPadding = compact ? 18 : 0;
 
   return (
     <div
@@ -2259,23 +2262,31 @@ function DesignOverlay({
           top,
           transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)`,
         }}
-        transition={{ type: "spring", stiffness: 400, damping: 40 }}
+        transition={compact ? { duration: 0 } : { type: "spring", stiffness: 400, damping: 40 }}
         className="pointer-events-auto absolute"
         style={{
           cursor: disabled ? "default" : "grab",
           touchAction: "none",
           willChange: "transform",
+          width: `${widthPx + compactHitPadding * 2}px`,
+          height: `${heightPx + compactHitPadding * 2}px`,
         }}
         onPointerDown={(e) => startDrag(e, "move")}
       >
         <div
           className={`relative overflow-hidden rounded-sm ${
-            isActive ? "border-2 border-blue-500 bg-blue-50/20" : "border border-slate-300/50"
+            compact
+              ? "border border-transparent bg-transparent"
+              : isActive
+                ? "border-2 border-blue-500 bg-blue-50/20"
+                : "border border-slate-300/50"
           }`}
           style={{
             width: `${widthPx}px`,
             height: `${heightPx}px`,
             opacity: disabled ? 0.6 : 1,
+            marginLeft: `${compactHitPadding}px`,
+            marginTop: `${compactHitPadding}px`,
           }}
         >
           {/* {layer.imageUrl && (
@@ -2292,7 +2303,7 @@ function DesignOverlay({
           )} */}
 
           {/* ✅ Resize handles (independent axes) */}
-          {isActive && !disabled && (
+          {isActive && !disabled && !compact && (
             <>
               {/* X handles */}
               <div
@@ -2321,7 +2332,7 @@ function DesignOverlay({
           )}
         </div>
 
-        {isActive && (
+        {isActive && !compact && (
           <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/75 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap">
             {layer.renderedWidthInches?.toFixed?.(1) || "?"}″ ×{" "}
             {layer.renderedHeightInches?.toFixed?.(1) || "?"}″{" "}

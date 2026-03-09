@@ -607,12 +607,12 @@ export default function ProductDetailPage() {
 
   // Size Selection Component
   const SizeSelection = () => (
-    <div className="space-y-3" id="mobile-size-selection">
+    <div className="space-y-2 sm:space-y-3" id="mobile-size-selection">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">Select Size</h3>
+        <h3 className="text-sm font-semibold text-gray-900 sm:text-lg">Select Size</h3>
         {sizeError && (
-          <span className="text-sm text-red-600 flex items-center gap-1">
-            <AlertCircle className="w-4 h-4" />
+          <span className="flex items-center gap-1 text-[11px] text-red-600 sm:text-sm">
+            <AlertCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             {sizeError}
           </span>
         )}
@@ -629,7 +629,7 @@ export default function ProductDetailPage() {
               onClick={() => !isDisabled && handleSizeSelect(v.size)}
               disabled={isDisabled}
               className={`
-                relative px-4 py-3 border-2 rounded-lg font-medium transition-all duration-200 min-w-[70px]
+                relative min-w-[52px] rounded-lg border px-2.5 py-1.5 text-sm font-medium transition-all duration-200 sm:min-w-[70px] sm:border-2 sm:px-4 sm:py-3 sm:text-base
                 ${isSelected 
                   ? 'border-blue-600 bg-blue-50 text-blue-600 ring-2 ring-blue-200' 
                   : isDisabled
@@ -639,9 +639,9 @@ export default function ProductDetailPage() {
               `}
               title={stockStatus}
             >
-              <span className="block text-lg">{v.size}</span>
+              <span className="block">{v.size}</span>
               {!isDisabled && (
-                <span className="absolute -top-2 -right-2 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></span>
+                <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border border-white bg-green-500 sm:-right-2 sm:-top-2 sm:h-4 sm:w-4 sm:border-2"></span>
               )}
             </button>
           );
@@ -650,10 +650,10 @@ export default function ProductDetailPage() {
       
       {/* Selected Size Feedback */}
       {selectedSize && (
-        <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+        <div className="mt-2 rounded-lg border border-green-200 bg-green-50 p-2 sm:p-3">
           <div className="flex items-center gap-2 text-green-700">
-            <Check className="w-4 h-4" />
-            <span className="text-sm font-medium">
+            <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span className="text-xs font-medium sm:text-sm">
               Selected: Size {selectedSize} • 
               Price: {formatPrice(Number(selectedVariant?.price || 0), displayData.currency)} • 
               Stock: {selectedVariant?.stock} available
@@ -1322,18 +1322,18 @@ export default function ProductDetailPage() {
         </div>
 
         {/* Mobile Action Bar - Fixed at bottom with Size Selection BEFORE Add to Cart */}
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-40">
-          <div className="p-4 space-y-4">
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white shadow-lg">
+          <div className="space-y-2 p-2.5">
             {/* Size Selection (Mobile - First in order) */}
             {isReadymade && hasVariants && (
-              <div className="mb-2">
+              <div className="mb-1">
                 <SizeSelection />
               </div>
             )}
 
             {/* Login required message for mobile */}
             {!isLoggedIn && (
-              <div className="mb-2 p-2 bg-purple-50 rounded-lg border border-purple-100">
+              <div className="mb-1 rounded-lg border border-purple-100 bg-purple-50 p-2">
                 <p className="text-xs text-purple-700 text-center">
                   Please login to add items to cart
                 </p>
@@ -1341,31 +1341,31 @@ export default function ProductDetailPage() {
             )}
 
             {/* Quantity and Action Buttons (Mobile) */}
-            <div className="space-y-3">
+            <div className="space-y-2">
               {isReadymade && isLoggedIn && (
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">Quantity:</span>
+                  <span className="text-xs font-medium text-gray-700">Qty</span>
                   <div className="flex items-center">
                     <button
                       onClick={() => handleQuantityChange(-1)}
                       disabled={quantity <= 1 || (hasVariants && !selectedSize)}
-                      className={`w-8 h-8 flex items-center justify-center border border-gray-300 rounded-l-lg ${
+                      className={`flex h-7 w-7 items-center justify-center rounded-l-lg border border-gray-300 ${
                         quantity <= 1 || (hasVariants && !selectedSize) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
                       }`}
                     >
-                      <span className="text-lg">-</span>
+                      <span className="text-base">-</span>
                     </button>
-                    <div className="w-10 h-8 flex items-center justify-center border-t border-b border-gray-300">
-                      <span className="text-base font-medium">{quantity}</span>
+                    <div className="flex h-7 w-8 items-center justify-center border-b border-t border-gray-300">
+                      <span className="text-sm font-medium">{quantity}</span>
                     </div>
                     <button
                       onClick={() => handleQuantityChange(1)}
                       disabled={quantity >= displayData.stock || (hasVariants && !selectedSize)}
-                      className={`w-8 h-8 flex items-center justify-center border border-gray-300 rounded-r-lg ${
+                      className={`flex h-7 w-7 items-center justify-center rounded-r-lg border border-gray-300 ${
                         quantity >= displayData.stock || (hasVariants && !selectedSize) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
                       }`}
                     >
-                      <span className="text-lg">+</span>
+                      <span className="text-base">+</span>
                     </button>
                   </div>
                 </div>
@@ -1377,7 +1377,7 @@ export default function ProductDetailPage() {
                     <button
                       onClick={handleAddToCart}
                       disabled={isOutOfStock || isAddingToCart || cartLoading || (hasVariants && !selectedSize)}
-                      className={`flex-1 h-12 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
+                      className={`flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg text-sm font-semibold transition-all ${
                         isOutOfStock || (hasVariants && !selectedSize)
                           ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           : isInCart
@@ -1387,18 +1387,18 @@ export default function ProductDetailPage() {
                     >
                       {isAddingToCart || cartLoading ? (
                         <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          <span className="text-sm">Adding...</span>
+                          <div className="h-3.5 w-3.5 animate-spin rounded-full border-b-2 border-white"></div>
+                          <span className="text-xs">Adding...</span>
                         </>
                       ) : isInCart ? (
                         <>
-                          <Check className="w-4 h-4" />
-                          <span className="text-sm">In Cart</span>
+                          <Check className="h-3.5 w-3.5" />
+                          <span className="text-xs">In Cart</span>
                         </>
                       ) : (
                         <>
-                          <ShoppingCart className="w-4 h-4" />
-                          <span className="text-sm">Add</span>
+                          <ShoppingCart className="h-3.5 w-3.5" />
+                          <span className="text-xs">Add</span>
                         </>
                       )}
                     </button>
@@ -1406,23 +1406,23 @@ export default function ProductDetailPage() {
                     <button
                       onClick={handleBuyNow}
                       disabled={isOutOfStock || (hasVariants && !selectedSize)}
-                      className={`flex-1 h-12 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
+                      className={`flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg text-sm font-semibold transition-all ${
                         isOutOfStock || (hasVariants && !selectedSize)
                           ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           : 'bg-gradient-to-r from-green-600 to-teal-600 text-white hover:opacity-90'
                       }`}
                     >
-                      <CreditCard className="w-4 h-4" />
-                      <span className="text-sm">Buy</span>
+                      <CreditCard className="h-3.5 w-3.5" />
+                      <span className="text-xs">Buy</span>
                     </button>
                   </>
                 ) : (
                   <button
                     onClick={() => navigate('/login', { state: { from: window.location.pathname } })}
-                    className="flex-1 h-12 rounded-xl font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:opacity-90 transition-all flex items-center justify-center gap-2"
+                    className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-sm font-semibold text-white transition-all hover:opacity-90"
                   >
-                    <LogIn className="w-4 h-4" />
-                    <span className="text-sm">Login to Add</span>
+                    <LogIn className="h-3.5 w-3.5" />
+                    <span className="text-xs">Login to Add</span>
                   </button>
                 )}
               </div>
@@ -1431,7 +1431,7 @@ export default function ProductDetailPage() {
         </div>
 
         {/* Mobile Product Info (Above the fixed bar) */}
-        <div className="lg:hidden space-y-6 pb-32">
+        <div className="lg:hidden space-y-6 pb-24">
           {/* Product Title and Price */}
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4">
             <h1 className="text-xl font-bold text-gray-900 mb-2">
