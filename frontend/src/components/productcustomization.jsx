@@ -1152,6 +1152,20 @@ const handleDesignScaleYChange = (value) => {
   calculatePrice();
 };
 
+const nudgeDesignScaleAxis = (axis, delta) => {
+  if (!activeDesign) return;
+  const current =
+    axis === "x"
+      ? (activeDesign.scaleX ?? activeDesign.scale ?? 0.35)
+      : (activeDesign.scaleY ?? activeDesign.scale ?? 0.35);
+  const next = Math.max(0.1, Math.min(1.6, current + delta));
+  if (axis === "x") {
+    handleDesignScaleXChange(next);
+    return;
+  }
+  handleDesignScaleYChange(next);
+};
+
   const handleSetTextLayers = (updater) => {
     setViewStates((prev) => {
       const existing = prev[viewCode];
@@ -1968,8 +1982,78 @@ const handleDesignScaleYChange = (value) => {
                         </div>
                       </div>
 
+                      <div className="mb-4 space-y-3 sm:hidden">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                          <div className="mb-2 flex items-center justify-between">
+                            <label className="text-xs font-medium text-slate-700">Width</label>
+                            <span className="text-xs font-semibold text-slate-600">
+                              {Math.round((activeDesign.scaleX ?? activeDesign.scale ?? 0.35) * 100)}%
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => nudgeDesignScaleAxis("x", -0.04)}
+                              className="h-9 w-9 rounded-full border border-slate-300 bg-white text-base font-semibold text-slate-700"
+                            >
+                              -
+                            </button>
+                            <input
+                              type="range"
+                              min={0.1}
+                              max={1.6}
+                              step={0.02}
+                              value={activeDesign.scaleX ?? activeDesign.scale ?? 0.35}
+                              onChange={(e) => handleDesignScaleXChange(e.target.value)}
+                              className="flex-1"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => nudgeDesignScaleAxis("x", 0.04)}
+                              className="h-9 w-9 rounded-full border border-slate-300 bg-white text-base font-semibold text-slate-700"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
 
-                      <div className="mb-4">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                          <div className="mb-2 flex items-center justify-between">
+                            <label className="text-xs font-medium text-slate-700">Height</label>
+                            <span className="text-xs font-semibold text-slate-600">
+                              {Math.round((activeDesign.scaleY ?? activeDesign.scale ?? 0.35) * 100)}%
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => nudgeDesignScaleAxis("y", -0.04)}
+                              className="h-9 w-9 rounded-full border border-slate-300 bg-white text-base font-semibold text-slate-700"
+                            >
+                              -
+                            </button>
+                            <input
+                              type="range"
+                              min={0.1}
+                              max={1.6}
+                              step={0.02}
+                              value={activeDesign.scaleY ?? activeDesign.scale ?? 0.35}
+                              onChange={(e) => handleDesignScaleYChange(e.target.value)}
+                              className="flex-1"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => nudgeDesignScaleAxis("y", 0.04)}
+                              className="h-9 w-9 rounded-full border border-slate-300 bg-white text-base font-semibold text-slate-700"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+
+                      <div className="mb-4 hidden sm:block">
   <label className="mb-2 block text-xs font-medium">Scale X (Width)</label>
   <div className="flex items-center gap-2">
     <input
@@ -1987,7 +2071,7 @@ const handleDesignScaleYChange = (value) => {
   </div>
 </div>
 
-<div className="mb-4">
+<div className="mb-4 hidden sm:block">
   <label className="mb-2 block text-xs font-medium">Scale Y (Height)</label>
   <div className="flex items-center gap-2">
     <input

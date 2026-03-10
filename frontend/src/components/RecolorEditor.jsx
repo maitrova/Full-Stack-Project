@@ -2220,9 +2220,6 @@ function DesignOverlay({
     };
   }, []);
 
-  const left = `${(layer.x ?? 0.5) * 100}%`;
-  const top = `${(layer.y ?? 0.5) * 100}%`;
-
   // ✅ prefer scaleX/scaleY with legacy fallback
   const legacyScale = layer.scale ?? 0.35;
   const sx = layer.scaleX ?? legacyScale;
@@ -2247,7 +2244,11 @@ function DesignOverlay({
     : canvasSize?.height
       ? canvasSize.height * sy
       : 0;
-  const compactHitPadding = compact ? 18 : 0;
+  const compactHitPadding = 0;
+  const centerXPx = (layer.x ?? 0.5) * (canvasSize?.width || 0);
+  const centerYPx = (layer.y ?? 0.5) * (canvasSize?.height || 0);
+  const leftPx = centerXPx - widthPx / 2;
+  const topPx = centerYPx - heightPx / 2;
 
   return (
     <div
@@ -2258,9 +2259,9 @@ function DesignOverlay({
       <motion.div
         initial={false}
         animate={{
-          left,
-          top,
-          transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)`,
+          left: `${leftPx}px`,
+          top: `${topPx}px`,
+          transform: `rotate(${layer.rotation}deg)`,
         }}
         transition={compact ? { duration: 0 } : { type: "spring", stiffness: 400, damping: 40 }}
         className="pointer-events-auto absolute"
@@ -2268,26 +2269,27 @@ function DesignOverlay({
           cursor: disabled ? "default" : "grab",
           touchAction: "none",
           willChange: "transform",
-          width: `${widthPx + compactHitPadding * 2}px`,
-          height: `${heightPx + compactHitPadding * 2}px`,
+          width: `${widthPx}px`,
+          height: `${heightPx}px`,
         }}
         onPointerDown={(e) => startDrag(e, "move")}
       >
         <div
           className={`relative overflow-hidden rounded-sm ${
-            compact
-              ? "border border-transparent bg-transparent"
-              : isActive
-                ? "border-2 border-blue-500 bg-blue-50/20"
+            isActive
+              ? "border-2 border-blue-500 bg-blue-50/20"
+              : compact
+                ? "border border-blue-400/70 bg-blue-50/10"
                 : "border border-slate-300/50"
           }`}
           style={{
             width: `${widthPx}px`,
             height: `${heightPx}px`,
             opacity: disabled ? 0.6 : 1,
-            marginLeft: `${compactHitPadding}px`,
-            marginTop: `${compactHitPadding}px`,
+            backgroundColor: compact ? "rgba(59, 130, 246, 0.04)" : undefined,
+            pointerEvents: "auto",
           }}
+          onPointerDown={(e) => startDrag(e, "move")}
         >
           {/* {layer.imageUrl && (
             <img
@@ -2303,28 +2305,28 @@ function DesignOverlay({
           )} */}
 
           {/* ✅ Resize handles (independent axes) */}
-          {isActive && !disabled && !compact && (
+          {isActive && !disabled && (
             <>
               {/* X handles */}
               <div
-                className="absolute top-1/2 -translate-y-1/2 -left-2 w-3 h-3 rounded bg-white border-2 border-blue-500 shadow"
+                className={`absolute top-1/2 -translate-y-1/2 -left-2 rounded bg-white border-2 border-blue-500 shadow ${compact ? "w-4 h-4" : "w-3 h-3"}`}
                 style={{ cursor: "ew-resize" }}
                 onPointerDown={(e) => startDrag(e, "resize", "left")}
               />
               <div
-                className="absolute top-1/2 -translate-y-1/2 -right-2 w-3 h-3 rounded bg-white border-2 border-blue-500 shadow"
+                className={`absolute top-1/2 -translate-y-1/2 -right-2 rounded bg-white border-2 border-blue-500 shadow ${compact ? "w-4 h-4" : "w-3 h-3"}`}
                 style={{ cursor: "ew-resize" }}
                 onPointerDown={(e) => startDrag(e, "resize", "right")}
               />
 
               {/* Y handles */}
               <div
-                className="absolute left-1/2 -translate-x-1/2 -top-2 w-3 h-3 rounded bg-white border-2 border-blue-500 shadow"
+                className={`absolute left-1/2 -translate-x-1/2 -top-2 rounded bg-white border-2 border-blue-500 shadow ${compact ? "w-4 h-4" : "w-3 h-3"}`}
                 style={{ cursor: "ns-resize" }}
                 onPointerDown={(e) => startDrag(e, "resize", "top")}
               />
               <div
-                className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-3 h-3 rounded bg-white border-2 border-blue-500 shadow"
+                className={`absolute left-1/2 -translate-x-1/2 -bottom-2 rounded bg-white border-2 border-blue-500 shadow ${compact ? "w-4 h-4" : "w-3 h-3"}`}
                 style={{ cursor: "ns-resize" }}
                 onPointerDown={(e) => startDrag(e, "resize", "bottom")}
               />
