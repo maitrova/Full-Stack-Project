@@ -45,8 +45,24 @@ const orderSchema = new mongoose.Schema(
     },
 
     subtotal: Number,
+    shipping: { type: Number, default: 0 },
+    discount: { type: Number, default: 0 },
     total: Number,
     currency: { type: String, default: "INR" },
+    coupon: {
+      couponId: { type: mongoose.Schema.Types.ObjectId, ref: "Coupon", default: null },
+      code: { type: String, default: null },
+      description: { type: String, default: "" },
+      discountType: {
+        type: String,
+        enum: ["PERCENTAGE", "FIXED_AMOUNT", null],
+        default: null,
+      },
+      discountValue: { type: Number, default: 0 },
+      maximumDiscountAmount: { type: Number, default: null },
+      discountApplied: { type: Number, default: 0 },
+      campaignTag: { type: String, default: "" },
+    },
 
     status: {
       type: String,

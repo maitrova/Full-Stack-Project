@@ -29,6 +29,7 @@ import emailrouter from './routes/emailroute.js';
 import searchproductroute from './routes/searchproduct.js';
 import invoicerouter from './routes/invoiceroutes.js';
 import brandroute from './routes/brandroute.js';
+import couponRouter from "./routes/couponRoutes.js";
 
 import colorselection from './routes/adminColorRoutes.js';
 import companypdfs from './routes/companyPdfRoutes.js';
@@ -90,6 +91,7 @@ app.use('/api/dropproducts', droprouter);
 app.use("/api/mockup-calibrations", caliberateroutes);
 app.use("/api/brands", brandroute);
 app.use("/api/company-pdfs", companypdfs);
+app.use("/api/coupons", couponRouter);
 // Error handling
 app.use((err, req, res, next) => {
   console.error("Server error:", err);

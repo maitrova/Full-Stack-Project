@@ -4,68 +4,102 @@ import Order from "../models/Order.js";
 import { Cart } from "../models/Cart.js";
 import Address from "../models/address.js";
 import { sendOrderStatusEmail } from "../services/orderEmailService.js";
+import {
+  redeemCouponForOrder,
+  validateCouponForCart,
+} from "../services/couponService.js";
 
 const toPaise = (rupees) => Math.round(Number(rupees) * 100);
+const getRefId = (value) => value?._id || value || null;
 
-// ✅ Create Razorpay order from cart
 export const createRazorpayOrderFromCart = async (req, res) => {
   try {
     const userId = req.user?.id;
+    const { couponCode } = req.body;
+
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    // 1) cart
-    const cart = await Cart.findOne({ user: userId, status: "ACTIVE" });
+    const cart = await Cart.findOne({ user: userId, status: "ACTIVE" })
+      .populate("items.readymadeProduct")
+      .populate("items.dropproduct")
+      .populate("items.product")
+      .populate({
+        path: "items.readymadeProduct",
+        populate: [
+          { path: "category", select: "name" },
+          { path: "subCategory", select: "name category" },
+        ],
+      });
+
     if (!cart || cart.items.length === 0) {
       return res.status(400).json({ message: "Cart is empty" });
     }
 
-    // 2) addresses (use your existing Address collection)
     const delivery = await Address.findOne({ user: userId, type: "delivery" });
     const billing = await Address.findOne({ user: userId, type: "billing" });
+
     if (!delivery) return res.status(400).json({ message: "Delivery address not found" });
     if (!billing) return res.status(400).json({ message: "Billing address not found" });
 
-    // 3) totals from cart snapshot
-    const subtotal = cart.items.reduce((sum, it) => sum + it.unitPrice * it.qty, 0);
+    const subtotal = cart.items.reduce(
+      (sum, item) => sum + Number(item.unitPrice || 0) * Number(item.qty || 0),
+      0
+    );
     const shipping = 0;
-    const discount = 0;
+    let discount = 0;
+    let couponSnapshot = null;
+
+    if (couponCode) {
+      const couponResult = await validateCouponForCart({ couponCode, cart, userId });
+      if (!couponResult.valid) {
+        return res.status(400).json({ message: couponResult.reason });
+      }
+
+      discount = couponResult.discount;
+      couponSnapshot = couponResult.couponSnapshot;
+    }
+
     const total = Math.max(0, subtotal + shipping - discount);
 
-    // 4) create DB order first (PENDING)
     const orderDoc = await Order.create({
       user: userId,
       cart: cart._id,
-      items: cart.items.map((it) => ({
-        kind: it.kind,
-        readymadeProduct: it.readymadeProduct,
-        design: it.design,
-        dropproduct: it.dropproduct,
-        product: it.product,
-        size: it.size,
-        qty: it.qty,
-        unitPrice: it.unitPrice,
-        currency: it.currency || "INR",
-        previewImage: it.previewImage,
-        signature: it.signature,
+      items: cart.items.map((item) => ({
+        kind: item.kind,
+        readymadeProduct: getRefId(item.readymadeProduct),
+        design: getRefId(item.design),
+        dropproduct: getRefId(item.dropproduct),
+        product: getRefId(item.product),
+        size: item.size,
+        qty: item.qty,
+        unitPrice: item.unitPrice,
+        currency: item.currency || "INR",
+        previewImage: item.previewImage,
+        signature: item.signature,
       })),
-      deliveryAddress: delivery._id, // ✅ reference
-      billingAddress: billing._id,   // ✅ reference
+      deliveryAddress: delivery._id,
+      billingAddress: billing._id,
       subtotal,
+      shipping,
+      discount,
       total,
       currency: "INR",
+      coupon: couponSnapshot,
       status: "PENDING_PAYMENT",
       payment: { status: "CREATED" },
     });
 
-    // 5) create Razorpay order (paise)
     const rpOrder = await razorpay.orders.create({
       amount: toPaise(total),
       currency: "INR",
       receipt: `rcpt_${orderDoc._id}`,
-      notes: { orderId: String(orderDoc._id), userId: String(userId) },
+      notes: {
+        orderId: String(orderDoc._id),
+        userId: String(userId),
+        couponCode: couponSnapshot?.code || "",
+      },
     });
 
-    // 6) save rp order id
     orderDoc.payment.razorpayOrderId = rpOrder.id;
     await orderDoc.save();
 
@@ -75,7 +109,14 @@ export const createRazorpayOrderFromCart = async (req, res) => {
       razorpayOrderId: rpOrder.id,
       amount: rpOrder.amount,
       currency: rpOrder.currency,
-      razorpayKeyId: process.env.RAZORPAY_KEY_ID, // ✅ safe to send
+      razorpayKeyId: process.env.RAZORPAY_KEY_ID,
+      pricing: {
+        subtotal,
+        shipping,
+        discount,
+        total,
+        coupon: couponSnapshot,
+      },
     });
   } catch (err) {
     console.error("createRazorpayOrderFromCart error:", err);
@@ -83,19 +124,12 @@ export const createRazorpayOrderFromCart = async (req, res) => {
   }
 };
 
-
-
 export const verifyRazorpayPayment = async (req, res) => {
   try {
     const userId = req.user?.id || req.user?._id;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    const {
-      orderId,
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-    } = req.body;
+    const { orderId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
     if (!orderId || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return res.status(400).json({ message: "Missing payment fields" });
@@ -108,7 +142,6 @@ export const verifyRazorpayPayment = async (req, res) => {
       return res.status(400).json({ message: "Razorpay order mismatch" });
     }
 
-    // 🔐 Verify signature
     const body = `${razorpay_order_id}|${razorpay_payment_id}`;
     const expected = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
@@ -125,7 +158,6 @@ export const verifyRazorpayPayment = async (req, res) => {
       return res.status(400).json({ message: "Payment verification failed" });
     }
 
-    // ✅ Mark order as PAID
     orderDoc.status = "PAID";
     orderDoc.payment.status = "PAID";
     orderDoc.orderStatus = "PROCESSING";
@@ -134,19 +166,21 @@ export const verifyRazorpayPayment = async (req, res) => {
 
     await orderDoc.save();
 
-    // 🔥🔥🔥 SEND CONFIRMATION EMAIL
-    const populatedOrder = await Order.findById(orderDoc._id).populate("user");
+    await redeemCouponForOrder({
+      couponSnapshot: orderDoc.coupon,
+      userId,
+      orderId: orderDoc._id,
+    });
 
+    const populatedOrder = await Order.findById(orderDoc._id).populate("user");
     await sendOrderStatusEmail(populatedOrder, populatedOrder.user);
 
-    // ✅ Close ACTIVE cart
     await Cart.findOneAndUpdate(
       { _id: orderDoc.cart, user: userId, status: "ACTIVE" },
       { $set: { status: "ORDERED" } },
       { new: true }
     );
 
-    // ✅ Ensure new ACTIVE cart
     const newActiveCart = await Cart.findOneAndUpdate(
       { user: userId, status: "ACTIVE" },
       { $setOnInsert: { user: userId, status: "ACTIVE", items: [] } },
@@ -158,13 +192,8 @@ export const verifyRazorpayPayment = async (req, res) => {
       order: orderDoc,
       cart: newActiveCart,
     });
-
   } catch (err) {
     console.error("verifyRazorpayPayment error:", err);
     return res.status(500).json({ message: "Server error" });
   }
 };
-
-
-
-

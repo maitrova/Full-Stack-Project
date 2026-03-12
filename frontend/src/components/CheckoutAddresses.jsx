@@ -1,4 +1,3 @@
-// src/components/CheckoutAddresses.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -14,8 +13,15 @@ import {
   selectAddressSuccess,
   selectAddressMessage,
 } from "../redux/slices/address.js";
+import {
+  getCart,
+  selectCartItems,
+  selectCartSummary,
+} from "../redux/slices/Cartslice.js";
 import { selectCurrentToken } from "../redux/slices/Userslice.js";
 import RazorpayPayNow from "../components/RazorpayPayNow.jsx";
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 const emptyAddress = {
   fullName: "",
@@ -25,6 +31,15 @@ const emptyAddress = {
   pincode: "",
   city: "",
   state: "",
+};
+
+const emptyCouponState = {
+  code: "",
+  status: "idle",
+  message: "",
+  discount: 0,
+  coupon: null,
+  subtotal: null,
 };
 
 function Input({ label, value, onChange, placeholder, type = "text" }) {
@@ -71,7 +86,7 @@ function AddressSummary({ title, addr, onEdit, onMakeDefault, loading }) {
             ) : null}
           </div>
           {addr ? (
-            <div className="mt-2 text-sm text-slate-700 space-y-1">
+            <div className="mt-2 space-y-1 text-sm text-slate-700">
               <div className="font-medium text-slate-900">{addr.fullName}</div>
               <div className="text-slate-600">{addr.mobileNumber}</div>
               <div>{addr.completeAddress}</div>
@@ -107,9 +122,18 @@ function AddressSummary({ title, addr, onEdit, onMakeDefault, loading }) {
   );
 }
 
+function PriceRow({ label, value, valueClassName = "font-medium text-slate-900" }) {
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span className="text-slate-600">{label}</span>
+      <span className={valueClassName}>{value}</span>
+    </div>
+  );
+}
+
 export default function CheckoutAddresses() {
   const dispatch = useDispatch();
-  
+
   const token = useSelector(selectCurrentToken);
   const deliverySaved = useSelector(selectDeliveryAddress);
   const billingSaved = useSelector(selectBillingAddress);
@@ -117,24 +141,45 @@ export default function CheckoutAddresses() {
   const error = useSelector(selectAddressError);
   const success = useSelector(selectAddressSuccess);
   const message = useSelector(selectAddressMessage);
+  const cartItems = useSelector(selectCartItems);
+  const cartSummary = useSelector(selectCartSummary);
 
   const [sameAsDelivery, setSameAsDelivery] = useState(true);
   const [setAsDefault, setSetAsDefault] = useState(true);
-  const [mode, setMode] = useState("create"); // create | edit-delivery | edit-billing
+  const [mode, setMode] = useState("create");
   const [delivery, setDelivery] = useState(emptyAddress);
   const [billing, setBilling] = useState(emptyAddress);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponState, setCouponState] = useState(emptyCouponState);
+  const [pricingPreview, setPricingPreview] = useState(null);
 
   const isEditing = useMemo(() => mode.startsWith("edit"), [mode]);
+  const normalizedCouponCode = useMemo(
+    () => String(couponCode || "").trim().toUpperCase(),
+    [couponCode]
+  );
+  const isCouponApplied =
+    couponState.status === "applied" && couponState.code === normalizedCouponCode;
+  const checkoutDisabled = !deliverySaved || !billingSaved || cartItems.length === 0;
+
+  const effectiveSubtotal = Number(pricingPreview?.subtotal ?? cartSummary.subtotal ?? 0);
+  const effectiveShipping = Number(pricingPreview?.shipping ?? 0);
+  const effectiveDiscount = Number(pricingPreview?.discount ?? couponState.discount ?? 0);
+  const effectiveTotal = Number(
+    pricingPreview?.total ??
+      Math.max(0, effectiveSubtotal + effectiveShipping - effectiveDiscount)
+  );
 
   useEffect(() => {
     dispatch(fetchMyAddresses());
+    dispatch(getCart());
+
     return () => {
       dispatch(resetAddressState());
     };
   }, [dispatch]);
 
   useEffect(() => {
-    // Prefill forms from saved addresses when available
     if (deliverySaved) {
       setDelivery((prev) => ({
         ...prev,
@@ -168,8 +213,7 @@ export default function CheckoutAddresses() {
         ...delivery,
       }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sameAsDelivery]);
+  }, [delivery, sameAsDelivery]);
 
   const handleChange = (which, key, value) => {
     if (which === "delivery") {
@@ -177,26 +221,29 @@ export default function CheckoutAddresses() {
       if (sameAsDelivery) {
         setBilling((prev) => ({ ...prev, [key]: value }));
       }
-    } else {
-      setBilling((prev) => ({ ...prev, [key]: value }));
+      return;
     }
+
+    setBilling((prev) => ({ ...prev, [key]: value }));
   };
 
   const validateLocal = (addr) => {
     const required = ["fullName", "mobileNumber", "completeAddress", "pincode", "city", "state"];
-    for (const f of required) {
-      if (!addr[f] || String(addr[f]).trim() === "") return `Please fill ${f}`;
+    for (const field of required) {
+      if (!addr[field] || String(addr[field]).trim() === "") {
+        return `Please fill ${field}`;
+      }
     }
     return null;
   };
 
   const onSave = async () => {
-    const dErr = validateLocal(delivery);
-    if (dErr) return alert(dErr);
+    const deliveryError = validateLocal(delivery);
+    if (deliveryError) return alert(deliveryError);
 
     if (!sameAsDelivery) {
-      const bErr = validateLocal(billing);
-      if (bErr) return alert(bErr);
+      const billingError = validateLocal(billing);
+      if (billingError) return alert(billingError);
     }
 
     await dispatch(
@@ -214,8 +261,8 @@ export default function CheckoutAddresses() {
   const onUpdate = async () => {
     if (mode === "edit-delivery") {
       if (!deliverySaved?._id) return;
-      const dErr = validateLocal(delivery);
-      if (dErr) return alert(dErr);
+      const deliveryError = validateLocal(delivery);
+      if (deliveryError) return alert(deliveryError);
 
       await dispatch(updateAddress({ id: deliverySaved._id, updates: delivery }));
       dispatch(fetchMyAddresses());
@@ -225,8 +272,8 @@ export default function CheckoutAddresses() {
 
     if (mode === "edit-billing") {
       if (!billingSaved?._id) return;
-      const bErr = validateLocal(billing);
-      if (bErr) return alert(bErr);
+      const billingError = validateLocal(billing);
+      if (billingError) return alert(billingError);
 
       await dispatch(updateAddress({ id: billingSaved._id, updates: billing }));
       dispatch(fetchMyAddresses());
@@ -240,17 +287,103 @@ export default function CheckoutAddresses() {
   };
 
   const handlePaymentSuccess = ({ orderId }) => {
-    // You can redirect to a success page or show a success message
     console.log("Paid order:", orderId);
-    // Example: navigate(`/order-success/${orderId}`);
+  };
+
+  const resetCouponFeedback = () => {
+    setCouponState(emptyCouponState);
+    setPricingPreview(null);
+  };
+
+  const handleValidateCoupon = async () => {
+    if (!token) return;
+
+    if (!normalizedCouponCode) {
+      setCouponState({
+        ...emptyCouponState,
+        status: "error",
+        message: "Enter a coupon code",
+      });
+      setPricingPreview(null);
+      return;
+    }
+
+    setCouponState((prev) => ({
+      ...prev,
+      code: normalizedCouponCode,
+      status: "validating",
+      message: "",
+    }));
+
+    try {
+      const res = await fetch(`${API_URL}/coupons/validate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ couponCode: normalizedCouponCode }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.message || "Failed to validate coupon");
+      }
+
+      const subtotal = Number(data.subtotal || cartSummary.subtotal || 0);
+      const shipping = 0;
+      const discount = Number(data.discount || 0);
+
+      setCouponState({
+        code: normalizedCouponCode,
+        status: "applied",
+        message: "Coupon applied",
+        discount,
+        coupon: data.coupon || null,
+        subtotal,
+      });
+      setPricingPreview({
+        subtotal,
+        shipping,
+        discount,
+        total: Math.max(0, subtotal + shipping - discount),
+        coupon: data.coupon || null,
+      });
+    } catch (validationError) {
+      setCouponState({
+        ...emptyCouponState,
+        code: normalizedCouponCode,
+        status: "error",
+        message: validationError.message || "Failed to validate coupon",
+      });
+      setPricingPreview(null);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setCouponCode("");
+    resetCouponFeedback();
+  };
+
+  const handleOrderCreated = (created) => {
+    const pricing = created?.pricing;
+    if (!pricing) return;
+
+    setPricingPreview({
+      subtotal: Number(pricing.subtotal || 0),
+      shipping: Number(pricing.shipping || 0),
+      discount: Number(pricing.discount || 0),
+      total: Number(pricing.total || 0),
+      coupon: pricing.coupon || null,
+    });
   };
 
   const headerTitle =
     mode === "edit-delivery"
       ? "Edit Delivery Address"
       : mode === "edit-billing"
-      ? "Edit Billing Address"
-      : "Delivery & Billing Address";
+        ? "Edit Billing Address"
+        : "Delivery & Billing Address";
 
   return (
     <div className="w-full bg-slate-50">
@@ -262,7 +395,6 @@ export default function CheckoutAddresses() {
           </p>
         </div>
 
-        {/* Alerts */}
         {error ? (
           <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             {error}
@@ -274,7 +406,6 @@ export default function CheckoutAddresses() {
           </div>
         ) : null}
 
-        {/* Saved summaries */}
         <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
           <AddressSummary
             title="Delivery"
@@ -292,10 +423,8 @@ export default function CheckoutAddresses() {
           />
         </div>
 
-        {/* Form */}
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            {/* Delivery */}
             <div>
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-slate-900">Delivery Information</h3>
@@ -308,52 +437,51 @@ export default function CheckoutAddresses() {
                 <Input
                   label="Full Name"
                   value={delivery.fullName}
-                  onChange={(v) => handleChange("delivery", "fullName", v)}
+                  onChange={(value) => handleChange("delivery", "fullName", value)}
                   placeholder="Enter full name"
                 />
                 <Input
                   label="Mobile Number"
                   value={delivery.mobileNumber}
-                  onChange={(v) => handleChange("delivery", "mobileNumber", v)}
+                  onChange={(value) => handleChange("delivery", "mobileNumber", value)}
                   placeholder="Enter mobile number"
                   type="tel"
                 />
                 <TextArea
                   label="Complete Address"
                   value={delivery.completeAddress}
-                  onChange={(v) => handleChange("delivery", "completeAddress", v)}
+                  onChange={(value) => handleChange("delivery", "completeAddress", value)}
                   placeholder="House no, street, area..."
                 />
                 <Input
                   label="Landmark (optional)"
                   value={delivery.landmark}
-                  onChange={(v) => handleChange("delivery", "landmark", v)}
+                  onChange={(value) => handleChange("delivery", "landmark", value)}
                   placeholder="Near ..."
                 />
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Input
                     label="Pincode"
                     value={delivery.pincode}
-                    onChange={(v) => handleChange("delivery", "pincode", v)}
+                    onChange={(value) => handleChange("delivery", "pincode", value)}
                     placeholder="6-digit pincode"
                   />
                   <Input
                     label="City"
                     value={delivery.city}
-                    onChange={(v) => handleChange("delivery", "city", v)}
+                    onChange={(value) => handleChange("delivery", "city", value)}
                     placeholder="City"
                   />
                 </div>
                 <Input
                   label="State"
                   value={delivery.state}
-                  onChange={(v) => handleChange("delivery", "state", v)}
+                  onChange={(value) => handleChange("delivery", "state", value)}
                   placeholder="State"
                 />
               </div>
             </div>
 
-            {/* Billing */}
             <div>
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-slate-900">Billing Information</h3>
@@ -362,7 +490,6 @@ export default function CheckoutAddresses() {
                 ) : null}
               </div>
 
-              {/* Same as delivery */}
               <label className="mb-4 flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                 <input
                   type="checkbox"
@@ -378,51 +505,50 @@ export default function CheckoutAddresses() {
                 <Input
                   label="Full Name"
                   value={billing.fullName}
-                  onChange={(v) => handleChange("billing", "fullName", v)}
+                  onChange={(value) => handleChange("billing", "fullName", value)}
                   placeholder="Enter full name"
                 />
                 <Input
                   label="Mobile Number"
                   value={billing.mobileNumber}
-                  onChange={(v) => handleChange("billing", "mobileNumber", v)}
+                  onChange={(value) => handleChange("billing", "mobileNumber", value)}
                   placeholder="Enter mobile number"
                   type="tel"
                 />
                 <TextArea
                   label="Complete Address"
                   value={billing.completeAddress}
-                  onChange={(v) => handleChange("billing", "completeAddress", v)}
+                  onChange={(value) => handleChange("billing", "completeAddress", value)}
                   placeholder="House no, street, area..."
                 />
                 <Input
                   label="Landmark (optional)"
                   value={billing.landmark}
-                  onChange={(v) => handleChange("billing", "landmark", v)}
+                  onChange={(value) => handleChange("billing", "landmark", value)}
                   placeholder="Near ..."
                 />
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Input
                     label="Pincode"
                     value={billing.pincode}
-                    onChange={(v) => handleChange("billing", "pincode", v)}
+                    onChange={(value) => handleChange("billing", "pincode", value)}
                     placeholder="6-digit pincode"
                   />
                   <Input
                     label="City"
                     value={billing.city}
-                    onChange={(v) => handleChange("billing", "city", v)}
+                    onChange={(value) => handleChange("billing", "city", value)}
                     placeholder="City"
                   />
                 </div>
                 <Input
                   label="State"
                   value={billing.state}
-                  onChange={(v) => handleChange("billing", "state", v)}
+                  onChange={(value) => handleChange("billing", "state", value)}
                   placeholder="State"
                 />
               </div>
 
-              {/* Default */}
               <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm text-slate-700">
                 <input
                   type="checkbox"
@@ -435,7 +561,6 @@ export default function CheckoutAddresses() {
             </div>
           </div>
 
-          {/* Actions */}
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-xs text-slate-500">
               {isEditing ? "You are updating an existing address." : "You can save both delivery & billing together."}
@@ -471,9 +596,84 @@ export default function CheckoutAddresses() {
           </div>
         </div>
 
-        {/* Payment Section */}
         <div className="mt-8">
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-end">
+                <div className="flex-1">
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Coupon Code
+                  </label>
+                  <input
+                    type="text"
+                    value={couponCode}
+                    onChange={(e) => {
+                      setCouponCode(e.target.value.toUpperCase());
+                      if (couponState.status !== "idle") {
+                        resetCouponFeedback();
+                      }
+                    }}
+                    placeholder="Enter coupon code"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm uppercase outline-none transition focus:border-slate-400"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleValidateCoupon}
+                    disabled={!normalizedCouponCode || couponState.status === "validating"}
+                    className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                  >
+                    {couponState.status === "validating" ? "Checking..." : "Apply"}
+                  </button>
+                  {(normalizedCouponCode || isCouponApplied) && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveCoupon}
+                      className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {couponState.message ? (
+                <div
+                  className={`mt-3 rounded-xl px-3 py-2 text-sm ${
+                    couponState.status === "applied"
+                      ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border border-rose-200 bg-rose-50 text-rose-700"
+                  }`}
+                >
+                  {couponState.message}
+                </div>
+              ) : null}
+
+              <div className="mt-4 space-y-2">
+                <PriceRow label="Cart Items" value={String(cartItems.length)} />
+                <PriceRow label="Subtotal" value={`Rs. ${effectiveSubtotal.toFixed(2)}`} />
+                <PriceRow
+                  label="Shipping"
+                  value={
+                    effectiveShipping === 0 ? "FREE" : `Rs. ${effectiveShipping.toFixed(2)}`
+                  }
+                />
+                <PriceRow
+                  label="Coupon Discount"
+                  value={effectiveDiscount > 0 ? `- Rs. ${effectiveDiscount.toFixed(2)}` : "Rs. 0.00"}
+                  valueClassName="font-medium text-emerald-700"
+                />
+                <div className="border-t border-slate-200 pt-2">
+                  <div className="flex items-center justify-between text-base font-semibold text-slate-900">
+                    <span>Payable Total</span>
+                    <span>Rs. {effectiveTotal.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <h3 className="text-lg font-bold text-slate-900">Payment</h3>
             <p className="mt-1 text-sm text-slate-600">
               Pay securely using Razorpay after saving your addresses.
@@ -482,14 +682,15 @@ export default function CheckoutAddresses() {
             <div className="mt-5">
               <RazorpayPayNow
                 token={token}
+                couponCode={isCouponApplied ? normalizedCouponCode : ""}
                 onSuccess={handlePaymentSuccess}
-                disabled={!deliverySaved || !billingSaved}
+                onOrderCreated={handleOrderCreated}
+                disabled={checkoutDisabled}
               />
             </div>
           </div>
         </div>
 
-        {/* Small note */}
         <div className="mt-4 text-xs text-slate-500">
           Tip: After saving addresses, use the "Make default" button in the summary cards if you want to switch defaults quickly.
         </div>
