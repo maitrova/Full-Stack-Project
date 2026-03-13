@@ -89,6 +89,7 @@ import ProductSearch from '../components/searchproductdetail.jsx';
  // Adjust the import path as needed
 import AdminDesignsPage from './AdminDesignsPage.jsx';
 import DesignUploadsManager from '../components/admindesignuploads.jsx';
+import CouponManagement from '../components/admin/CouponManagement.jsx';
 
 const AdminDashboard = () => {
   const dispatch = useDispatch();
@@ -185,7 +186,8 @@ const AdminDashboard = () => {
         activeTab !== 'orders' && 
         activeTab !== 'homepage' &&
         activeTab !== 'search' &&
-        activeTab !== 'adminDesigns') {
+        activeTab !== 'adminDesigns' &&
+        activeTab !== 'coupons') {
       loadProducts();
     }
   }, [currentFilter, pagination.page, currentCategory, currentSubCategory, activeTab]);
@@ -281,6 +283,8 @@ const AdminDashboard = () => {
     setViewMode('homepage');
   } else if (tab === 'search') {
     setViewMode('search');
+  } else if (tab === 'coupons') {
+    setViewMode('coupons');
   } else {
     setViewMode('products');
     loadProducts();
@@ -601,6 +605,7 @@ const AdminDashboard = () => {
     { id: 'homepage', label: 'Homepage', icon: <Home className="w-5 h-5" /> },
     { id: 'search', label: 'Product Search', icon: <Search className="w-5 h-5" /> },
     { id: 'adminUploads', label: 'Admin Uploads', icon: <Upload className="w-5 h-5" /> },
+    { id: 'coupons', label: 'Coupon Management', icon: <DollarSign className="w-5 h-5" /> },
     { id: 'newArrival', label: 'New Arrivals', icon: <TrendingUp className="w-5 h-5" /> },
     { id: 'bestSeller', label: 'Best Sellers', icon: <BarChart3 className="w-5 h-5" /> },
     { id: 'prices', label: 'Prices', icon: <DollarSign className="w-5 h-5" /> },
@@ -979,6 +984,7 @@ const AdminDashboard = () => {
                 {activeSidebarItem === 'analytics' && 'Analytics'}
                 {activeSidebarItem === 'settings' && 'Settings'}
                 {activeSidebarItem === 'adminUploads' && 'Admin Uploads'}
+                {activeSidebarItem === 'coupons' && 'Coupon Management'}
               </h1>
               <p className="text-gray-600 mt-2">
                 {activeSidebarItem === 'dashboard' && 'Overview of your store performance'}
@@ -996,6 +1002,7 @@ const AdminDashboard = () => {
                 {activeSidebarItem === 'analytics' && 'View sales and performance analytics'}
                 {activeSidebarItem === 'settings' && 'Configure store settings'}
                 {activeSidebarItem === 'adminUploads' && 'Upload and manage admin files'}
+                {activeSidebarItem === 'coupons' && 'Create, edit, pause, and delete coupon rules'}
               </p>
             </div>
             
@@ -1107,6 +1114,10 @@ const AdminDashboard = () => {
           {/* Admin Uploads Component */}
           {activeSidebarItem === 'adminUploads' && (
             <DesignUploadsManager />
+          )}
+
+          {activeSidebarItem === 'coupons' && (
+            <CouponManagement />
           )}
 
           {/* Search and Filters for Products */}
@@ -1679,7 +1690,8 @@ const AdminDashboard = () => {
      activeSidebarItem !== 'homepage' && 
      activeSidebarItem !== 'search' && 
      activeSidebarItem !== 'adminDesigns' &&
-     activeSidebarItem !== 'adminUploads' ? (            /* View Mode for Products (excluding dropproducts, orders, homepage, search, and adminDesigns) */
+     activeSidebarItem !== 'adminUploads' &&
+     activeSidebarItem !== 'coupons' ? (            /* View Mode for Products (excluding dropproducts, orders, homepage, search, and adminDesigns) */
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
               {productsLoading ? (
                 <div className="flex justify-center items-center h-64">
