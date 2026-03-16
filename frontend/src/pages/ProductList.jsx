@@ -45,12 +45,9 @@ import { fetchProducts, fetchProductCategories } from "../redux/slices/productsS
 // Import common saved data slice
 import { 
   fetchCommonSavedData,
-  fetchMoreCommonSavedData,
   selectCommonSavedData,
   selectCommonSavedDataLoading,
   selectCommonSavedDataError,
-  selectCommonSavedDataLoadingMore,
-  selectCommonSavedDataPagination,
   updateFilters as updateCommonFilters,
   resetCommonSavedData
 } from "../redux/slices/commonproducts.js";
@@ -141,8 +138,6 @@ const PRICE_RANGES = [
   { label: '₹5000+', min: 5000, max: 10000 }
 ];
 
-const CATALOG_PAGE_SIZE = 24;
-
 // Default placeholder image - Higher quality
 const DEFAULT_PRODUCT_IMAGE = "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&h=600&fit=crop&q=80";
 
@@ -207,8 +202,6 @@ export default function UnifiedProductHub() {
   const commonSavedData = useSelector(selectCommonSavedData);
   const commonLoading = useSelector(selectCommonSavedDataLoading);
   const commonError = useSelector(selectCommonSavedDataError);
-  const commonLoadingMore = useSelector(selectCommonSavedDataLoadingMore);
-  const commonPagination = useSelector(selectCommonSavedDataPagination);
   
   // Cart state
   const cartItems = useSelector(selectCartItems);
@@ -459,7 +452,7 @@ export default function UnifiedProductHub() {
       }
     } else if (activeProductType === 'all') {
       console.log("Fetching common saved data");
-      dispatch(fetchCommonSavedData({ page: 1, limit: CATALOG_PAGE_SIZE }));
+      dispatch(fetchCommonSavedData({ page: 1 }));
     }
     
     if (isFirstLoad) {
@@ -473,29 +466,6 @@ export default function UnifiedProductHub() {
       });
     };
   }, [activeProductType, dispatch, isFirstLoad, selectedCategory, selectedSubCategory]);
-
-  const handleLoadMoreCommonProducts = useCallback(() => {
-    if (
-      activeProductType !== "all" ||
-      commonLoadingMore ||
-      !commonPagination.hasMore
-    ) {
-      return;
-    }
-
-    dispatch(
-      fetchMoreCommonSavedData({
-        page: commonPagination.page + 1,
-        limit: CATALOG_PAGE_SIZE,
-      })
-    );
-  }, [
-    activeProductType,
-    commonLoadingMore,
-    commonPagination.hasMore,
-    commonPagination.page,
-    dispatch,
-  ]);
 
   // Update subcategories when category changes for custom products
   useEffect(() => {
@@ -2161,33 +2131,8 @@ export default function UnifiedProductHub() {
                 )}
               </div>
             ) : (
-              <div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-5">
-                  {productsToDisplay.map((product) => renderProductCard(product))}
-                </div>
-
-                {activeProductType === "all" && commonPagination.hasMore && (
-                  <div className="mt-8 flex justify-center">
-                    <button
-                      type="button"
-                      onClick={handleLoadMoreCommonProducts}
-                      disabled={commonLoadingMore}
-                      className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-5 py-3 text-sm font-semibold text-gray-800 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {commonLoadingMore ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Loading more
-                        </>
-                      ) : (
-                        <>
-                          Load more products
-                          <ChevronDown className="h-4 w-4" />
-                        </>
-                      )}
-                    </button>
-                  </div>
-                )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-5">
+                {productsToDisplay.map((product) => renderProductCard(product))}
               </div>
             )}
           </div>

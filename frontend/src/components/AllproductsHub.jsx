@@ -30,12 +30,9 @@ import {
 
 import { 
   fetchCommonSavedData,
-  fetchMoreCommonSavedData,
   selectCommonSavedData,
   selectCommonSavedDataLoading,
-  selectCommonSavedDataError,
-  selectCommonSavedDataLoadingMore,
-  selectCommonSavedDataPagination
+  selectCommonSavedDataError
 } from "../redux/slices/commonproducts.js";
 import { 
   addToCart, 
@@ -75,8 +72,6 @@ const ALL_PRODUCTS_PRICE_RANGES = [
   { label: '₹2500 - ₹5000', min: 2500, max: 5000 },
   { label: '₹5000+', min: 5000, max: 10000 }
 ];
-
-const CATALOG_PAGE_SIZE = 24;
 
 export default function AllProductsHub() {
   const dispatch = useDispatch();
@@ -139,8 +134,6 @@ export default function AllProductsHub() {
   const commonSavedData = useSelector(selectCommonSavedData);
   const commonLoading = useSelector(selectCommonSavedDataLoading);
   const commonError = useSelector(selectCommonSavedDataError);
-  const commonLoadingMore = useSelector(selectCommonSavedDataLoadingMore);
-  const commonPagination = useSelector(selectCommonSavedDataPagination);
   const cartItems = useSelector(selectCartItems);
   const cartLoading = useSelector(selectCartLoading);
   const token = useSelector(selectCurrentToken);
@@ -224,19 +217,8 @@ export default function AllProductsHub() {
   
   // Fetch data on mount
   useEffect(() => {
-    dispatch(fetchCommonSavedData({ page: 1, limit: CATALOG_PAGE_SIZE }));
+    dispatch(fetchCommonSavedData({ page: 1 }));
   }, [dispatch]);
-
-  const handleLoadMoreProducts = useCallback(() => {
-    if (commonLoadingMore || !commonPagination.hasMore) return;
-
-    dispatch(
-      fetchMoreCommonSavedData({
-        page: commonPagination.page + 1,
-        limit: CATALOG_PAGE_SIZE,
-      })
-    );
-  }, [commonLoadingMore, commonPagination.hasMore, commonPagination.page, dispatch]);
   
   // Update local state when URL changes
   useEffect(() => {
@@ -1246,9 +1228,8 @@ export default function AllProductsHub() {
                   </button>
                 </div>
               ) : (
-                <div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {filteredProducts.map((product) => {
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {filteredProducts.map((product) => {
                     const isInCart = getCartQuantityForCommon(product) > 0;
                     const currentPrice =
                       product.type === "readymade"
@@ -1381,30 +1362,6 @@ export default function AllProductsHub() {
                       </div>
                     );
                   })}
-                  </div>
-
-                  {commonPagination.hasMore && (
-                    <div className="mt-8 flex justify-center">
-                      <button
-                        type="button"
-                        onClick={handleLoadMoreProducts}
-                        disabled={commonLoadingMore}
-                        className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-800 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {commonLoadingMore ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Loading more
-                          </>
-                        ) : (
-                          <>
-                            Load more products
-                            <ChevronDown className="h-4 w-4" />
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  )}
                 </div>
               )
             )}
