@@ -80,8 +80,9 @@ const ReadymadeProductList = () => {
     if (!products || !Array.isArray(products)) return;
 
     products.forEach(product => {
-      if (product.images && product.images.length > 1) {
-        startSlideshow(product._id, product.images.length);
+      const productImages = getProductImages(product);
+      if (productImages.length > 1) {
+        startSlideshow(product._id, productImages.length);
       }
     });
 
@@ -245,17 +246,34 @@ const ReadymadeProductList = () => {
     }
   };
 
+  const getRawImagePath = (image) => {
+    if (!image) return null;
+    return typeof image === 'string' ? image : image.url || null;
+  };
+
+  const getProductImages = (product) => {
+    const images = Array.isArray(product?.images)
+      ? product.images.map(getRawImagePath).filter(Boolean)
+      : [];
+    const thumbnail = getRawImagePath(product?.thumbnail);
+
+    return thumbnail
+      ? [thumbnail, ...images.filter((image) => image !== thumbnail)]
+      : images;
+  };
+
   // Safe image URL construction
   const getImageUrl = (imagePath) => {
-    if (!imagePath) return null;
+    const normalizedPath = getRawImagePath(imagePath);
+    if (!normalizedPath) return null;
     
     // Handle both relative and absolute URLs
-    if (imagePath.startsWith('http')) {
-      return imagePath;
-    } else if (imagePath.startsWith('/')) {
-      return `${IMAGE_URL}${imagePath}`;
+    if (normalizedPath.startsWith('http')) {
+      return normalizedPath;
+    } else if (normalizedPath.startsWith('/')) {
+      return `${IMAGE_URL}${normalizedPath}`;
     } else {
-      return `${IMAGE_URL}/${imagePath}`;
+      return `${IMAGE_URL}/${normalizedPath}`;
     }
   };
 
@@ -405,10 +423,10 @@ const ReadymadeProductList = () => {
         {/* Products Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {sortedProducts.map((product) => {
+            const productImages = getProductImages(product);
             const currentIndex = currentImageIndex[product?._id] || 0;
-            const productImages = product?.images || [];
             const hasMultipleImages = productImages.length > 1;
-            const mainImage = productImages[currentIndex];
+            const mainImage = productImages[currentIndex] || productImages[0] || null;
             const imageUrl = getImageUrl(mainImage);
             const isInCart = isItemInCart(product?._id);
             const cartQuantity = getCartQuantity(product?._id);
@@ -429,6 +447,9 @@ const ReadymadeProductList = () => {
                     <img
                       src={imageUrl}
                       alt={product?.title || 'Product image'}
+                      loading="lazy"
+                      decoding="async"
+                      fetchPriority="low"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       onError={(e) => {
                         e.target.onerror = null;

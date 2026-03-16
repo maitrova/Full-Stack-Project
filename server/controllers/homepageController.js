@@ -12,7 +12,7 @@ export const getEligibleNewArrivals = async (req, res) => {
         .lean(),
 
       ReadymadeProduct.find({ newArrival: true })
-        .select("_id title images price currency newArrival createdAt")
+        .select("_id title images thumbnail price currency newArrival createdAt")
         .sort({ createdAt: -1 })
         .lean(),
     ]);
@@ -31,7 +31,13 @@ export const getEligibleNewArrivals = async (req, res) => {
       type: "readymade",
       _id: x._id,
       title: x.title,
-      previewImage: Array.isArray(x.images) && x.images[0] ? x.images[0] : null,
+      previewImage:
+        x.thumbnail ||
+        (Array.isArray(x.images) && x.images[0]
+          ? typeof x.images[0] === "string"
+            ? x.images[0]
+            : x.images[0]?.url
+          : null),
       price: x.price,
       currency: x.currency || "INR",
       createdAt: x.createdAt,
@@ -136,16 +142,24 @@ export const getHomepageNewArrivals = async (req, res) => {
       }),
 
       ...readymades.map((p) => {
-        const imgs = Array.isArray(p.images) ? p.images.filter(Boolean) : [];
+        const imgs = Array.isArray(p.images)
+          ? p.images
+              .map((img) => (typeof img === "string" ? img : img?.url))
+              .filter(Boolean)
+          : [];
+        const previewImage = p.thumbnail || imgs[0] || null;
+        const previewImages = previewImage
+          ? [previewImage, ...imgs.filter((img) => img !== previewImage)]
+          : imgs;
 
         return {
           type: "readymade",
           _id: p._id,
           title: p.title,
           // keep single (optional)
-          previewImage: imgs[0] || null,
+          previewImage,
           // ✅ new array (all up to 4)
-          previewImages: imgs, // <-- all images
+          previewImages,
           price: p.price ?? 0,
           currency: p.currency || "INR",
           createdAt: p.createdAt,
@@ -173,7 +187,7 @@ export const getEligibleBestSellers = async (req, res) => {
         .lean(),
 
       ReadymadeProduct.find({ bestSeller: true })
-        .select("_id title images price currency bestSeller createdAt")
+        .select("_id title images thumbnail price currency bestSeller createdAt")
         .sort({ createdAt: -1 })
         .lean(),
     ]);
@@ -192,7 +206,13 @@ export const getEligibleBestSellers = async (req, res) => {
       type: "readymade",
       _id: x._id,
       title: x.title,
-      previewImage: Array.isArray(x.images) && x.images[0] ? x.images[0] : null,
+      previewImage:
+        x.thumbnail ||
+        (Array.isArray(x.images) && x.images[0]
+          ? typeof x.images[0] === "string"
+            ? x.images[0]
+            : x.images[0]?.url
+          : null),
       price: x.price,
       currency: x.currency || "INR",
       createdAt: x.createdAt,
@@ -286,14 +306,22 @@ export const getHomepageBestSellers = async (req, res) => {
       }),
 
       ...readymades.map((p) => {
-        const imgs = Array.isArray(p.images) ? p.images.filter(Boolean) : [];
+        const imgs = Array.isArray(p.images)
+          ? p.images
+              .map((img) => (typeof img === "string" ? img : img?.url))
+              .filter(Boolean)
+          : [];
+        const previewImage = p.thumbnail || imgs[0] || null;
+        const previewImages = previewImage
+          ? [previewImage, ...imgs.filter((img) => img !== previewImage)]
+          : imgs;
 
         return {
           type: "readymade",
           _id: p._id,
           title: p.title,
-          previewImage: imgs[0] || null,
-          previewImages: imgs,
+          previewImage,
+          previewImages,
           price: p.price ?? 0,
           currency: p.currency || "INR",
           createdAt: p.createdAt,
