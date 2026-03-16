@@ -8,9 +8,29 @@ import {
   redeemCouponForOrder,
   validateCouponForCart,
 } from "../services/couponService.js";
+import { getReadymadePricing } from "../utils/readymadePricing.js";
 
 const toPaise = (rupees) => Math.round(Number(rupees) * 100);
 const getRefId = (value) => value?._id || value || null;
+
+const refreshCartItemPricing = (item) => {
+  if (item.kind !== "READYMADE" || !item.readymadeProduct) {
+    return item;
+  }
+
+  const selectedSize = String(item.size || "").trim().toUpperCase();
+  const variant = Array.isArray(item.readymadeProduct.variants)
+    ? item.readymadeProduct.variants.find(
+        (entry) => String(entry.size).toUpperCase() === selectedSize
+      )
+    : null;
+  const pricing = getReadymadePricing(item.readymadeProduct, { variant });
+
+  item.unitPrice = pricing.effectivePrice;
+  item.basePrice = pricing.mrp;
+  item.priceDetails = pricing;
+  return item;
+};
 
 export const createRazorpayOrderFromCart = async (req, res) => {
   try {
@@ -34,6 +54,8 @@ export const createRazorpayOrderFromCart = async (req, res) => {
     if (!cart || cart.items.length === 0) {
       return res.status(400).json({ message: "Cart is empty" });
     }
+
+    cart.items = cart.items.map((item) => refreshCartItemPricing(item));
 
     const delivery = await Address.findOne({ user: userId, type: "delivery" });
     const billing = await Address.findOne({ user: userId, type: "billing" });
@@ -73,6 +95,7 @@ export const createRazorpayOrderFromCart = async (req, res) => {
         size: item.size,
         qty: item.qty,
         unitPrice: item.unitPrice,
+        basePrice: item.basePrice,
         currency: item.currency || "INR",
         previewImage: item.previewImage,
         signature: item.signature,

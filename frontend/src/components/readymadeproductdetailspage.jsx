@@ -465,9 +465,13 @@ export default function ProductDetailPage() {
       const activeVariant = selectedVariant || null;
 
       const resolvedPrice =
-        activeVariant?.price !== undefined && activeVariant?.price !== null
-          ? Number(activeVariant.price)
-          : Number(itemData.price || 0);
+        activeVariant?.effectivePrice !== undefined && activeVariant?.effectivePrice !== null
+          ? Number(activeVariant.effectivePrice)
+          : Number((itemData.effectivePrice ?? itemData.price) || 0);
+      const resolvedOriginalPrice =
+        activeVariant?.mrp !== undefined && activeVariant?.mrp !== null
+          ? Number(activeVariant.mrp)
+          : Number((itemData.mrp ?? itemData.price) || 0);
 
       const resolvedStock =
         activeVariant?.stock !== undefined && activeVariant?.stock !== null
@@ -478,7 +482,10 @@ export default function ProductDetailPage() {
         title: itemData.title,
         description: itemData.description,
         price: resolvedPrice,
-        originalPrice: itemData.originalPrice,
+        originalPrice: resolvedOriginalPrice,
+        saleActive: Boolean(activeVariant?.saleActive ?? itemData.saleActive),
+        saveAmount: Number(activeVariant?.saveAmount ?? itemData.saveAmount ?? 0),
+        discountPercent: Number(activeVariant?.discountPercent ?? itemData.discountPercent ?? 0),
         currency: itemData.currency || 'INR',
         images: Array.isArray(itemData.images) ? itemData.images : [],
         stock: resolvedStock,
@@ -532,6 +539,12 @@ export default function ProductDetailPage() {
   const displayData = getDisplayData();
   const isOutOfStock = displayData?.isOutOfStock || false;
   const images = displayData?.images || [];
+  const offerTagDiscount =
+    displayData?.saleActive &&
+    displayData?.originalPrice &&
+    displayData?.price < displayData?.originalPrice
+      ? Number(displayData.discountPercent || 0)
+      : 0;
 
   const media = [
     ...(itemData?.video
@@ -992,6 +1005,12 @@ export default function ProductDetailPage() {
                       </span>
                     )}
                   </div>
+
+                  {offerTagDiscount > 0 && (
+                    <span className="absolute top-4 right-4 z-10 rounded-full bg-red-600 px-3 py-1.5 text-xs sm:text-sm font-semibold text-white shadow-lg">
+                      {offerTagDiscount}% OFF
+                    </span>
+                  )}
                 </div>
 
                 {/* Media Thumbnails */}
@@ -1129,6 +1148,14 @@ export default function ProductDetailPage() {
                     </span>
                   )}
                 </div>
+                {displayData.saleActive && (
+                  <div className="mt-2 flex items-center gap-2 text-sm">
+                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700">
+                      {displayData.discountPercent}% OFF
+                    </span>
+                    <span className="text-emerald-700">Save {formatPrice(displayData.saveAmount, displayData.currency)}</span>
+                  </div>
+                )}
                 <p className="text-sm text-gray-500 mt-2">Inclusive of all taxes</p>
                 
                 {isInCart && (
@@ -1451,6 +1478,11 @@ export default function ProductDetailPage() {
                   <span className="text-gray-400 line-through ml-2 text-sm">
                     {formatPrice(displayData.originalPrice, displayData.currency)}
                   </span>
+                )}
+                {displayData.saleActive && (
+                  <div className="mt-1 text-xs font-medium text-emerald-700">
+                    Save {formatPrice(displayData.saveAmount, displayData.currency)} • {displayData.discountPercent}% OFF
+                  </div>
                 )}
               </div>
               <div className="flex items-center gap-1">

@@ -1,6 +1,7 @@
 import ReadymadeProduct from "../models/readymadeproducts.js";
 import fs from "fs/promises";
 import path from "path";
+import { attachReadymadePricing } from "../utils/readymadePricing.js";
 
 /* 🔐 Safe file delete */
 const safeDeleteFile = async (filePath) => {
@@ -18,6 +19,52 @@ const safeDeleteFile = async (filePath) => {
   } catch (err) {
     if (err.code !== "ENOENT") throw err;
   }
+};
+
+const parseOptionalNumber = (value) => {
+  if (Array.isArray(value)) {
+    value = value[0];
+  }
+  if (value === undefined || value === null) return null;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (
+      normalized === "" ||
+      normalized === "null" ||
+      normalized === "undefined" ||
+      normalized === "nan"
+    ) {
+      return null;
+    }
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    throw new Error("Invalid numeric value");
+  }
+  return numeric;
+};
+
+const parseOptionalDate = (value) => {
+  if (Array.isArray(value)) {
+    value = value[0];
+  }
+  if (value === undefined || value === null) return null;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (
+      normalized === "" ||
+      normalized === "null" ||
+      normalized === "undefined" ||
+      normalized === "nan"
+    ) {
+      return null;
+    }
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("Invalid date value");
+  }
+  return date;
 };
 
 /* ==================== PUBLIC CONTROLLERS ==================== */
@@ -44,7 +91,7 @@ export const getAllReadymadeProducts = async (req, res) => {
     
     res.status(200).json({
       success: true,
-      data: products,
+      data: products.map((product) => attachReadymadePricing(product.toObject())),
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -83,7 +130,7 @@ export const getAllReadymadeProductsPublic = async (req, res) => {
       .lean();
 
     // ✅ FLATTEN → keep response unchanged
-    const normalizedProducts = products.map((p) => ({
+    const normalizedProducts = products.map((p) => attachReadymadePricing({
       ...p,
       category:
         typeof p.category === "string"
@@ -143,7 +190,7 @@ export const getReadymadeProductById = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      data: product
+      data: attachReadymadePricing(product)
     });
 
   } catch (error) {
@@ -177,7 +224,7 @@ export const getBestSellerProducts = async (req, res) => {
       .lean();   // important for modifying response
 
     // 🔥 Keep fields unchanged (convert object → string)
-    const formattedProducts = products.map(product => ({
+    const formattedProducts = products.map(product => attachReadymadePricing({
       ...product,
       category: product.category?.name || null,
       subCategory: product.subCategory?.name || null,
@@ -230,7 +277,7 @@ export const getNewArrivalProducts = async (req, res) => {
       .lean();   // Important for modifying response
 
     // 🔥 Keep fields unchanged (convert populated object → string)
-    const formattedProducts = products.map(product => ({
+    const formattedProducts = products.map(product => attachReadymadePricing({
       ...product,
       category: product.category?.name || null,
       subCategory: product.subCategory?.name || null,
@@ -284,7 +331,7 @@ export const getProductsByCategory = async (req, res) => {
     
     res.status(200).json({
       success: true,
-      data: products,
+      data: products.map((product) => attachReadymadePricing(product.toObject())),
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -323,7 +370,7 @@ export const getProductsBySubCategory = async (req, res) => {
     
     res.status(200).json({
       success: true,
-      data: products,
+      data: products.map((product) => attachReadymadePricing(product.toObject())),
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -389,7 +436,7 @@ export const searchProducts = async (req, res) => {
     
     res.status(200).json({
       success: true,
-      data: products,
+      data: products.map((product) => attachReadymadePricing(product.toObject())),
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -447,11 +494,11 @@ export const getFilteredProducts = async (req, res) => {
     const formattedProducts = products.map(product => {
       const obj = product.toObject();
 
-      return {
+      return attachReadymadePricing({
         ...obj,
         category: obj.category?.name || obj.category,
         subCategory: obj.subCategory?.name || obj.subCategory,
-      };
+      });
     });
 
     res.status(200).json({
@@ -534,6 +581,9 @@ export const createReadymadeProduct = async (req, res) => {
       bestSeller,
       newArrival,
       variants,
+      salePrice,
+      saleStartAt,
+      saleEndAt,
       thumbnail: thumbnailFromBody,
       imageAltTexts, // ✅ correct field
     } = req.body;
@@ -630,6 +680,10 @@ export const createReadymadeProduct = async (req, res) => {
       ...normalizedVariants.map((v) => v.price)
     );
 
+    const parsedSalePrice = parseOptionalNumber(salePrice);
+    const parsedSaleStartAt = parseOptionalDate(saleStartAt);
+    const parsedSaleEndAt = parseOptionalDate(saleEndAt);
+
     const product = await ReadymadeProduct.create({
       title,
       description,
@@ -642,6 +696,9 @@ export const createReadymadeProduct = async (req, res) => {
       brand,
 
       variants: normalizedVariants,
+      salePrice: parsedSalePrice,
+      saleStartAt: parsedSaleStartAt,
+      saleEndAt: parsedSaleEndAt,
 
       isActive: isActive === "true",
       bestSeller: bestSeller === "true",
@@ -655,7 +712,7 @@ export const createReadymadeProduct = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      data: product,
+      data: attachReadymadePricing(product.toObject()),
     });
   } catch (err) {
     res.status(500).json({
@@ -693,6 +750,9 @@ export const updateReadymadeProduct = async (req, res) => {
       bestSeller,
       newArrival,
       variants,
+      salePrice,
+      saleStartAt,
+      saleEndAt,
       thumbnail: thumbnailFromBody,
       imageAltTexts,
     } = req.body;
@@ -713,6 +773,18 @@ export const updateReadymadeProduct = async (req, res) => {
 
     if (newArrival !== undefined)
       product.newArrival = newArrival === "true";
+
+    if (salePrice !== undefined) {
+      product.salePrice = parseOptionalNumber(salePrice);
+    }
+
+    if (saleStartAt !== undefined) {
+      product.saleStartAt = parseOptionalDate(saleStartAt);
+    }
+
+    if (saleEndAt !== undefined) {
+      product.saleEndAt = parseOptionalDate(saleEndAt);
+    }
 
     // ✅ Parse alt texts
     let parsedAltTexts = [];
@@ -816,7 +888,7 @@ export const updateReadymadeProduct = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: product,
+      data: attachReadymadePricing(product.toObject()),
     });
   } catch (err) {
     res.status(500).json({

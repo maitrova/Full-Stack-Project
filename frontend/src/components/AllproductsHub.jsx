@@ -217,7 +217,7 @@ export default function AllProductsHub() {
   
   // Fetch data on mount
   useEffect(() => {
-    dispatch(fetchCommonSavedData({ page: 1, limit: 100 }));
+    dispatch(fetchCommonSavedData({ page: 1 }));
   }, [dispatch]);
   
   // Update local state when URL changes
@@ -439,7 +439,7 @@ export default function AllProductsHub() {
     if (!imagePath)
       return "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800";
 
-    // ✅ HANDLE OBJECT CASE
+    // HANDLE OBJECT CASE
     if (typeof imagePath === "object") {
       imagePath = imagePath.url;
     }
@@ -1060,7 +1060,7 @@ export default function AllProductsHub() {
             
             {/* Products Grid OR Category Tiles OR Subcategory Tiles */}
             {showCategoryTiles ? (
-              // ✅ Category tiles view (similar to subcategory tiles design)
+              // Category tiles view (similar to subcategory tiles design)
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-gray-900">
@@ -1135,7 +1135,7 @@ export default function AllProductsHub() {
                 )}
               </div>
             ) : showSubCategoryTiles ? (
-              // ✅ Subcategory tiles view
+              // Subcategory tiles view
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-gray-900">
@@ -1210,7 +1210,7 @@ export default function AllProductsHub() {
                 )}
               </div>
             ) : (
-              // ✅ Products view (your existing product list)
+              // Products view (your existing product list)
               filteredProducts.length === 0 ? (
                 <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
                   <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -1231,25 +1231,26 @@ export default function AllProductsHub() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {filteredProducts.map((product) => {
                     const isInCart = getCartQuantityForCommon(product) > 0;
-                    const isAdding = addingToCartId === product._id;
-
+                    const currentPrice =
+                      product.type === "readymade"
+                        ? Number(product.raw?.effectivePrice ?? product.price ?? 0)
+                        : Number(product.price || 0);
+                    const originalPrice =
+                      product.type === "readymade"
+                        ? Number(product.raw?.mrp ?? product.raw?.originalPrice ?? product.price ?? 0)
+                        : 0;
                     const discountPercent =
-                      product.type === "readymade" &&
-                      product.raw?.originalPrice &&
-                      product.raw.originalPrice > (product.price || 0)
-                        ? Math.round(
-                            ((product.raw.originalPrice - (product.price || 0)) /
-                              product.raw.originalPrice) *
-                              100
-                          )
+                      product.type === "readymade" && originalPrice > currentPrice
+                        ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100)
                         : 0;
 
+                    const displayPrice = product.type === "readymade" ? currentPrice : Number(product.price || 0);
+                    const displayOriginalPrice = product.type === "readymade" ? originalPrice : 0;
                     return (
                       <div
                         key={product._id}
                         className="group bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden"
                       >
-                        {/* ===== Premium Square Image Block ===== */}
                         <Link
                           to={
                             product.type === "readymade"
@@ -1259,7 +1260,7 @@ export default function AllProductsHub() {
                           className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
                         >
                           <div className="relative aspect-square bg-white flex items-center justify-center overflow-hidden rounded-t-xl">
-                          <img
+                            <img
                               src={getImageUrl(
                                 product.previewImage ||
                                 product.raw?.images?.[0]
@@ -1275,10 +1276,8 @@ export default function AllProductsHub() {
                               className="max-h-[85%] max-w-[85%] object-contain"
                             />
 
-                            {/* subtle border like ecommerce */}
                             <div className="absolute inset-0 ring-1 ring-gray-200" />
 
-                            {/* ===== Badges ===== */}
                             <div className="absolute top-2 left-2 flex flex-col gap-2 z-10">
                               {product.bestSeller && (
                                 <span className="px-2 py-1 text-[11px] font-semibold bg-orange-500 text-white rounded-md">
@@ -1299,7 +1298,12 @@ export default function AllProductsHub() {
                               )}
                             </div>
 
-                            {/* Eco Friendly badge bottom */}
+                            {discountPercent > 0 && (
+                              <span className="absolute top-2 right-2 z-10 rounded-md bg-red-600 px-2 py-1 text-[11px] font-semibold text-white shadow-sm">
+                                {discountPercent}% OFF
+                              </span>
+                            )}
+
                             {product.ecoFriendly && (
                               <span className="absolute bottom-2 right-2 px-2 py-1 text-[11px] font-medium bg-green-100 text-green-700 rounded-md">
                                 🌿 Eco-friendly
@@ -1307,7 +1311,6 @@ export default function AllProductsHub() {
                             )}
                           </div>
                         </Link>
-                        {/* Product Info */}
                         <div className="p-3">
                           <div className="mb-2">
                             <p className="text-xs text-gray-500 mb-1">
@@ -1318,27 +1321,30 @@ export default function AllProductsHub() {
                             </h3>
                           </div>
 
-                          {/* Price and Action */}
                           <div className="flex items-center justify-between">
                             <div>
                               <div className="flex items-baseline gap-1">
                                 <span className="text-sm font-semibold text-gray-900">
-                                  ₹{(product.price || 0).toLocaleString()}
+                                  ₹{displayPrice.toLocaleString()}
                                 </span>
 
                                 {discountPercent > 0 && (
                                   <span className="text-xs text-gray-400 line-through">
-                                    ₹{product.raw?.originalPrice?.toLocaleString()}
+                                    ₹{displayOriginalPrice.toLocaleString()}
                                   </span>
                                 )}
                               </div>
-                              <p className="text-[10px] text-gray-500 mt-0.5">
+                              {discountPercent > 0 && (
+                                <p className="text-[10px] font-medium text-emerald-700 mt-0.5">
+                                  {discountPercent}% OFF
+                                </p>
+                              )}
+                              {/* <p className="text-[10px] text-gray-500 mt-0.5">
                                 incl. taxes
-                              </p>
+                              </p> */}
                             </div>
                           </div>
 
-                          {/* View Details Link */}
                           <div className="mt-3">
                             <Link
                               to={

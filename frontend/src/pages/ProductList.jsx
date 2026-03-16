@@ -373,22 +373,28 @@ export default function UnifiedProductHub() {
     const images = [];
     
     if (!product) return images;
+
+    const preferredPreview =
+      product.thumbnail ||
+      product.previewImage ||
+      null;
+
+    if (preferredPreview) {
+      const previewUrl = getImageUrl(preferredPreview);
+      if (previewUrl !== DEFAULT_PRODUCT_IMAGE && !images.includes(previewUrl)) {
+        images.push(previewUrl);
+      }
+    }
     
     // Add images from images array
     if (product.images && Array.isArray(product.images)) {
       product.images.forEach(img => {
-        const imgUrl = getImageUrl(img);
+        const rawImagePath = typeof img === "object" ? img.url : img;
+        const imgUrl = getImageUrl(rawImagePath);
         if (imgUrl !== DEFAULT_PRODUCT_IMAGE && !images.includes(imgUrl)) {
           images.push(imgUrl);
         }
       });
-    }
-    
-    if (product.previewImage) {
-      const imgUrl = getImageUrl(product.previewImage);
-      if (imgUrl !== DEFAULT_PRODUCT_IMAGE && !images.includes(imgUrl)) {
-        images.push(imgUrl);
-      }
     }
     
     if (images.length === 0) {
@@ -446,7 +452,7 @@ export default function UnifiedProductHub() {
       }
     } else if (activeProductType === 'all') {
       console.log("Fetching common saved data");
-      dispatch(fetchCommonSavedData({ page: 1, limit: 100 }));
+      dispatch(fetchCommonSavedData({ page: 1 }));
     }
     
     if (isFirstLoad) {
@@ -1092,6 +1098,10 @@ export default function UnifiedProductHub() {
     const type = isCustom ? "custom" : product.type || "common";
 
     const basePrice = getProductPrice(product, activeProductType);
+    const originalPrice =
+      !isCustom && type === "readymade"
+        ? Number(product.raw?.originalPrice || product.raw?.mrp || 0)
+        : 0;
     const name = product.title || product.name || product.productName || "Unnamed Product";
     const description = product.description || "";
     const category = product.category || "";
@@ -1162,6 +1172,12 @@ export default function UnifiedProductHub() {
             )}
           </div>
 
+          {discountPercent > 0 && (
+            <span className="absolute top-2 right-2 z-10 rounded bg-red-600 px-2 py-1 text-[10px] font-semibold text-white tracking-wide shadow-sm">
+              {discountPercent}% OFF
+            </span>
+          )}
+
           {/* Loader */}
           {isLoadingImage && (
             <div className="absolute inset-0 flex items-center justify-center">
@@ -1181,6 +1197,8 @@ export default function UnifiedProductHub() {
                 onLoad={() => handleImageLoad(product._id)}
                 onError={() => handleImageError(product._id)}
                 loading="lazy"
+                decoding="async"
+                fetchPriority="low"
               />
 
               {/* Arrows */}
@@ -1279,8 +1297,7 @@ export default function UnifiedProductHub() {
 
                 {!isCustom &&
                   type === "readymade" &&
-                  product.raw?.originalPrice &&
-                  product.raw.originalPrice > basePrice && (
+                  originalPrice > basePrice && (
                     <span className="text-xs text-gray-400 line-through">
                       ₹{product.raw.originalPrice.toLocaleString()}
                     </span>

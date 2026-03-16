@@ -88,6 +88,9 @@ const ProductFormModal = ({
   category: '',
   subCategory: '',
   brand: '',
+  salePrice: '',
+  saleStartAt: '',
+  saleEndAt: '',
   isActive: true,
   bestSeller: false,
   newArrival: false,
@@ -266,6 +269,9 @@ const ProductFormModal = ({
       category: resolveReferenceId(product.category, categories),
       subCategory: resolveReferenceId(product.subCategory, subCategories),
       brand: resolveReferenceId(product.brand, brands),
+      salePrice: product.productSalePrice?.toString() || product.salePrice?.toString() || '',
+      saleStartAt: product.saleStartAt ? new Date(product.saleStartAt).toISOString().slice(0, 16) : '',
+      saleEndAt: product.saleEndAt ? new Date(product.saleEndAt).toISOString().slice(0, 16) : '',
       isActive: product.isActive ?? true,
       bestSeller: product.bestSeller || false,
       newArrival: product.newArrival || false,
@@ -359,6 +365,9 @@ const ProductFormModal = ({
       category: '',
       subCategory: '',
       brand: '',
+      salePrice: '',
+      saleStartAt: '',
+      saleEndAt: '',
       isActive: true,
       bestSeller: false,
       newArrival: false,
@@ -507,6 +516,21 @@ const removeSizeChart = () => {
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: null }));
     }
+  };
+
+  const handleClearOffer = () => {
+    setFormData((prev) => ({
+      ...prev,
+      salePrice: '',
+      saleStartAt: '',
+      saleEndAt: '',
+    }));
+    setErrors((prev) => ({
+      ...prev,
+      salePrice: null,
+      saleStartAt: null,
+      saleEndAt: null,
+    }));
   };
 
   // Handle variant changes
@@ -1510,6 +1534,29 @@ const validateForm = () => {
     newErrors.category = "Category is required";
   }
 
+  if (formData.salePrice !== "") {
+    const minVariantPrice = Math.min(
+      ...variants
+        .map((variant) => Number(variant.price))
+        .filter((price) => Number.isFinite(price) && price > 0)
+    );
+    const salePrice = Number(formData.salePrice);
+
+    if (!Number.isFinite(salePrice) || salePrice <= 0) {
+      newErrors.salePrice = "Offer price must be greater than 0";
+    } else if (Number.isFinite(minVariantPrice) && salePrice >= minVariantPrice) {
+      newErrors.salePrice = "Offer price must be lower than the lowest MRP";
+    }
+  }
+
+  if (formData.saleStartAt && formData.saleEndAt) {
+    const start = new Date(formData.saleStartAt);
+    const end = new Date(formData.saleEndAt);
+    if (start >= end) {
+      newErrors.saleEndAt = "Offer end date must be after start date";
+    }
+  }
+
   // Keep your existing variant validation below this
   const variantErrors = [];
   const usedSizes = new Set();
@@ -1574,6 +1621,15 @@ const validateForm = () => {
       data.append('price', overallPrice);
       data.append('stock', totalStock);
       data.append('variants', JSON.stringify(normalizedVariants));
+      if (String(formData.salePrice || '').trim() !== '') {
+        data.append('salePrice', formData.salePrice);
+      }
+      if (String(formData.saleStartAt || '').trim() !== '') {
+        data.append('saleStartAt', formData.saleStartAt);
+      }
+      if (String(formData.saleEndAt || '').trim() !== '') {
+        data.append('saleEndAt', formData.saleEndAt);
+      }
       
       images.forEach((img) => {
         data.append("images", img.file);
@@ -2806,6 +2862,85 @@ const validateForm = () => {
     </p>
   )}
           </div>
+
+            <div className="border rounded-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                    <Tag className="w-5 h-5 mr-2 text-emerald-600" />
+                    Strike-through Pricing
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Offer pricing is applied proportionally across size variants.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleClearOffer}
+                  disabled={loading}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-60"
+                >
+                  Clear Offer
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Offer Price (Rs.)
+                  </label>
+                  <input
+                    type="number"
+                    name="salePrice"
+                    value={formData.salePrice}
+                    onChange={handleInputChange}
+                    step="0.01"
+                    min="0"
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      errors.salePrice ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="Optional offer price"
+                    disabled={loading}
+                  />
+                  {errors.salePrice ? <p className="mt-1 text-sm text-red-600">{errors.salePrice}</p> : null}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Offer Start
+                  </label>
+                  <input
+                    type="datetime-local"
+                    name="saleStartAt"
+                    value={formData.saleStartAt}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Offer End
+                  </label>
+                  <input
+                    type="datetime-local"
+                    name="saleEndAt"
+                    value={formData.saleEndAt}
+                    onChange={handleInputChange}
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      errors.saleEndAt ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    disabled={loading}
+                  />
+                  {errors.saleEndAt ? <p className="mt-1 text-sm text-red-600">{errors.saleEndAt}</p> : null}
+                </div>
+              </div>
+
+              <p className="mt-4 text-xs text-gray-500">
+                MRP is derived from the lowest size price below. Customers are charged the effective offer price at checkout.
+              </p>
+            </div>
 
             {/* Variants Section */}
             <div className="border rounded-lg p-6">

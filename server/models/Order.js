@@ -16,6 +16,7 @@ const orderItemSchema = new mongoose.Schema(
     size: String,
     qty: Number,
     unitPrice: Number,
+    basePrice: Number,
     currency: { type: String, default: "INR" },
     previewImage: String,
     signature: String,

@@ -5,10 +5,15 @@ import axios from 'axios';
 // Async thunk for fetching common saved data
 export const fetchCommonSavedData = createAsyncThunk(
   'commonSavedData/fetchCommonSavedData',
-  async ({ page = 1, limit = 50 } = {}, { rejectWithValue }) => {
+  async ({ page = 1, limit } = {}, { rejectWithValue }) => {
     try {
+      const params = { page };
+      if (limit !== undefined && limit !== null) {
+        params.limit = limit;
+      }
+
       const response = await axios.get(`${import.meta.env.VITE_API_URL}/savedata/common`, {
-        params: { page, limit }
+        params
       });
       return response.data;
     } catch (error) {
@@ -35,7 +40,7 @@ export const fetchMoreCommonSavedData = createAsyncThunk(
 const initialState = {
   items: [],
   page: 1,
-  limit: 50,
+  limit: null,
   total: 0,
   returned: 0,
   loading: false,

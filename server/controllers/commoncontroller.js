@@ -1,5 +1,6 @@
 import { Design } from "../models/Design.js";
 import ReadymadeProduct from "../models/readymadeproducts.js";
+import { attachReadymadePricing } from "../utils/readymadePricing.js";
 
 /**
  * GET /api/catalog
@@ -23,13 +24,20 @@ import ReadymadeProduct from "../models/readymadeproducts.js";
 
 export const getCommonSavedData = async (req, res) => {
   try {
-    // Safe pagination
-    const page = Math.max(parseInt(req.query.page || "1", 10), 1);
-    const limit = Math.min(
-      Math.max(parseInt(req.query.limit || "50", 10), 1),
-      200
-    );
-    const skip = (page - 1) * limit;
+    const hasLimit =
+      req.query.limit !== undefined &&
+      req.query.limit !== null &&
+      `${req.query.limit}`.trim() !== "";
+
+    const parsedPage = parseInt(req.query.page || "1", 10);
+    const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+
+    const parsedLimit = hasLimit ? parseInt(req.query.limit, 10) : null;
+    const limit =
+      hasLimit && Number.isFinite(parsedLimit) && parsedLimit > 0
+        ? parsedLimit
+        : null;
+    const skip = limit ? (page - 1) * limit : 0;
 
     // Fetch data
     const [designs, readymades] = await Promise.all([
@@ -40,7 +48,7 @@ export const getCommonSavedData = async (req, res) => {
       ReadymadeProduct.find({})
         .populate("category", "name thumbnail")
         .populate("subCategory", "name thumbnail")
-        .populate("brand", "name") // ✅ POPULATE BRAND NAME ONLY
+        .populate("brand", "name") // POPULATE BRAND NAME ONLY
         .sort({ createdAt: -1 })
         .lean(),
     ]);
@@ -67,49 +75,51 @@ export const getCommonSavedData = async (req, res) => {
 
     // Normalize readymade products
     const normalizedReadymades = readymades.map((p) => {
+      const pricedProduct = attachReadymadePricing({ ...p });
       const category =
-        typeof p.category === "string"
-          ? p.category
-          : p.category?.name || "";
+        typeof pricedProduct.category === "string"
+          ? pricedProduct.category
+          : pricedProduct.category?.name || "";
 
       const categoryThumbnail =
-        typeof p.category === "object"
-          ? p.category?.thumbnail || null
+        typeof pricedProduct.category === "object"
+          ? pricedProduct.category?.thumbnail || null
           : null;
 
       const subCategory =
-        typeof p.subCategory === "string"
-          ? p.subCategory
-          : p.subCategory?.name || "";
+        typeof pricedProduct.subCategory === "string"
+          ? pricedProduct.subCategory
+          : pricedProduct.subCategory?.name || "";
 
       const subCategoryThumbnail =
-        typeof p.subCategory === "object"
-          ? p.subCategory?.thumbnail || null
+        typeof pricedProduct.subCategory === "object"
+          ? pricedProduct.subCategory?.thumbnail || null
           : null;
 
       const brand =
-        typeof p.brand === "string"
-          ? p.brand
-          : p.brand?.name || ""; // ✅ BRAND NAME ONLY
+        typeof pricedProduct.brand === "string"
+          ? pricedProduct.brand
+          : p.brand?.name || "";
 
       return {
         type: "readymade",
-        _id: p._id,
-        title: p.title || "",
-        description: p.description || "",
-        previewImage: p.images?.[0] || null,
+        _id: pricedProduct._id,
+        title: pricedProduct.title || "",
+        description: pricedProduct.description || "",
+        previewImage: pricedProduct.thumbnail || pricedProduct.images?.[0] || null,
+        thumbnail: pricedProduct.thumbnail || pricedProduct.images?.[0] || null,
 
         category,
         categoryThumbnail,
         subCategory,
         subCategoryThumbnail,
-        brand, // ✅ Clean brand name
+        brand, // Clean brand name
 
-        stock: p.stock ?? 0,
-        price: p.price ?? 0,
-        currency: p.currency || "INR",
-        createdAt: p.createdAt,
-        raw: p,
+        stock: pricedProduct.stock ?? 0,
+        price: pricedProduct.effectivePrice ?? pricedProduct.price ?? 0,
+        currency: pricedProduct.currency || "INR",
+        createdAt: pricedProduct.createdAt,
+        raw: pricedProduct,
       };
     });
 
@@ -120,17 +130,17 @@ export const getCommonSavedData = async (req, res) => {
         new Date(a.createdAt || 0).getTime()
     );
 
-    // Apply pagination AFTER merge
+    // Apply pagination only when a limit is explicitly requested.
     const total = merged.length;
-    const paged = merged.slice(skip, skip + limit);
+    const items = limit ? merged.slice(skip, skip + limit) : merged;
 
     return res.json({
       success: true,
       page,
-      limit,
+      limit: limit ?? total,
       total,
-      returned: paged.length,
-      items: paged,
+      returned: items.length,
+      items,
     });
   } catch (err) {
     console.error("getCommonSavedData error:", err);
@@ -140,6 +150,3 @@ export const getCommonSavedData = async (req, res) => {
     });
   }
 };
-
-
-

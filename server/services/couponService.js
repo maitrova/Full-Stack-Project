@@ -1,6 +1,7 @@
 import Coupon from "../models/Coupon.js";
 import CouponRedemption from "../models/CouponRedemption.js";
 import Order from "../models/Order.js";
+import { getReadymadePricing } from "../utils/readymadePricing.js";
 
 const normalizeCode = (value) => String(value || "").trim().toUpperCase();
 
@@ -56,16 +57,32 @@ const getItemSubCategoryIds = (item) => {
 };
 
 export const buildCartPricingContext = (cart) => {
-  const subtotal = (cart?.items || []).reduce(
-    (sum, item) => sum + Number(item.unitPrice || 0) * Number(item.qty || 0),
-    0
-  );
+  let subtotal = 0;
 
   const categoryIdSet = new Set();
   const subCategoryIdSet = new Set();
   const productIdSet = new Set();
+  let saleItemCount = 0;
 
   for (const item of cart?.items || []) {
+    let effectiveUnitPrice = Number(item.unitPrice || 0);
+
+    if (item.kind === "READYMADE" && item.readymadeProduct) {
+      const selectedSize = String(item.size || "").trim().toUpperCase();
+      const variant = Array.isArray(item.readymadeProduct.variants)
+        ? item.readymadeProduct.variants.find(
+            (entry) => String(entry.size).toUpperCase() === selectedSize
+          )
+        : null;
+      const pricing = getReadymadePricing(item.readymadeProduct, { variant });
+      effectiveUnitPrice = pricing.effectivePrice;
+      if (pricing.saleActive) {
+        saleItemCount += Number(item.qty || 0);
+      }
+    }
+
+    subtotal += effectiveUnitPrice * Number(item.qty || 0);
+
     for (const categoryId of getItemCategoryIds(item)) {
       categoryIdSet.add(categoryId);
     }
@@ -82,6 +99,7 @@ export const buildCartPricingContext = (cart) => {
     categoryIdSet,
     subCategoryIdSet,
     productIdSet,
+    saleItemCount,
     itemCount: cart?.items?.length || 0,
   };
 };
@@ -131,6 +149,10 @@ export const validateCouponForCart = async ({ couponCode, cart, userId }) => {
   }
 
   const context = buildCartPricingContext(cart);
+
+  if (context.saleItemCount > 0) {
+    return { valid: false, reason: "Coupons cannot be applied to sale items" };
+  }
 
   if (context.subtotal < Number(coupon.minimumCartAmount || 0)) {
     return {

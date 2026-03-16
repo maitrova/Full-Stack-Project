@@ -233,11 +233,17 @@ const AllProducts = ({
                   
                   const totalStock = product.variants?.reduce((sum, v) => sum + (v.stock || 0), 0) || product.stock || 0;
                   const minPrice = product.variants?.length 
-                    ? Math.min(...product.variants.map(v => v.price))
-                    : product.price || 0;
+                    ? Math.min(...product.variants.map(v => v.effectivePrice ?? v.price))
+                    : product.effectivePrice || product.price || 0;
                   const maxPrice = product.variants?.length 
-                    ? Math.max(...product.variants.map(v => v.price))
-                    : product.price || 0;
+                    ? Math.max(...product.variants.map(v => v.effectivePrice ?? v.price))
+                    : product.effectivePrice || product.price || 0;
+                  const minMrp = product.variants?.length
+                    ? Math.min(...product.variants.map(v => v.mrp ?? v.price))
+                    : product.mrp || product.price || 0;
+                  const maxMrp = product.variants?.length
+                    ? Math.max(...product.variants.map(v => v.mrp ?? v.price))
+                    : product.mrp || product.price || 0;
 
                   return (
                     <tr key={product._id} className="hover:bg-gray-50">

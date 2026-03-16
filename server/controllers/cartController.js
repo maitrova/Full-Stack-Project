@@ -5,6 +5,7 @@ import { Design } from "../models/Design.js";
 import { Cart } from "../models/Cart.js";
 
 import Dropproduct from "../models/dropproduct.model.js"; // ✅ NEW
+import { attachReadymadePricing, getReadymadePricing } from "../utils/readymadePricing.js";
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 const getOrCreateActiveCart = async (userId) => {
@@ -42,6 +43,41 @@ const parsePriceDetails = (value) => {
     }
   }
   return null;
+};
+
+const getReadymadeVariantSelection = (product, size) => {
+  const normalizedSize = String(size || "").trim().toUpperCase();
+  const hasVariants = Array.isArray(product?.variants) && product.variants.length > 0;
+
+  if (!hasVariants) {
+    const pricing = getReadymadePricing(product);
+    return {
+      hasVariants: false,
+      variant: null,
+      availableStock: Number(product?.stock || 0),
+      size: normalizedSize || "M",
+      unitPrice: pricing.effectivePrice,
+      basePrice: pricing.mrp,
+      priceDetails: pricing,
+    };
+  }
+
+  const variant = product.variants.find(
+    (entry) => String(entry.size).toUpperCase() === normalizedSize
+  );
+
+  if (!variant) return null;
+
+  const pricing = getReadymadePricing(product, { variant });
+  return {
+    hasVariants: true,
+    variant,
+    availableStock: Number(variant.stock || 0),
+    size: normalizedSize,
+    unitPrice: pricing.effectivePrice,
+    basePrice: pricing.mrp,
+    priceDetails: pricing,
+  };
 };
 
 export const addToCart = async (req, res) => {
@@ -112,19 +148,13 @@ export const addToCart = async (req, res) => {
         return res.status(400).json({ message: "size is required for this product" });
       }
 
-      let unitPrice = Number(product.price || 0);
-      let availableStock = Number(product.stock || 0);
-
-      if (hasVariants) {
-        const variant = product.variants.find(
-          (v) => String(v.size).toUpperCase() === String(normalizedSize).toUpperCase()
-        );
-        if (!variant) {
-          return res.status(400).json({ message: "Selected size is not available" });
-        }
-        unitPrice = Number(variant.price || 0);
-        availableStock = Number(variant.stock || 0);
+      const selection = getReadymadeVariantSelection(product, normalizedSize);
+      if (!selection) {
+        return res.status(400).json({ message: "Selected size is not available" });
       }
+
+      let unitPrice = Number(selection.unitPrice || 0);
+      let availableStock = Number(selection.availableStock || 0);
 
       if (!(unitPrice >= 0)) {
         return res.status(400).json({ message: "Invalid price" });
@@ -133,7 +163,7 @@ export const addToCart = async (req, res) => {
         return res.status(400).json({ message: "Not enough stock" });
       }
 
-      const finalSize = (hasVariants ? normalizedSize : (normalizedSize || "M")).toUpperCase();
+      const finalSize = selection.size;
 
       // ✅ Signature includes source to avoid collisions between models
       signature = `${sourceType}:${product._id.toString()}:SIZE:${finalSize}`;
@@ -147,8 +177,8 @@ export const addToCart = async (req, res) => {
         qty: parsedQty,
         size: finalSize,
         unitPrice,
-        basePrice: unitPrice,
-        priceDetails: null,
+        basePrice: selection.basePrice,
+        priceDetails: sourceType === "READYMADE" ? selection.priceDetails : null,
         currency: product.currency || "INR",
         previewImage: product.images?.[0]?.url || null,
         signature,
@@ -224,24 +254,24 @@ export const addToCart = async (req, res) => {
         }
 
         const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
+        const selection = !isDropItem
+          ? getReadymadeVariantSelection(p, String(cart.items[idx].size || "").trim())
+          : null;
 
-        let availableStock = Number(p.stock || 0);
-
-        if (hasVariants) {
-          const cartSize = String(cart.items[idx].size || "").trim();
-          const variant = p.variants.find(
-            (v) => String(v.size).toUpperCase() === cartSize.toUpperCase()
-          );
-          if (!variant) return res.status(400).json({ message: "Selected size is not available" });
-          availableStock = Number(variant.stock || 0);
-        }
+        let availableStock = isDropItem
+          ? Number(p.stock || 0)
+          : Number(selection?.availableStock || 0);
 
         if (availableStock < nextQty) {
           return res.status(400).json({ message: "Not enough stock" });
         }
 
         // refresh snapshot price as well
-        if (hasVariants) {
+        if (!isDropItem && selection) {
+          cart.items[idx].unitPrice = Number(selection.unitPrice || cart.items[idx].unitPrice);
+          cart.items[idx].basePrice = Number(selection.basePrice || cart.items[idx].basePrice);
+          cart.items[idx].priceDetails = selection.priceDetails;
+        } else if (hasVariants) {
           const cartSize = String(cart.items[idx].size || "").trim();
           const variant = p.variants.find(
             (v) => String(v.size).toUpperCase() === cartSize.toUpperCase()
@@ -255,8 +285,10 @@ export const addToCart = async (req, res) => {
         cart.items[idx].previewImage =
   p.images?.[0]?.url || cart.items[idx].previewImage;
 
-        cart.items[idx].basePrice = cart.items[idx].unitPrice;
-        cart.items[idx].priceDetails = null;
+        if (isDropItem) {
+          cart.items[idx].basePrice = cart.items[idx].unitPrice;
+          cart.items[idx].priceDetails = null;
+        }
       }
 
       cart.items[idx].qty = nextQty;
@@ -320,7 +352,7 @@ export const getCart = async (req, res) => {
 
       if (it.readymadeProduct) {
         updatedItem.readymadeProduct = {
-          ...it.readymadeProduct,
+          ...attachReadymadePricing({ ...it.readymadeProduct }),
 
           category:
             it.readymadeProduct.category?.name ||
@@ -334,6 +366,16 @@ export const getCart = async (req, res) => {
             it.readymadeProduct.brand?.name ||
             it.readymadeProduct.brand,
         };
+
+        if (!Array.isArray(it.readymadeProduct.variants) || it.readymadeProduct.variants.length === 0) {
+          const pricing = getReadymadePricing(it.readymadeProduct);
+          updatedItem.unitPrice = Number(pricing.effectivePrice || updatedItem.unitPrice || 0);
+          updatedItem.basePrice = Number(pricing.mrp || updatedItem.basePrice || updatedItem.unitPrice || 0);
+          updatedItem.priceDetails = {
+            ...(updatedItem.priceDetails || {}),
+            ...pricing,
+          };
+        }
       }
 
       if (
@@ -347,6 +389,14 @@ export const getCart = async (req, res) => {
         );
 
         updatedItem.activeVariant = v || null;
+        if (updatedItem.activeVariant) {
+          updatedItem.unitPrice = Number(updatedItem.activeVariant.effectivePrice || updatedItem.unitPrice || 0);
+          updatedItem.basePrice = Number(updatedItem.activeVariant.mrp || updatedItem.basePrice || updatedItem.unitPrice || 0);
+          updatedItem.priceDetails = {
+            ...(updatedItem.priceDetails || {}),
+            ...getReadymadePricing(it.readymadeProduct, { variant: v }),
+          };
+        }
       }
 
       return updatedItem;
@@ -420,23 +470,13 @@ export const updateCartItemQty = async (req, res) => {
           return res.status(404).json({ message: "Drop product not found or inactive" });
         }
 
-        const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
-
-        let availableStock = Number(p.stock || p.totalStock || 0);
-        let unitPrice = Number(p.price || 0);
-
-        if (hasVariants) {
-          const variant = p.variants.find(
-            (v) => String(v.size || "").toUpperCase() === cartSize
-          );
-
-          if (!variant) {
-            return res.status(400).json({ message: "Selected size is not available" });
-          }
-
-          availableStock = Number(variant.stock || 0);
-          unitPrice = Number(variant.price || 0);
+        const selection = getReadymadeVariantSelection(p, cartSize);
+        if (!selection) {
+          return res.status(400).json({ message: "Selected size is not available" });
         }
+
+        const availableStock = Number(selection.availableStock || 0);
+        const unitPrice = Number(selection.unitPrice || 0);
 
         if (availableStock < parsedQty) {
           return res.status(400).json({ message: "Not enough stock" });
@@ -447,8 +487,8 @@ export const updateCartItemQty = async (req, res) => {
         item.currency = p.currency || "INR";
         item.previewImage = p.images?.[0]?.url || null;
 
-        item.basePrice = unitPrice;
-        item.priceDetails = null;
+        item.basePrice = selection.basePrice;
+        item.priceDetails = selection.priceDetails;
 
         // ensure ids are consistent
         item.size = cartSize;

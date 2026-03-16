@@ -58,7 +58,18 @@ app.use(cors({ origin: [
 
 // Static files - serve at both /outputs and /api/outputs
 // app.use("/outputs", express.static(path.join(__dirname, "outputs")));
-app.use("/api/outputs", express.static(path.join(__dirname, "outputs")));
+app.use(
+  "/api/outputs",
+  express.static(path.join(__dirname, "outputs"), {
+    maxAge: "30d",
+    etag: true,
+    setHeaders: (res, filePath) => {
+      if (/\.(avif|webp|png|jpe?g|gif|svg|mp4|webm)$/i.test(filePath)) {
+        res.setHeader("Cache-Control", "public, max-age=2592000, immutable");
+      }
+    },
+  })
+);
 
 // Health check endpoint for Kubernetes
 app.get('/health', (req, res) => {

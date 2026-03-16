@@ -301,20 +301,20 @@ const Header = () => {
 
   // Simplified top banner without social media
   const TopBanner = () => (
-    <div className="bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 py-2 px-4">
+    <div className="border-b border-slate-200 bg-slate-50 py-2 px-4">
       <div className="container mx-auto">
         <div className="text-center text-sm">
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-            <span className="flex items-center text-blue-600 whitespace-nowrap">
+            <span className="flex items-center whitespace-nowrap font-medium text-slate-700">
               <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
               </svg>
               Free Shipping Nationwide
             </span>
             <span className="text-gray-400 hidden sm:inline">•</span>
-            <span className="text-purple-600 whitespace-nowrap">Custom Designs in 48 Hours</span>
+            <span className="whitespace-nowrap text-slate-600">Custom Designs in 48 Hours</span>
             <span className="text-gray-400 hidden lg:inline">•</span>
-            <span className="text-pink-600 whitespace-nowrap hidden lg:inline">Premium Quality Guaranteed</span>
+            <span className="hidden whitespace-nowrap text-slate-600 lg:inline">Premium Quality Guaranteed</span>
           </div>
         </div>
       </div>
@@ -322,23 +322,23 @@ const Header = () => {
   );
 
   return (
-    <header className="bg-white/95 backdrop-blur-md border-b border-gray-200/80 sticky top-0 z-50 shadow-sm">
+    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-md shadow-sm">
       {/* Top banner */}
       <TopBanner />
       
       {/* Main header */}
       <div className="container mx-auto px-4 py-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-[0_16px_40px_-28px_rgba(15,23,42,0.28)] md:px-5">
           {/* Left side - Logo & Mobile Menu */}
           <div className="flex items-center space-x-6">
             {/* Mobile Menu Button */}
             <button
-              className={`md:hidden p-3 rounded-xl border border-gray-200 ${hoverEffects.glow}`}
+              className={`md:hidden p-3 rounded-xl border border-slate-200 bg-slate-50 ${hoverEffects.glow}`}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
               <svg 
                 xmlns="http://www.w3.org/2000/svg" 
-                className="h-5 w-5 text-gray-700"
+                className="h-5 w-5 text-slate-700"
                 fill="none" 
                 viewBox="0 0 24 24" 
                 stroke="currentColor"
@@ -351,14 +351,27 @@ const Header = () => {
               </svg>
             </button>
             
-            {/* Logo */}
+            {/* Logo - Updated with image from public folder */}
             <Link to="/" className={`relative ${hoverEffects.lift}`}>
               <div className="relative overflow-hidden">
-                <div className="w-40 h-12 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center text-white font-bold text-xl rounded-xl shadow-lg hover:shadow-xl transition-all duration-500">
-                  <span className="relative z-10">MAITROVA</span>
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+                <div className="flex h-12 w-40 items-center justify-center rounded-xl bg-white shadow-lg transition-all duration-500 hover:shadow-xl">
+                  <img 
+                    src="/logo/logo.jpeg" 
+                    alt="MAITROVA" 
+                    className="h-12 w-auto object-contain rounded-4xl"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.style.display = 'none';
+                      e.target.parentElement.classList.add('fallback-logo');
+                      // Add fallback text if image fails to load
+                      const fallbackDiv = document.createElement('div');
+                      fallbackDiv.className = 'text-xl font-bold text-gray-800';
+                      fallbackDiv.textContent = 'MAITROVA';
+                      e.target.parentElement.appendChild(fallbackDiv);
+                    }}
+                  />
                 </div>
-                <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-16 h-1 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full"></div>
+                <div className="absolute -bottom-1 left-1/2 h-1 w-16 -translate-x-1/2 transform rounded-full bg-[linear-gradient(90deg,_#cbd5e1,_#94a3b8)]"></div>
               </div>
             </Link>
           </div>
@@ -369,7 +382,7 @@ const Header = () => {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`relative px-6 py-3 rounded-xl font-medium text-gray-700 ${hoverEffects.slide} hover:text-blue-600 group`}
+                className={`relative px-6 py-3 rounded-xl font-medium text-slate-700 ${hoverEffects.slide} hover:text-slate-950 group`}
                 onMouseEnter={() => setHoveredLink(item.path)}
                 onMouseLeave={() => setHoveredLink(null)}
               >
@@ -378,7 +391,7 @@ const Header = () => {
                   <span>{item.label}</span>
                 </div>
                 {hoveredLink === item.path && (
-                  <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-blue-50/30 to-purple-50/30 rounded-xl -z-10"></div>
+                  <div className="absolute top-0 left-0 w-full h-full rounded-xl bg-slate-50 -z-10"></div>
                 )}
               </Link>
             ))}
@@ -390,13 +403,16 @@ const Header = () => {
             <div className="hidden md:flex items-center space-x-3">
               {isAuthenticated ? (
                 <>
-                  {/* Quick Action Buttons */}
+                  <div className="relative group">
+                    <UserProfile />
+                  </div>
+
                   <div className="flex items-center space-x-2">
                     {userMenuItems.slice(1).map((item) => (
                       <Link
                         key={item.path}
                         to={item.path}
-                        className={`px-4 py-2.5 rounded-lg font-medium text-gray-700 bg-gray-50 border border-gray-200 ${hoverEffects.lift} hover:bg-white hover:border-blue-300 hover:shadow-md group`}
+                        className={`px-4 py-2.5 rounded-xl font-medium text-slate-700 bg-slate-50 border border-slate-200 ${hoverEffects.lift} hover:bg-white hover:border-slate-300 hover:shadow-md group`}
                       >
                         <div className="flex items-center space-x-2">
                           <span>{item.icon}</span>
@@ -406,18 +422,13 @@ const Header = () => {
                     ))}
                     <button
                       onClick={handleLogout}
-                      className={`px-4 py-2.5 rounded-lg font-medium text-red-600 bg-red-50 border border-red-200 ${hoverEffects.lift} hover:bg-red-100 hover:border-red-300 hover:shadow-md`}
+                      className={`px-4 py-2.5 rounded-xl font-medium text-red-600 bg-red-50 border border-red-200 ${hoverEffects.lift} hover:bg-red-100 hover:border-red-300 hover:shadow-md`}
                     >
                       <div className="flex items-center space-x-2">
                         <span>🚪</span>
                         <span className="text-sm">Logout</span>
                       </div>
                     </button>
-                  </div>
-                  
-                  {/* User Profile with Social Media */}
-                  <div className="relative group">
-                    <UserProfile />
                   </div>
                 </>
               ) : (

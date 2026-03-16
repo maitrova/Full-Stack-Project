@@ -37,6 +37,9 @@ const readymadeProductSchema = new mongoose.Schema(
     description: { type: String, required: true },
 
     price: { type: Number, required: true, min: 0 },
+    salePrice: { type: Number, default: null, min: 0 },
+    saleStartAt: { type: Date, default: null },
+    saleEndAt: { type: Date, default: null },
     currency: { type: String, default: "INR" },
 
     category: {
@@ -105,5 +108,32 @@ const readymadeProductSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+readymadeProductSchema.pre("validate", function (next) {
+  if (!(Number(this.price) > 0)) {
+    this.invalidate("price", "MRP price must be greater than 0");
+  }
+
+  const hasSalePrice =
+    this.salePrice !== null &&
+    this.salePrice !== undefined &&
+    this.salePrice !== "";
+
+  if (hasSalePrice) {
+    if (!(Number(this.salePrice) > 0)) {
+      this.invalidate("salePrice", "Offer price must be greater than 0");
+    }
+
+    if (!(Number(this.salePrice) < Number(this.price))) {
+      this.invalidate("salePrice", "Offer price must be lower than MRP price");
+    }
+  }
+
+  if (this.saleStartAt && this.saleEndAt && this.saleStartAt >= this.saleEndAt) {
+    this.invalidate("saleEndAt", "Offer end date must be after start date");
+  }
+
+  next();
+});
 
 export default mongoose.model("ReadymadeProduct", readymadeProductSchema);

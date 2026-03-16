@@ -30,6 +30,17 @@ const ensureImageUrl = (imagePath) => {
   return `${API_BASE_URL}${imagePath.startsWith("/") ? "" : "/"}${imagePath}`;
 };
 
+const getPlainTextFromHtml = (value) => {
+  if (!value || typeof value !== "string") return "";
+
+  if (typeof window !== "undefined" && typeof window.DOMParser !== "undefined") {
+    const doc = new window.DOMParser().parseFromString(value, "text/html");
+    return doc.body.textContent?.replace(/\s+/g, " ").trim() || "";
+  }
+
+  return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+};
+
 const getDropId = (item) => {
   if (!item) return null;
   if (typeof item.dropproduct === "string") return item.dropproduct;
@@ -147,7 +158,7 @@ const CartPage = () => {
       const product = item.dropproduct || item.readymadeProduct;
       if (!product) return {};
       return {
-        description: product.description,
+        description: getPlainTextFromHtml(product.description),
         category: product.category,
         subCategory: product.subCategory,
         brand: product.brand,
@@ -158,7 +169,7 @@ const CartPage = () => {
     if (item.kind === "DESIGN" && item.design) {
       const design = item.design;
       return {
-        description: design.description || design.designDescription,
+        description: getPlainTextFromHtml(design.description || design.designDescription),
         category: design.category,
         style: design.style,
         color: design.colorPalette || design.primaryColor,
@@ -591,14 +602,19 @@ const CartPage = () => {
                               {/* Price - Mobile */}
                               <div className="flex justify-between items-center sm:hidden mt-2">
                                 <span className="text-sm text-gray-600">Price:</span>
-                                <div className="text-right">
-                                  <p className="text-base font-semibold text-gray-900">
-                                    {formatPrice(itemTotal, item.currency)}
+                              <div className="text-right">
+                                <p className="text-base font-semibold text-gray-900">
+                                  {formatPrice(itemTotal, item.currency)}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {formatPrice(item.unitPrice, item.currency)} each
+                                </p>
+                                {Number(item.basePrice || 0) > Number(item.unitPrice || 0) && (
+                                  <p className="text-xs text-gray-400 line-through">
+                                    {formatPrice(item.basePrice, item.currency)} MRP
                                   </p>
-                                  <p className="text-xs text-gray-500">
-                                    {formatPrice(item.unitPrice, item.currency)} each
-                                  </p>
-                                </div>
+                                )}
+                              </div>
                               </div>
                               
                               {/* Additional product info - Collapsible on mobile */}
@@ -648,6 +664,11 @@ const CartPage = () => {
                               <p className="text-sm text-gray-500">
                                 {formatPrice(item.unitPrice, item.currency)} each
                               </p>
+                              {Number(item.basePrice || 0) > Number(item.unitPrice || 0) && (
+                                <p className="text-xs text-gray-400 line-through">
+                                  {formatPrice(item.basePrice, item.currency)} MRP
+                                </p>
+                              )}
                             </div>
                           </div>
 
