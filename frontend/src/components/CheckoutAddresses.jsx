@@ -104,6 +104,123 @@ function CouponCelebration({ visible, code, discount }) {
   );
 }
 
+const formatCouponPrimaryText = (coupon) => {
+  if (!coupon) return "";
+  if (coupon.discountType === "PERCENTAGE") {
+    const maxText =
+      coupon.maximumDiscountAmount !== null && coupon.maximumDiscountAmount !== undefined
+        ? ` up to Rs.${Number(coupon.maximumDiscountAmount).toFixed(0)}`
+        : "";
+    return `${Number(coupon.discountValue || 0).toFixed(0)}% off${maxText}`;
+  }
+  return `Flat Rs.${Number(coupon.discountValue || 0).toFixed(0)} off`;
+};
+
+const formatCouponMeta = (coupon) => {
+  if (!coupon) return "";
+  const parts = [];
+  if (Number(coupon.minimumCartAmount || 0) > 0) {
+    parts.push(`Min order Rs.${Number(coupon.minimumCartAmount).toFixed(0)}`);
+  }
+  if (coupon.firstOrderOnly || coupon.newCustomersOnly) {
+    parts.push("First order only");
+  }
+  if (coupon.autoApply) {
+    parts.push("Auto apply");
+  }
+  return parts.join(" • ");
+};
+
+const formatCouponExpiry = (coupon) => {
+  if (!coupon?.endDate) return "";
+  const endDate = new Date(coupon.endDate);
+  if (Number.isNaN(endDate.getTime())) return "";
+  return `Valid till ${endDate.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })}`;
+};
+
+function AvailableCoupons({ coupons, loading, copiedCouponCode, onCopy }) {
+  return (
+    <div className="rounded-[24px] border border-emerald-100 bg-[radial-gradient(circle_at_top_right,_rgba(16,185,129,0.18),_transparent_30%),linear-gradient(180deg,_#ffffff,_#f0fdf4)] p-5 shadow-sm">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.26em] text-emerald-700">
+            Available Coupons
+          </div>
+          <h4 className="mt-1 text-lg font-semibold text-slate-900">
+            Pick an offer for this checkout
+          </h4>
+        </div>
+        <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-emerald-700 shadow-sm">
+          {loading ? "Loading..." : `${coupons.length} live`}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="space-y-3">
+          {[0, 1].map((item) => (
+            <div key={item} className="animate-pulse rounded-2xl border border-white/80 bg-white/90 p-3">
+              <div className="h-3 w-24 rounded bg-slate-200" />
+              <div className="mt-3 h-4 w-40 rounded bg-slate-200" />
+              <div className="mt-2 h-3 w-full rounded bg-slate-100" />
+            </div>
+          ))}
+        </div>
+      ) : coupons.length ? (
+        <div className="space-y-3">
+          {coupons.map((coupon) => (
+            <div key={coupon.code} className="rounded-2xl border border-emerald-200 bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="inline-flex rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
+                    {coupon.code}
+                  </div>
+                  <p className="mt-2 text-sm font-semibold text-slate-900">
+                    {formatCouponPrimaryText(coupon)}
+                  </p>
+                  {coupon.description ? (
+                    <p className="mt-1 text-xs leading-5 text-slate-600">{coupon.description}</p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onCopy(coupon.code)}
+                  className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${
+                    copiedCouponCode === coupon.code
+                      ? "border-emerald-200 bg-emerald-100 text-emerald-700"
+                      : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
+                  }`}
+                >
+                  {copiedCouponCode === coupon.code ? "Copied" : "Copy"}
+                </button>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {formatCouponMeta(coupon) ? (
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
+                    {formatCouponMeta(coupon)}
+                  </span>
+                ) : null}
+                {formatCouponExpiry(coupon) ? (
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                    {formatCouponExpiry(coupon)}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-500">
+          No active coupons available right now.
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CheckoutAddresses() {
   const dispatch = useDispatch();
   const token = useSelector(selectCurrentToken);
@@ -125,6 +242,9 @@ export default function CheckoutAddresses() {
   const [couponState, setCouponState] = useState(emptyCouponState);
   const [pricingPreview, setPricingPreview] = useState(null);
   const [showCouponCelebration, setShowCouponCelebration] = useState(false);
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+  const [loadingCoupons, setLoadingCoupons] = useState(false);
+  const [copiedCouponCode, setCopiedCouponCode] = useState("");
 
   const isEditing = useMemo(() => mode.startsWith("edit"), [mode]);
   const normalizedCouponCode = useMemo(() => String(couponCode || "").trim().toUpperCase(), [couponCode]);
@@ -155,6 +275,39 @@ export default function CheckoutAddresses() {
     const timer = window.setTimeout(() => setShowCouponCelebration(false), 2600);
     return () => window.clearTimeout(timer);
   }, [showCouponCelebration]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCoupons = async () => {
+      try {
+        setLoadingCoupons(true);
+        const res = await fetch(`${API_URL}/coupons/active`);
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.message || "Failed to load coupons");
+        }
+        if (!cancelled) {
+          setAvailableCoupons(Array.isArray(data?.coupons) ? data.coupons : []);
+        }
+      } catch (couponError) {
+        console.error("Failed to load coupons:", couponError);
+        if (!cancelled) {
+          setAvailableCoupons([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingCoupons(false);
+        }
+      }
+    };
+
+    loadCoupons();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleChange = (which, key, value) => {
     if (which === "delivery") {
@@ -240,6 +393,36 @@ export default function CheckoutAddresses() {
   const handleRemoveCoupon = () => {
     setCouponCode("");
     resetCouponFeedback();
+  };
+
+  const handleCopyCoupon = async (couponCodeToCopy) => {
+    if (!couponCodeToCopy) return;
+
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(couponCodeToCopy);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = couponCodeToCopy;
+        textArea.setAttribute("readonly", "");
+        textArea.style.position = "absolute";
+        textArea.style.left = "-9999px";
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+      }
+
+      setCouponCode(couponCodeToCopy);
+      setCopiedCouponCode(couponCodeToCopy);
+      window.setTimeout(() => {
+        setCopiedCouponCode((currentCode) =>
+          currentCode === couponCodeToCopy ? "" : currentCode
+        );
+      }, 1800);
+    } catch (copyError) {
+      console.error("Failed to copy coupon:", copyError);
+    }
   };
 
   const handleOrderCreated = (created) => {
@@ -346,6 +529,13 @@ export default function CheckoutAddresses() {
 
               <div className="space-y-5 px-6 py-6">
                 <CouponCelebration visible={showCouponCelebration || (isCouponApplied && effectiveDiscount > 0)} code={normalizedCouponCode} discount={effectiveDiscount} />
+
+                <AvailableCoupons
+                  coupons={availableCoupons}
+                  loading={loadingCoupons}
+                  copiedCouponCode={copiedCouponCode}
+                  onCopy={handleCopyCoupon}
+                />
 
                 <div className="rounded-[24px] border border-slate-200 bg-[radial-gradient(circle_at_top_right,_rgba(14,165,233,0.10),_transparent_28%),linear-gradient(180deg,_#ffffff,_#f8fafc)] p-5">
                   <div className="mb-4 flex items-center justify-between gap-3">

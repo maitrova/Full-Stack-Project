@@ -91,140 +91,6 @@ const getColorLabel = (colorValue) => {
   return label ? label : `Custom (${colorValue.toUpperCase()})`;
 };
 
-const formatCouponPrimaryText = (coupon) => {
-  if (!coupon) return "";
-  if (coupon.discountType === "PERCENTAGE") {
-    const maxText =
-      coupon.maximumDiscountAmount !== null && coupon.maximumDiscountAmount !== undefined
-        ? ` up to Rs.${Number(coupon.maximumDiscountAmount).toFixed(0)}`
-        : "";
-    return `${Number(coupon.discountValue || 0).toFixed(0)}% off${maxText}`;
-  }
-  return `Flat Rs.${Number(coupon.discountValue || 0).toFixed(0)} off`;
-};
-
-const formatCouponMeta = (coupon) => {
-  if (!coupon) return "";
-  const parts = [];
-  if (Number(coupon.minimumCartAmount || 0) > 0) {
-    parts.push(`Min order Rs.${Number(coupon.minimumCartAmount).toFixed(0)}`);
-  }
-  if (coupon.firstOrderOnly || coupon.newCustomersOnly) {
-    parts.push("First order only");
-  }
-  if (coupon.autoApply) {
-    parts.push("Auto apply");
-  }
-  return parts.join(" • ");
-};
-
-const formatCouponExpiry = (coupon) => {
-  if (!coupon?.endDate) return "";
-  const endDate = new Date(coupon.endDate);
-  if (Number.isNaN(endDate.getTime())) return "";
-  return `Valid till ${endDate.toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  })}`;
-};
-
-const CouponListSection = ({
-  coupons,
-  loading,
-  copiedCouponCode,
-  onCopy,
-  className = "",
-}) => (
-  <section
-    className={`rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-4 shadow-sm ${className}`.trim()}
-  >
-    <div className="flex items-start justify-between gap-3">
-      <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-600">
-          Available Coupons
-        </p>
-        <h3 className="mt-1 text-sm font-semibold text-slate-900">
-          Apply these offers at checkout
-        </h3>
-      </div>
-      <div className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-emerald-700 shadow-sm">
-        {loading ? "Loading..." : `${coupons.length} live`}
-      </div>
-    </div>
-
-    {loading ? (
-      <div className="mt-4 space-y-3">
-        {[0, 1].map((item) => (
-          <div
-            key={item}
-            className="animate-pulse rounded-2xl border border-white/80 bg-white/80 p-3"
-          >
-            <div className="h-3 w-24 rounded bg-slate-200" />
-            <div className="mt-3 h-4 w-40 rounded bg-slate-200" />
-            <div className="mt-2 h-3 w-full rounded bg-slate-100" />
-            <div className="mt-2 h-3 w-2/3 rounded bg-slate-100" />
-          </div>
-        ))}
-      </div>
-    ) : coupons.length ? (
-      <div className="mt-4 space-y-3">
-        {coupons.map((coupon) => (
-          <article
-            key={coupon.code}
-            className="rounded-2xl border border-emerald-200 bg-white/95 p-3 shadow-[0_10px_30px_rgba(15,23,42,0.06)]"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="inline-flex rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
-                  {coupon.code}
-                </div>
-                <p className="mt-2 text-sm font-semibold text-slate-900">
-                  {formatCouponPrimaryText(coupon)}
-                </p>
-                {coupon.description ? (
-                  <p className="mt-1 text-xs leading-5 text-slate-600">
-                    {coupon.description}
-                  </p>
-                ) : null}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => onCopy(coupon.code)}
-                className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${
-                  copiedCouponCode === coupon.code
-                    ? "border-emerald-200 bg-emerald-100 text-emerald-700"
-                    : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
-                }`}
-              >
-                {copiedCouponCode === coupon.code ? "Copied" : "Copy"}
-              </button>
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              {formatCouponMeta(coupon) ? (
-                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
-                  {formatCouponMeta(coupon)}
-                </span>
-              ) : null}
-              {formatCouponExpiry(coupon) ? (
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
-                  {formatCouponExpiry(coupon)}
-                </span>
-              ) : null}
-            </div>
-          </article>
-        ))}
-      </div>
-    ) : (
-      <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white/80 px-4 py-5 text-sm text-slate-500">
-        No active coupons available right now.
-      </div>
-    )}
-  </section>
-);
-
 const createDefaultTextLayer = () => ({
   id: "text-" + Date.now() + "-" + Math.random().toString(36).slice(2),
   text: "YOUR TEXT",
@@ -331,10 +197,6 @@ const getSizeBasePrice = (prod, size) => {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [calculatingPrice, setCalculatingPrice] = useState(false);
   const [selectedLibraryImage, setSelectedLibraryImage] = useState(null);
-  const [availableCoupons, setAvailableCoupons] = useState([]);
-  const [loadingCoupons, setLoadingCoupons] = useState(false);
-  const [copiedCouponCode, setCopiedCouponCode] = useState("");
-  
   const [price, setPrice] = useState(BASE_PRICE);
   const [priceBreakdown, setPriceBreakdown] = useState({
     basePrice: BASE_PRICE,
@@ -367,35 +229,6 @@ const getSizeBasePrice = (prod, size) => {
   const handleColorChange = (color, label = null) => {
     setProductColor(color);
     setProductColorName(label || getColorLabel(color));
-  };
-
-  const handleCopyCoupon = async (couponCode) => {
-    if (!couponCode) return;
-
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(couponCode);
-      } else {
-        const textArea = document.createElement("textarea");
-        textArea.value = couponCode;
-        textArea.setAttribute("readonly", "");
-        textArea.style.position = "absolute";
-        textArea.style.left = "-9999px";
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand("copy");
-        document.body.removeChild(textArea);
-      }
-
-      setCopiedCouponCode(couponCode);
-      window.setTimeout(() => {
-        setCopiedCouponCode((currentCode) =>
-          currentCode === couponCode ? "" : currentCode
-        );
-      }, 1800);
-    } catch (copyError) {
-      console.error("Failed to copy coupon:", copyError);
-    }
   };
 
   const getImageSizeFromFile = (file) =>
@@ -813,39 +646,6 @@ const finalUrl = rawUrl.startsWith("http")
   useEffect(() => {
     dispatch(fetchFolders());
   }, [dispatch]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadCoupons = async () => {
-      try {
-        setLoadingCoupons(true);
-        const res = await fetch(`${API_URL}/coupons/active`);
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data?.message || "Failed to load coupons");
-        }
-        if (!cancelled) {
-          setAvailableCoupons(Array.isArray(data?.coupons) ? data.coupons : []);
-        }
-      } catch (couponError) {
-        console.error("Failed to load coupons:", couponError);
-        if (!cancelled) {
-          setAvailableCoupons([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingCoupons(false);
-        }
-      }
-    };
-
-    loadCoupons();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Fetch images when folder changes
   useEffect(() => {
@@ -1851,6 +1651,28 @@ const nudgeDesignScaleAxis = (axis, delta) => {
             <span className="text-xl font-bold text-green-600">₹{price.toFixed(2)}</span>
           </div>
 
+          <div className="grid grid-cols-2 gap-2 sm:hidden">
+            <button
+              onClick={handleSaveDesign}
+              disabled={saving || addingToCart}
+              className="rounded-full border border-sky-600 bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+            >
+              {saving ? "Savingâ€¦" : isEditMode ? "Update Design" : "Save Design"}
+            </button>
+
+            <button
+              onClick={handleSaveAndAddToCart}
+              disabled={saving || addingToCart}
+              className="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+            >
+              {addingToCart
+                ? "Addingâ€¦"
+                : savedDesignId
+                  ? "Add to Cart"
+                  : "Save & Add to Cart"}
+            </button>
+          </div>
+
           <div className="hidden flex-wrap items-center gap-2 sm:flex">
             <button
               onClick={handleSaveDesign}
@@ -1939,14 +1761,6 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                 </button>
               </div>
             </div>
-          </div>
-          <div className="lg:hidden">
-            <CouponListSection
-              coupons={availableCoupons}
-              loading={loadingCoupons}
-              copiedCouponCode={copiedCouponCode}
-              onCopy={handleCopyCoupon}
-            />
           </div>
           {/* Left sidebar - Controls */}
           <aside className="order-2 w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col gap-4 min-h-0 lg:order-1 lg:w-auto lg:gap-6">
@@ -2837,15 +2651,6 @@ const nudgeDesignScaleAxis = (axis, delta) => {
               </div>
             </div>
           </div>
-
-          <CouponListSection
-            coupons={availableCoupons}
-            loading={loadingCoupons}
-            copiedCouponCode={copiedCouponCode}
-            onCopy={handleCopyCoupon}
-            className="mt-6"
-          />
-          
           {/* Pricing Info */}
           <div className={`${showMobilePriceDetails ? "block" : "hidden"} mt-6 pt-4 border-t border-slate-200 lg:block`}>
             <div className="text-xs text-slate-600 space-y-1">
