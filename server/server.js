@@ -39,15 +39,35 @@ const __dirname = path.dirname(__filename);
 connectDB();
 
 const app = express();
+const defaultCorsOrigins = [
+  "http://localhost:5173",
+  "http://maitrova.in",
+  "https://maitrova.in",
+  "http://www.maitrova.in",
+  "https://www.maitrova.in",
+];
+const configuredCorsOrigins = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const allowedOrigins = configuredCorsOrigins.length
+  ? configuredCorsOrigins
+  : defaultCorsOrigins;
 
 // Middleware
 app.use(express.json({ limit: "200mb" }));
 app.use(express.urlencoded({ extended: true, limit: "200mb" }));
-app.use(cors({ origin: [
-    "http://localhost:5173", 
-    "http://maitrova.in", 
-    "https://maitrova.in"
-  ], credentials: true }));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    credentials: true,
+  })
+);
 
   app.use((req, res, next) => {
   res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");

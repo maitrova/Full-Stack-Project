@@ -90,6 +90,21 @@ const couponAdminProjection = {
   updatedAt: 1,
 };
 
+const couponPublicProjection = {
+  code: 1,
+  description: 1,
+  discountType: 1,
+  discountValue: 1,
+  minimumCartAmount: 1,
+  maximumDiscountAmount: 1,
+  newCustomersOnly: 1,
+  firstOrderOnly: 1,
+  autoApply: 1,
+  campaignTag: 1,
+  startDate: 1,
+  endDate: 1,
+};
+
 export const createCoupon = async (req, res) => {
   try {
     if (!ensureAdmin(req, res)) return;
@@ -118,6 +133,27 @@ export const listCoupons = async (req, res) => {
     return res.status(200).json({ coupons });
   } catch (error) {
     console.error("listCoupons error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const listActiveCoupons = async (_req, res) => {
+  try {
+    const now = new Date();
+    const coupons = await Coupon.find(
+      {
+        status: "ACTIVE",
+        startDate: { $lte: now },
+        endDate: { $gte: now },
+      },
+      couponPublicProjection
+    )
+      .sort({ autoApply: -1, discountValue: -1, createdAt: -1 })
+      .lean();
+
+    return res.status(200).json({ coupons });
+  } catch (error) {
+    console.error("listActiveCoupons error:", error);
     return res.status(500).json({ message: "Server error" });
   }
 };
@@ -216,4 +252,3 @@ export const validateCoupon = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
-

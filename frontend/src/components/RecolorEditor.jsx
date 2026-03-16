@@ -132,13 +132,43 @@ function pointInBoundary(x, y, b) {
   return x >= b.minX && x <= b.maxX && y >= b.minY && y <= b.maxY;
 }
 
+function pointInBoundaryWithInset(x, y, b, insetRatio = 0.12) {
+  if (!b) return false;
+  const width = b.maxX - b.minX;
+  const height = b.maxY - b.minY;
+  const insetX = Math.min(width * insetRatio, width * 0.35);
+  const insetY = Math.min(height * insetRatio, height * 0.35);
+
+  return (
+    x >= b.minX + insetX &&
+    x <= b.maxX - insetX &&
+    y >= b.minY + insetY &&
+    y <= b.maxY - insetY
+  );
+}
+
 // Decide which zone the point belongs to (prefer smaller zones like pocket if overlap)
-function pickZoneForPoint(x, y, zones, boundaries) {
+function pickZoneForPoint(x, y, zones, boundaries, preferredZone = null, insetRatio = 0.12) {
   const candidates = (zones || [])
     .map((z) => ({ z, b: boundaries?.[z] }))
     .filter((it) => it.b && pointInBoundary(x, y, it.b));
 
   if (!candidates.length) return null;
+
+  if (preferredZone) {
+    const preferred = candidates.find((candidate) => candidate.z === preferredZone);
+    if (preferred) {
+      const nextNestedZone = candidates.find(
+        (candidate) =>
+          candidate.z !== preferredZone &&
+          pointInBoundaryWithInset(x, y, candidate.b, insetRatio)
+      );
+
+      if (!nextNestedZone) {
+        return preferredZone;
+      }
+    }
+  }
 
   // pick smallest area zone (pocket wins over front-full usually)
   candidates.sort((a, b) => {
@@ -397,7 +427,15 @@ async function upsertCalibration({ productKey, view, mockupUrl, maskUrl, payload
 /* =========================
    Measurement Overlay
    ========================= */
-function MeasurementOverlay({ canvasSize, boundaries, specs, view, zonesList, calibratedConfig }) {
+function MeasurementOverlay({
+  canvasSize,
+  boundaries,
+  specs,
+  view,
+  zonesList,
+  calibratedConfig,
+  compact = false,
+}) {
   if (!canvasSize || !boundaries || !specs) return null;
 
   const zonesToShow = zonesList || [];
@@ -410,9 +448,10 @@ function MeasurementOverlay({ canvasSize, boundaries, specs, view, zonesList, ca
 
         const spec = getZoneSpec(zoneKey, specs, calibratedConfig);
         if (!spec) return null;
-        const compact = false;
-        const isTinyZone = false;
-        const compactLabel = "";
+        const zoneWidth = b.maxX - b.minX;
+        const zoneHeight = b.maxY - b.minY;
+        const isTinyZone = compact || zoneWidth < 0.18 || zoneHeight < 0.18;
+        const compactLabel = getZoneLabel(zoneKey, calibratedConfig);
         const left = `${b.minX * 100}%`;
         const top = `${b.minY * 100}%`;
         const width = `${(b.maxX - b.minX) * 100}%`;
@@ -423,27 +462,34 @@ function MeasurementOverlay({ canvasSize, boundaries, specs, view, zonesList, ca
             <div
               className="absolute inset-0"
               style={{
-                border: "2px solid rgba(59, 130, 246, 0.95)",
+                border: compact
+                  ? "1.5px solid rgba(59, 130, 246, 0.95)"
+                  : "2px solid rgba(59, 130, 246, 0.95)",
+                borderRadius: compact ? "12px" : "8px",
                 boxShadow: "0 0 0 1px rgba(59,130,246,0.15) inset",
               }}
             />
 
-            <div
-              className="absolute left-1/2 -bottom-6 -translate-x-1/2 text-[12px] font-medium"
-              style={{ color: "rgba(30, 64, 175, 0.95)" }}
-            >
-              {spec.maxW} inches
-            </div>
+            {!isTinyZone && (
+              <>
+                <div
+                  className="absolute left-1/2 -bottom-6 -translate-x-1/2 text-[12px] font-medium"
+                  style={{ color: "rgba(30, 64, 175, 0.95)" }}
+                >
+                  {spec.maxW} inches
+                </div>
+
+                <div
+                  className="absolute -left-12 top-1/2 -translate-y-1/2 text-[12px] font-medium"
+                  style={{ color: "rgba(30, 64, 175, 0.95)" }}
+                >
+                  {spec.maxH} inches
+                </div>
+              </>
+            )}
 
             <div
-              className="absolute -left-12 top-1/2 -translate-y-1/2 text-[12px] font-medium"
-              style={{ color: "rgba(30, 64, 175, 0.95)" }}
-            >
-              {spec.maxH} inches
-            </div>
-
-            <div
-              className="absolute right-2 top-2 rounded px-2 py-1 text-[12px] font-semibold"
+              className={`absolute rounded font-semibold ${compact ? "left-1.5 top-1.5 px-2 py-0.5 text-[10px]" : "right-2 top-2 px-2 py-1 text-[12px]"}`}
               style={{
                 background: "rgba(255,255,255,0.85)",
                 color: "rgba(15, 23, 42, 0.95)",
@@ -454,6 +500,72 @@ function MeasurementOverlay({ canvasSize, boundaries, specs, view, zonesList, ca
                 ? compactLabel
                 : `${getZoneLabel(zoneKey, calibratedConfig)} • ${spec.maxW} × ${spec.maxH} in`}
             </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function MeasurementOverlayPlain({
+  canvasSize,
+  boundaries,
+  specs,
+  zonesList,
+  calibratedConfig,
+  compact = false,
+}) {
+  if (!canvasSize || !boundaries || !specs) return null;
+
+  const zonesToShow = zonesList || [];
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-40">
+      {zonesToShow.map((zoneKey) => {
+        const b = boundaries[zoneKey];
+        if (!b) return null;
+
+        const spec = getZoneSpec(zoneKey, specs, calibratedConfig);
+        if (!spec) return null;
+
+        const zoneWidth = b.maxX - b.minX;
+        const zoneHeight = b.maxY - b.minY;
+        const isTinyZone = compact || zoneWidth < 0.18 || zoneHeight < 0.18;
+        const left = `${b.minX * 100}%`;
+        const top = `${b.minY * 100}%`;
+        const width = `${zoneWidth * 100}%`;
+        const height = `${zoneHeight * 100}%`;
+
+        return (
+          <div key={zoneKey} className="absolute" style={{ left, top, width, height }}>
+            <div
+              className="absolute inset-0"
+              style={{
+                border: compact
+                  ? "1.5px solid rgba(59, 130, 246, 0.95)"
+                  : "2px solid rgba(59, 130, 246, 0.95)",
+                borderRadius: compact ? "12px" : "8px",
+                boxShadow: "0 0 0 1px rgba(59,130,246,0.15) inset",
+              }}
+            />
+
+            {!isTinyZone && (
+              <>
+                <div
+                  className="absolute left-1/2 -bottom-6 -translate-x-1/2 text-[12px] font-medium"
+                  style={{ color: "rgba(30, 64, 175, 0.95)" }}
+                >
+                  {spec.maxW} inches
+                </div>
+
+                <div
+                  className="absolute -left-12 top-1/2 -translate-y-1/2 text-[12px] font-medium"
+                  style={{ color: "rgba(30, 64, 175, 0.95)" }}
+                >
+                  {spec.maxH} inches
+                </div>
+              </>
+            )}
           </div>
         );
       })}
@@ -1052,6 +1164,80 @@ function getZoneSpec(zoneKey, specs, calibratedConfig) {
   return specs?.[specKey] || specs.front;
 }
 
+function normalizeImageLayerToBoundary(layer, canvasSize, boundaries, specs, calibratedConfig) {
+  if (!layer?.imageUrl || !canvasSize?.width || !canvasSize?.height) return layer;
+
+  const zoneKey = getBoundaryKeyForLayer(layer);
+  const boundary =
+    boundaries?.[zoneKey] ||
+    boundaries?.["front-full"] ||
+    FALLBACK_BOUNDARIES["front-full"];
+  const spec = getZoneSpec(zoneKey, specs, calibratedConfig);
+
+  const boundaryWidth = Math.max(0.02, boundary.maxX - boundary.minX);
+  const boundaryHeight = Math.max(0.02, boundary.maxY - boundary.minY);
+
+  let scaleX = layer.scaleX ?? layer.scale ?? 0.35;
+  let scaleY = layer.scaleY ?? layer.scale ?? 0.35;
+
+  scaleX = Math.max(0.02, Math.min(scaleX, boundaryWidth));
+  scaleY = Math.max(0.02, Math.min(scaleY, boundaryHeight));
+
+  const minCenterX = boundary.minX + scaleX / 2;
+  const maxCenterX = boundary.maxX - scaleX / 2;
+  const minCenterY = boundary.minY + scaleY / 2;
+  const maxCenterY = boundary.maxY - scaleY / 2;
+
+  let x =
+    typeof layer.x === "number"
+      ? layer.x
+      : (boundary.minX + boundary.maxX) / 2;
+  let y =
+    typeof layer.y === "number"
+      ? layer.y
+      : (boundary.minY + boundary.maxY) / 2;
+
+  x = Math.max(minCenterX, Math.min(maxCenterX, x));
+  y = Math.max(minCenterY, Math.min(maxCenterY, y));
+
+  const snapped = snapToBoundaryCenter(x, y, boundary, scaleX / 2, scaleY / 2);
+  x = snapped.x;
+  y = snapped.y;
+
+  const renderedWidthPx = canvasSize.width * scaleX;
+  const renderedHeightPx = canvasSize.height * scaleY;
+  const zonePx = getPrintableAreaPx(canvasSize, boundary);
+  const renderedWidthInches = inchesFromPx(renderedWidthPx, zonePx.widthPx, spec.maxW);
+  const renderedHeightInches = inchesFromPx(renderedHeightPx, zonePx.heightPx, spec.maxH);
+
+  const changed =
+    Math.abs((layer.x ?? 0) - x) > 1e-4 ||
+    Math.abs((layer.y ?? 0) - y) > 1e-4 ||
+    Math.abs((layer.scaleX ?? layer.scale ?? 0.35) - scaleX) > 1e-4 ||
+    Math.abs((layer.scaleY ?? layer.scale ?? 0.35) - scaleY) > 1e-4 ||
+    layer.zone !== zoneKey ||
+    Math.abs((layer.renderedWidthPx ?? 0) - renderedWidthPx) > 0.5 ||
+    Math.abs((layer.renderedHeightPx ?? 0) - renderedHeightPx) > 0.5;
+
+  if (!changed) return layer;
+
+  return {
+    ...layer,
+    x,
+    y,
+    zone: zoneKey,
+    scaleX,
+    scaleY,
+    scale: Math.min(scaleX, scaleY),
+    renderedWidthPx,
+    renderedHeightPx,
+    renderedWidthInches,
+    renderedHeightInches,
+    printableAreaWidthInches: spec.maxW,
+    printableAreaHeightInches: spec.maxH,
+  };
+}
+
 /* =========================
    RecolorEditor
    ========================= */
@@ -1085,13 +1271,15 @@ const RecolorEditor = forwardRef(function RecolorEditor(
   ref
 ) {
   const rootRef = useRef(null);
+  const stageRef = useRef(null);
+  const designRenderSeqRef = useRef(0);
   const [renderer, setRenderer] = useState(null);
   const [canvasSize, setCanvasSize] = useState(null);
   const [renderCanvasSize, setRenderCanvasSize] = useState(null);
   const [canvasFrame, setCanvasFrame] = useState(null);
   const effectiveCanvasWidth = canvasSize?.width || previewWidth || 800;
   const isCompactUI = effectiveCanvasWidth < 460;
-  const showMeasurementsByDefault = !isCompactUI && effectiveCanvasWidth >= 540;
+  const showMeasurementsByDefault = true;
 
   const [showMeasurements, setShowMeasurements] = useState(showMeasurementsByDefault);
   const [calibrationMode, setCalibrationMode] = useState(false);
@@ -1148,7 +1336,6 @@ useEffect(() => {
   };
 }, [productKey, activeView, mockupUrl, maskUrl]);
  
-
   const boundaries = useMemo(() => {
   const merged = { ...FALLBACK_BOUNDARIES };
 
@@ -1177,6 +1364,29 @@ useEffect(() => {
 const zonesForActiveView = useMemo(() => {
   return getZonesForView(activeView, calibratedConfig);
 }, [activeView, calibratedConfig]);
+
+  useEffect(() => {
+    if (!canvasSize || !Array.isArray(designLayers) || designLayers.length === 0) return;
+
+    let changed = false;
+    const nextLayers = designLayers.map((layer) => {
+      if (!layer?.imageUrl) return layer;
+      const normalized = normalizeImageLayerToBoundary(
+        layer,
+        canvasSize,
+        boundaries,
+        specs,
+        calibratedConfig
+      );
+      if (normalized !== layer) changed = true;
+      return normalized;
+    });
+
+    if (changed) {
+      setDesignLayers(nextLayers);
+    }
+  }, [canvasSize, designLayers, setDesignLayers, boundaries, specs, calibratedConfig]);
+
   const handleRendererReady = useCallback((instance) => {
     setRenderer(instance || null);
     if (instance?.canvas) {
@@ -1192,13 +1402,13 @@ const zonesForActiveView = useMemo(() => {
     let animationFrameId = null;
 
     const updateSize = () => {
-      if (!renderer?.canvas || !rootRef.current) return;
+      if (!renderer?.canvas || !stageRef.current) return;
       const rect = renderer.canvas.getBoundingClientRect();
-      const rootRect = rootRef.current.getBoundingClientRect();
+      const stageRect = stageRef.current.getBoundingClientRect();
       setCanvasSize({ width: rect.width, height: rect.height });
       setCanvasFrame({
-        left: rect.left - rootRect.left,
-        top: rect.top - rootRect.top,
+        left: rect.left - stageRect.left,
+        top: rect.top - stageRect.top,
         width: rect.width,
         height: rect.height,
       });
@@ -1220,7 +1430,7 @@ const zonesForActiveView = useMemo(() => {
     window.addEventListener("resize", scheduleUpdate);
     window.addEventListener("orientationchange", scheduleUpdate);
     resizeObserver?.observe(renderer.canvas);
-    resizeObserver?.observe(rootRef.current);
+    resizeObserver?.observe(stageRef.current);
 
     return () => {
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
@@ -1233,22 +1443,86 @@ const zonesForActiveView = useMemo(() => {
   useImperativeHandle(
     ref,
     () => ({
-      capturePreview() {
+      async capturePreview() {
         if (!renderer?.canvas) return null;
         try {
-          return renderer.canvas.toDataURL("image/jpeg", 0.7);
+          const glCanvas = renderer.canvas;
+          const previewCanvas = document.createElement("canvas");
+          previewCanvas.width = glCanvas.width;
+          previewCanvas.height = glCanvas.height;
+
+          const ctx = previewCanvas.getContext("2d");
+          if (!ctx) {
+            return glCanvas.toDataURL("image/jpeg", 0.7);
+          }
+
+          ctx.drawImage(glCanvas, 0, 0, previewCanvas.width, previewCanvas.height);
+
+          (textLayers || []).forEach((layer) => {
+            if (!layer?.text) return;
+
+            const px = (layer.x ?? 0.5) * previewCanvas.width;
+            const py = (layer.y ?? 0.5) * previewCanvas.height;
+            const scaleX = layer.scaleX ?? 1;
+            const scaleY = layer.scaleY ?? 1;
+
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.rotate((((layer.rotation || 0) * Math.PI) / 180) || 0);
+            ctx.scale(scaleX, scaleY);
+            ctx.fillStyle = layer.color || "#000000";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.font = `700 ${layer.fontSize || 40}px ${layer.fontFamily || "Impact, sans-serif"}`;
+            ctx.fillText(layer.text, 0, 0);
+            ctx.restore();
+          });
+
+          const imageLayers = (designLayers || []).filter((layer) => !!layer?.imageUrl);
+          if (imageLayers.length) {
+            const results = await Promise.allSettled(
+              imageLayers.map((layer) => loadImage(normalizeImageUrl(layer.imageUrl)))
+            );
+
+            results.forEach((result, index) => {
+              if (result.status !== "fulfilled") {
+                console.warn("Preview image load failed:", imageLayers[index]?.imageUrl, result.reason);
+                return;
+              }
+
+              const layer = imageLayers[index];
+              const img = result.value;
+              const legacyScale = layer.scale ?? 0.35;
+              const scaleX = layer.scaleX ?? legacyScale;
+              const scaleY = layer.scaleY ?? legacyScale;
+              const drawW = previewCanvas.width * scaleX;
+              const drawH = previewCanvas.height * scaleY;
+              const px = (layer.x ?? 0.5) * previewCanvas.width;
+              const py = (layer.y ?? 0.5) * previewCanvas.height;
+
+              ctx.save();
+              ctx.translate(px, py);
+              ctx.rotate((((layer.rotation || 0) * Math.PI) / 180) || 0);
+              ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+              ctx.restore();
+            });
+          }
+
+          return previewCanvas.toDataURL("image/jpeg", 0.82);
         } catch (e) {
           console.error("Failed to capture preview", e);
           return null;
         }
       },
     }),
-    [renderer]
+    [renderer, textLayers, designLayers]
   );
 
   useEffect(() => {
     if (!renderer?.canvas) return;
     if (!canvasSize) return;
+
+    const renderSeq = ++designRenderSeqRef.current;
 
     const glCanvas = renderer.canvas;
     const w = glCanvas.width;
@@ -1329,6 +1603,8 @@ async function drawAll() {
           return loadImage(normalizeImageUrl(url));
         })
       );
+
+      if (cancelled || designRenderSeqRef.current !== renderSeq) return;
 
       // Log failures
       results.forEach((r, idx) => {
@@ -1432,6 +1708,8 @@ async function drawAll() {
         ctx.restore();
       });
 
+      if (cancelled || designRenderSeqRef.current !== renderSeq) return;
+
       if (updates.length) {
         setDesignLayers((prev) =>
           prev.map((l) => {
@@ -1442,7 +1720,9 @@ async function drawAll() {
       }
     }
 
-    renderer.updateDesignTexture(offscreen);
+    if (cancelled || designRenderSeqRef.current !== renderSeq) return;
+
+    renderer.clearDesignTexture();
     renderer.render(productColor);
 
     const activeDesign = (designLayers || []).find((d) => d.id === activeDesignId);
@@ -1464,6 +1744,9 @@ drawAll();
 
 return () => {
   cancelled = true;
+  if (designRenderSeqRef.current === renderSeq) {
+    designRenderSeqRef.current += 1;
+  }
 };
 
     
@@ -1522,18 +1805,29 @@ return () => {
       style={{ touchAction: isCompactUI ? "pan-y" : "none" }}
       onPointerDown={handleBackgroundPointerDown}
     >
-      {isCompactUI && isAdmin && (
-        <div className="flex justify-end rounded-2xl bg-white px-2 py-2 shadow-sm">
+      <div className="flex flex-wrap items-center justify-end gap-2 rounded-2xl bg-white/90 px-2 py-2 shadow-sm">
+        <button
+          onClick={() => setShowMeasurements((s) => !s)}
+          className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs shadow-sm hover:bg-slate-50"
+          type="button"
+        >
+          {showMeasurements ? "Hide Measurements" : "Show Measurements"}
+        </button>
+        {isAdmin && (
           <button
             onClick={() => setCalibrationMode(true)}
-            className="rounded-xl bg-blue-600 px-3 py-1.5 text-[11px] font-medium text-white shadow-sm"
+            className="rounded bg-blue-600 px-3 py-1.5 text-xs text-white shadow-sm hover:bg-blue-700"
             type="button"
           >
-            Calibrate
+            Calibrate Zones
           </button>
-        </div>
-      )}
-      <div className="relative" style={{ touchAction: isCompactUI ? "pan-y" : "none" }}>
+        )}
+      </div>
+      <div
+        ref={stageRef}
+        className="relative"
+        style={{ touchAction: isCompactUI ? "pan-y" : "none" }}
+      >
       <CanvasRenderer
         mockupUrl={mockupUrl}
         maskUrl={maskUrl}
@@ -1553,35 +1847,15 @@ return () => {
           }}
         >
           {showMeasurements && canvasSize && (
-            <MeasurementOverlay
+            <MeasurementOverlayPlain
               canvasSize={canvasSize}
               boundaries={boundaries}
               specs={specs}
-              view={activeView}
               zonesList={zonesForActiveView}
               calibratedConfig={calibratedConfig}
-              compact={isCompactUI}
+              compact={false}
             />
           )}
-
-      <div className={`absolute z-50 flex gap-2 ${isCompactUI ? "hidden" : "top-2 right-2"}`}>
-        <button
-          onClick={() => setShowMeasurements((s) => !s)}
-          className="bg-white/90 hover:bg-white rounded border border-slate-300 shadow-sm px-2 py-1 text-xs"
-          type="button"
-        >
-          {showMeasurements ? "Hide Measurements" : "Show Measurements"}
-        </button>
-        {isAdmin && (
-        <button
-          onClick={() => setCalibrationMode(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white rounded shadow-sm px-2 py-1 text-xs"
-          type="button"
-        >
-          Calibrate Zones
-        </button>
-        )}
-      </div>
       
 
       {calibrationMode && canvasSize && (
@@ -2067,7 +2341,7 @@ function DesignOverlay({
       const baseW = canvasSize?.width || rectWidth || 0;
       const baseH = canvasSize?.height || rectHeight || 0;
 
-      const currentZoneKey = getBoundaryKeyForLayer(initialLayer);
+      const currentZoneKey = layer?.zone || getBoundaryKeyForLayer(initialLayer);
 
       const getBoundaryForZone = (zoneKey) =>
         boundaries?.[zoneKey] ||
@@ -2079,7 +2353,17 @@ function DesignOverlay({
         const nyRaw = (initialLayer.y ?? 0.5) + dyPx / rectHeight;
 
         const zoneSource = zoneCandidates.length ? zoneCandidates : [currentZoneKey];
-        const detectedZone = pickZoneForPoint(nxRaw, nyRaw, zoneSource, boundaries) || currentZoneKey;
+        const zoneSwitchInsetRatio = compact ? 0.025 : 0.08;
+        const detectedZone =
+          pickZoneForPoint(
+            nxRaw,
+            nyRaw,
+            zoneSource,
+            boundaries,
+            currentZoneKey,
+            zoneSwitchInsetRatio
+          ) ||
+          currentZoneKey;
 
         const zoneKey = detectedZone;
         const b = getBoundaryForZone(zoneKey);
@@ -2153,7 +2437,7 @@ function DesignOverlay({
         );
       }
     },
-    [setDesignLayers, boundaries, canvasSize, zoneCandidates]
+    [setDesignLayers, boundaries, canvasSize, zoneCandidates, layer?.zone, compact]
   );
 
   const onPointerMove = useCallback(
@@ -2225,25 +2509,8 @@ function DesignOverlay({
   const sx = layer.scaleX ?? legacyScale;
   const sy = layer.scaleY ?? legacyScale;
 
-  const widthRatio =
-    canvasSize?.width && renderCanvasSize?.width
-      ? canvasSize.width / renderCanvasSize.width
-      : 1;
-  const heightRatio =
-    canvasSize?.height && renderCanvasSize?.height
-      ? canvasSize.height / renderCanvasSize.height
-      : 1;
-
-  const widthPx = layer.renderedWidthPx
-    ? layer.renderedWidthPx * widthRatio
-    : canvasSize?.width
-      ? canvasSize.width * sx
-      : 0;
-  const heightPx = layer.renderedHeightPx
-    ? layer.renderedHeightPx * heightRatio
-    : canvasSize?.height
-      ? canvasSize.height * sy
-      : 0;
+  const widthPx = canvasSize?.width ? canvasSize.width * sx : 0;
+  const heightPx = canvasSize?.height ? canvasSize.height * sy : 0;
   const compactHitPadding = 0;
   const centerXPx = (layer.x ?? 0.5) * (canvasSize?.width || 0);
   const centerYPx = (layer.y ?? 0.5) * (canvasSize?.height || 0);
@@ -2263,7 +2530,11 @@ function DesignOverlay({
           top: `${topPx}px`,
           transform: `rotate(${layer.rotation}deg)`,
         }}
-        transition={compact ? { duration: 0 } : { type: "spring", stiffness: 400, damping: 40 }}
+        transition={
+          compact
+            ? { type: "spring", stiffness: 700, damping: 42, mass: 0.35 }
+            : { type: "spring", stiffness: 400, damping: 40 }
+        }
         className="pointer-events-auto absolute"
         style={{
           cursor: disabled ? "default" : "grab",
@@ -2277,32 +2548,34 @@ function DesignOverlay({
         <div
           className={`relative overflow-hidden rounded-sm ${
             isActive
-              ? "border-2 border-blue-500 bg-blue-50/20"
+              ? "border-2 border-blue-500"
               : compact
-                ? "border border-blue-400/70 bg-blue-50/10"
-                : "border border-slate-300/50"
+                ? "border border-blue-400/70"
+                : "border border-slate-300/40"
           }`}
           style={{
             width: `${widthPx}px`,
             height: `${heightPx}px`,
             opacity: disabled ? 0.6 : 1,
-            backgroundColor: compact ? "rgba(59, 130, 246, 0.04)" : undefined,
+            backgroundColor: "transparent",
             pointerEvents: "auto",
           }}
           onPointerDown={(e) => startDrag(e, "move")}
         >
-          {/* {layer.imageUrl && (
+          {layer.imageUrl && (
             <img
               src={normalizeImageUrl(layer.imageUrl)}
               alt="design"
               style={{
                 width: "100%",
                 height: "100%",
-                objectFit: "contain",
+                objectFit: "fill",
+                opacity: isActive ? 0.96 : 0.9,
                 pointerEvents: "none",
               }}
+              draggable={false}
             />
-          )} */}
+          )}
 
           {/* ✅ Resize handles (independent axes) */}
           {isActive && !disabled && (
@@ -2334,7 +2607,7 @@ function DesignOverlay({
           )}
         </div>
 
-        {isActive && !compact && (
+        {false && isActive && !compact && (
           <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/75 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap">
             {layer.renderedWidthInches?.toFixed?.(1) || "?"}″ ×{" "}
             {layer.renderedHeightInches?.toFixed?.(1) || "?"}″{" "}

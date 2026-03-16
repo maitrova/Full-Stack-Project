@@ -91,6 +91,140 @@ const getColorLabel = (colorValue) => {
   return label ? label : `Custom (${colorValue.toUpperCase()})`;
 };
 
+const formatCouponPrimaryText = (coupon) => {
+  if (!coupon) return "";
+  if (coupon.discountType === "PERCENTAGE") {
+    const maxText =
+      coupon.maximumDiscountAmount !== null && coupon.maximumDiscountAmount !== undefined
+        ? ` up to Rs.${Number(coupon.maximumDiscountAmount).toFixed(0)}`
+        : "";
+    return `${Number(coupon.discountValue || 0).toFixed(0)}% off${maxText}`;
+  }
+  return `Flat Rs.${Number(coupon.discountValue || 0).toFixed(0)} off`;
+};
+
+const formatCouponMeta = (coupon) => {
+  if (!coupon) return "";
+  const parts = [];
+  if (Number(coupon.minimumCartAmount || 0) > 0) {
+    parts.push(`Min order Rs.${Number(coupon.minimumCartAmount).toFixed(0)}`);
+  }
+  if (coupon.firstOrderOnly || coupon.newCustomersOnly) {
+    parts.push("First order only");
+  }
+  if (coupon.autoApply) {
+    parts.push("Auto apply");
+  }
+  return parts.join(" • ");
+};
+
+const formatCouponExpiry = (coupon) => {
+  if (!coupon?.endDate) return "";
+  const endDate = new Date(coupon.endDate);
+  if (Number.isNaN(endDate.getTime())) return "";
+  return `Valid till ${endDate.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })}`;
+};
+
+const CouponListSection = ({
+  coupons,
+  loading,
+  copiedCouponCode,
+  onCopy,
+  className = "",
+}) => (
+  <section
+    className={`rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-4 shadow-sm ${className}`.trim()}
+  >
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-600">
+          Available Coupons
+        </p>
+        <h3 className="mt-1 text-sm font-semibold text-slate-900">
+          Apply these offers at checkout
+        </h3>
+      </div>
+      <div className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-emerald-700 shadow-sm">
+        {loading ? "Loading..." : `${coupons.length} live`}
+      </div>
+    </div>
+
+    {loading ? (
+      <div className="mt-4 space-y-3">
+        {[0, 1].map((item) => (
+          <div
+            key={item}
+            className="animate-pulse rounded-2xl border border-white/80 bg-white/80 p-3"
+          >
+            <div className="h-3 w-24 rounded bg-slate-200" />
+            <div className="mt-3 h-4 w-40 rounded bg-slate-200" />
+            <div className="mt-2 h-3 w-full rounded bg-slate-100" />
+            <div className="mt-2 h-3 w-2/3 rounded bg-slate-100" />
+          </div>
+        ))}
+      </div>
+    ) : coupons.length ? (
+      <div className="mt-4 space-y-3">
+        {coupons.map((coupon) => (
+          <article
+            key={coupon.code}
+            className="rounded-2xl border border-emerald-200 bg-white/95 p-3 shadow-[0_10px_30px_rgba(15,23,42,0.06)]"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="inline-flex rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
+                  {coupon.code}
+                </div>
+                <p className="mt-2 text-sm font-semibold text-slate-900">
+                  {formatCouponPrimaryText(coupon)}
+                </p>
+                {coupon.description ? (
+                  <p className="mt-1 text-xs leading-5 text-slate-600">
+                    {coupon.description}
+                  </p>
+                ) : null}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => onCopy(coupon.code)}
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${
+                  copiedCouponCode === coupon.code
+                    ? "border-emerald-200 bg-emerald-100 text-emerald-700"
+                    : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
+                }`}
+              >
+                {copiedCouponCode === coupon.code ? "Copied" : "Copy"}
+              </button>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {formatCouponMeta(coupon) ? (
+                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
+                  {formatCouponMeta(coupon)}
+                </span>
+              ) : null}
+              {formatCouponExpiry(coupon) ? (
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                  {formatCouponExpiry(coupon)}
+                </span>
+              ) : null}
+            </div>
+          </article>
+        ))}
+      </div>
+    ) : (
+      <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white/80 px-4 py-5 text-sm text-slate-500">
+        No active coupons available right now.
+      </div>
+    )}
+  </section>
+);
+
 const createDefaultTextLayer = () => ({
   id: "text-" + Date.now() + "-" + Math.random().toString(36).slice(2),
   text: "YOUR TEXT",
@@ -197,6 +331,9 @@ const getSizeBasePrice = (prod, size) => {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [calculatingPrice, setCalculatingPrice] = useState(false);
   const [selectedLibraryImage, setSelectedLibraryImage] = useState(null);
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+  const [loadingCoupons, setLoadingCoupons] = useState(false);
+  const [copiedCouponCode, setCopiedCouponCode] = useState("");
   
   const [price, setPrice] = useState(BASE_PRICE);
   const [priceBreakdown, setPriceBreakdown] = useState({
@@ -223,6 +360,7 @@ const getSizeBasePrice = (prod, size) => {
   // Active tab state
   const [activeTab, setActiveTab] = useState(TABS.PRODUCT_COLORS);
   const [showMobilePriceDetails, setShowMobilePriceDetails] = useState(false);
+  const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
 
   const editorRef = useRef(null);
 
@@ -230,6 +368,36 @@ const getSizeBasePrice = (prod, size) => {
     setProductColor(color);
     setProductColorName(label || getColorLabel(color));
   };
+
+  const handleCopyCoupon = async (couponCode) => {
+    if (!couponCode) return;
+
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(couponCode);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = couponCode;
+        textArea.setAttribute("readonly", "");
+        textArea.style.position = "absolute";
+        textArea.style.left = "-9999px";
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+      }
+
+      setCopiedCouponCode(couponCode);
+      window.setTimeout(() => {
+        setCopiedCouponCode((currentCode) =>
+          currentCode === couponCode ? "" : currentCode
+        );
+      }, 1800);
+    } catch (copyError) {
+      console.error("Failed to copy coupon:", copyError);
+    }
+  };
+
   const getImageSizeFromFile = (file) =>
   new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
@@ -646,6 +814,39 @@ const finalUrl = rawUrl.startsWith("http")
     dispatch(fetchFolders());
   }, [dispatch]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCoupons = async () => {
+      try {
+        setLoadingCoupons(true);
+        const res = await fetch(`${API_URL}/coupons/active`);
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.message || "Failed to load coupons");
+        }
+        if (!cancelled) {
+          setAvailableCoupons(Array.isArray(data?.coupons) ? data.coupons : []);
+        }
+      } catch (couponError) {
+        console.error("Failed to load coupons:", couponError);
+        if (!cancelled) {
+          setAvailableCoupons([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingCoupons(false);
+        }
+      }
+    };
+
+    loadCoupons();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Fetch images when folder changes
   useEffect(() => {
     if (activeTab === TABS.DESIGN_LIBRARY && currentFolder) {
@@ -919,6 +1120,8 @@ const handleDesignUpload = async (e) => {
       designLayers: all,
       activeDesignId: lastId,
     });
+    setActiveTab(TABS.DESIGNS);
+    setIsLibraryModalOpen(false);
 
   } catch (err) {
     console.error("Error uploading design images:", err);
@@ -967,6 +1170,7 @@ const handleDesignUpload = async (e) => {
 
       // Switch to designs tab to show the controls
       setActiveTab(TABS.DESIGNS);
+      setIsLibraryModalOpen(false);
       setSelectedLibraryImage(image.filename);
       
     } catch (err) {
@@ -1238,7 +1442,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
       setViewCode(v.code);
       await new Promise((resolve) => setTimeout(resolve, 3000));
 
-      const img = editorRef.current?.capturePreview?.() || null;
+      const img = (await editorRef.current?.capturePreview?.()) || null;
       if (img) {
         previewsByCode[v.code] = img;
       }
@@ -1675,7 +1879,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
       <div className="flex flex-1 min-h-0 flex-col gap-4 px-2 pb-6 pt-2 sm:gap-6 sm:px-6 sm:pt-3">
         <div className="flex flex-1 flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)_minmax(0,320px)] lg:items-start lg:gap-6">
           {/* Mobile helper card */}
-          <div className="hidden">
+          <div className="lg:hidden">
             <div className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 text-[11px] text-slate-600 shadow-sm">
               <p className="mb-1 font-semibold text-slate-800">Design tips</p>
               <p className="text-[11px] leading-tight text-slate-600">
@@ -1706,7 +1910,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
               </div>
             </div>
           </div>
-          <div className="hidden">
+          <div className="lg:hidden">
             <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-3">
               <div className="rounded-2xl bg-slate-50 px-3 py-2">
                 <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Size</div>
@@ -1735,6 +1939,14 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                 </button>
               </div>
             </div>
+          </div>
+          <div className="lg:hidden">
+            <CouponListSection
+              coupons={availableCoupons}
+              loading={loadingCoupons}
+              copiedCouponCode={copiedCouponCode}
+              onCopy={handleCopyCoupon}
+            />
           </div>
           {/* Left sidebar - Controls */}
           <aside className="order-2 w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col gap-4 min-h-0 lg:order-1 lg:w-auto lg:gap-6">
@@ -2224,64 +2436,32 @@ const nudgeDesignScaleAxis = (axis, delta) => {
               <div className="space-y-6">
                 <div>
                   <h3 className="mb-3 font-semibold text-sm">Design Library</h3>
-                  <p className="mb-3 text-xs text-slate-600">Select designs from your library to use on your product.</p>
+                  <p className="mb-3 text-xs text-slate-600">Open the library in a popup so the sidebar stays compact.</p>
 
-                  {/* Folder selection */}
-                  <div className="mb-4">
-                    <label className="mb-2 block text-xs font-medium">Select Folder</label>
-                    <div className="flex flex-wrap gap-2">
-                      {folders.map((folder) => (
-                        <button
-                          key={folder}
-                          type="button"
-                          onClick={() => dispatch(setCurrentFolder(folder))}
-                          className={`px-3 py-1 rounded text-xs border ${currentFolder === folder ? 'bg-sky-100 border-sky-300 text-sky-700' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}`}
-                        >
-                          {folder}
-                        </button>
-                      ))}
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">Library Picker</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {currentFolder
+                            ? `Current folder: ${currentFolder}${images.length ? ` • ${images.length} design${images.length === 1 ? "" : "s"}` : ""}`
+                            : "Choose a folder and select a design in the popup."}
+                        </p>
+                        {selectedLibraryImage && (
+                          <p className="mt-2 text-xs text-sky-700">
+                            Last selected: <span className="font-medium">{selectedLibraryImage}</span>
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsLibraryModalOpen(true)}
+                        className="rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+                      >
+                        Open Library
+                      </button>
                     </div>
                   </div>
-
-                  {/* Images grid */}
-                  {libraryLoading ? (
-                    <div className="flex justify-center py-8">
-                      <div className="text-xs text-slate-500">Loading designs...</div>
-                    </div>
-                  ) : currentFolder && images.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                      {images.map((image) => (
-                        <div 
-                          key={image.filename} 
-                          className="relative group cursor-pointer"
-                          onClick={() => handleSelectFromLibrary(image)}
-                        >
-                          <div className="aspect-square overflow-hidden rounded border border-slate-200 bg-slate-50">
-                            <img 
-                              src={`${IMAGE_URL}/outputs/adminuploadeddesigns/${currentFolder}/${image.filename}`} 
-                              alt={image.filename}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                              loading="lazy"
-                            />
-                          </div>
-                          <div className="mt-1 text-[10px] text-slate-600 truncate">
-                            {image.filename}
-                          </div>
-                          <div className="absolute inset-0 bg-sky-500/0 group-hover:bg-sky-500/10 transition-colors rounded border-2 border-transparent group-hover:border-sky-400"></div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : currentFolder ? (
-                    <div className="p-4 bg-slate-50 rounded border border-slate-200 text-center">
-                      <p className="text-xs text-slate-600">No designs in this folder</p>
-                      <p className="text-[10px] text-slate-500 mt-1">Upload designs to this folder in the admin panel</p>
-                    </div>
-                  ) : (
-                    <div className="p-4 bg-slate-50 rounded border border-slate-200 text-center">
-                      <p className="text-xs text-slate-600">Select a folder to view designs</p>
-                      <p className="text-[10px] text-slate-500 mt-1">Designs are organized in folders for easy access</p>
-                    </div>
-                  )}
 
                   <div className="hidden text-xs text-slate-600 space-y-2 mt-4 sm:block">
                     <p className="font-medium">How to use:</p>
@@ -2304,6 +2484,127 @@ const nudgeDesignScaleAxis = (axis, delta) => {
             </div>
           )}
         </aside>
+
+        {isLibraryModalOpen && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/55 p-3 sm:p-6">
+            <div className="flex h-[min(88vh,760px)] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
+              <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-6">
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900">Design Library</h3>
+                  <p className="mt-1 text-xs text-slate-500">Browse folders, upload a design, or pick one from the library.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsLibraryModalOpen(false)}
+                  className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="grid gap-0 overflow-hidden lg:grid-cols-[280px_minmax(0,1fr)]">
+                <div className="border-b border-slate-200 bg-slate-50/80 p-4 lg:border-b-0 lg:border-r">
+                  <div>
+                    <label className="mb-2 block text-xs font-medium text-slate-700">Upload a design</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleDesignUpload}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs"
+                    />
+                    <p className="mt-2 text-[11px] text-slate-500">Uploaded files go straight into your editable design layers.</p>
+                  </div>
+
+                  <div className="mt-5">
+                    <label className="mb-2 block text-xs font-medium text-slate-700">Folders</label>
+                    <div className="flex max-h-[220px] flex-wrap gap-2 overflow-y-auto pr-1 lg:max-h-[420px]">
+                      {folders.map((folder) => (
+                        <button
+                          key={folder}
+                          type="button"
+                          onClick={() => dispatch(setCurrentFolder(folder))}
+                          className={`rounded-full border px-3 py-1.5 text-xs ${
+                            currentFolder === folder
+                              ? "border-sky-300 bg-sky-100 text-sky-700"
+                              : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                          }`}
+                        >
+                          {folder}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex min-h-0 flex-col">
+                  <div className="border-b border-slate-200 px-4 py-3 sm:px-6">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-800">
+                          {currentFolder || "Select a folder"}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {currentFolder
+                            ? `${images.length} design${images.length === 1 ? "" : "s"} available`
+                            : "Choose a folder on the left to view designs."}
+                        </p>
+                      </div>
+                      {selectedLibraryImage && (
+                        <div className="hidden rounded-full bg-sky-50 px-3 py-1 text-[11px] font-medium text-sky-700 sm:block">
+                          Last selected: {selectedLibraryImage}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+                    {libraryLoading ? (
+                      <div className="flex h-full items-center justify-center text-xs text-slate-500">
+                        Loading designs...
+                      </div>
+                    ) : currentFolder && images.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                        {images.map((image) => (
+                          <button
+                            key={image.filename}
+                            type="button"
+                            onClick={() => handleSelectFromLibrary(image)}
+                            className="group text-left"
+                          >
+                            <div className="aspect-square overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                              <img
+                                src={`${IMAGE_URL}/outputs/adminuploadeddesigns/${currentFolder}/${image.filename}`}
+                                alt={image.filename}
+                                className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                                loading="lazy"
+                              />
+                            </div>
+                            <div className="mt-2 truncate text-[11px] text-slate-600">{image.filename}</div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : currentFolder ? (
+                      <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
+                        <div>
+                          <p className="text-sm font-medium text-slate-700">No designs in this folder</p>
+                          <p className="mt-1 text-xs text-slate-500">Upload a design above or choose another folder.</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
+                        <div>
+                          <p className="text-sm font-medium text-slate-700">Select a folder to view designs</p>
+                          <p className="mt-1 text-xs text-slate-500">The popup keeps the library compact while still letting you browse everything.</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Center workspace */}
         <main className="order-1 flex min-h-0 flex-1 flex-col overflow-auto lg:order-2">
@@ -2536,6 +2837,14 @@ const nudgeDesignScaleAxis = (axis, delta) => {
               </div>
             </div>
           </div>
+
+          <CouponListSection
+            coupons={availableCoupons}
+            loading={loadingCoupons}
+            copiedCouponCode={copiedCouponCode}
+            onCopy={handleCopyCoupon}
+            className="mt-6"
+          />
           
           {/* Pricing Info */}
           <div className={`${showMobilePriceDetails ? "block" : "hidden"} mt-6 pt-4 border-t border-slate-200 lg:block`}>
@@ -2554,46 +2863,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
     </div>
 
     {/* Bottom bar */}
-    <footer className="sticky bottom-0 z-20 flex flex-col gap-2 border-t border-slate-200 bg-white/95 px-4 py-3 text-xs backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <div className="flex flex-col gap-1">
-          <span className="font-semibold">{product?.name || "Custom Product"}</span>
-          <span className="text-slate-500">
-            Color: <span className="font-medium">{productColorName}</span>
-            <span className="ml-2 text-[10px] text-slate-400">{productColor?.toUpperCase()}</span>
-            {isEditMode && <span className="ml-3 text-amber-600">• Editing mode •</span>}
-          </span>
-        </div>
-        <span className="hidden text-slate-400 lg:inline">
-          {isEditMode ? "Editing existing design. Changes will update the original when you click 'Update Design'." : "Drag, resize, and customize elements. Click tabs on the left to switch between tools."}
-        </span>
-        <div className="flex flex-col gap-2 pt-2 sm:pt-0">
-          <div className="text-[11px] text-slate-500 lg:hidden">
-            Total Rs.{price.toFixed(2)}. Save your work before adding it to cart.
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleSaveDesign}
-              disabled={saving || addingToCart}
-              className="flex-1 rounded-full border border-sky-600 bg-sky-600 px-4 py-2 text-[11px] font-semibold text-white hover:bg-sky-700 disabled:opacity-60 sm:flex-initial"
-            >
-              {saving ? "Saving…" : isEditMode ? "Update design" : "Save design"}
-            </button>
-            <button
-              type="button"
-              onClick={handleSaveAndAddToCart}
-              disabled={saving || addingToCart}
-              className="flex-1 rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-[11px] font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 sm:flex-initial"
-            >
-              {addingToCart
-                ? "Adding…"
-                : savedDesignId
-                  ? "Add to cart"
-                  : "Save & add to cart"}
-            </button>
-          </div>
-        </div>
-      </footer>
+   
     </div>
   );
 }

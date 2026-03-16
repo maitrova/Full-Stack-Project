@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loadRazorpay } from "../utils/loadRazorpay.js";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/api";
 
 export default function RazorpayPayNow({
   token,

@@ -17,7 +17,7 @@ import { getCart, selectCartItems, selectCartSummary } from "../redux/slices/Car
 import { selectCurrentToken } from "../redux/slices/Userslice.js";
 import RazorpayPayNow from "../components/RazorpayPayNow.jsx";
 
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/api";
 
 const emptyAddress = { fullName: "", mobileNumber: "", completeAddress: "", landmark: "", pincode: "", city: "", state: "" };
 const emptyCouponState = { code: "", status: "idle", message: "", discount: 0, coupon: null, subtotal: null };
