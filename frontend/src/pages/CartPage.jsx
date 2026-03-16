@@ -481,7 +481,7 @@ const CartPage = () => {
           
         </div>
 
-        {/* Mobile Order Summary Toggle */}
+        {/* Mobile Order Summary Toggle - Now without checkout button */}
         <div className="lg:hidden mb-4">
           <button
             onClick={() => setExpandedMobileMenu(!expandedMobileMenu)}
@@ -508,12 +508,32 @@ const CartPage = () => {
               <OrderSummaryContent
                 cartSummary={cartSummary}
                 formatPrice={formatPrice}
-                handleCheckout={handleCheckout}
-                isCheckoutLoading={isCheckoutLoading}
+                hideCheckoutButton={true} // Hide checkout button in dropdown
                 cartItems={cartItems}
               />
             </div>
           )}
+        </div>
+
+        {/* Mobile Checkout Button - Always visible at the top of cart items on mobile */}
+        <div className="lg:hidden mb-4">
+          <button
+            onClick={handleCheckout}
+            disabled={isCheckoutLoading || cartItems.length === 0}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-4 rounded-xl shadow-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-base"
+          >
+            {isCheckoutLoading ? (
+              <span className="flex items-center justify-center">
+                <svg className="animate-spin h-5 w-5 mr-2 text-current" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing...
+              </span>
+            ) : (
+              `Proceed to Checkout • ${formatPrice(cartSummary.total, 'INR')}`
+            )}
+          </button>
         </div>
 
         <div className="lg:grid lg:grid-cols-12 lg:gap-8">
@@ -761,6 +781,7 @@ const CartPage = () => {
                 handleCheckout={handleCheckout}
                 isCheckoutLoading={isCheckoutLoading}
                 cartItems={cartItems}
+                showCheckoutButton={true} // Show checkout button in desktop
               />
             </div>
           </div>
@@ -770,8 +791,16 @@ const CartPage = () => {
   );
 };
 
-// Separate component for Order Summary to avoid code duplication
-const OrderSummaryContent = ({ cartSummary, formatPrice, handleCheckout, isCheckoutLoading, cartItems }) => (
+// Updated Order Summary component with conditional checkout button
+const OrderSummaryContent = ({ 
+  cartSummary, 
+  formatPrice, 
+  handleCheckout, 
+  isCheckoutLoading, 
+  cartItems,
+  showCheckoutButton = true,
+  hideCheckoutButton = false 
+}) => (
   <>
     <div className="space-y-3 sm:space-y-4">
       <div className="flex justify-between">
@@ -802,24 +831,26 @@ const OrderSummaryContent = ({ cartSummary, formatPrice, handleCheckout, isCheck
       </div>
     </div>
 
-    {/* Checkout Button */}
-    <button
-      onClick={handleCheckout}
-      disabled={isCheckoutLoading || cartItems.length === 0}
-      className="w-full mt-6 sm:mt-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
-    >
-      {isCheckoutLoading ? (
-        <span className="flex items-center justify-center">
-          <svg className="animate-spin h-5 w-5 mr-2 text-current" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          Processing...
-        </span>
-      ) : (
-        'Proceed to Checkout'
-      )}
-    </button>
+    {/* Checkout Button - Only show if not hidden and showCheckoutButton is true */}
+    {!hideCheckoutButton && showCheckoutButton && (
+      <button
+        onClick={handleCheckout}
+        disabled={isCheckoutLoading || cartItems.length === 0}
+        className="w-full mt-6 sm:mt-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+      >
+        {isCheckoutLoading ? (
+          <span className="flex items-center justify-center">
+            <svg className="animate-spin h-5 w-5 mr-2 text-current" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Processing...
+          </span>
+        ) : (
+          'Proceed to Checkout'
+        )}
+      </button>
+    )}
 
     {/* Additional Info - Mobile Optimized */}
     <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200">
@@ -836,6 +867,8 @@ const OrderSummaryContent = ({ cartSummary, formatPrice, handleCheckout, isCheck
         <span>Secure checkout</span>
       </div>
     </div>
+
+    
   </>
 );
 
