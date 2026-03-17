@@ -35,6 +35,7 @@ import {
   Package,
   AlertCircle,
 } from "lucide-react";
+import { getResponsiveImageProps } from "../utils/responsiveImage.js";
 
 const DropProductDetailsPage = () => {
   const { id } = useParams();
@@ -58,17 +59,6 @@ const DropProductDetailsPage = () => {
 
   const mainImageRef = useRef(null);
   const thumbnailContainerRef = useRef(null);
-
-  // ✅ IMPORTANT: this should be your backend base URL for serving images
-  const IMAGE_URL = import.meta.env.VITE_IMAGE_URL || "https://maitrova.in/backend";
-
-  const buildImg = (path) => {
-    if (!path) return "";
-    if (path.startsWith("http://") || path.startsWith("https://")) return path;
-    const base = IMAGE_URL.endsWith("/") ? IMAGE_URL.slice(0, -1) : IMAGE_URL;
-    const p = path.startsWith("/") ? path : `/${path}`;
-    return `${base}${p}`;
-  };
 
   useEffect(() => {
     if (id) dispatch(getDropproductById(id));
@@ -378,7 +368,13 @@ const DropProductDetailsPage = () => {
             {/* Main Image */}
             <div className="relative bg-white rounded-3xl shadow-xl overflow-hidden group">
               <div className="relative h-[500px] md:h-[600px] overflow-hidden">
-                {product.images?.map((image, index) => (
+                {product.images?.map((image, index) => {
+                  const imageProps = getResponsiveImageProps(image, {
+                    sizes: "(max-width: 1024px) 100vw, 50vw",
+                    loading: index === 0 ? "eager" : "lazy",
+                  });
+
+                  return (
                   <div
                     key={index}
                     className={`absolute inset-0 transition-opacity duration-500 ${
@@ -389,16 +385,31 @@ const DropProductDetailsPage = () => {
 
                     <img
                       ref={mainImageRef}
-                      src={buildImg(image)}
+                      src={imageProps.src}
+                      srcSet={imageProps.srcSet}
+                      sizes={imageProps.sizes}
                       alt={`${product.name} - ${index + 1}`}
                       className={`w-full h-full object-contain p-4 transition-transform duration-700 ${
                         imageLoading ? "opacity-0" : "opacity-100"
                       }`}
+                      style={
+                        imageProps.placeholder
+                          ? {
+                              backgroundImage: `url(${imageProps.placeholder})`,
+                              backgroundPosition: "center",
+                              backgroundSize: "cover",
+                            }
+                          : undefined
+                      }
                       onLoad={() => setImageLoading(false)}
                       onError={() => setImageLoading(false)}
+                      loading={imageProps.loading}
+                      decoding={imageProps.decoding}
+                      fetchPriority={imageProps.fetchPriority}
                     />
                   </div>
-                ))}
+                  );
+                })}
 
                 {/* Nav overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
@@ -439,7 +450,12 @@ const DropProductDetailsPage = () => {
                 className="flex space-x-3 overflow-x-auto pb-4 scrollbar-hide"
                 style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
               >
-                {product.images?.map((image, index) => (
+                {product.images?.map((image, index) => {
+                  const thumbProps = getResponsiveImageProps(image, {
+                    sizes: "80px",
+                  });
+
+                  return (
                   <button
                     key={index}
                     onClick={() => scrollToImage(index)}
@@ -449,9 +465,19 @@ const DropProductDetailsPage = () => {
                         : "border-gray-200 hover:border-gray-300"
                     }`}
                   >
-                    <img src={buildImg(image)} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-cover" />
+                    <img
+                      src={thumbProps.src}
+                      srcSet={thumbProps.srcSet}
+                      sizes={thumbProps.sizes}
+                      alt={`Thumbnail ${index + 1}`}
+                      className="w-full h-full object-cover"
+                      loading={thumbProps.loading}
+                      decoding={thumbProps.decoding}
+                      fetchPriority={thumbProps.fetchPriority}
+                    />
                   </button>
-                ))}
+                  );
+                })}
               </div>
 
               {product.images?.length > 5 && (

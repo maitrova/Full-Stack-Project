@@ -39,6 +39,7 @@ const __dirname = path.dirname(__filename);
 connectDB();
 
 const app = express();
+const outputsDir = path.join(__dirname, "outputs");
 const defaultCorsOrigins = [
   "http://localhost:5173",
   "http://maitrova.in",
@@ -76,20 +77,20 @@ app.use(
 });
 
 
-// Static files - serve at both /outputs and /api/outputs
-// app.use("/outputs", express.static(path.join(__dirname, "outputs")));
-app.use(
-  "/api/outputs",
-  express.static(path.join(__dirname, "outputs"), {
-    maxAge: "30d",
-    etag: true,
-    setHeaders: (res, filePath) => {
-      if (/\.(avif|webp|png|jpe?g|gif|svg|mp4|webm)$/i.test(filePath)) {
-        res.setHeader("Cache-Control", "public, max-age=2592000, immutable");
-      }
-    },
-  })
-);
+// Static files - direct image access with long-lived caching
+const staticOutputs = express.static(outputsDir, {
+  maxAge: "365d",
+  etag: true,
+  immutable: true,
+  setHeaders: (res, filePath) => {
+    if (/\.(avif|webp|png|jpe?g|gif|svg|mp4|webm)$/i.test(filePath)) {
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    }
+  },
+});
+
+app.use("/outputs", staticOutputs);
+app.use("/api/outputs", staticOutputs);
 
 // Health check endpoint for Kubernetes
 app.get('/health', (req, res) => {

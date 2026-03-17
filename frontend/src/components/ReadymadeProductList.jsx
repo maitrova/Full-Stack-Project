@@ -10,10 +10,10 @@ import {
   selectCartSuccess,
   selectCartError,
   clearError,
-  clearSuccess,
-  getItemQuantity 
+  clearSuccess
 } from '../redux/slices/Cartslice.js'; // Adjust path as needed
-const IMAGE_URL = import.meta.env.VITE_IMAGE_URL;
+import { buildImageUrl, getRawImagePath, getResponsiveImageProps } from "../utils/responsiveImage.js";
+
 const ReadymadeProductList = () => {
   const dispatch = useDispatch();
   const { products, loading, error } = useSelector((state) => state.readymadeproducts);
@@ -33,6 +33,7 @@ const ReadymadeProductList = () => {
   const [hasError, setHasError] = useState(false);
   const [addingToCartId, setAddingToCartId] = useState(null);
   const [notification, setNotification] = useState({ show: false, message: '', type: '' });
+  const [visibleCount, setVisibleCount] = useState(12);
   const slideInterval = useRef({});
 
   useEffect(() => {
@@ -246,11 +247,6 @@ const ReadymadeProductList = () => {
     }
   };
 
-  const getRawImagePath = (image) => {
-    if (!image) return null;
-    return typeof image === 'string' ? image : image.url || null;
-  };
-
   const getProductImages = (product) => {
     const images = Array.isArray(product?.images)
       ? product.images.map(getRawImagePath).filter(Boolean)
@@ -262,20 +258,7 @@ const ReadymadeProductList = () => {
       : images;
   };
 
-  // Safe image URL construction
-  const getImageUrl = (imagePath) => {
-    const normalizedPath = getRawImagePath(imagePath);
-    if (!normalizedPath) return null;
-    
-    // Handle both relative and absolute URLs
-    if (normalizedPath.startsWith('http')) {
-      return normalizedPath;
-    } else if (normalizedPath.startsWith('/')) {
-      return `${IMAGE_URL}${normalizedPath}`;
-    } else {
-      return `${IMAGE_URL}/${normalizedPath}`;
-    }
-  };
+  const getImageUrl = (imagePath) => buildImageUrl(imagePath);
 
   // Safe category extraction
   const getCategories = () => {
@@ -292,6 +275,11 @@ const ReadymadeProductList = () => {
 
   const sortedProducts = getSortedProducts();
   const categories = getCategories();
+  const visibleProducts = sortedProducts.slice(0, visibleCount);
+
+  useEffect(() => {
+    setVisibleCount(12);
+  }, [searchTerm, categoryFilter, sortBy]);
 
   // Error state
   if (hasError) {
@@ -422,12 +410,15 @@ const ReadymadeProductList = () => {
 
         {/* Products Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {sortedProducts.map((product) => {
+          {visibleProducts.map((product) => {
             const productImages = getProductImages(product);
             const currentIndex = currentImageIndex[product?._id] || 0;
             const hasMultipleImages = productImages.length > 1;
             const mainImage = productImages[currentIndex] || productImages[0] || null;
-            const imageUrl = getImageUrl(mainImage);
+            const imageProps = getResponsiveImageProps(mainImage, {
+              sizes: "(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw",
+            });
+            const imageUrl = imageProps.src || getImageUrl(mainImage);
             const isInCart = isItemInCart(product?._id);
             const cartQuantity = getCartQuantity(product?._id);
             const isOutOfStock = !product?.isActive || product?.stock <= 0;
@@ -446,11 +437,22 @@ const ReadymadeProductList = () => {
                   {imageUrl ? (
                     <img
                       src={imageUrl}
+                      srcSet={imageProps.srcSet}
+                      sizes={imageProps.sizes}
                       alt={product?.title || 'Product image'}
-                      loading="lazy"
-                      decoding="async"
-                      fetchPriority="low"
+                      loading={imageProps.loading}
+                      decoding={imageProps.decoding}
+                      fetchPriority={imageProps.fetchPriority}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      style={
+                        imageProps.placeholder
+                          ? {
+                              backgroundImage: `url(${imageProps.placeholder})`,
+                              backgroundPosition: "center",
+                              backgroundSize: "cover",
+                            }
+                          : undefined
+                      }
                       onError={(e) => {
                         e.target.onerror = null;
                         e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9IiNFNUU1RTUiLz48cGF0aCBkPSJNNTAgNzVMMTAwIDEyNUwxNTAgNzUiIHN0cm9rZT0iI0I4QjhCOCIgc3Ryb2tlLXdpZHRoPSIyIi8+PHBhdGggZD0iTTUwIDEyNUwxMDAgNzVMMTUwIDEyNSIgc3Ryb2tlPSIjQjhCOEI4IiBzdHJva2Utd2lkdGg9IjIiLz48L3N2Zz4=';
@@ -602,6 +604,17 @@ const ReadymadeProductList = () => {
             );
           })}
         </div>
+
+        {sortedProducts.length > visibleProducts.length && (
+          <div className="mt-8 flex justify-center">
+            <button
+              onClick={() => setVisibleCount((count) => count + 12)}
+              className="rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              Load More Products
+            </button>
+          </div>
+        )}
 
         {/* Empty State */}
         {sortedProducts.length === 0 && (

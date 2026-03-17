@@ -18,17 +18,10 @@ import {
   clearSuccess,
 } from '../redux/slices/Cartslice.js';
 import { selectCurrentToken } from '../redux/slices/Userslice.js';
+import { buildImageUrl, getRawImagePath, getResponsiveImageProps } from "../utils/responsiveImage.js";
 
 // Constants
-const API_BASE_URL = import.meta.env.VITE_IMAGE_URL || "https://maitrova.in/backend";
-
-const ensureImageUrl = (imagePath) => {
-  if (!imagePath) return null;
-  if (imagePath.startsWith("data:")) return imagePath;
-  if (imagePath.startsWith("blob:")) return imagePath;
-  if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) return imagePath;
-  return `${API_BASE_URL}${imagePath.startsWith("/") ? "" : "/"}${imagePath}`;
-};
+const ensureImageUrl = (imagePath) => buildImageUrl(imagePath) || null;
 
 const getPlainTextFromHtml = (value) => {
   if (!value || typeof value !== "string") return "";
@@ -130,11 +123,13 @@ const CartPage = () => {
   };
 
   // Get main image URL
-  const getImageUrl = (item) => {
-    if (item.previewImage) return ensureImageUrl(item.previewImage);
+  const getImagePath = (item) => {
+    if (item.previewImage) return getRawImagePath(item.previewImage);
     let imagePath = null;
     if (item.kind === "READYMADE") {
-      if (item.dropproduct?.images?.length) imagePath = item.dropproduct.images[0];
+      if (item.dropproduct?.thumbnail) imagePath = item.dropproduct.thumbnail;
+      else if (item.dropproduct?.images?.length) imagePath = item.dropproduct.images[0];
+      else if (item.readymadeProduct?.thumbnail) imagePath = item.readymadeProduct.thumbnail;
       else if (item.readymadeProduct?.images?.length) imagePath = item.readymadeProduct.images[0];
     } else if (item.kind === "DESIGN") {
       if (item.design?.images?.length) imagePath = item.design.images[0];
@@ -142,6 +137,11 @@ const CartPage = () => {
     } else if (item.product?.images?.length) {
       imagePath = item.product.images[0];
     }
+    return getRawImagePath(imagePath);
+  };
+
+  const getImageUrl = (item) => {
+    const imagePath = getImagePath(item);
     return imagePath ? ensureImageUrl(imagePath) : null;
   };
 
@@ -548,7 +548,11 @@ const CartPage = () => {
                 {cartItems.map((item) => {
                   const isUpdating = updatingItem === item._id;
                   const isRemoving = removingItem === item._id;
-                  const imageUrl = getImageUrl(item);
+                  const imagePath = getImagePath(item);
+                  const imageUrl = imagePath ? ensureImageUrl(imagePath) : null;
+                  const imageProps = getResponsiveImageProps(imagePath, {
+                    sizes: "(max-width: 640px) 100vw, 128px",
+                  });
                   const itemTotal = (item.unitPrice || 0) * (item.qty || 0);
                   const itemName = getItemName(item);
                   const productType = getProductType(item);
@@ -566,13 +570,27 @@ const CartPage = () => {
                           {imageUrl ? (
                             <div className="relative w-full h-48 sm:h-32 rounded-lg overflow-hidden group">
                               <img
-                                src={imageUrl}
+                                src={imageProps.src || imageUrl}
+                                srcSet={imageProps.srcSet}
+                                sizes={imageProps.sizes}
                                 alt={itemName}
                                 className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                                style={
+                                  imageProps.placeholder
+                                    ? {
+                                        backgroundImage: `url(${imageProps.placeholder})`,
+                                        backgroundPosition: "center",
+                                        backgroundSize: "cover",
+                                      }
+                                    : undefined
+                                }
                                 onError={(e) => {
                                   e.target.onerror = null;
                                   e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDIwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbGw9IiNFNUU1RTUiLz48L3N2Zz4=';
                                 }}
+                                loading={imageProps.loading}
+                                decoding={imageProps.decoding}
+                                fetchPriority={imageProps.fetchPriority}
                               />
                               {/* Mobile optimized overlay */}
                               <div className="absolute inset-0 bg-black/30 sm:bg-transparent sm:group-hover:bg-black/40 transition-all duration-300 flex items-center justify-center">

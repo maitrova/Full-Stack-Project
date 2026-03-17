@@ -15,6 +15,7 @@ import {
   clearSuccess,
 } from '../redux/slices/Cartslice.js';
 import { selectCurrentToken } from '../redux/slices/Userslice.js';
+import { buildImageUrl, getResponsiveImageProps } from "../utils/responsiveImage.js";
 
 // Lucide React icons
 import { 
@@ -422,15 +423,7 @@ export default function ProductDetailPage() {
   };
 
   const getImageUrl = (imagePath) => {
-    if (!imagePath) return '';
-    
-    if (imagePath.startsWith('http')) {
-      return imagePath;
-    } else if (imagePath.startsWith('/')) {
-      return `${IMAGE_URL}${imagePath}`;
-    } else {
-      return `${IMAGE_URL}/${imagePath}`;
-    }
+    return buildImageUrl(imagePath);
   };
   
   const getVideoUrl = (videoPath) => {
@@ -555,12 +548,15 @@ export default function ProductDetailPage() {
       : []),
     ...images.map(img => ({
       type: "image",
-      url: getImageUrl(img.url),
+      image: img.url,
       alt: img.altText
     }))
   ];
   
-  const sizeChartUrl = itemData?.sizeChart ? getImageUrl(itemData.sizeChart) : null;
+  const sizeChartImageProps = getResponsiveImageProps(itemData?.sizeChart, {
+    sizes: "100vw",
+  });
+  const sizeChartUrl = sizeChartImageProps.src;
   
   if (loading) {
     return (
@@ -615,7 +611,13 @@ export default function ProductDetailPage() {
   const currentMedia = media[selectedImageIndex];
 
   const isVideo = currentMedia?.type === "video";
-  const mediaUrl = currentMedia?.url;
+  const currentMediaImageProps = !isVideo
+    ? getResponsiveImageProps(currentMedia?.image, {
+        sizes: "(max-width: 1024px) 100vw, 50vw",
+        loading: selectedImageIndex === 0 ? "eager" : "lazy",
+      })
+    : null;
+  const mediaUrl = isVideo ? currentMedia?.url : currentMediaImageProps?.src;
   const imageAlt = currentMedia?.alt || displayData.title;
 
   // Size Selection Component
@@ -696,6 +698,11 @@ export default function ProductDetailPage() {
               src={sizeChartUrl}
               alt="Size Chart"
               className="w-full rounded-lg border border-gray-200 transition-transform group-hover:scale-[1.02]"
+              srcSet={sizeChartImageProps.srcSet}
+              sizes={sizeChartImageProps.sizes}
+              loading={sizeChartImageProps.loading}
+              decoding={sizeChartImageProps.decoding}
+              fetchPriority={sizeChartImageProps.fetchPriority}
             />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors rounded-lg flex items-center justify-center">
               <span className="bg-white/90 text-gray-800 px-3 py-1.5 rounded-full text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
@@ -953,8 +960,19 @@ export default function ProductDetailPage() {
                     ) : (
                       <img
                         src={mediaUrl}
+                        srcSet={currentMediaImageProps?.srcSet}
+                        sizes={currentMediaImageProps?.sizes}
                         alt={imageAlt}
                         className="w-full h-full object-contain"
+                        style={
+                          currentMediaImageProps?.placeholder
+                            ? {
+                                backgroundImage: `url(${currentMediaImageProps.placeholder})`,
+                                backgroundPosition: "center",
+                                backgroundSize: "cover",
+                              }
+                            : undefined
+                        }
                         onError={(e) => {
                           e.target.style.display = 'none';
                           e.target.parentElement.innerHTML = `
@@ -965,6 +983,9 @@ export default function ProductDetailPage() {
                             </div>
                           `;
                         }}
+                        loading={currentMediaImageProps?.loading}
+                        decoding={currentMediaImageProps?.decoding}
+                        fetchPriority={currentMediaImageProps?.fetchPriority}
                       />
                     )
                   ) : (
@@ -1041,9 +1062,10 @@ export default function ProductDetailPage() {
                             </>
                           ) : (
                             <img
-                              src={item.url}
+                              src={getImageUrl(item.image)}
                               alt={`Thumbnail ${index + 1}`}
                               className="w-full h-full object-cover"
+                              loading="lazy"
                             />
                           )}
                         </button>

@@ -1,18 +1,21 @@
 import Dropproduct from "../models/dropproduct.model.js";
-import fs from "fs";
-import path from "path";
+import {
+  createReadymadeThumbnail,
+  deleteOptimizedImageSet,
+  normalizeStoredPath,
+  optimizeUploadedImage,
+} from "../utils/imageOptimization.js";
 
-const BASE_IMAGE_PATH = "/outputs/dropimages/";
+const optimizeDropImage = async (file) => {
+  const optimized = await optimizeUploadedImage(normalizeStoredPath(file?.path), {
+    cleanupSource: true,
+  });
 
-/* =================================
-   Helper: safe file delete
-================================= */
-const safeUnlink = (filePath) => {
-  if (!filePath) return;
-  try {
-    const abs = path.join(process.cwd(), filePath.replace(/^\//, ""));
-    if (fs.existsSync(abs)) fs.unlinkSync(abs);
-  } catch {}
+  return optimized.url;
+};
+
+const safeUnlink = async (filePath) => {
+  await deleteOptimizedImageSet(filePath);
 };
 
 
@@ -33,12 +36,15 @@ export const createDropproduct = async (req, res) => {
       return res.status(400).json({ message: "Maximum 6 images allowed" });
     }
 
-    const images = uploadedImages.map((f) => BASE_IMAGE_PATH + f.filename);
+    const images = await Promise.all(
+      uploadedImages.map((file) => optimizeDropImage(file))
+    );
 
-    // ✅ thumbnail (same path)
     const thumbnail = uploadedThumbnail
-      ? BASE_IMAGE_PATH + uploadedThumbnail.filename
-      : images[0]; // fallback
+      ? await createReadymadeThumbnail(normalizeStoredPath(uploadedThumbnail.path), {
+          cleanupSource: true,
+        })
+      : images[0];
 
 
 
@@ -151,9 +157,11 @@ export const updateDropproduct = async (req, res) => {
       }
 
       // delete old images
-      product.images.forEach(safeUnlink);
+      await Promise.all((product.images || []).map((imagePath) => safeUnlink(imagePath)));
 
-      images = uploadedImages.map((f) => BASE_IMAGE_PATH + f.filename);
+      images = await Promise.all(
+        uploadedImages.map((file) => optimizeDropImage(file))
+      );
 
       // if thumbnail pointed to old image → reset
       if (thumbnail && !images.includes(thumbnail)) {
@@ -167,8 +175,11 @@ export const updateDropproduct = async (req, res) => {
        THUMBNAIL (replace if new)
     ========================= */
     if (uploadedThumbnail) {
-      if (thumbnail) safeUnlink(thumbnail);
-      thumbnail = BASE_IMAGE_PATH + uploadedThumbnail.filename;
+      if (thumbnail) await safeUnlink(thumbnail);
+      thumbnail = await createReadymadeThumbnail(
+        normalizeStoredPath(uploadedThumbnail.path),
+        { cleanupSource: true }
+      );
     }
 
 
@@ -177,7 +188,7 @@ export const updateDropproduct = async (req, res) => {
        REMOVE THUMBNAIL FLAG
     ========================= */
     if (String(req.body.removeThumbnail) === "true") {
-      safeUnlink(thumbnail);
+      await safeUnlink(thumbnail);
       thumbnail = images[0] || null;
     }
 
@@ -298,16 +309,8 @@ export const deleteDropproduct = async (req, res) => {
       return res.status(404).json({ message: "Dropproduct not found" });
     }
 
-    // delete images from disk
-    (product.images || []).forEach((img) => {
-      try {
-        const imagePath = path.join(process.cwd(), img.replace(/^\//, ""));
-        if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
-      } catch (e) {
-        // don't fail delete if one file missing
-        console.error("Image delete failed:", img, e.message);
-      }
-    });
+    await Promise.all((product.images || []).map((img) => safeUnlink(img)));
+    await safeUnlink(product.thumbnail);
 
     await product.deleteOne();
 

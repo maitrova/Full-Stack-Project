@@ -1,25 +1,15 @@
 import ReadymadeProduct from "../models/readymadeproducts.js";
-import fs from "fs/promises";
-import path from "path";
 import { attachReadymadePricing } from "../utils/readymadePricing.js";
-import { createReadymadeThumbnail } from "../utils/imageOptimization.js";
+import {
+  createReadymadeThumbnail,
+  deleteOptimizedImageSet,
+  normalizeStoredPath,
+  optimizeUploadedImage,
+} from "../utils/imageOptimization.js";
 
 /* 🔐 Safe file delete */
 const safeDeleteFile = async (filePath) => {
-  if (!filePath) return;
-
-  const normalized = filePath.replace(/\\/g, "/");
-  const absolutePath = path.resolve(normalized);
-  const outputsRoot = path.resolve("outputs");
-
-  // safety: only delete files inside outputs/
-  if (!absolutePath.startsWith(outputsRoot)) return;
-
-  try {
-    await fs.unlink(absolutePath);
-  } catch (err) {
-    if (err.code !== "ENOENT") throw err;
-  }
+  await deleteOptimizedImageSet(filePath);
 };
 
 const parseOptionalNumber = (value) => {
@@ -68,14 +58,21 @@ const parseOptionalDate = (value) => {
   return date;
 };
 
-const normalizeUploadedPath = (file) =>
-  file?.path ? file.path.replace(/\\/g, "/") : null;
+const normalizeUploadedPath = (file) => normalizeStoredPath(file?.path);
 
-const mapUploadedImages = (files, altTexts = []) =>
-  (files || []).map((file, index) => ({
-    url: normalizeUploadedPath(file),
-    altText: altTexts[index] || "",
-  }));
+const mapUploadedImages = async (files, altTexts = []) =>
+  Promise.all(
+    (files || []).map(async (file, index) => {
+      const optimizedImage = await optimizeUploadedImage(normalizeUploadedPath(file), {
+        cleanupSource: true,
+      });
+
+      return {
+        url: optimizedImage.url,
+        altText: altTexts[index] || "",
+      };
+    })
+  );
 
 const generateThumbnailForProduct = async ({
   uploadedThumbnailPath,
@@ -83,18 +80,11 @@ const generateThumbnailForProduct = async ({
   firstImagePath,
 }) => {
   if (uploadedThumbnailPath) {
-    const optimizedThumbnailPath = await createReadymadeThumbnail(
-      uploadedThumbnailPath
+    return (
+      (await createReadymadeThumbnail(uploadedThumbnailPath, {
+        cleanupSource: true,
+      })) || uploadedThumbnailPath
     );
-
-    if (
-      optimizedThumbnailPath &&
-      optimizedThumbnailPath !== uploadedThumbnailPath
-    ) {
-      await safeDeleteFile(uploadedThumbnailPath);
-    }
-
-    return optimizedThumbnailPath || uploadedThumbnailPath;
   }
 
   if (thumbnailFromBody) {
@@ -102,6 +92,9 @@ const generateThumbnailForProduct = async ({
   }
 
   if (firstImagePath) {
+    if (/-md\.webp$/i.test(firstImagePath)) {
+      return firstImagePath;
+    }
     return (await createReadymadeThumbnail(firstImagePath)) || firstImagePath;
   }
 
@@ -655,7 +648,7 @@ export const createReadymadeProduct = async (req, res) => {
     }
 
     // ✅ create image objects
-    const images = mapUploadedImages(req.files?.images, parsedAltTexts);
+    const images = await mapUploadedImages(req.files?.images, parsedAltTexts);
 
     if (images.length > 4)
       return res.status(400).json({
@@ -833,7 +826,7 @@ export const updateReadymadeProduct = async (req, res) => {
 
     // ✅ Update Images (if new ones uploaded)
     if (req.files?.images) {
-      const newImages = mapUploadedImages(req.files.images, parsedAltTexts);
+      const newImages = await mapUploadedImages(req.files.images, parsedAltTexts);
 
       if (newImages.length > 4) {
         return res.status(400).json({

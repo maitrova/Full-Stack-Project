@@ -63,8 +63,7 @@ import {
   clearSuccess 
 } from "../redux/slices/Cartslice.js";
 import { selectCurrentToken } from "../redux/slices/Userslice.js";
-
-const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
+import { buildImageUrl, getResponsiveImageProps } from "../utils/responsiveImage.js";
 
 // Modern professional color palette
 const MODERN_COLORS = {
@@ -186,6 +185,7 @@ export default function UnifiedProductHub() {
   const [imageIndices, setImageIndices] = useState({});
   const [autoSlideIntervals, setAutoSlideIntervals] = useState({});
   const [imageLoading, setImageLoading] = useState({});
+  const [visibleCount, setVisibleCount] = useState(12);
   
   // Custom products state
   const { 
@@ -325,14 +325,7 @@ export default function UnifiedProductHub() {
 
   // Get image URL helper function
   const getImageUrl = useCallback((imagePath) => {
-    if (!imagePath) return DEFAULT_PRODUCT_IMAGE;
-
-    if (imagePath.startsWith('http') || imagePath.startsWith('data:')) {
-      return imagePath;
-    }
-
-    const baseUrl = API_URL.replace('/backend', '');
-    return `${baseUrl}${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
+    return buildImageUrl(imagePath) || DEFAULT_PRODUCT_IMAGE;
   }, []);
 
   // Helper function to extract all images from design views
@@ -380,9 +373,8 @@ export default function UnifiedProductHub() {
       null;
 
     if (preferredPreview) {
-      const previewUrl = getImageUrl(preferredPreview);
-      if (previewUrl !== DEFAULT_PRODUCT_IMAGE && !images.includes(previewUrl)) {
-        images.push(previewUrl);
+      if (!images.includes(preferredPreview)) {
+        images.push(preferredPreview);
       }
     }
     
@@ -390,9 +382,8 @@ export default function UnifiedProductHub() {
     if (product.images && Array.isArray(product.images)) {
       product.images.forEach(img => {
         const rawImagePath = typeof img === "object" ? img.url : img;
-        const imgUrl = getImageUrl(rawImagePath);
-        if (imgUrl !== DEFAULT_PRODUCT_IMAGE && !images.includes(imgUrl)) {
-          images.push(imgUrl);
+        if (rawImagePath && !images.includes(rawImagePath)) {
+          images.push(rawImagePath);
         }
       });
     }
@@ -1065,6 +1056,22 @@ export default function UnifiedProductHub() {
     ratingFilter
   ]);
 
+  useEffect(() => {
+    setVisibleCount(12);
+  }, [
+    activeProductType,
+    searchQuery,
+    sortOption,
+    priceRange,
+    ratingFilter,
+    selectedCategory,
+    selectedSubCategory,
+    selectedCommonCategory,
+    selectedCommonSubCategory,
+    productTypeFilter,
+    urlFilter,
+  ]);
+
   // Loading state
   const isLoading = () => {
     switch (activeProductType) {
@@ -1117,6 +1124,9 @@ export default function UnifiedProductHub() {
     const images = getProductImages(product, activeProductType);
     const currentImageIndex = imageIndices[product._id] || 0;
     const currentImage = images[currentImageIndex];
+    const imageProps = getResponsiveImageProps(currentImage, {
+      sizes: "(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw",
+    });
     const hasMultipleImages = images.length > 1;
     const isLoadingImage = imageLoading[product._id] !== false;
 
@@ -1189,16 +1199,27 @@ export default function UnifiedProductHub() {
           {currentImage ? (
             <>
               <img
-                src={currentImage}
+                src={imageProps.src || DEFAULT_PRODUCT_IMAGE}
+                srcSet={imageProps.srcSet}
+                sizes={imageProps.sizes}
                 alt={name}
                 className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02] ${
                   isLoadingImage ? "opacity-0" : "opacity-100"
                 }`}
+                style={
+                  imageProps.placeholder
+                    ? {
+                        backgroundImage: `url(${imageProps.placeholder})`,
+                        backgroundPosition: "center",
+                        backgroundSize: "cover",
+                      }
+                    : undefined
+                }
                 onLoad={() => handleImageLoad(product._id)}
                 onError={() => handleImageError(product._id)}
-                loading="lazy"
-                decoding="async"
-                fetchPriority="low"
+                loading={imageProps.loading}
+                decoding={imageProps.decoding}
+                fetchPriority={imageProps.fetchPriority}
               />
 
               {/* Arrows */}
@@ -1419,6 +1440,7 @@ export default function UnifiedProductHub() {
   }
 
   const productsToDisplay = filteredProducts;
+  const visibleProducts = productsToDisplay.slice(0, visibleCount);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -2131,9 +2153,21 @@ export default function UnifiedProductHub() {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-5">
-                {productsToDisplay.map((product) => renderProductCard(product))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-5">
+                  {visibleProducts.map((product) => renderProductCard(product))}
+                </div>
+                {productsToDisplay.length > visibleProducts.length && (
+                  <div className="mt-6 flex justify-center">
+                    <button
+                      onClick={() => setVisibleCount((count) => count + 12)}
+                      className="rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                    >
+                      Load More Products
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
