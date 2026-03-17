@@ -24,7 +24,7 @@ import upload from "../middleware/readymadeProductUpload.middleware.js";
 const readymadeproducts = express.Router();
 
 const productUpload = upload.fields([
-  { name: "images", maxCount: 4 },
+  { name: "images", maxCount: 6 },
   { name: "video", maxCount: 1 },
   { name: "thumbnail", maxCount: 1 },
   { name: "sizeChart", maxCount: 1 },

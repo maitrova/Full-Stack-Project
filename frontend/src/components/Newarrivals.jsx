@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { Link } from "react-router-dom";
+import { buildImageUrl, getRawImagePath, getResponsiveImageProps } from "../utils/responsiveImage.js";
 
 // Shared components
 const ImageSlider = ({ images = [], alt = "", autoScrollInterval = 4000 }) => {
@@ -77,16 +78,38 @@ const ImageSlider = ({ images = [], alt = "", autoScrollInterval = 4000 }) => {
               index === currentIndex ? "opacity-100" : "opacity-0"
             }`}
           >
-            <img
-              src={img}
-              alt={`${alt} - ${index + 1}`}
-              className="w-full h-full object-contain"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23f3f4f6'/%3E%3Cpath d='M35 40l15 15 15-15' stroke='%239ca3af' stroke-width='2' fill='none'/%3E%3C/svg%3E";
-              }}
-              loading="lazy"
-            />
+            {(() => {
+              const imageProps = getResponsiveImageProps(img, {
+                sizes: "(max-width: 640px) 50vw, 280px",
+                loading: index === currentIndex ? "eager" : "lazy",
+              });
+
+              return (
+                <img
+                  src={imageProps.src || buildImageUrl(img)}
+                  srcSet={imageProps.srcSet}
+                  sizes={imageProps.sizes}
+                  alt={`${alt} - ${index + 1}`}
+                  className="w-full h-full object-contain"
+                  loading={imageProps.loading}
+                  decoding={imageProps.decoding}
+                  fetchPriority={imageProps.fetchPriority}
+                  style={
+                    imageProps.placeholder
+                      ? {
+                          backgroundImage: `url(${imageProps.placeholder})`,
+                          backgroundPosition: "center",
+                          backgroundSize: "cover",
+                        }
+                      : undefined
+                  }
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23f3f4f6'/%3E%3Cpath d='M35 40l15 15 15-15' stroke='%239ca3af' stroke-width='2' fill='none'/%3E%3C/svg%3E";
+                  }}
+                />
+              );
+            })()}
           </div>
         ))}
       </div>
@@ -239,17 +262,9 @@ const HomepageFeatured = ({
       else if (item.imageUrl) imgs = [item.imageUrl];
     }
 
-    if (item.type === "readymade") {
-      imgs = imgs.map((src) => {
-        if (!src) return "";
-        if (src.startsWith("http://") || src.startsWith("https://")) return src;
-        const cleanSrc = src.startsWith("/") ? src : `/${src}`;
-        return `${import.meta.env.VITE_IMAGE_URL}${cleanSrc}`;
-
-      });
-    }
-
-    return imgs.filter(img => img && img.trim() !== "");
+    return imgs
+      .map((image) => getRawImagePath(image))
+      .filter((image) => image && image.trim() !== "");
   };
 
   // Loading State

@@ -15,7 +15,7 @@ import {
   clearSuccess,
 } from '../redux/slices/Cartslice.js';
 import { selectCurrentToken } from '../redux/slices/Userslice.js';
-import { buildImageUrl, getResponsiveImageProps } from "../utils/responsiveImage.js";
+import { buildImageUrl, getRawImagePath, getResponsiveImageProps } from "../utils/responsiveImage.js";
 
 // Lucide React icons
 import { 
@@ -422,10 +422,6 @@ export default function ProductDetailPage() {
     setSelectedColor(color);
   };
 
-  const getImageUrl = (imagePath) => {
-    return buildImageUrl(imagePath);
-  };
-  
   const getVideoUrl = (videoPath) => {
     if (!videoPath) return '';
 
@@ -540,17 +536,27 @@ export default function ProductDetailPage() {
       : 0;
 
   const media = [
+    ...images
+      .map((img) => {
+        const imagePath = getRawImagePath(img);
+        if (!imagePath) return null;
+
+        return {
+          type: "image",
+          image: imagePath,
+          alt:
+            (typeof img === "object" ? img.altText : "") ||
+            displayData?.title ||
+            "Product image",
+        };
+      })
+      .filter(Boolean),
     ...(itemData?.video
       ? [{
           type: "video",
           url: getVideoUrl(itemData.video),
         }]
       : []),
-    ...images.map(img => ({
-      type: "image",
-      image: img.url,
-      alt: img.altText
-    }))
   ];
   
   const sizeChartImageProps = getResponsiveImageProps(itemData?.sizeChart, {
@@ -934,7 +940,7 @@ export default function ProductDetailPage() {
                 )}
 
                 {/* Main Media Display */}
-                <div className="relative h-[300px] sm:h-[400px] md:h-[500px] bg-gradient-to-br from-gray-50 to-white rounded-xl overflow-hidden">
+                <div className="relative h-[300px] sm:h-[400px] md:h-[500px] bg-white rounded-xl overflow-hidden">
                   {mediaUrl ? (
                     isVideo ? (
                       <video
@@ -964,15 +970,6 @@ export default function ProductDetailPage() {
                         sizes={currentMediaImageProps?.sizes}
                         alt={imageAlt}
                         className="w-full h-full object-contain"
-                        style={
-                          currentMediaImageProps?.placeholder
-                            ? {
-                                backgroundImage: `url(${currentMediaImageProps.placeholder})`,
-                                backgroundPosition: "center",
-                                backgroundSize: "cover",
-                              }
-                            : undefined
-                        }
                         onError={(e) => {
                           e.target.style.display = 'none';
                           e.target.parentElement.innerHTML = `
@@ -1061,12 +1058,24 @@ export default function ProductDetailPage() {
                               </div>
                             </>
                           ) : (
-                            <img
-                              src={getImageUrl(item.image)}
-                              alt={`Thumbnail ${index + 1}`}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                            />
+                            (() => {
+                              const thumbProps = getResponsiveImageProps(item.image, {
+                                sizes: "80px",
+                              });
+
+                              return (
+                                <img
+                                  src={thumbProps.src || buildImageUrl(item.image)}
+                                  srcSet={thumbProps.srcSet}
+                                  sizes={thumbProps.sizes}
+                                  alt={`Thumbnail ${index + 1}`}
+                                  className="w-full h-full object-cover"
+                                  loading={thumbProps.loading}
+                                  decoding={thumbProps.decoding}
+                                  fetchPriority={thumbProps.fetchPriority}
+                                />
+                              );
+                            })()
                           )}
                         </button>
                       ))}
@@ -1093,11 +1102,24 @@ export default function ProductDetailPage() {
                         >
                           <div className="aspect-square bg-gray-50">
                             {view.previewImage ? (
-                              <img
-                                src={view.previewImage}
-                                alt={view.code}
-                                className="w-full h-full object-cover"
-                              />
+                              (() => {
+                                const viewImageProps = getResponsiveImageProps(view.previewImage, {
+                                  sizes: "(max-width: 768px) 25vw, 120px",
+                                });
+
+                                return (
+                                  <img
+                                    src={viewImageProps.src || buildImageUrl(view.previewImage)}
+                                    srcSet={viewImageProps.srcSet}
+                                    sizes={viewImageProps.sizes}
+                                    alt={view.code}
+                                    className="w-full h-full object-cover"
+                                    loading={viewImageProps.loading}
+                                    decoding={viewImageProps.decoding}
+                                    fetchPriority={viewImageProps.fetchPriority}
+                                  />
+                                );
+                              })()
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
                                 <Eye className="w-5 h-5 sm:w-6 sm:h-6 text-gray-300" />

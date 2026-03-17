@@ -39,6 +39,13 @@ const fileFilter = (req, file, cb) => {
  * ✅ THIS IS `upload`
  * Multer instance exported
  */
-const upload = multer({ storage, fileFilter });
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+    files: 9,
+  },
+});
 
 export default upload;

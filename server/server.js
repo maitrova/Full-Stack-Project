@@ -82,9 +82,13 @@ const staticOutputs = express.static(outputsDir, {
   maxAge: "365d",
   etag: true,
   immutable: true,
+  index: false,
   setHeaders: (res, filePath) => {
     if (/\.(avif|webp|png|jpe?g|gif|svg|mp4|webm)$/i.test(filePath)) {
-      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      res.setHeader(
+        "Cache-Control",
+        "public, max-age=31536000, immutable, stale-while-revalidate=86400"
+      );
     }
   },
 });

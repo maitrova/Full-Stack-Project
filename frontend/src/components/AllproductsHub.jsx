@@ -40,9 +40,7 @@ import {
   selectCartLoading 
 } from "../redux/slices/Cartslice.js";
 import { selectCurrentToken } from "../redux/slices/Userslice.js";
-
-const API_URL = import.meta.env.VITE_API_URL;        
-const IMAGE_URL = import.meta.env.VITE_IMAGE_URL || "https://maitrova.in/backend";
+import { buildImageUrl, getResponsiveImageProps } from "../utils/responsiveImage.js";
 
 // All products specific color palette - More muted, professional colors
 const ALL_PRODUCTS_COLORS = {
@@ -116,6 +114,7 @@ export default function AllProductsHub() {
   const [addedProductName, setAddedProductName] = useState('');
   const [addingToCartId, setAddingToCartId] = useState(null);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [visibleProductCount, setVisibleProductCount] = useState(24);
   
   // Determine what to show
   const showCategoryTiles = 
@@ -435,27 +434,21 @@ export default function AllProductsHub() {
   ]);
   
   // Helper functions
-  const getImageUrl = useCallback((imagePath) => {
-    if (!imagePath)
-      return "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800";
+  const getImageUrl = useCallback(
+    (imagePath) =>
+      buildImageUrl(imagePath) ||
+      "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800",
+    []
+  );
 
-    // HANDLE OBJECT CASE
-    if (typeof imagePath === "object") {
-      imagePath = imagePath.url;
-    }
-
-    // safety check
-    if (!imagePath || typeof imagePath !== "string")
-      return "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800";
-
-    if (imagePath.startsWith("http") || imagePath.startsWith("data:")) {
-      return imagePath;
-    }
-
-    const baseUrl = IMAGE_URL.replace("/backend", "");
-
-    return `${baseUrl}${imagePath.startsWith("/") ? "" : "/"}${imagePath}`;
-  }, []);
+  const getCardImageProps = useCallback(
+    (image, sizes) =>
+      getResponsiveImageProps(image, {
+        sizes,
+        loading: "lazy",
+      }),
+    []
+  );
 
   // Get categories with thumbnails
   const getCategoriesWithThumbnails = useMemo(() => {
@@ -587,6 +580,21 @@ export default function AllProductsHub() {
 
     return Array.from(map.values());
   }, [commonSavedData, selectedCommonCategory]);
+
+  useEffect(() => {
+    setVisibleProductCount(24);
+  }, [
+    searchQuery,
+    sortOption,
+    productTypeFilter,
+    selectedCommonCategory,
+    selectedCommonSubCategory,
+    ratingFilter,
+    priceRange,
+    urlFilter,
+  ]);
+
+  const visibleProducts = filteredProducts.slice(0, visibleProductCount);
   
   const applyQuickPriceRange = (range) => {
     setQuickPriceRange(range.label);
@@ -1089,31 +1097,49 @@ export default function AllProductsHub() {
                         className="group bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden text-left"
                       >
                         <div className="relative aspect-square bg-white flex items-center justify-center overflow-hidden">
-                            {category.thumbnail ? (
-                            <img
-                              src={getImageUrl(category.thumbnail)}
-                              alt={category.altText || category.name}
-                              loading="lazy"
-                              decoding="async"
-                              fetchPriority="low"
-                              className="max-h-[85%] max-w-[85%] object-contain transition-transform duration-300 group-hover:scale-105"
-                              onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.style.display = 'none';
-                                const parent = e.target.parentElement;
-                                const fallback = document.createElement('div');
-                                fallback.className = 'w-full h-full flex items-center justify-center bg-gray-100';
-                                fallback.innerHTML = `<span class="text-4xl text-gray-400 font-medium">${category.name.charAt(0).toUpperCase()}</span>`;
-                                parent.appendChild(fallback);
-                              }}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                              <span className="text-4xl text-gray-400 font-medium">
-                                {category.name.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                          )}
+                          {(() => {
+                            const imageProps = getCardImageProps(
+                              category.thumbnail,
+                              "(max-width: 640px) 50vw, (max-width: 1280px) 25vw, 20vw"
+                            );
+
+                            return category.thumbnail ? (
+                              <img
+                                src={imageProps.src || getImageUrl(category.thumbnail)}
+                                srcSet={imageProps.srcSet}
+                                sizes={imageProps.sizes}
+                                alt={category.altText || category.name}
+                                loading={imageProps.loading}
+                                decoding={imageProps.decoding}
+                                fetchPriority={imageProps.fetchPriority}
+                                className="max-h-[85%] max-w-[85%] object-contain transition-transform duration-300 group-hover:scale-105"
+                                style={
+                                  imageProps.placeholder
+                                    ? {
+                                        backgroundImage: `url(${imageProps.placeholder})`,
+                                        backgroundPosition: "center",
+                                        backgroundSize: "cover",
+                                      }
+                                    : undefined
+                                }
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.style.display = 'none';
+                                  const parent = e.target.parentElement;
+                                  const fallback = document.createElement('div');
+                                  fallback.className = 'w-full h-full flex items-center justify-center bg-gray-100';
+                                  fallback.innerHTML = `<span class="text-4xl text-gray-400 font-medium">${category.name.charAt(0).toUpperCase()}</span>`;
+                                  parent.appendChild(fallback);
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                                <span className="text-4xl text-gray-400 font-medium">
+                                  {category.name.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                            );
+                          })()}
                           <div className="absolute inset-0 ring-1 ring-gray-200" />
                         </div>
                         <div className="p-3">
@@ -1164,31 +1190,49 @@ export default function AllProductsHub() {
                         className="group bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden text-left"
                       >
                         <div className="relative aspect-square bg-white flex items-center justify-center overflow-hidden">
-                          {sub.thumb ? (
-                            <img
-                              src={getImageUrl(sub.thumb)}
-                              alt={sub.altText || sub.name}
-                              loading="lazy"
-                              decoding="async"
-                              fetchPriority="low"
-                              className="max-h-[85%] max-w-[85%] object-contain transition-transform duration-300 group-hover:scale-105"
-                              onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.style.display = 'none';
-                                const parent = e.target.parentElement;
-                                const fallback = document.createElement('div');
-                                fallback.className = 'w-full h-full flex items-center justify-center bg-gray-100';
-                                fallback.innerHTML = `<span class="text-4xl text-gray-400 font-medium">${sub.name.charAt(0).toUpperCase()}</span>`;
-                                parent.appendChild(fallback);
-                              }}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                              <span className="text-4xl text-gray-400 font-medium">
-                                {sub.name.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                          )}
+                          {(() => {
+                            const imageProps = getCardImageProps(
+                              sub.thumb,
+                              "(max-width: 640px) 50vw, (max-width: 1280px) 25vw, 20vw"
+                            );
+
+                            return sub.thumb ? (
+                              <img
+                                src={imageProps.src || getImageUrl(sub.thumb)}
+                                srcSet={imageProps.srcSet}
+                                sizes={imageProps.sizes}
+                                alt={sub.altText || sub.name}
+                                loading={imageProps.loading}
+                                decoding={imageProps.decoding}
+                                fetchPriority={imageProps.fetchPriority}
+                                className="max-h-[85%] max-w-[85%] object-contain transition-transform duration-300 group-hover:scale-105"
+                                style={
+                                  imageProps.placeholder
+                                    ? {
+                                        backgroundImage: `url(${imageProps.placeholder})`,
+                                        backgroundPosition: "center",
+                                        backgroundSize: "cover",
+                                      }
+                                    : undefined
+                                }
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.style.display = 'none';
+                                  const parent = e.target.parentElement;
+                                  const fallback = document.createElement('div');
+                                  fallback.className = 'w-full h-full flex items-center justify-center bg-gray-100';
+                                  fallback.innerHTML = `<span class="text-4xl text-gray-400 font-medium">${sub.name.charAt(0).toUpperCase()}</span>`;
+                                  parent.appendChild(fallback);
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                                <span className="text-4xl text-gray-400 font-medium">
+                                  {sub.name.charAt(0).toUpperCase()}
+                                </span>
+                              </div>
+                            );
+                          })()}
                           <div className="absolute inset-0 ring-1 ring-gray-200" />
                         </div>
                         <div className="p-3">
@@ -1228,8 +1272,9 @@ export default function AllProductsHub() {
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {filteredProducts.map((product) => {
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {visibleProducts.map((product) => {
                     const isInCart = getCartQuantityForCommon(product) > 0;
                     const currentPrice =
                       product.type === "readymade"
@@ -1246,6 +1291,11 @@ export default function AllProductsHub() {
 
                     const displayPrice = product.type === "readymade" ? currentPrice : Number(product.price || 0);
                     const displayOriginalPrice = product.type === "readymade" ? originalPrice : 0;
+                    const previewImage = product.previewImage || product.raw?.images?.[0];
+                    const imageProps = getCardImageProps(
+                      previewImage,
+                      "(max-width: 640px) 50vw, (max-width: 1280px) 25vw, 20vw"
+                    );
                     return (
                       <div
                         key={product._id}
@@ -1261,19 +1311,27 @@ export default function AllProductsHub() {
                         >
                           <div className="relative aspect-square bg-white flex items-center justify-center overflow-hidden rounded-t-xl">
                             <img
-                              src={getImageUrl(
-                                product.previewImage ||
-                                product.raw?.images?.[0]
-                              )}
+                              src={imageProps.src || getImageUrl(previewImage)}
+                              srcSet={imageProps.srcSet}
+                              sizes={imageProps.sizes}
                               alt={
                                 product.raw?.images?.[0]?.altText ||
                                 product.title ||
                                 "Product image"
                               }
-                              loading="lazy"
-                              decoding="async"
-                              fetchPriority="auto"
+                              loading={imageProps.loading}
+                              decoding={imageProps.decoding}
+                              fetchPriority={imageProps.fetchPriority}
                               className="max-h-[85%] max-w-[85%] object-contain"
+                              style={
+                                imageProps.placeholder
+                                  ? {
+                                      backgroundImage: `url(${imageProps.placeholder})`,
+                                      backgroundPosition: "center",
+                                      backgroundSize: "cover",
+                                    }
+                                  : undefined
+                              }
                             />
 
                             <div className="absolute inset-0 ring-1 ring-gray-200" />
@@ -1362,7 +1420,18 @@ export default function AllProductsHub() {
                       </div>
                     );
                   })}
-                </div>
+                  </div>
+                  {filteredProducts.length > visibleProducts.length && (
+                    <div className="mt-6 flex justify-center">
+                      <button
+                        onClick={() => setVisibleProductCount((count) => count + 24)}
+                        className="rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                      >
+                        Load More Products
+                      </button>
+                    </div>
+                  )}
+                </>
               )
             )}
           </div>

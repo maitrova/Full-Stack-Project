@@ -662,10 +662,10 @@ const removeSizeChart = () => {
   const handleImageUpload = (e) => {
   const files = Array.from(e.target.files);
 
-  if (images.length + files.length > 4) {
+  if (images.length + files.length > 6) {
     setErrors(prev => ({
       ...prev,
-      images: "Maximum 4 images allowed",
+      images: "Maximum 6 images allowed",
     }));
     return;
   }
@@ -3077,7 +3077,7 @@ const validateForm = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Product Images {!isEdit && '*'}
-                <span className="text-xs text-gray-500 ml-2">(Max 4 images, 5MB each)</span>
+                <span className="text-xs text-gray-500 ml-2">(Max 6 images, 5MB each)</span>
               </label>
               <div className={`border-2 border-dashed rounded-lg p-6 ${
                 errors.images ? 'border-red-500 bg-red-50' : 'border-gray-300'

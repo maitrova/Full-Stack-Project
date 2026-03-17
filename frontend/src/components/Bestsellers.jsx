@@ -7,16 +7,12 @@ import {
   selectBestSellersSelectedError,
 } from "../redux/slices/HomepageSlice.js";
 import { Link } from "react-router-dom";
+import { buildImageUrl, getRawImagePath, getResponsiveImageProps } from "../utils/responsiveImage.js";
 
 const BestSellers = () => {
   const dispatch = useDispatch();
   
   const items = useSelector(selectBestSellersSelectedItemsFull);
-  useEffect(() => {
-  console.log("====================================");
-  console.log("Best Sellers Items:", items);
-  console.log("====================================");
-}, [items]);
   const loading = useSelector(selectBestSellersSelectedLoading);
   const error = useSelector(selectBestSellersSelectedError);
 
@@ -35,45 +31,25 @@ const getItemImages = (item) => {
     ? item.previewImages.filter(Boolean)
     : [];
 
-  // fallback
   if (!imgs.length) {
     if (item.previewImage) imgs = [item.previewImage];
-    else if (item.imageUrl)
-      imgs = [{ url: item.imageUrl, altText: item.title }];
+    else if (item.imageUrl) imgs = [item.imageUrl];
   }
 
-  // normalize readymade URLs + altText
-  if (item.type === "readymade") {
-    imgs = imgs.map((imgObj) => {
-      if (!imgObj) return null;
-
-      let url = "";
-      let altText = "";
-
-      if (typeof imgObj === "object") {
-        url = imgObj.url || "";
-        altText = imgObj.altText || item.title || "Product image";
-      } else {
-        url = String(imgObj);
-        altText = item.title || "Product image";
-      }
-
-      if (!url) return null;
-
-      // add base URL if not absolute
-      if (!url.startsWith("http")) {
-        const cleanSrc = url.startsWith("/") ? url : `/${url}`;
-        url = `${import.meta.env.VITE_IMAGE_URL}${cleanSrc}`;
-      }
+  return imgs
+    .map((image) => {
+      const rawPath = getRawImagePath(image);
+      if (!rawPath) return null;
 
       return {
-        url,
-        altText,
+        image: rawPath,
+        altText:
+          (typeof image === "object" ? image.altText : "") ||
+          item.title ||
+          "Product image",
       };
-    });
-  }
-
-  return imgs.filter(Boolean);
+    })
+    .filter(Boolean);
 };
 
 
@@ -153,23 +129,39 @@ const getItemImages = (item) => {
                 index === currentIndex ? "opacity-100" : "opacity-0"
               }`}
             >
+              {(() => {
+                const imageProps = getResponsiveImageProps(imgObj.image, {
+                  sizes: "(max-width: 640px) 50vw, 280px",
+                  loading: index === currentIndex ? "eager" : "lazy",
+                });
+
+                return (
               <img
-  src={imgObj.url}
-  alt={imgObj.altText}
-  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-  loading="lazy"
-  onLoad={() =>
-    console.log("Image loaded:", {
-      src: imgObj.url,
-      alt: imgObj.altText,
-    })
-  }
-  onError={(e) => {
-    e.target.onerror = null;
-    e.target.src =
-      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%23f3f4f6'/%3E%3Ctext x='50' y='50' font-size='12' text-anchor='middle' fill='%239ca3af'%3ENo Image%3C/text%3E%3C/svg%3E";
-  }}
-/>
+                    src={imageProps.src || buildImageUrl(imgObj.image)}
+                    srcSet={imageProps.srcSet}
+                    sizes={imageProps.sizes}
+                    alt={imgObj.altText}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                    loading={imageProps.loading}
+                    decoding={imageProps.decoding}
+                    fetchPriority={imageProps.fetchPriority}
+                    style={
+                      imageProps.placeholder
+                        ? {
+                            backgroundImage: `url(${imageProps.placeholder})`,
+                            backgroundPosition: "center",
+                            backgroundSize: "cover",
+                          }
+                        : undefined
+                    }
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src =
+                        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%23f3f4f6'/%3E%3Ctext x='50' y='50' font-size='12' text-anchor='middle' fill='%239ca3af'%3ENo Image%3C/text%3E%3C/svg%3E";
+                    }}
+                  />
+                );
+              })()}
 
             </div>
           ))}

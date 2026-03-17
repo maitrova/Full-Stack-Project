@@ -60,6 +60,28 @@ const parseOptionalDate = (value) => {
 
 const normalizeUploadedPath = (file) => normalizeStoredPath(file?.path);
 
+const optimizeSizeChartUpload = async (file) => {
+  if (!file?.path) return null;
+
+  const optimizedChart = await optimizeUploadedImage(normalizeUploadedPath(file), {
+    cleanupSource: true,
+    outputDir: "outputs/readymade-products/size-chart",
+    baseName: `${Date.now()}-${file.originalname || "size-chart"}`,
+    widths: {
+      small: 600,
+      medium: 1200,
+      blur: 24,
+    },
+    qualities: {
+      small: 74,
+      medium: 82,
+      blur: 40,
+    },
+  });
+
+  return optimizedChart.url;
+};
+
 const mapUploadedImages = async (files, altTexts = []) =>
   Promise.all(
     (files || []).map(async (file, index) => {
@@ -650,10 +672,10 @@ export const createReadymadeProduct = async (req, res) => {
     // ✅ create image objects
     const images = await mapUploadedImages(req.files?.images, parsedAltTexts);
 
-    if (images.length > 4)
+    if (images.length > 6)
       return res.status(400).json({
         success: false,
-        message: "Maximum 4 images allowed",
+        message: "Maximum 6 images allowed",
       });
 
     // video
@@ -665,9 +687,7 @@ export const createReadymadeProduct = async (req, res) => {
       thumbnailFromBody,
       firstImagePath: images[0]?.url || null,
     });
-
-
-    const sizeChart = normalizeUploadedPath(req.files?.sizeChart?.[0]);
+    const sizeChart = await optimizeSizeChartUpload(req.files?.sizeChart?.[0]);
       
       
 
@@ -828,10 +848,10 @@ export const updateReadymadeProduct = async (req, res) => {
     if (req.files?.images) {
       const newImages = await mapUploadedImages(req.files.images, parsedAltTexts);
 
-      if (newImages.length > 4) {
+      if (newImages.length > 6) {
         return res.status(400).json({
           success: false,
-          message: "Maximum 4 images allowed",
+          message: "Maximum 6 images allowed",
         });
       }
 
@@ -879,7 +899,7 @@ export const updateReadymadeProduct = async (req, res) => {
       if (product.sizeChart) {
         await safeDeleteFile(product.sizeChart);
       }
-      product.sizeChart = normalizeUploadedPath(req.files.sizeChart[0]);
+      product.sizeChart = await optimizeSizeChartUpload(req.files.sizeChart[0]);
     }
 
     // ✅ Update variants (if provided)

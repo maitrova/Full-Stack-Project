@@ -86,8 +86,8 @@ const readymadeProductSchema = new mongoose.Schema(
     images: {
       type: [imageSchema],
       validate: {
-        validator: (arr) => arr.length <= 4,
-        message: "Maximum 4 images allowed",
+        validator: (arr) => arr.length <= 6,
+        message: "Maximum 6 images allowed",
       },
       default: [],
     },

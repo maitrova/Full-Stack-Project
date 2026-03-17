@@ -247,9 +247,9 @@ const ReadymadeProductsManager = () => {
     try {
       const files = Array.from(e.target.files);
       
-      // Validate max 4 images
-      if (formData.images.length + files.length > 4) {
-        alert('Maximum 4 images allowed');
+      // Validate max 6 images
+      if (formData.images.length + files.length > 6) {
+        alert('Maximum 6 images allowed');
         return;
       }
 
@@ -793,7 +793,7 @@ const ReadymadeProductsManager = () => {
                     )}
                   </div>
                   <p className="text-xs text-gray-500">
-                    Upload up to 4 images. Recommended size: 800x800px
+                    Upload up to 6 images. Recommended size: 800x800px
                   </p>
                 </div>
               </div>

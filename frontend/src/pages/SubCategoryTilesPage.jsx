@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+import { buildImageUrl, getResponsiveImageProps } from "../utils/responsiveImage.js";
 
 import {
   fetchHomeSubCategoryTiles,
@@ -8,8 +9,6 @@ import {
   selectSubCategoriesLoading,
   selectSubCategoriesError,
 } from "../redux/slices/Homepagecategorylist.js";
-
-const IMAGE_URL = import.meta.env.VITE_IMAGE_URL || ""; // ex: https://maitrova.in/api/
 
 export default function SubCategoryTilesPage() {
   const dispatch = useDispatch();
@@ -47,7 +46,7 @@ export default function SubCategoryTilesPage() {
 
       return {
         title: name,
-        image: normalizeImageUrl(rawPath, IMAGE_URL),
+        image: rawPath,
         href: `/allproducts?category=${encodeURIComponent(category)}&subCategory=${encodeURIComponent(name)}`,
 
         count: item.count ?? null,
@@ -112,6 +111,12 @@ export default function SubCategoryTilesPage() {
 }
 
 function TileCard({ title, image, href, featured = false }) {
+  const imageProps = getResponsiveImageProps(image, {
+    sizes: featured
+      ? "(max-width: 1280px) 100vw, 60vw"
+      : "(max-width: 640px) 100vw, (max-width: 1280px) 33vw, 20vw",
+  });
+
   return (
     <Link
       to={href}
@@ -141,10 +146,23 @@ function TileCard({ title, image, href, featured = false }) {
           ].join(" ")}
         >
           <img
-            src={image}
+            src={imageProps.src || buildImageUrl(image)}
+            srcSet={imageProps.srcSet}
+            sizes={imageProps.sizes}
             alt={title}
             className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-[1.03]"
-            loading="lazy"
+            loading={imageProps.loading}
+            decoding={imageProps.decoding}
+            fetchPriority={imageProps.fetchPriority}
+            style={
+              imageProps.placeholder
+                ? {
+                    backgroundImage: `url(${imageProps.placeholder})`,
+                    backgroundPosition: "center",
+                    backgroundSize: "cover",
+                  }
+                : undefined
+            }
           />
         </div>
       ) : (
@@ -158,22 +176,6 @@ function TileCard({ title, image, href, featured = false }) {
       </div>
     </Link>
   );
-}
-
-// ✅ Builds full image URL from relative path like "outputs/..."
-function normalizeImageUrl(path, base) {
-  if (!path) return null;
-
-  // already absolute
-  if (/^(https?:)?\/\//i.test(path) || path.startsWith("blob:") || path.startsWith("data:")) {
-    return path;
-  }
-
-  // ensure base has no trailing slash issues
-  const cleanBase = String(base).replace(/\/+$/, "");
-  const cleanPath = String(path).replace(/^\/+/, "");
-
-  return `${cleanBase}/${cleanPath}`;
 }
 
 function encodeSlug(str = "") {

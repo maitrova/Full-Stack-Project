@@ -1,7 +1,21 @@
 import Category from "../models/Category.js";
 import SubCategory from "../models/SubCategory.js";
-import fs from "fs";
-import path from "path";
+import {
+  createReadymadeThumbnail,
+  deleteOptimizedImageSet,
+  normalizeStoredPath,
+} from "../utils/imageOptimization.js";
+
+const optimizeThumbnailUpload = async (file, fallbackName) =>
+  createReadymadeThumbnail(normalizeStoredPath(file?.path), {
+    outputDir: "outputs/thumbnail",
+    baseName: fallbackName,
+    cleanupSource: true,
+  });
+
+const deleteManagedThumbnail = async (filePath) => {
+  await deleteOptimizedImageSet(filePath);
+};
 
 /* ===========================
    CATEGORY CONTROLLERS
@@ -30,7 +44,7 @@ export const createCategory = async (req, res) => {
         message: "Alt text is required",
       });
 
-    const thumbnailPath = `/outputs/thumbnail/${req.file.filename}`;
+    const thumbnailPath = await optimizeThumbnailUpload(req.file, name);
 
     const category = await Category.create({
       name,
@@ -76,11 +90,7 @@ export const deleteCategory = async (req, res) => {
       });
     }
 
-    // Delete thumbnail from disk
-    const filePath = path.join(process.cwd(), category.thumbnail);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    await deleteManagedThumbnail(category.thumbnail);
 
     // Delete related subcategories
     await SubCategory.deleteMany({ category: id });
@@ -119,7 +129,7 @@ export const createSubCategory = async (req, res) => {
       });
     }
 
-    const thumbnailPath = `/outputs/thumbnail/${req.file.filename}`;
+    const thumbnailPath = await optimizeThumbnailUpload(req.file, name);
 
     const subCategory = await SubCategory.create({
       name,
@@ -168,11 +178,7 @@ export const deleteSubCategory = async (req, res) => {
       });
     }
 
-    // Delete thumbnail from disk
-    const filePath = path.join(process.cwd(), subCategory.thumbnail);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    await deleteManagedThumbnail(subCategory.thumbnail);
 
     await subCategory.deleteOne();
 
@@ -204,13 +210,8 @@ export const updateCategory = async (req, res) => {
     if (altText) category.altText = altText;
 
     if (req.file) {
-      // delete old thumbnail
-      const oldPath = path.join(process.cwd(), category.thumbnail);
-
-      if (fs.existsSync(oldPath))
-        fs.unlinkSync(oldPath);
-
-      category.thumbnail = `/outputs/thumbnail/${req.file.filename}`;
+      await deleteManagedThumbnail(category.thumbnail);
+      category.thumbnail = await optimizeThumbnailUpload(req.file, name || category.name);
     }
 
     await category.save();
@@ -252,15 +253,11 @@ export const updateSubCategory = async (req, res) => {
 
     // update thumbnail if uploaded
     if (req.file) {
-
-      // delete old thumbnail
-      const oldFilePath = path.join(process.cwd(), subCategory.thumbnail);
-
-      if (fs.existsSync(oldFilePath)) {
-        fs.unlinkSync(oldFilePath);
-      }
-
-      subCategory.thumbnail = `/outputs/thumbnail/${req.file.filename}`;
+      await deleteManagedThumbnail(subCategory.thumbnail);
+      subCategory.thumbnail = await optimizeThumbnailUpload(
+        req.file,
+        name || subCategory.name
+      );
     }
 
     await subCategory.save();
