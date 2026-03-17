@@ -85,7 +85,7 @@ const orderSchema = new mongoose.Schema(
       status: { type: String, default: "CREATED" },
     },
 
-    invoiceNumber: { type: String, unique: true },
+    invoiceNumber: { type: String, unique: false },
     invoiceDate: Date,
     invoicePdfUrl: String,
 
