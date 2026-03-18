@@ -1054,9 +1054,11 @@ const handleDesignUpload = async (e) => {
         throw new Error("Background removal failed: no output URL");
       }
 
-      // Construct proper image URL - backend returns /outputs/..., we need to add base URL
-      const baseUrl = IMAGE_URL || API_URL;
-      const imageUrl = `${baseUrl}${data.outputUrl}?t=${Date.now()}`;
+      // Background-removed files are served from /outputs, not from the /api route prefix.
+      const assetBaseUrl = (IMAGE_URL || API_URL || window.location.origin)
+        .replace(/\/$/, "")
+        .replace(/\/api$/, "");
+      const imageUrl = `${assetBaseUrl}${data.outputUrl}?t=${Date.now()}`;
       console.log("Constructed background removed image URL:", imageUrl);
 
       const updatedLayers = designLayers.map((d) =>

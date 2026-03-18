@@ -263,7 +263,7 @@ const HomepageAdmin = () => {
             <div className="bg-gray-50 px-4 py-2 rounded-lg">
               <p className="text-sm text-gray-600">Selected Items</p>
               <p className="text-2xl font-bold">
-                {sectionData.selectedItemIds.length} <span className="text-sm font-normal text-gray-500">/ 6</span>
+                {sectionData.selectedItemIds.length}
               </p>
             </div>
             
@@ -314,7 +314,7 @@ const HomepageAdmin = () => {
             <p className="text-yellow-800 text-sm">
               {sectionData.selectedItemIds.length < 2 
                 ? `Select ${2 - sectionData.selectedItemIds.length} more item${2 - sectionData.selectedItemIds.length === 1 ? '' : 's'} to save`
-                : `Remove ${sectionData.selectedItemIds.length - 6} item${sectionData.selectedItemIds.length - 6 === 1 ? '' : 's'} (maximum 6 allowed)`
+                : ''
               }
             </p>
           </div>
@@ -326,7 +326,7 @@ const HomepageAdmin = () => {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Eligible {sectionData.sectionLabel}</h2>
-            <p className="text-sm text-gray-600">Select 2-6 items to display on homepage</p>
+            <p className="text-sm text-gray-600">Select at least 2 items to display on homepage</p>
           </div>
           
           <div className="flex items-center space-x-2">
@@ -542,7 +542,7 @@ const HomepageAdmin = () => {
               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Selection ({sectionData.selectedItemIds.length}/6)
+              Selection ({sectionData.selectedItemIds.length})
             </span>
           </button>
           <button

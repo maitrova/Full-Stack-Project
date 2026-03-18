@@ -8,6 +8,7 @@ import {
 } from "../redux/slices/HomepageSlice.js";
 import { Link } from "react-router-dom";
 import { buildImageUrl, getRawImagePath, getResponsiveImageProps } from "../utils/responsiveImage.js";
+import { getHomepageItemPricing } from "../utils/homepageProductPricing.js";
 
 const BestSellers = () => {
   const dispatch = useDispatch();
@@ -205,27 +206,34 @@ const getItemImages = (item) => {
   const ProductCard = ({ item }) => {
     const images = getItemImages(item);
     const label = item.name || item.title;
+    const pricing = getHomepageItemPricing(item);
+    const detailPath = item.type === "design" ? `/catalogue/${item._id}` : `/readymade/${item._id}`;
     
     return (
       <Link
-        to={`/${item.type === "design" ? "catalogue" : "products"}/${item._id}`}
-        className="group block bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-all duration-300"
+        to={detailPath}
+        className="group block overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
       >
-        {/* Image Section with name overlay */}
+        {/* Image Section */}
         <div className="relative h-64 bg-gray-50 overflow-hidden">
           <ImageSlider 
             images={images} 
             alt={label}
             autoScrollInterval={4000}
           />
-          
-          {/* Gradient overlay at bottom for readability */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/30 to-transparent" />
-          
-          {/* Name badge on image */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/35 via-black/10 to-transparent" />
+
+          <div className="absolute right-3 top-3">
+            {pricing.hasOffer && (
+              <span className="rounded bg-red-600 px-2 py-1 text-[10px] font-semibold tracking-wide text-white shadow-sm">
+                {pricing.discountPercent}% OFF
+              </span>
+            )}
+          </div>
+
           <div className="absolute inset-x-0 bottom-3 flex justify-center px-3">
-            <div className="flex items-center gap-2 max-w-full px-4 py-2 rounded-md bg-white text-gray-900 shadow">
-              <span className="text-sm font-medium text-gray-900 truncate">
+            <div className="flex max-w-full items-center gap-2 rounded-md bg-white px-4 py-2 text-gray-900 shadow">
+              <span className="truncate text-sm font-medium text-gray-900">
                 {label}
               </span>
             </div>

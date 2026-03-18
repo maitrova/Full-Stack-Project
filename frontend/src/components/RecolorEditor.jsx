@@ -1722,7 +1722,7 @@ async function drawAll() {
 
     if (cancelled || designRenderSeqRef.current !== renderSeq) return;
 
-    renderer.clearDesignTexture();
+    renderer.updateDesignTexture(offscreen);
     renderer.render(productColor);
 
     const activeDesign = (designLayers || []).find((d) => d.id === activeDesignId);

@@ -26,12 +26,12 @@ const homepageSelectionSchema = new mongoose.Schema(
       default: "new_arrivals",
     },
 
-    // 2 to 6 selected products
+    // At least 2 selected products
     items: {
       type: [selectedItemSchema],
       validate: {
-        validator: (arr) => arr.length >= 2 && arr.length <= 6,
-        message: "You must select between 2 and 6 items",
+        validator: (arr) => arr.length >= 2,
+        message: "You must select at least 2 items",
       },
       default: [],
     },

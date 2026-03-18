@@ -747,7 +747,11 @@ export default function CustomProductsHub() {
                     : `/products/${product._id}`;
                   
                   return (
-                    <div key={product._id} className="group bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden">
+                    <Link
+                      key={product._id}
+                      to={productLink}
+                      className="group block bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden"
+                    >
                       {/* Image Container - Compact for mobile */}
                       <div className="relative aspect-[3/4] bg-gray-100 overflow-hidden">
                         <img
@@ -793,12 +797,9 @@ export default function CustomProductsHub() {
                             <p className="text-[10px] text-gray-500 mt-0.5">starting price</p>
                           </div>
                           
-                          <Link
-                            to={productLink}
-                            className="px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded hover:bg-black transition-colors"
-                          >
+                          <span className="px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded">
                             Customize
-                          </Link>
+                          </span>
                         </div>
                         
                         {/* View Details Link */}
@@ -812,7 +813,7 @@ export default function CustomProductsHub() {
                           </Link>
                         </div> */}
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
@@ -825,7 +826,11 @@ export default function CustomProductsHub() {
                     : `/products/${product._id}`;
                   
                   return (
-                    <div key={product._id} className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-sm transition-shadow">
+                    <Link
+                      key={product._id}
+                      to={productLink}
+                      className="block bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-sm transition-shadow"
+                    >
                       <div className="flex flex-col md:flex-row">
                         <div className="md:w-48 h-48 bg-gray-100 overflow-hidden">
                           <img
@@ -858,18 +863,15 @@ export default function CustomProductsHub() {
                               </div>
                               
                               <div className="flex items-center gap-3">
-                                <Link
-                                  to={`/products/${product._id}`}
-                                  className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded hover:bg-black transition"
-                                >
+                                <span className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded">
                                   Customize Now
-                                </Link>
+                                </span>
                               </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>

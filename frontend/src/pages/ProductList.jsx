@@ -1,7 +1,7 @@
 // client/src/pages/UnifiedProductHub.jsx
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { 
   Grid, 
   Search, 
@@ -143,6 +143,7 @@ const DEFAULT_PRODUCT_IMAGE = "https://images.unsplash.com/photo-1505740420928-5
 export default function UnifiedProductHub() {
   const dispatch = useDispatch();
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   
   // Read URL parameters
@@ -1148,7 +1149,14 @@ export default function UnifiedProductHub() {
     return (
       <div
         key={product._id}
-        className="group bg-white border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all duration-200 overflow-hidden"
+        className={`group bg-white border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all duration-200 overflow-hidden ${
+          isCustom ? "cursor-pointer" : ""
+        }`}
+        onClick={() => {
+          if (isCustom) {
+            navigate(viewDetailsLink);
+          }
+        }}
         onMouseEnter={() => {
           if (hasMultipleImages) startAutoSlideshow(product._id, images);
         }}
@@ -1331,6 +1339,7 @@ export default function UnifiedProductHub() {
               <Link
                 to={`/products/${product.slug}/customize`}
                 className="px-4 py-2 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-black transition"
+                onClick={(e) => e.stopPropagation()}
               >
                 Customize
               </Link>

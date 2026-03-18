@@ -382,8 +382,7 @@ export const selectNewArrivalsEligibleError = (state) => state.homepage.newArriv
 export const selectNewArrivalsSelectedError = (state) => state.homepage.newArrivals.selectedError;
 export const selectNewArrivalsSettingError = (state) => state.homepage.newArrivals.settingError;
 export const selectNewArrivalsCanSubmitSelection = (state) => 
-  state.homepage.newArrivals.selectedItemIds.length >= 2 && 
-  state.homepage.newArrivals.selectedItemIds.length <= 6;
+  state.homepage.newArrivals.selectedItemIds.length >= 2;
 
 // Export selectors for Best Sellers
 export const selectBestSellersEligibleItems = (state) => state.homepage.bestSellers.eligibleItems;
@@ -396,8 +395,7 @@ export const selectBestSellersEligibleError = (state) => state.homepage.bestSell
 export const selectBestSellersSelectedError = (state) => state.homepage.bestSellers.selectedError;
 export const selectBestSellersSettingError = (state) => state.homepage.bestSellers.settingError;
 export const selectBestSellersCanSubmitSelection = (state) => 
-  state.homepage.bestSellers.selectedItemIds.length >= 2 && 
-  state.homepage.bestSellers.selectedItemIds.length <= 6;
+  state.homepage.bestSellers.selectedItemIds.length >= 2;
 
 // Export common selectors
 export const selectOperationStatus = (state) => ({

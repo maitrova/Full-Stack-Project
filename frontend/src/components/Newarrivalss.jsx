@@ -7,6 +7,8 @@ import {
   selectNewArrivalsSelectedError,
 } from "../redux/slices/HomepageSlice.js";
 import { Link } from "react-router-dom";
+import { buildImageUrl, getRawImagePath } from "../utils/responsiveImage.js";
+import { getHomepageItemPricing } from "../utils/homepageProductPricing.js";
 
 const NewArrivals = () => {
   const dispatch = useDispatch();
@@ -23,10 +25,6 @@ const NewArrivals = () => {
     dispatch(fetchHomepageNewArrivals());
   }, [dispatch]);
 
-  useEffect(() => {
-  console.log("New Arrivals Items:", items);
-}, [items]);
-
   // Image normalization
 const getItemImages = (item) => {
   let imgs = Array.isArray(item.previewImages)
@@ -35,39 +33,23 @@ const getItemImages = (item) => {
 
   if (!imgs.length) {
     if (item.previewImage) imgs = [item.previewImage];
-    else if (item.imageUrl) imgs = [{ url: item.imageUrl, altText: item.title }];
+    else if (item.imageUrl) imgs = [item.imageUrl];
   }
 
-  if (item.type === "readymade") {
-    imgs = imgs.map((imgObj) => {
-      if (!imgObj) return null;
-
-      let url = "";
-      let altText = "";
-
-      if (typeof imgObj === "object") {
-        url = imgObj.url || "";
-        altText = imgObj.altText || item.title || "Product image";
-      } else {
-        url = String(imgObj);
-        altText = item.title || "Product image";
-      }
-
-      if (!url) return null;
-
-      if (!url.startsWith("http")) {
-        const cleanSrc = url.startsWith("/") ? url : `/${url}`;
-        url = `${import.meta.env.VITE_IMAGE_URL}${cleanSrc}`;
-      }
+  return imgs
+    .map((image) => {
+      const rawPath = getRawImagePath(image);
+      if (!rawPath) return null;
 
       return {
-        url,
-        altText,
+        url: buildImageUrl(rawPath) || rawPath,
+        altText:
+          (typeof image === "object" ? image.altText : "") ||
+          item.title ||
+          "Product image",
       };
-    });
-  }
-
-  return imgs.filter(Boolean);
+    })
+    .filter(Boolean);
 };
 
 
@@ -149,17 +131,11 @@ const getItemImages = (item) => {
               }`}
             >
               <img
-  src={imgObj.url}
-  alt={imgObj.altText}
-  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-  loading="lazy"
-  onLoad={(e) =>
-    console.log("Image loaded:", {
-      src: imgObj.url,
-      alt: imgObj.altText,
-    })
-  }
-/>
+                src={imgObj.url}
+                alt={imgObj.altText}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                loading="lazy"
+              />
 
             </div>
           ))}
@@ -203,27 +179,34 @@ const getItemImages = (item) => {
   const ProductCard = ({ item }) => {
     const images = getItemImages(item);
     const label = item.name || item.title;
+    const pricing = getHomepageItemPricing(item);
+    const detailPath = item.type === "design" ? `/catalogue/${item._id}` : `/readymade/${item._id}`;
     
     return (
       <Link
-        to={`/${item.type === "design" ? "catalogue" : "readymade"}/${item._id}`}
-        className="group block bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-all duration-300"
+        to={detailPath}
+        className="group block overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
       >
-        {/* Image Section with name overlay */}
+        {/* Image Section */}
         <div className="relative h-64 bg-gray-50 overflow-hidden">
           <ImageSlider 
             images={images} 
             alt={label}
             autoScrollInterval={4000}
           />
-          
-          {/* Gradient overlay at bottom for readability */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/30 to-transparent" />
-          
-          {/* Name badge on image (like Dropproduct) */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/35 via-black/10 to-transparent" />
+
+          <div className="absolute right-3 top-3">
+            {pricing.hasOffer && (
+              <span className="rounded bg-red-600 px-2 py-1 text-[10px] font-semibold tracking-wide text-white shadow-sm">
+                {pricing.discountPercent}% OFF
+              </span>
+            )}
+          </div>
+
           <div className="absolute inset-x-0 bottom-3 flex justify-center px-3">
-            <div className="flex items-center gap-2 max-w-full px-4 py-2 rounded-md bg-white text-gray-900 shadow">
-              <span className="text-sm font-medium text-gray-900 truncate">
+            <div className="flex max-w-full items-center gap-2 rounded-md bg-white px-4 py-2 text-gray-900 shadow">
+              <span className="truncate text-sm font-medium text-gray-900">
                 {label}
               </span>
             </div>

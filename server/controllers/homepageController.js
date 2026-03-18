@@ -3,63 +3,116 @@ import { Design } from "../models/Design.js";
 import ReadymadeProduct from "../models/readymadeproducts.js";
 import mongoose from "mongoose";
 import HomepageSelection from "../models/HomepageSelection.js";
+import { attachReadymadePricing } from "../utils/readymadePricing.js";
+
+const normalizeDesignHomepageItem = (design) => {
+  const viewPreviewImages = Array.isArray(design.views)
+    ? design.views.map((view) => view?.previewImage).filter(Boolean)
+    : [];
+
+  return {
+    type: "design",
+    _id: design._id,
+    title: design.title || design.productName || "",
+    previewImage: design.previewImage || viewPreviewImages[0] || null,
+    previewImages: viewPreviewImages,
+    price:
+      (design.salePrice > 0
+        ? design.salePrice
+        : design.calculatedPrice > 0
+          ? design.calculatedPrice
+          : design.basePrice) ?? 0,
+    createdAt: design.createdAt,
+  };
+};
+
+const normalizeReadymadeHomepageItem = (product) => {
+  const pricedProduct = attachReadymadePricing({ ...product });
+  const images = Array.isArray(pricedProduct.images)
+    ? pricedProduct.images
+        .map((img) =>
+          typeof img === "string"
+            ? img
+            : img?.url
+              ? {
+                  url: img.url,
+                  altText: img.altText || pricedProduct.title || "Product image",
+                }
+              : null
+        )
+        .filter(Boolean)
+    : [];
+
+  const previewImage =
+    pricedProduct.thumbnail ||
+    (typeof images[0] === "string" ? images[0] : images[0]?.url) ||
+    null;
+
+  const previewImages = previewImage
+    ? [
+        previewImage,
+        ...images.filter((img) => {
+          const imageUrl = typeof img === "string" ? img : img?.url;
+          return imageUrl && imageUrl !== previewImage;
+        }),
+      ]
+    : images;
+
+  return {
+    type: "readymade",
+    _id: pricedProduct._id,
+    title: pricedProduct.title,
+    previewImage,
+    previewImages,
+    price: pricedProduct.effectivePrice ?? pricedProduct.price ?? 0,
+    mrp: pricedProduct.mrp ?? pricedProduct.price ?? 0,
+    originalPrice: pricedProduct.originalPrice ?? pricedProduct.price ?? 0,
+    offerPrice: pricedProduct.offerPrice ?? null,
+    saleActive: Boolean(pricedProduct.saleActive),
+    offerActive: Boolean(pricedProduct.offerActive),
+    saveAmount: pricedProduct.saveAmount ?? 0,
+    discountPercent: pricedProduct.discountPercent ?? 0,
+    currency: pricedProduct.currency || "INR",
+    createdAt: pricedProduct.createdAt,
+  };
+};
+
 export const getEligibleNewArrivals = async (req, res) => {
   try {
     const [designs, readymades] = await Promise.all([
       Design.find({ newArrivals: true })
-        .select("_id title productName previewImage salePrice calculatedPrice basePrice newArrivals createdAt")
+        .select("_id title productName previewImage views salePrice calculatedPrice basePrice newArrivals createdAt")
         .sort({ createdAt: -1 })
         .lean(),
-
       ReadymadeProduct.find({ newArrival: true })
-        .select("_id title images thumbnail price currency newArrival createdAt")
+        .select(
+          "_id title images thumbnail price salePrice saleStartAt saleEndAt variants currency newArrival createdAt"
+        )
         .sort({ createdAt: -1 })
         .lean(),
     ]);
 
-    const d = designs.map((x) => ({
-      type: "design",
-      _id: x._id,
-      title: x.title || x.productName || "",
-      previewImage: x.previewImage || null,
-      price:
-        (x.salePrice > 0 ? x.salePrice : x.calculatedPrice > 0 ? x.calculatedPrice : x.basePrice) ?? 0,
-      createdAt: x.createdAt,
-    }));
-
-    const r = readymades.map((x) => ({
-      type: "readymade",
-      _id: x._id,
-      title: x.title,
-      previewImage:
-        x.thumbnail ||
-        (Array.isArray(x.images) && x.images[0]
-          ? typeof x.images[0] === "string"
-            ? x.images[0]
-            : x.images[0]?.url
-          : null),
-      price: x.price,
-      currency: x.currency || "INR",
-      createdAt: x.createdAt,
-    }));
-
-    return res.json({ success: true, eligible: [...d, ...r] });
+    return res.json({
+      success: true,
+      eligible: [
+        ...designs.map(normalizeDesignHomepageItem),
+        ...readymades.map(normalizeReadymadeHomepageItem),
+      ],
+    });
   } catch (err) {
     console.error("getEligibleNewArrivals error:", err);
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-
 export const setHomepageNewArrivals = async (req, res) => {
   try {
     const { items } = req.body;
-    
-    if (!Array.isArray(items) || items.length < 2 || items.length > 6) {
-      return res.status(400).json({ success: false, message: "Select minimum 2 and maximum 6 items" });
+
+    if (!Array.isArray(items) || items.length < 2) {
+      return res.status(400).json({ success: false, message: "Select at least 2 items" });
     }
 
-    // Validate each item
     for (const item of items) {
       if (!item?.itemType || !["design", "readymade"].includes(item.itemType)) {
         return res.status(400).json({ success: false, message: "Invalid itemType" });
@@ -69,23 +122,21 @@ export const setHomepageNewArrivals = async (req, res) => {
       }
     }
 
-    // Check if the selected items exist and are eligible
-    const designIds = items.filter(i => i.itemType === "design").map(i => i.itemId);
-    const readymadeIds = items.filter(i => i.itemType === "readymade").map(i => i.itemId);
+    const designIds = items.filter((item) => item.itemType === "design").map((item) => item.itemId);
+    const readymadeIds = items.filter((item) => item.itemType === "readymade").map((item) => item.itemId);
 
     const [designCount, readymadeCount] = await Promise.all([
       Design.countDocuments({ _id: { $in: designIds }, newArrivals: true }),
-      ReadymadeProduct.countDocuments({ _id: { $in: readymadeIds }, newArrival: true })
+      ReadymadeProduct.countDocuments({ _id: { $in: readymadeIds }, newArrival: true }),
     ]);
 
     if (designCount !== designIds.length || readymadeCount !== readymadeIds.length) {
       return res.status(400).json({ success: false, message: "Some selected items are not eligible" });
     }
 
-    // Save selected items into HomepageSelection model
     const updatedSelection = await HomepageSelection.findOneAndUpdate(
       { key: "new_arrivals" },
-      { $set: { items: items } },
+      { $set: { items } },
       { upsert: true, new: true }
     );
 
@@ -96,8 +147,6 @@ export const setHomepageNewArrivals = async (req, res) => {
   }
 };
 
-
-// Fetch the selected homepage new arrivals for frontend display
 export const getHomepageNewArrivals = async (req, res) => {
   try {
     const selection = await HomepageSelection.findOne({ key: "new_arrivals" }).lean();
@@ -107,118 +156,52 @@ export const getHomepageNewArrivals = async (req, res) => {
     }
 
     const designIds = selection.items
-      .filter((i) => i.itemType === "design")
-      .map((i) => i.itemId);
-
+      .filter((item) => item.itemType === "design")
+      .map((item) => item.itemId);
     const readymadeIds = selection.items
-      .filter((i) => i.itemType === "readymade")
-      .map((i) => i.itemId);
+      .filter((item) => item.itemType === "readymade")
+      .map((item) => item.itemId);
 
     const [designs, readymades] = await Promise.all([
       designIds.length ? Design.find({ _id: { $in: designIds } }).lean() : [],
       readymadeIds.length ? ReadymadeProduct.find({ _id: { $in: readymadeIds } }).lean() : [],
     ]);
 
-    const items = [
-      ...designs.map((d) => {
-        // ✅ collect all view preview images (max 4 if you want)
-        const viewPreviewImages = Array.isArray(d.views)
-          ? d.views
-              .map((v) => v?.previewImage)
-              .filter(Boolean) // removes null/undefined/""
-          : [];
-
-        return {
-          type: "design",
-          _id: d._id,
-          title: d.title || d.productName || "",
-          // keep single (optional)
-          previewImage: d.previewImage || viewPreviewImages[0] || null,
-          // ✅ new array
-          previewImages: viewPreviewImages, // <-- all view preview images
-          price: d.salePrice || d.calculatedPrice || d.basePrice || 0,
-          createdAt: d.createdAt,
-        };
-      }),
-
-      ...readymades.map((p) => {
-        const imgs = Array.isArray(p.images)
-          ? p.images
-              .map((img) => (typeof img === "string" ? img : img?.url))
-              .filter(Boolean)
-          : [];
-        const previewImage = p.thumbnail || imgs[0] || null;
-        const previewImages = previewImage
-          ? [previewImage, ...imgs.filter((img) => img !== previewImage)]
-          : imgs;
-
-        return {
-          type: "readymade",
-          _id: p._id,
-          title: p.title,
-          // keep single (optional)
-          previewImage,
-          // ✅ new array (all up to 4)
-          previewImages,
-          price: p.price ?? 0,
-          currency: p.currency || "INR",
-          createdAt: p.createdAt,
-        };
-      }),
-    ];
-
-    return res.json({ success: true, items });
+    return res.json({
+      success: true,
+      items: [
+        ...designs.map(normalizeDesignHomepageItem),
+        ...readymades.map(normalizeReadymadeHomepageItem),
+      ],
+    });
   } catch (err) {
     console.error("getHomepageNewArrivals error:", err);
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-// ================================
-// BEST SELLERS (same as New Arrivals)
-// ================================
-
 export const getEligibleBestSellers = async (req, res) => {
   try {
     const [designs, readymades] = await Promise.all([
       Design.find({ bestSeller: true })
-        .select("_id title productName previewImage salePrice calculatedPrice basePrice bestSeller createdAt")
+        .select("_id title productName previewImage views salePrice calculatedPrice basePrice bestSeller createdAt")
         .sort({ createdAt: -1 })
         .lean(),
-
       ReadymadeProduct.find({ bestSeller: true })
-        .select("_id title images thumbnail price currency bestSeller createdAt")
+        .select(
+          "_id title images thumbnail price salePrice saleStartAt saleEndAt variants currency bestSeller createdAt"
+        )
         .sort({ createdAt: -1 })
         .lean(),
     ]);
 
-    const d = designs.map((x) => ({
-      type: "design",
-      _id: x._id,
-      title: x.title || x.productName || "",
-      previewImage: x.previewImage || null,
-      price:
-        (x.salePrice > 0 ? x.salePrice : x.calculatedPrice > 0 ? x.calculatedPrice : x.basePrice) ?? 0,
-      createdAt: x.createdAt,
-    }));
-
-    const r = readymades.map((x) => ({
-      type: "readymade",
-      _id: x._id,
-      title: x.title,
-      previewImage:
-        x.thumbnail ||
-        (Array.isArray(x.images) && x.images[0]
-          ? typeof x.images[0] === "string"
-            ? x.images[0]
-            : x.images[0]?.url
-          : null),
-      price: x.price,
-      currency: x.currency || "INR",
-      createdAt: x.createdAt,
-    }));
-
-    return res.json({ success: true, eligible: [...d, ...r] });
+    return res.json({
+      success: true,
+      eligible: [
+        ...designs.map(normalizeDesignHomepageItem),
+        ...readymades.map(normalizeReadymadeHomepageItem),
+      ],
+    });
   } catch (err) {
     console.error("getEligibleBestSellers error:", err);
     return res.status(500).json({ success: false, message: "Server error" });
@@ -229,8 +212,8 @@ export const setHomepageBestSellers = async (req, res) => {
   try {
     const { items } = req.body;
 
-    if (!Array.isArray(items) || items.length < 2 || items.length > 6) {
-      return res.status(400).json({ success: false, message: "Select minimum 2 and maximum 6 items" });
+    if (!Array.isArray(items) || items.length < 2) {
+      return res.status(400).json({ success: false, message: "Select at least 2 items" });
     }
 
     for (const item of items) {
@@ -242,8 +225,8 @@ export const setHomepageBestSellers = async (req, res) => {
       }
     }
 
-    const designIds = items.filter((i) => i.itemType === "design").map((i) => i.itemId);
-    const readymadeIds = items.filter((i) => i.itemType === "readymade").map((i) => i.itemId);
+    const designIds = items.filter((item) => item.itemType === "design").map((item) => item.itemId);
+    const readymadeIds = items.filter((item) => item.itemType === "readymade").map((item) => item.itemId);
 
     const [designCount, readymadeCount] = await Promise.all([
       Design.countDocuments({ _id: { $in: designIds }, bestSeller: true }),
@@ -256,7 +239,7 @@ export const setHomepageBestSellers = async (req, res) => {
 
     const updatedSelection = await HomepageSelection.findOneAndUpdate(
       { key: "best_sellers" },
-      { $set: { items: items } },
+      { $set: { items } },
       { upsert: true, new: true }
     );
 
@@ -276,60 +259,24 @@ export const getHomepageBestSellers = async (req, res) => {
     }
 
     const designIds = selection.items
-      .filter((i) => i.itemType === "design")
-      .map((i) => i.itemId);
-
+      .filter((item) => item.itemType === "design")
+      .map((item) => item.itemId);
     const readymadeIds = selection.items
-      .filter((i) => i.itemType === "readymade")
-      .map((i) => i.itemId);
+      .filter((item) => item.itemType === "readymade")
+      .map((item) => item.itemId);
 
     const [designs, readymades] = await Promise.all([
       designIds.length ? Design.find({ _id: { $in: designIds } }).lean() : [],
       readymadeIds.length ? ReadymadeProduct.find({ _id: { $in: readymadeIds } }).lean() : [],
     ]);
 
-    const items = [
-      ...designs.map((d) => {
-        const viewPreviewImages = Array.isArray(d.views)
-          ? d.views.map((v) => v?.previewImage).filter(Boolean)
-          : [];
-
-        return {
-          type: "design",
-          _id: d._id,
-          title: d.title || d.productName || "",
-          previewImage: d.previewImage || viewPreviewImages[0] || null,
-          previewImages: viewPreviewImages,
-          price: d.salePrice || d.calculatedPrice || d.basePrice || 0,
-          createdAt: d.createdAt,
-        };
-      }),
-
-      ...readymades.map((p) => {
-        const imgs = Array.isArray(p.images)
-          ? p.images
-              .map((img) => (typeof img === "string" ? img : img?.url))
-              .filter(Boolean)
-          : [];
-        const previewImage = p.thumbnail || imgs[0] || null;
-        const previewImages = previewImage
-          ? [previewImage, ...imgs.filter((img) => img !== previewImage)]
-          : imgs;
-
-        return {
-          type: "readymade",
-          _id: p._id,
-          title: p.title,
-          previewImage,
-          previewImages,
-          price: p.price ?? 0,
-          currency: p.currency || "INR",
-          createdAt: p.createdAt,
-        };
-      }),
-    ];
-
-    return res.json({ success: true, items });
+    return res.json({
+      success: true,
+      items: [
+        ...designs.map(normalizeDesignHomepageItem),
+        ...readymades.map(normalizeReadymadeHomepageItem),
+      ],
+    });
   } catch (err) {
     console.error("getHomepageBestSellers error:", err);
     return res.status(500).json({ success: false, message: "Server error" });
