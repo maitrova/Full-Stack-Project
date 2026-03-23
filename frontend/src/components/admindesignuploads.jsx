@@ -28,9 +28,11 @@ const DesignUploadsManager = () => {
   
   const [newFolderName, setNewFolderName] = useState('');
   const [selectedFiles, setSelectedFiles] = useState([]);
+  const [selectionType, setSelectionType] = useState(null);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef(null);
+  const imageInputRef = useRef(null);
+  const folderInputRef = useRef(null);
   const dropZoneRef = useRef(null);
 
   // Get base URL from env
@@ -64,23 +66,42 @@ const DesignUploadsManager = () => {
   };
 
   // Handle folder selection
+  const clearSelectedFiles = () => {
+    setSelectedFiles([]);
+    setSelectionType(null);
+
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
+
+    if (folderInputRef.current) {
+      folderInputRef.current.value = '';
+    }
+  };
+
   const handleSelectFolder = (folder) => {
+    clearSelectedFiles();
     dispatch(setCurrentFolder(folder));
     dispatch(fetchImages(folder));
   };
 
+  const selectImageFiles = (files, type) => {
+    const imageFiles = Array.from(files).filter((file) =>
+      file.type.startsWith('image/')
+    );
+
+    setSelectedFiles(imageFiles);
+    setSelectionType(imageFiles.length ? type : null);
+  };
+
   // Handle file selection
   const handleFileSelect = (e) => {
+    selectImageFiles(e.target.files, 'images');
+  };
 
-  const files = Array.from(e.target.files);
-
-  const imageFiles = files.filter(file =>
-    file.type.startsWith("image/")
-  );
-
-  setSelectedFiles(imageFiles);
-
-};
+  const handleFolderSelect = (e) => {
+    selectImageFiles(e.target.files, 'folder');
+  };
 
   // Handle drag and drop
   const handleDragEnter = (e) => {
@@ -106,28 +127,26 @@ const DesignUploadsManager = () => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    
-    const files = Array.from(e.dataTransfer.files);
-    const imageFiles = files.filter(file => file.type.startsWith('image/'));
-    setSelectedFiles(imageFiles);
+
+    selectImageFiles(e.dataTransfer.files, 'images');
   };
 
   // Handle upload
-  const handleUpload = () => {
+  const handleUpload = async () => {
+    if (!currentFolder || !selectedFiles.length) return;
 
-    if (!currentFolder) return;
+    try {
+      await dispatch(
+        uploadImages({
+          folder: currentFolder,
+          images: selectedFiles,
+        })
+      ).unwrap();
 
-    const formData = new FormData();
-
-    selectedFiles.forEach(file => {
-      formData.append("images", file);
-    });
-
-    dispatch(uploadImages({
-      folder: currentFolder,
-      images: formData
-    }));
-
+      clearSelectedFiles();
+    } catch (err) {
+      console.error('Upload failed:', err);
+    }
   };
 
   // Handle image deletion
@@ -170,9 +189,13 @@ const DesignUploadsManager = () => {
   const getImageUrl = (filename) => {
     // Remove /api from baseURL if it exists, then add the path
     const baseUrlWithoutApi = baseURL
-    console.log("Constructed image URL:", `${baseUrlWithoutApi}/outputs/adminuploadeddesigns/${currentFolder}/${filename}`);
     return `${baseUrlWithoutApi}/outputs/adminuploadeddesigns/${currentFolder}/${filename}`;
   };
+
+  const selectedFolderName =
+    selectionType === 'folder'
+      ? selectedFiles[0]?.webkitRelativePath?.split('/')[0] || 'folder'
+      : null;
 
   // Simple SVG Icons
   const FolderIcon = ({ className = "h-5 w-5" }) => (
@@ -404,29 +427,47 @@ const DesignUploadsManager = () => {
                   <UploadIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-700 mb-2">
                     {selectedFiles.length > 0
-                      ? `${selectedFiles.length} file${selectedFiles.length !== 1 ? 's' : ''} selected`
-                      : 'Drag & drop images here or click to browse'}
+                      ? selectionType === 'folder'
+                        ? `${selectedFiles.length} image${selectedFiles.length !== 1 ? 's' : ''} selected from ${selectedFolderName}`
+                        : `${selectedFiles.length} image${selectedFiles.length !== 1 ? 's' : ''} selected`
+                      : 'Drag & drop images here, upload a folder, or browse individual files'}
                   </p>
                   <input
-                    ref={fileInputRef}
+                    ref={imageInputRef}
                     type="file"
                     multiple
-                    webkitdirectory="true"
-                    directory="true"
+                    accept="image/*"
                     onChange={handleFileSelect}
                     className="hidden"
-                    id="file-upload"
+                    id="image-upload"
+                  />
+                  <input
+                    ref={folderInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    webkitdirectory="true"
+                    directory="true"
+                    onChange={handleFolderSelect}
+                    className="hidden"
+                    id="folder-upload"
                   />
                   <div className="flex items-center justify-center space-x-4">
                     <label
-                      htmlFor="file-upload"
+                      htmlFor="image-upload"
                       className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 cursor-pointer transition-colors"
                     >
-                      Browse Files
+                      Browse Images
+                    </label>
+                    <label
+                      htmlFor="folder-upload"
+                      className="px-4 py-2 bg-white text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-50 cursor-pointer transition-colors"
+                    >
+                      Browse Folder
                     </label>
                     {selectedFiles.length > 0 && (
                       <button
-                        onClick={() => setSelectedFiles([])}
+                        onClick={clearSelectedFiles}
                         className="px-4 py-2 text-gray-600 hover:text-gray-800"
                       >
                         Clear

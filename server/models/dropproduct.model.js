@@ -40,6 +40,20 @@ const dropproductSchema = new mongoose.Schema(
     // price: { type: Number, required: true },
 
     description: String,
+
+    salePrice: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+    saleStartAt: {
+      type: Date,
+      default: null,
+    },
+    saleEndAt: {
+      type: Date,
+      default: null,
+    },
     
      category: {
       type: String,
@@ -61,6 +75,11 @@ const dropproductSchema = new mongoose.Schema(
       },
     },
     thumbnail: {
+      type: String,
+      default: null,
+    },
+
+    sizeChart: {
       type: String,
       default: null,
     },
@@ -90,9 +109,43 @@ const dropproductSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    bestSeller: {
+      type: Boolean,
+      default: false,
+    },
+    newArrival: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );
+
+dropproductSchema.pre("validate", function (next) {
+  const prices = (this.variants || []).map((v) => Number(v.price));
+  const minVariantPrice = prices.length ? Math.min(...prices) : 0;
+
+  const hasSalePrice =
+    this.salePrice !== null &&
+    this.salePrice !== undefined &&
+    this.salePrice !== "";
+
+  if (hasSalePrice) {
+    if (!(Number(this.salePrice) > 0)) {
+      this.invalidate("salePrice", "Offer price must be greater than 0");
+    }
+
+    if (minVariantPrice > 0 && !(Number(this.salePrice) < minVariantPrice)) {
+      this.invalidate("salePrice", "Offer price must be lower than MRP price");
+    }
+  }
+
+  if (this.saleStartAt && this.saleEndAt && this.saleStartAt >= this.saleEndAt) {
+    this.invalidate("saleEndAt", "Offer end date must be after start date");
+  }
+
+  next();
+});
 
 // keep totals updated automatically
 dropproductSchema.pre("save", function (next) {

@@ -12,7 +12,11 @@ export class WebGLRenderer {
     try {
       container.innerHTML = "";
       this.canvas = document.createElement("canvas");
+      this.canvas.style.display = "block";
+      this.canvas.style.width = "auto";
+      this.canvas.style.height = "auto";
       this.canvas.style.maxWidth = "100%";
+      this.canvas.style.maxHeight = "min(68vh, 620px)";
       container.appendChild(this.canvas);
 
       this.gl = this.canvas.getContext("webgl", { preserveDrawingBuffer: true });

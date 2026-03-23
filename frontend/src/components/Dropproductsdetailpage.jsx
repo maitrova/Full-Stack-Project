@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+import DOMPurify from "dompurify";
 import {
   getDropproductById,
   selectCurrentProduct,
@@ -59,6 +60,12 @@ const DropProductDetailsPage = () => {
 
   const mainImageRef = useRef(null);
   const thumbnailContainerRef = useRef(null);
+  const assetUrl = (path) => {
+    if (!path) return null;
+    const base = import.meta.env.VITE_IMAGE_URL || "";
+    if (path.startsWith("http")) return path;
+    return path.startsWith("/") ? `${base}${path}` : `${base}/${path}`;
+  };
 
   useEffect(() => {
     if (id) dispatch(getDropproductById(id));
@@ -89,7 +96,25 @@ const DropProductDetailsPage = () => {
     return found || variants[0] || null;
   }, [variants, normalizedSelectedSize]);
 
-  const currentPrice = selectedVariant?.price ?? 0;
+  const saleActive = useMemo(() => {
+    const mrp = Number(product?.minPrice || 0);
+    const sale = Number(product?.salePrice || 0);
+    if (!(mrp > 0) || !(sale > 0) || !(sale < mrp)) return false;
+    const now = new Date();
+    const start = product?.saleStartAt ? new Date(product.saleStartAt) : null;
+    const end = product?.saleEndAt ? new Date(product.saleEndAt) : null;
+    if (start && now < start) return false;
+    if (end && now > end) return false;
+    return true;
+  }, [product]);
+  const originalPrice = selectedVariant?.price ?? 0;
+  const currentPrice = useMemo(() => {
+    if (!saleActive || !selectedVariant?.price || !product?.minPrice) {
+      return selectedVariant?.price ?? 0;
+    }
+    const ratio = Number(product.salePrice) / Number(product.minPrice);
+    return Math.round(selectedVariant.price * ratio * 100) / 100;
+  }, [product, saleActive, selectedVariant]);
   const currentStock = selectedVariant?.stock ?? 0;
 
   // ✅ Keep size default when product loads
@@ -158,7 +183,6 @@ const DropProductDetailsPage = () => {
   };
 
   // ✅ Use currentPrice for discount, not product.price
-  const originalPrice = product?.originalPrice ?? currentPrice * 1.2;
   const discount = calculateDiscount(originalPrice, currentPrice);
 
   // ✅ Signature should NOT rely on variant._id (your variant objects may not have _id)
@@ -590,7 +614,10 @@ const DropProductDetailsPage = () => {
             {/* Description */}
             <div className="prose max-w-none border-t pt-8">
               <h3 className="text-2xl font-bold text-gray-900 mb-6">Product Details</h3>
-              <p className="text-gray-700 leading-relaxed text-lg mb-8">{product.description}</p>
+              <div
+                className="text-gray-700 leading-relaxed text-lg mb-8"
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(product.description || "") }}
+              />
               <div className="space-y-4">
                 <div className="flex items-center">
                   <Check className="w-5 h-5 text-green-500 mr-3" />
@@ -644,6 +671,17 @@ const DropProductDetailsPage = () => {
                     <span className="font-semibold text-gray-900">Stock:</span> {currentStock}
                   </div>
                 )}
+              </div>
+            )}
+
+            {product?.sizeChart && (
+              <div className="space-y-4 border-t pt-8">
+                <h3 className="text-xl font-semibold text-gray-900">Size Chart</h3>
+                <img
+                  src={assetUrl(product.sizeChart)}
+                  alt={`${product.name} size chart`}
+                  className="w-full max-w-xl rounded-2xl border border-gray-200 bg-white"
+                />
               </div>
             )}
 

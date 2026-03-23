@@ -175,7 +175,7 @@ const getItemImages = (item) => {
               onClick={prevSlide}
               className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-white/90 hover:bg-white 
                 border border-gray-200 rounded-sm flex items-center justify-center shadow-sm 
-                transition-all duration-200 ${isImageHovered ? "opacity-100" : "opacity-0"}`}
+                transition-all duration-200 ${isImageHovered ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
               aria-label="Previous image"
               type="button"
             >
@@ -188,7 +188,7 @@ const getItemImages = (item) => {
               onClick={nextSlide}
               className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-white/90 hover:bg-white 
                 border border-gray-200 rounded-sm flex items-center justify-center shadow-sm 
-                transition-all duration-200 ${isImageHovered ? "opacity-100" : "opacity-0"}`}
+                transition-all duration-200 ${isImageHovered ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
               aria-label="Next image"
               type="button"
             >

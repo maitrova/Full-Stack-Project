@@ -447,6 +447,11 @@ const handleSizeChartUpload = (e) => {
   }
 
   setSizeChart(file);
+  setErrors(prev => ({
+    ...prev,
+    sizeChart: null,
+    general: null,
+  }));
 
   const reader = new FileReader();
   reader.onloadend = () => setSizeChartPreview(reader.result);
@@ -457,6 +462,7 @@ const handleSizeChartUpload = (e) => {
 const removeSizeChart = () => {
   setSizeChart(null);
   setSizeChartPreview(null);
+  setErrors(prev => ({ ...prev, sizeChart: null, general: null }));
 };
   // Step navigation handlers
   const goToNextStep = () => {
@@ -466,9 +472,15 @@ const removeSizeChart = () => {
         return;
       }
     } else if (currentStep === 2) {
-      // Sub-category is optional, no validation needed
+      if (!formData.subCategory) {
+        setErrors({ subCategory: 'Please select a sub-category' });
+        return;
+      }
     } else if (currentStep === 3) {
-      // Brand is optional, no validation needed
+      if (!formData.brand) {
+        setErrors({ brand: 'Please select a brand' });
+        return;
+      }
     }
     setCurrentStep(prev => Math.min(prev + 1, steps.length));
     setErrors({});
@@ -503,6 +515,8 @@ const removeSizeChart = () => {
     
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: null }));
+    } else if (errors.general) {
+      setErrors(prev => ({ ...prev, general: null }));
     }
   };
 
@@ -515,6 +529,8 @@ const removeSizeChart = () => {
     
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: null }));
+    } else if (errors.general) {
+      setErrors(prev => ({ ...prev, general: null }));
     }
   };
 
@@ -541,6 +557,8 @@ const removeSizeChart = () => {
     
     if (errors.variants) {
       setErrors(prev => ({ ...prev, variants: null }));
+    } else if (errors.general) {
+      setErrors(prev => ({ ...prev, general: null }));
     }
   };
 
@@ -686,6 +704,11 @@ const removeSizeChart = () => {
   }));
 
   setImages(prev => [...prev, ...newImages]);
+  setErrors(prev => ({
+    ...prev,
+    images: null,
+    general: null,
+  }));
 
   validFiles.forEach(file => {
     const reader = new FileReader();
@@ -700,6 +723,7 @@ const removeSizeChart = () => {
   const removeImage = (index) => {
     setImages(prev => prev.filter((_, i) => i !== index));
     setImagePreviews(prev => prev.filter((_, i) => i !== index));
+    setErrors(prev => ({ ...prev, images: null, general: null }));
 
     setImagePreviews(prev => prev.filter((_, i) => i !== index));
   };
@@ -729,6 +753,11 @@ const removeSizeChart = () => {
     }
     
     setVideo(file);
+    setErrors(prev => ({
+      ...prev,
+      video: null,
+      general: null,
+    }));
     
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -744,6 +773,7 @@ const removeSizeChart = () => {
   const removeVideo = () => {
     setVideo(null);
     setVideoPreview(null);
+    setErrors(prev => ({ ...prev, video: null, general: null }));
   };
 
   // ============= CATEGORY MANAGEMENT FUNCTIONS =============
@@ -1508,6 +1538,73 @@ const removeSizeChart = () => {
       .sort((a, b) => a.name.localeCompare(b.name));
   };
 
+  const getStepForErrors = (nextErrors = {}) => {
+    if (nextErrors.category) return 1;
+    if (nextErrors.subCategory) return 2;
+    if (nextErrors.brand) return 3;
+    return 4;
+  };
+
+  const mapServerErrorToFormErrors = (message) => {
+    const normalized = String(message || '').toLowerCase();
+    const nextErrors = {};
+
+    if (normalized.includes('title') && normalized.includes('description')) {
+      nextErrors.title = 'Title is required';
+      nextErrors.description = 'Description is required';
+    } else {
+      if (normalized.includes('title')) {
+        nextErrors.title = 'Title is required';
+      }
+
+      if (normalized.includes('description')) {
+        nextErrors.description = 'Description is required';
+      }
+    }
+
+    if (normalized.includes('category')) {
+      nextErrors.category = 'Category is required';
+    }
+
+    if (normalized.includes('sub-category') || normalized.includes('subcategory')) {
+      nextErrors.subCategory = 'Sub-category is required';
+    }
+
+    if (normalized.includes('brand')) {
+      nextErrors.brand = 'Brand is required';
+    }
+
+    if (normalized.includes('variant')) {
+      nextErrors.variants = message;
+    }
+
+    if (normalized.includes('image')) {
+      nextErrors.images = message;
+    }
+
+    if (normalized.includes('size chart')) {
+      nextErrors.sizeChart = message;
+    }
+
+    if (normalized.includes('video')) {
+      nextErrors.video = message;
+    }
+
+    if (normalized.includes('sale price') || normalized.includes('offer price')) {
+      nextErrors.salePrice = message;
+    }
+
+    if (normalized.includes('sale end') || normalized.includes('offer end')) {
+      nextErrors.saleEndAt = message;
+    }
+
+    if (Object.keys(nextErrors).length === 0) {
+      nextErrors.general = message || 'Failed to save product';
+    }
+
+    return nextErrors;
+  };
+
 const validateForm = () => {
   const newErrors = {};   // ✅ define it FIRST
 
@@ -1532,6 +1629,14 @@ const validateForm = () => {
   // Category validation
   if (!formData.category) {
     newErrors.category = "Category is required";
+  }
+
+  if (!formData.subCategory) {
+    newErrors.subCategory = "Sub-category is required";
+  }
+
+  if (!formData.brand) {
+    newErrors.brand = "Brand is required";
   }
 
   if (formData.salePrice !== "") {
@@ -1588,6 +1693,7 @@ const validateForm = () => {
   }
 
   setErrors(newErrors);
+  setCurrentStep(getStepForErrors(newErrors));
 
   return Object.keys(newErrors).length === 0;
 };
@@ -1674,10 +1780,9 @@ const validateForm = () => {
       resetForm();
     } catch (error) {
       const errorMessage = typeof error === 'string' ? error : error?.message || 'Failed to save product';
-      dispatch(addNotification({
-        type: 'error',
-        message: errorMessage,
-      }));
+      const nextErrors = mapServerErrorToFormErrors(errorMessage);
+      setErrors(nextErrors);
+      setCurrentStep(getStepForErrors(nextErrors));
     } finally {
       setLoading(false);
     }
@@ -2346,17 +2451,19 @@ const validateForm = () => {
                   <>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Select Sub-category (Optional)
+                        Select Sub-category *
                       </label>
                       <div className="relative">
                         <select
                           name="subCategory"
                           value={formData.subCategory}
                           onChange={handleInputChange}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                            errors.subCategory ? 'border-red-500' : 'border-gray-300'
+                          }`}
                           disabled={loading || !formData.category || subCategoryLoading}
                         >
-                          <option value="">No sub-category</option>
+                          <option value="">Choose a sub-category</option>
                           {subCategoriesForCategory.map(sub => (
                             <option key={sub._id} value={sub._id}>{sub.name}</option>
                           ))}
@@ -2371,6 +2478,12 @@ const validateForm = () => {
                       {!formData.category && (
                         <p className="mt-1 text-xs text-gray-500">
                           Please select a category first
+                        </p>
+                      )}
+                      {errors.subCategory && (
+                        <p className="mt-1 text-sm text-red-600 flex items-center">
+                          <AlertCircle className="w-4 h-4 mr-1" />
+                          {errors.subCategory}
                         </p>
                       )}
                     </div>
@@ -2623,17 +2736,19 @@ const validateForm = () => {
                   <>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Select Brand (Optional)
+                        Select Brand *
                       </label>
                       <div className="relative">
                         <select
                           name="brand"
                           value={formData.brand}
                           onChange={handleInputChange}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                            errors.brand ? 'border-red-500' : 'border-gray-300'
+                          }`}
                           disabled={loading || !formData.subCategory || brandsLoading || brandLoading}
                         >
-                          <option value="">No brand</option>
+                          <option value="">Choose a brand</option>
                           {brandsForSubCategory.map(brand => (
                             <option key={brand._id} value={brand._id}>{brand.name}</option>
                           ))}
@@ -2648,6 +2763,12 @@ const validateForm = () => {
                       {!formData.subCategory && (
                         <p className="mt-1 text-xs text-gray-500">
                           Please select a sub-category first
+                        </p>
+                      )}
+                      {errors.brand && (
+                        <p className="mt-1 text-sm text-red-600 flex items-center">
+                          <AlertCircle className="w-4 h-4 mr-1" />
+                          {errors.brand}
                         </p>
                       )}
                     </div>
@@ -3361,6 +3482,15 @@ const validateForm = () => {
         {!isEdit && renderStepIndicator()}
 
         <form onSubmit={handleSubmit}>
+          {errors.general && (
+            <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div className="flex items-center">
+                <AlertCircle className="mr-2 h-4 w-4" />
+                {errors.general}
+              </div>
+            </div>
+          )}
+
           {renderStepContent()}
 
           <div className="flex justify-between space-x-4 pt-6 border-t mt-6">

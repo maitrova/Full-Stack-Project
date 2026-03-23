@@ -1,48 +1,55 @@
-// dropproductSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
-// Base URL for API calls
-const API_BASE_URL = `${import.meta.env.VITE_API_URL}/dropproducts`; // Update with your actual API URL
+const API_BASE_URL = `${import.meta.env.VITE_API_URL}/dropproducts`;
 
-// Async thunks
 export const createDropproduct = createAsyncThunk(
-  "dropproducts/create",
+  'dropproducts/create',
   async (productData, { rejectWithValue }) => {
     try {
-      const fd = new FormData();
+      const formData = new FormData();
 
-      // ✅ required text fields
-      fd.append("name", productData.name || "");
-      fd.append("description", productData.description || "");
-      fd.append("category", productData.category || "");
-      fd.append("subCategory", productData.subCategory || "");
+      formData.append('name', productData.name || '');
+      formData.append('description', productData.description || '');
+      formData.append('category', productData.category || '');
+      formData.append('subCategory', productData.subCategory || '');
+      formData.append('salePrice', productData.salePrice ?? '');
+      formData.append('saleStartAt', productData.saleStartAt ?? '');
+      formData.append('saleEndAt', productData.saleEndAt ?? '');
+      formData.append('variants', JSON.stringify(productData.variants || []));
 
-      // ✅ images (array of Files)
       (productData.images || []).forEach((file) => {
-        if (file instanceof File) fd.append("images", file);
+        if (file instanceof File) {
+          formData.append('images', file);
+        }
       });
 
-      // ✅ thumbnail (single File)
       if (productData.thumbnail instanceof File) {
-        fd.append("thumbnail", productData.thumbnail);
+        formData.append('thumbnail', productData.thumbnail);
       }
 
-      // ✅ variants (send as JSON string)
-      fd.append("variants", JSON.stringify(productData.variants || []));
+      if (productData.sizeChart instanceof File) {
+        formData.append('sizeChart', productData.sizeChart);
+      }
 
-      // ✅ isActive (optional)
       if (productData.isActive !== undefined) {
-        fd.append("isActive", String(productData.isActive));
+        formData.append('isActive', String(productData.isActive));
       }
-
-      // ✅ removeThumbnail (only if true) - mostly for update, but harmless
+      if (productData.bestSeller !== undefined) {
+        formData.append('bestSeller', String(productData.bestSeller));
+      }
+      if (productData.newArrival !== undefined) {
+        formData.append('newArrival', String(productData.newArrival));
+      }
       if (productData.removeThumbnail) {
-        fd.append("removeThumbnail", "true");
+        formData.append('removeThumbnail', 'true');
+      }
+      if (productData.removeSizeChart) {
+        formData.append('removeSizeChart', 'true');
       }
 
-      const response = await axios.post(`${API_BASE_URL}`, fd, {
-        headers: { "Content-Type": "multipart/form-data" },
+      const response = await axios.post(API_BASE_URL, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
 
       return response.data;
@@ -51,18 +58,17 @@ export const createDropproduct = createAsyncThunk(
         error.response?.data?.message ||
           error.response?.data ||
           error.message ||
-          "Create dropproduct failed"
+          'Create dropproduct failed'
       );
     }
   }
 );
 
-
 export const getAllDropproducts = createAsyncThunk(
   'dropproducts/getAll',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}`);
+      const response = await axios.get(API_BASE_URL);
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
@@ -87,31 +93,36 @@ export const updateDropproduct = createAsyncThunk(
   async ({ id, productData }, { rejectWithValue }) => {
     try {
       const formData = new FormData();
-      
-      // Append product fields
-      Object.keys(productData).forEach((key) => {
-  if (key === "images" && Array.isArray(productData[key])) {
-    productData[key].forEach((file) => {
-      if (file instanceof File) formData.append("images", file);
-    });
-  } else if (key === "variants") {
-    // ✅ important
-    formData.append("variants", JSON.stringify(productData.variants || []));
-  } else {
-    formData.append(key, productData[key]);
-  }
-});
 
-
-      const response = await axios.put(
-        `${API_BASE_URL}/${id}`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
+      Object.entries(productData).forEach(([key, value]) => {
+        if (key === 'images' && Array.isArray(value)) {
+          value.forEach((file) => {
+            if (file instanceof File) {
+              formData.append('images', file);
+            }
+          });
+          return;
         }
-      );
+
+        if (key === 'variants') {
+          formData.append('variants', JSON.stringify(value || []));
+          return;
+        }
+
+        if ((key === 'thumbnail' || key === 'sizeChart') && value instanceof File) {
+          formData.append(key, value);
+          return;
+        }
+
+        if (value !== undefined && value !== null) {
+          formData.append(key, value);
+        }
+      });
+
+      const response = await axios.put(`${API_BASE_URL}/${id}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
@@ -138,7 +149,7 @@ const initialState = {
   error: null,
   success: false,
   total: 0,
-  operation: null, // 'create', 'update', 'delete', 'fetch'
+  operation: null,
 };
 
 const dropproductSlice = createSlice({
@@ -161,7 +172,6 @@ const dropproductSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Create Dropproduct
       .addCase(createDropproduct.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -176,10 +186,8 @@ const dropproductSlice = createSlice({
       })
       .addCase(createDropproduct.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Failed to create product';
+        state.error = action.payload?.message || action.payload || 'Failed to create product';
       })
-
-      // Get All Dropproducts
       .addCase(getAllDropproducts.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -192,10 +200,8 @@ const dropproductSlice = createSlice({
       })
       .addCase(getAllDropproducts.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Failed to fetch products';
+        state.error = action.payload?.message || action.payload || 'Failed to fetch products';
       })
-
-      // Get Dropproduct by ID
       .addCase(getDropproductById.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -207,10 +213,8 @@ const dropproductSlice = createSlice({
       })
       .addCase(getDropproductById.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Failed to fetch product';
+        state.error = action.payload?.message || action.payload || 'Failed to fetch product';
       })
-
-      // Update Dropproduct
       .addCase(updateDropproduct.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -220,7 +224,7 @@ const dropproductSlice = createSlice({
       .addCase(updateDropproduct.fulfilled, (state, action) => {
         state.loading = false;
         state.success = true;
-        state.products = state.products.map(product =>
+        state.products = state.products.map((product) =>
           product._id === action.payload._id ? action.payload : product
         );
         if (state.currentProduct?._id === action.payload._id) {
@@ -229,10 +233,8 @@ const dropproductSlice = createSlice({
       })
       .addCase(updateDropproduct.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Failed to update product';
+        state.error = action.payload?.message || action.payload || 'Failed to update product';
       })
-
-      // Delete Dropproduct
       .addCase(deleteDropproduct.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -242,9 +244,7 @@ const dropproductSlice = createSlice({
       .addCase(deleteDropproduct.fulfilled, (state, action) => {
         state.loading = false;
         state.success = true;
-        state.products = state.products.filter(
-          product => product._id !== action.payload
-        );
+        state.products = state.products.filter((product) => product._id !== action.payload);
         if (state.currentProduct?._id === action.payload) {
           state.currentProduct = null;
         }
@@ -252,12 +252,11 @@ const dropproductSlice = createSlice({
       })
       .addCase(deleteDropproduct.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Failed to delete product';
+        state.error = action.payload?.message || action.payload || 'Failed to delete product';
       });
   },
 });
 
-// Selectors
 export const selectAllProducts = (state) => state.dropproducts.products;
 export const selectCurrentProduct = (state) => state.dropproducts.currentProduct;
 export const selectLoading = (state) => state.dropproducts.loading;
@@ -266,6 +265,7 @@ export const selectSuccess = (state) => state.dropproducts.success;
 export const selectTotalProducts = (state) => state.dropproducts.total;
 export const selectOperation = (state) => state.dropproducts.operation;
 
-export const { clearCurrentProduct, clearError, resetOperationState } = dropproductSlice.actions;
+export const { clearCurrentProduct, clearError, resetOperationState } =
+  dropproductSlice.actions;
 
 export default dropproductSlice.reducer;

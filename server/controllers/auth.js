@@ -1,8 +1,10 @@
 import jwt from "jsonwebtoken";
 import User from "../models/authmodel.js";
 import { OAuth2Client } from "google-auth-library";
-import crypto from "crypto";
-import apiInstance from "../config/brevo.js";
+import {
+  getBrevoTemplateId,
+  sendBrevoEmail,
+} from "../services/brevoEmailService.js";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -206,13 +208,13 @@ export const forgotPassword = async (req, res) => {
     user.otpExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
     await user.save();
 
-    // Send Email via Brevo
-    await apiInstance.sendTransacEmail({
-      sender: {
-        name: "Maitrova",
-        email: "maitrova122@gmail.com", // must be verified in Brevo
-      },
-      to: [{ email: user.email }],
+    const templateId = getBrevoTemplateId(
+      "BREVO_FORGOT_PASSWORD_TEMPLATE_ID",
+      "BREVO_RESET_PASSWORD_TEMPLATE_ID"
+    );
+
+    await sendBrevoEmail({
+      to: [{ email: user.email, name: user.name }],
       subject: "Password Reset OTP",
       htmlContent: `
         <h2>Password Reset OTP</h2>
@@ -220,6 +222,13 @@ export const forgotPassword = async (req, res) => {
         <h1>${otp}</h1>
         <p>This OTP expires in 10 minutes.</p>
       `,
+      templateId,
+      params: {
+        customerName: user.name,
+        email: user.email,
+        otp,
+        expiresInMinutes: 10,
+      },
     });
 
     res.json({ message: "OTP sent to email" });

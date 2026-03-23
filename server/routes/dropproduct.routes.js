@@ -33,7 +33,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   // ✅ allow up to 7 total files (6 images + 1 thumbnail)
-  limits: { files: 7, fileSize: 10 * 1024 * 1024 },
+  limits: { files: 8, fileSize: 10 * 1024 * 1024 },
   fileFilter: (_, file, cb) => {
     if (!file.mimetype.startsWith("image/")) {
       return cb(new Error("Only image files allowed"));
@@ -46,6 +46,7 @@ const upload = multer({
 const uploadDropFiles = upload.fields([
   { name: "images", maxCount: 6 },
   { name: "thumbnail", maxCount: 1 },
+  { name: "sizeChart", maxCount: 1 },
 ]);
 
 /* 🔹 Routes */

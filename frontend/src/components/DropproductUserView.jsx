@@ -50,7 +50,7 @@ const Dropproduct = () => {
         <div className="mb-6 flex flex-col items-center justify-center">
           <div className="flex items-center justify-center space-x-2 mb-1">
             <Package className="w-5 h-5 text-gray-600" />
-            <h1 className="text-xl font-medium text-gray-900">Drop Products</h1>
+            <h1 className="text-xl font-medium text-gray-900">Trending</h1>
           </div>
           {/* <p className="text-gray-500 text-sm">{products.length} items available</p> */}
         </div>

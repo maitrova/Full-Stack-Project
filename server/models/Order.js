@@ -88,6 +88,7 @@ const orderSchema = new mongoose.Schema(
     invoiceNumber: { type: String, unique: false },
     invoiceDate: Date,
     invoicePdfUrl: String,
+    inventoryAdjustedAt: { type: Date, default: null },
 
       },
   { timestamps: true }

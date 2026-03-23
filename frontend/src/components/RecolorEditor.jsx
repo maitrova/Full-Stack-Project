@@ -147,37 +147,111 @@ function pointInBoundaryWithInset(x, y, b, insetRatio = 0.12) {
   );
 }
 
-// Decide which zone the point belongs to (prefer smaller zones like pocket if overlap)
-function pickZoneForPoint(x, y, zones, boundaries, preferredZone = null, insetRatio = 0.12) {
+function getBoundaryArea(boundary) {
+  if (!boundary) return 0;
+  return Math.max(0, boundary.maxX - boundary.minX) * Math.max(0, boundary.maxY - boundary.minY);
+}
+
+function rectFromCenter(x, y, halfW, halfH) {
+  return {
+    minX: x - halfW,
+    maxX: x + halfW,
+    minY: y - halfH,
+    maxY: y + halfH,
+  };
+}
+
+function getRectArea(rect) {
+  if (!rect) return 0;
+  return Math.max(0, rect.maxX - rect.minX) * Math.max(0, rect.maxY - rect.minY);
+}
+
+function getRectBoundaryOverlapArea(rect, boundary) {
+  if (!rect || !boundary) return 0;
+
+  const overlapW = Math.max(
+    0,
+    Math.min(rect.maxX, boundary.maxX) - Math.max(rect.minX, boundary.minX)
+  );
+  const overlapH = Math.max(
+    0,
+    Math.min(rect.maxY, boundary.maxY) - Math.max(rect.minY, boundary.minY)
+  );
+
+  return overlapW * overlapH;
+}
+
+// Decide which zone a dragged layer belongs to by using its footprint, not only its center.
+function pickZoneForLayerRect(
+  x,
+  y,
+  halfW,
+  halfH,
+  zones,
+  boundaries,
+  preferredZone = null,
+  options = {}
+) {
+  const {
+    insetRatio = 0.12,
+    switchMargin = 0.1,
+    minOverlapRatio = 0.12,
+    allowOversizedTarget = false,
+  } = options;
+  const rect = rectFromCenter(x, y, halfW, halfH);
+  const rectArea = Math.max(getRectArea(rect), 1e-6);
+
   const candidates = (zones || [])
     .map((z) => ({ z, b: boundaries?.[z] }))
-    .filter((it) => it.b && pointInBoundary(x, y, it.b));
+    .filter((it) => it.b && (allowOversizedTarget || boundaryCanFit(it.b, halfW, halfH)))
+    .map(({ z, b }) => {
+      const overlapArea = getRectBoundaryOverlapArea(rect, b);
+      const overlapRatio = overlapArea / rectArea;
+      const centerInside = pointInBoundary(x, y, b);
+      const centerInset = pointInBoundaryWithInset(x, y, b, insetRatio);
+      const sizeBonus = 1 / Math.max(getBoundaryArea(b), 1e-6);
+
+      return {
+        z,
+        b,
+        overlapArea,
+        overlapRatio,
+        centerInside,
+        centerInset,
+        score:
+          overlapRatio +
+          (centerInside ? 0.22 : 0) +
+          (centerInset ? 0.12 : 0) +
+          sizeBonus * 0.001,
+      };
+    })
+    .filter((candidate) => candidate.overlapArea > 0 || candidate.centerInside);
 
   if (!candidates.length) return null;
 
-  if (preferredZone) {
-    const preferred = candidates.find((candidate) => candidate.z === preferredZone);
-    if (preferred) {
-      const nextNestedZone = candidates.find(
-        (candidate) =>
-          candidate.z !== preferredZone &&
-          pointInBoundaryWithInset(x, y, candidate.b, insetRatio)
-      );
+  candidates.sort((a, b) => {
+    if (Math.abs(b.score - a.score) > 1e-6) return b.score - a.score;
+    if (Math.abs(b.overlapRatio - a.overlapRatio) > 1e-6) return b.overlapRatio - a.overlapRatio;
+    return getBoundaryArea(a.b) - getBoundaryArea(b.b);
+  });
 
-      if (!nextNestedZone) {
+  const bestCandidate = candidates[0];
+
+  if (preferredZone && bestCandidate?.z !== preferredZone) {
+    const preferredCandidate = candidates.find((candidate) => candidate.z === preferredZone);
+    if (preferredCandidate) {
+      const bestHasClearIntent =
+        bestCandidate.centerInset ||
+        bestCandidate.overlapRatio >= minOverlapRatio ||
+        bestCandidate.score >= preferredCandidate.score + switchMargin;
+
+      if (!bestHasClearIntent || bestCandidate.score < preferredCandidate.score + switchMargin) {
         return preferredZone;
       }
     }
   }
 
-  // pick smallest area zone (pocket wins over front-full usually)
-  candidates.sort((a, b) => {
-    const areaA = (a.b.maxX - a.b.minX) * (a.b.maxY - a.b.minY);
-    const areaB = (b.b.maxX - b.b.minX) * (b.b.maxY - b.b.minY);
-    return areaA - areaB;
-  });
-
-  return candidates[0].z;
+  return bestCandidate.z;
 }
 
 function clamp01(n) {
@@ -316,6 +390,33 @@ function snapToBoundaryCenter(x, y, boundary, halfW, halfH, threshold = 0.02) {
 
   return { x: sx, y: sy };
 }
+
+function boundaryCanFit(boundary, halfW, halfH) {
+  if (!boundary) return false;
+  const width = Math.max(0, boundary.maxX - boundary.minX);
+  const height = Math.max(0, boundary.maxY - boundary.minY);
+  return halfW * 2 <= width + 1e-6 && halfH * 2 <= height + 1e-6;
+}
+
+function constrainCenterToBoundary(x, y, boundary, halfW, halfH) {
+  if (!boundary) return { x, y };
+
+  const width = Math.max(0, boundary.maxX - boundary.minX);
+  const height = Math.max(0, boundary.maxY - boundary.minY);
+  const effectiveHalfW = Math.min(halfW, width / 2);
+  const effectiveHalfH = Math.min(halfH, height / 2);
+
+  const minCX = boundary.minX + effectiveHalfW;
+  const maxCX = boundary.maxX - effectiveHalfW;
+  const minCY = boundary.minY + effectiveHalfH;
+  const maxCY = boundary.maxY - effectiveHalfH;
+
+  return {
+    x: Math.max(minCX, Math.min(maxCX, x)),
+    y: Math.max(minCY, Math.min(maxCY, y)),
+  };
+}
+
 function getBoundaryKeyForTextLayer(layer) {
   if (layer?.zone) return layer.zone;
 
@@ -365,23 +466,38 @@ function clampScaleToMaxInches({
   return Math.min(fitScaleW, fitScaleH, currentScale);
 }
 
-function loadImage(src) {
-  return new Promise((resolve, reject) => {
-    if (!src) return reject(new Error("loadImage: empty src"));
+const imageLoadCache = new Map();
 
+function loadImage(src) {
+  if (!src) return Promise.reject(new Error("loadImage: empty src"));
+
+  const cached = imageLoadCache.get(src);
+  if (cached?.status === "fulfilled" && cached.image) {
+    return Promise.resolve(cached.image);
+  }
+  if (cached?.promise) {
+    return cached.promise;
+  }
+
+  const promise = new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
 
-    img.onload = () => resolve(img);
+    img.onload = () => {
+      imageLoadCache.set(src, { status: "fulfilled", image: img, promise: Promise.resolve(img) });
+      resolve(img);
+    };
 
-    img.onerror = (e) => {
-      // Convert browser Event -> readable error
+    img.onerror = () => {
+      imageLoadCache.delete(src);
       reject(new Error(`Failed to load image: ${src}`));
     };
 
-    // cache-bust (optional, helps during updates)
     img.src = src;
   });
+
+  imageLoadCache.set(src, { status: "pending", promise });
+  return promise;
 }
 
 
@@ -1164,7 +1280,14 @@ function getZoneSpec(zoneKey, specs, calibratedConfig) {
   return specs?.[specKey] || specs.front;
 }
 
-function normalizeImageLayerToBoundary(layer, canvasSize, boundaries, specs, calibratedConfig) {
+function normalizeImageLayerToBoundary(
+  layer,
+  canvasSize,
+  boundaries,
+  specs,
+  calibratedConfig,
+  options = {}
+) {
   if (!layer?.imageUrl || !canvasSize?.width || !canvasSize?.height) return layer;
 
   const zoneKey = getBoundaryKeyForLayer(layer);
@@ -1183,11 +1306,6 @@ function normalizeImageLayerToBoundary(layer, canvasSize, boundaries, specs, cal
   scaleX = Math.max(0.02, Math.min(scaleX, boundaryWidth));
   scaleY = Math.max(0.02, Math.min(scaleY, boundaryHeight));
 
-  const minCenterX = boundary.minX + scaleX / 2;
-  const maxCenterX = boundary.maxX - scaleX / 2;
-  const minCenterY = boundary.minY + scaleY / 2;
-  const maxCenterY = boundary.maxY - scaleY / 2;
-
   let x =
     typeof layer.x === "number"
       ? layer.x
@@ -1197,18 +1315,34 @@ function normalizeImageLayerToBoundary(layer, canvasSize, boundaries, specs, cal
       ? layer.y
       : (boundary.minY + boundary.maxY) / 2;
 
-  x = Math.max(minCenterX, Math.min(maxCenterX, x));
-  y = Math.max(minCenterY, Math.min(maxCenterY, y));
+  const constrained = constrainCenterToBoundary(x, y, boundary, scaleX / 2, scaleY / 2);
+  x = constrained.x;
+  y = constrained.y;
 
-  const snapped = snapToBoundaryCenter(x, y, boundary, scaleX / 2, scaleY / 2);
-  x = snapped.x;
-  y = snapped.y;
-
-  const renderedWidthPx = canvasSize.width * scaleX;
-  const renderedHeightPx = canvasSize.height * scaleY;
+  let renderedWidthPx = canvasSize.width * scaleX;
+  let renderedHeightPx = canvasSize.height * scaleY;
   const zonePx = getPrintableAreaPx(canvasSize, boundary);
-  const renderedWidthInches = inchesFromPx(renderedWidthPx, zonePx.widthPx, spec.maxW);
-  const renderedHeightInches = inchesFromPx(renderedHeightPx, zonePx.heightPx, spec.maxH);
+  let renderedWidthInches = inchesFromPx(renderedWidthPx, zonePx.widthPx, spec.maxW);
+  let renderedHeightInches = inchesFromPx(renderedHeightPx, zonePx.heightPx, spec.maxH);
+
+  if (renderedWidthInches > spec.maxW + 1e-6 && renderedWidthInches > 0) {
+    scaleX *= spec.maxW / renderedWidthInches;
+  }
+  if (renderedHeightInches > spec.maxH + 1e-6 && renderedHeightInches > 0) {
+    scaleY *= spec.maxH / renderedHeightInches;
+  }
+
+  scaleX = Math.max(0.02, Math.min(scaleX, boundaryWidth));
+  scaleY = Math.max(0.02, Math.min(scaleY, boundaryHeight));
+
+  const reconstrained = constrainCenterToBoundary(x, y, boundary, scaleX / 2, scaleY / 2);
+  x = reconstrained.x;
+  y = reconstrained.y;
+
+  renderedWidthPx = canvasSize.width * scaleX;
+  renderedHeightPx = canvasSize.height * scaleY;
+  renderedWidthInches = inchesFromPx(renderedWidthPx, zonePx.widthPx, spec.maxW);
+  renderedHeightInches = inchesFromPx(renderedHeightPx, zonePx.heightPx, spec.maxH);
 
   const changed =
     Math.abs((layer.x ?? 0) - x) > 1e-4 ||
@@ -1277,6 +1411,8 @@ const RecolorEditor = forwardRef(function RecolorEditor(
   const [canvasSize, setCanvasSize] = useState(null);
   const [renderCanvasSize, setRenderCanvasSize] = useState(null);
   const [canvasFrame, setCanvasFrame] = useState(null);
+  const [dragTargetZoneKey, setDragTargetZoneKey] = useState(null);
+  const [designInteractionActive, setDesignInteractionActive] = useState(false);
   const effectiveCanvasWidth = canvasSize?.width || previewWidth || 800;
   const isCompactUI = effectiveCanvasWidth < 460;
   const showMeasurementsByDefault = true;
@@ -1287,6 +1423,12 @@ const RecolorEditor = forwardRef(function RecolorEditor(
   useEffect(() => {
     setShowMeasurements(showMeasurementsByDefault);
   }, [showMeasurementsByDefault, mockupUrl, maskUrl, selectedView]);
+
+  useEffect(() => {
+    if (!activeDesignId) {
+      setDragTargetZoneKey(null);
+    }
+  }, [activeDesignId]);
 
   const specs = PRINT_SPECS[productKey] || PRINT_SPECS[DEFAULT_PRODUCT_KEY];
 
@@ -1365,6 +1507,43 @@ const zonesForActiveView = useMemo(() => {
   return getZonesForView(activeView, calibratedConfig);
 }, [activeView, calibratedConfig]);
 
+  const activeDesign = useMemo(
+    () => (designLayers || []).find((layer) => layer.id === activeDesignId) || null,
+    [designLayers, activeDesignId]
+  );
+
+  const moveActiveDesignToZone = useCallback(
+    (zoneKey) => {
+      if (!activeDesign || !canvasSize || !zoneKey) return;
+
+      const boundary =
+        boundaries?.[zoneKey] ||
+        FALLBACK_BOUNDARIES?.[zoneKey] ||
+        FALLBACK_BOUNDARIES["front-full"];
+
+      const centeredLayer = normalizeImageLayerToBoundary(
+        {
+          ...activeDesign,
+          zone: zoneKey,
+          x: (boundary.minX + boundary.maxX) / 2,
+          y: (boundary.minY + boundary.maxY) / 2,
+        },
+        canvasSize,
+        boundaries,
+        specs,
+        calibratedConfig,
+        { snapToEdges: false }
+      );
+
+      setDragTargetZoneKey(zoneKey);
+      setDesignLayers((prev) =>
+        prev.map((layer) => (layer.id === activeDesign.id ? { ...layer, ...centeredLayer } : layer))
+      );
+      setActiveDesignId(activeDesign.id);
+    },
+    [activeDesign, canvasSize, boundaries, specs, calibratedConfig, setDesignLayers, setActiveDesignId]
+  );
+
   useEffect(() => {
     if (!canvasSize || !Array.isArray(designLayers) || designLayers.length === 0) return;
 
@@ -1376,7 +1555,8 @@ const zonesForActiveView = useMemo(() => {
         canvasSize,
         boundaries,
         specs,
-        calibratedConfig
+        calibratedConfig,
+        { snapToEdges: false }
       );
       if (normalized !== layer) changed = true;
       return normalized;
@@ -1530,7 +1710,11 @@ const zonesForActiveView = useMemo(() => {
     if (!w || !h) return;
 
     const hasText = textLayers?.some((l) => l.text && l.text.trim().length > 0);
-    const imageLayers = (designLayers || []).filter((l) => !!l.imageUrl);
+    const imageLayers = (designLayers || []).filter(
+      (l) =>
+        !!l.imageUrl &&
+        !(designInteractionActive && activeDesignId && l.id === activeDesignId)
+    );
     const hasImages = imageLayers.length > 0;
 
     if (!hasText && !hasImages) {
@@ -1555,41 +1739,6 @@ async function drawAll() {
     }
 
     ctx.clearRect(0, 0, w, h);
-
-    /* -------------------------
-       Draw TEXT layers
-       ------------------------- */
-    /* -------------------------
-   Draw TEXT layers (with scaleX/scaleY)
-   ------------------------- */
-(textLayers || []).forEach((layer) => {
-  if (!layer?.text) return;
-
-  const px = (layer.x ?? 0.5) * w;
-  const py = (layer.y ?? 0.5) * h;
-
-  // ✅ default independent scales for text
-  const sX = layer.scaleX ?? 1;
-  const sY = layer.scaleY ?? 1;
-
-  ctx.save();
-  ctx.translate(px, py);
-  ctx.rotate((((layer.rotation || 0) * Math.PI) / 180) || 0);
-
-  // ✅ independent horizontal/vertical scale
-  ctx.scale(sX, sY);
-
-  ctx.fillStyle = layer.color || "#000000";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-
-  const fontSize = layer.fontSize || 40;
-  const fontFamily = layer.fontFamily || "Impact, sans-serif";
-  ctx.font = `700 ${fontSize}px ${fontFamily}`;
-
-  ctx.fillText(layer.text, 0, 0);
-  ctx.restore();
-});
 
     /* -------------------------
        Draw IMAGE layers
@@ -1755,6 +1904,7 @@ return () => {
     canvasSize,
     textLayers,
     designLayers,
+    designInteractionActive,
     productColor,
     activeDesignId,
     setDesignLayers,
@@ -1765,6 +1915,7 @@ return () => {
 
   const handleBackgroundPointerDown = (e) => {
     if (e.target !== e.currentTarget) return;
+    setDragTargetZoneKey(null);
     setActiveDesignId(null);
     setActiveTextId(null);
   };
@@ -1856,7 +2007,40 @@ return () => {
               compact={false}
             />
           )}
-      
+
+          {activeDesign && zonesForActiveView.length > 1 && (
+            <div className="pointer-events-none absolute inset-x-0 top-3 z-40 flex justify-center px-3">
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ type: "spring", stiffness: 320, damping: 28 }}
+                className="pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-2 rounded-full border border-slate-200 bg-white/92 px-3 py-2 shadow-lg backdrop-blur"
+              >
+                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Move Selected Design
+                </span>
+                {zonesForActiveView.map((zoneKey) => {
+                  const isCurrentZone = (activeDesign.zone || getBoundaryKeyForLayer(activeDesign)) === zoneKey;
+                  return (
+                    <button
+                      key={zoneKey}
+                      type="button"
+                      onClick={() => moveActiveDesignToZone(zoneKey)}
+                      disabled={isCurrentZone}
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                        isCurrentZone
+                          ? "cursor-default bg-sky-100 text-sky-700"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      }`}
+                    >
+                      {isCurrentZone ? `In ${getZoneLabel(zoneKey, calibratedConfig)}` : `Move to ${getZoneLabel(zoneKey, calibratedConfig)}`}
+                    </button>
+                  );
+                })}
+              </motion.div>
+            </div>
+          )}
+       
 
       {calibrationMode && canvasSize && (
         <CalibrationOverlay
@@ -1901,6 +2085,10 @@ return () => {
             disabled={bgRemovalLoading}
             boundaries={boundaries}
             zonesForView={zonesForActiveView}
+            specs={specs}
+            calibratedConfig={calibratedConfig}
+            setDragTargetZoneKey={setDragTargetZoneKey}
+            setDesignInteractionActive={setDesignInteractionActive}
           />{/*
       zonesForView={zonesForActiveView}   // ✅ ADD THIS
           />*/}</>
@@ -2067,13 +2255,6 @@ function clampFontSizeToBoundary({
         if (!textLayer || !canvasSize) return;
 
         const currentZoneKey = getBoundaryKeyForTextLayer(textLayer);
-        const detectedZone = pickZoneForPoint(nxRaw, nyRaw, zonesForView, boundaries) || currentZoneKey;
-
-        const zoneKey = detectedZone;
-        const b =
-          boundaries?.[zoneKey] ||
-          FALLBACK_BOUNDARIES?.[zoneKey] ||
-          FALLBACK_BOUNDARIES["front-full"];
 
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
@@ -2091,16 +2272,39 @@ function clampFontSizeToBoundary({
         const halfW = (textWidthPx / canvasSize.width) / 2;
         const halfH = (textHeightPx / canvasSize.height) / 2;
 
-        const constrainedX = Math.max(b.minX + halfW, Math.min(b.maxX - halfW, nxRaw));
-        const constrainedY = Math.max(b.minY + halfH, Math.min(b.maxY - halfH, nyRaw));
+        const zoneSource = (zonesForView || []).length ? zonesForView : [currentZoneKey];
+        const allowedZones = zoneSource.length ? zoneSource : [currentZoneKey];
+        const detectedFittingZone =
+          pickZoneForLayerRect(nxRaw, nyRaw, halfW, halfH, allowedZones, boundaries, currentZoneKey, {
+            insetRatio: 0.1,
+            switchMargin: 0.08,
+            minOverlapRatio: 0.1,
+          }) || currentZoneKey;
+        const safeBoundary =
+          boundaries?.[detectedFittingZone] ||
+          FALLBACK_BOUNDARIES?.[detectedFittingZone] ||
+          FALLBACK_BOUNDARIES["front-full"];
+        const constrained = constrainCenterToBoundary(nxRaw, nyRaw, safeBoundary, halfW, halfH);
+        const constrainedX = constrained.x;
+        const constrainedY = constrained.y;
 
         const measurementPatch =
-          buildTextMeasurementPatch(textLayer, { x: constrainedX, y: constrainedY, zone: zoneKey }) || {};
+          buildTextMeasurementPatch(textLayer, {
+            x: constrainedX,
+            y: constrainedY,
+            zone: detectedFittingZone,
+          }) || {};
 
         setTextLayers((prev) =>
           prev.map((layer) =>
             layer.id === id
-              ? { ...layer, x: constrainedX, y: constrainedY, zone: zoneKey, ...measurementPatch }
+              ? {
+                  ...layer,
+                  x: constrainedX,
+                  y: constrainedY,
+                  zone: detectedFittingZone,
+                  ...measurementPatch,
+                }
               : layer
           )
         );
@@ -2314,11 +2518,25 @@ function DesignOverlay({
   disabled,
   boundaries,
   zonesForView,
+  specs,
+  calibratedConfig,
+  setDragTargetZoneKey,
+  setDesignInteractionActive,
 }) {
   const overlayRef = useRef(null);
   const dragStateRef = useRef(null);
   const designMoveRafRef = useRef(null);
   const pendingDesignEventRef = useRef(null);
+  const latestLayerRef = useRef(layer);
+  const [isInteracting, setIsInteracting] = useState(false);
+  const [previewLayer, setPreviewLayer] = useState(null);
+
+  useEffect(() => {
+    if (!isInteracting) {
+      latestLayerRef.current = layer;
+      setPreviewLayer(null);
+    }
+  }, [layer, isInteracting]);
 
   const zoneCandidates = useMemo(() => {
     const uniqueKeys = new Set(zonesForView || []);
@@ -2341,7 +2559,8 @@ function DesignOverlay({
       const baseW = canvasSize?.width || rectWidth || 0;
       const baseH = canvasSize?.height || rectHeight || 0;
 
-      const currentZoneKey = layer?.zone || getBoundaryKeyForLayer(initialLayer);
+      const liveLayer = latestLayerRef.current || initialLayer;
+      const currentZoneKey = liveLayer?.zone || getBoundaryKeyForLayer(initialLayer);
 
       const getBoundaryForZone = (zoneKey) =>
         boundaries?.[zoneKey] ||
@@ -2353,47 +2572,60 @@ function DesignOverlay({
         const nyRaw = (initialLayer.y ?? 0.5) + dyPx / rectHeight;
 
         const zoneSource = zoneCandidates.length ? zoneCandidates : [currentZoneKey];
-        const zoneSwitchInsetRatio = compact ? 0.025 : 0.08;
-        const detectedZone =
-          pickZoneForPoint(
-            nxRaw,
-            nyRaw,
-            zoneSource,
-            boundaries,
-            currentZoneKey,
-            zoneSwitchInsetRatio
-          ) ||
-          currentZoneKey;
+        const zoneSwitchInsetRatio = compact ? 0.08 : 0.06;
 
-        const zoneKey = detectedZone;
-        const b = getBoundaryForZone(zoneKey);
-
-        const legacyScale = initialLayer.scale ?? 0.35;
-        const scaleX = initialLayer.scaleX ?? legacyScale;
-        const scaleY = initialLayer.scaleY ?? legacyScale;
+        const legacyScale = liveLayer.scale ?? initialLayer.scale ?? 0.35;
+        const scaleX = liveLayer.scaleX ?? legacyScale;
+        const scaleY = liveLayer.scaleY ?? legacyScale;
 
         const halfW = scaleX / 2;
         const halfH = scaleY / 2;
-
-        let constrainedX = Math.max(b.minX + halfW, Math.min(b.maxX - halfW, nxRaw));
-        let constrainedY = Math.max(b.minY + halfH, Math.min(b.maxY - halfH, nyRaw));
-
-        const snapped = snapToBoundaryCenter(constrainedX, constrainedY, b, halfW, halfH);
-        constrainedX = snapped.x;
-        constrainedY = snapped.y;
-
-        setDesignLayers((prev) =>
-          prev.map((d) =>
-            d.id === id ? { ...d, x: constrainedX, y: constrainedY, zone: zoneKey } : d
-          )
+        const allowedZones = zoneSource.length ? zoneSource : [currentZoneKey];
+        const fittingZone =
+          pickZoneForLayerRect(
+            nxRaw,
+            nyRaw,
+            halfW,
+            halfH,
+            allowedZones,
+            boundaries,
+            currentZoneKey,
+            {
+              insetRatio: zoneSwitchInsetRatio,
+              switchMargin: compact ? 0.07 : 0.09,
+              minOverlapRatio: compact ? 0.08 : 0.1,
+              allowOversizedTarget: true,
+            }
+          ) || currentZoneKey;
+        setDragTargetZoneKey?.(fittingZone);
+        const normalizedLayer = normalizeImageLayerToBoundary(
+          {
+            ...liveLayer,
+            x: nxRaw,
+            y: nyRaw,
+            zone: fittingZone,
+          },
+          canvasSize,
+          boundaries,
+          specs,
+          calibratedConfig,
+          { snapToEdges: false }
         );
+
+        latestLayerRef.current = normalizedLayer;
+        setPreviewLayer(normalizedLayer);
+        dragStateRef.current = {
+          ...st,
+          startX: e.clientX,
+          startY: e.clientY,
+          initialLayer: { ...normalizedLayer },
+        };
         return;
       }
 
       if (mode === "resize") {
         const zoneKey = getBoundaryKeyForLayer(initialLayer);
-        const b = getBoundaryForZone(zoneKey);
-
+        const boundary = getBoundaryForZone(zoneKey);
         const cx = initialLayer.x ?? 0.5;
         const cy = initialLayer.y ?? 0.5;
 
@@ -2401,8 +2633,8 @@ function DesignOverlay({
         let nextScaleX = initialLayer.scaleX ?? legacy;
         let nextScaleY = initialLayer.scaleY ?? legacy;
 
-        const maxHalfWNorm = Math.max(0, Math.min(cx - b.minX, b.maxX - cx));
-        const maxHalfHNorm = Math.max(0, Math.min(cy - b.minY, b.maxY - cy));
+        const maxHalfWNorm = Math.max(0, Math.min(cx - boundary.minX, boundary.maxX - cx));
+        const maxHalfHNorm = Math.max(0, Math.min(cy - boundary.minY, boundary.maxY - cy));
         const maxScaleX = Math.max(0.02, 2 * maxHalfWNorm);
         const maxScaleY = Math.max(0.02, 2 * maxHalfHNorm);
 
@@ -2423,21 +2655,28 @@ function DesignOverlay({
         nextScaleX = Math.max(0.02, Math.min(nextScaleX, maxScaleX));
         nextScaleY = Math.max(0.02, Math.min(nextScaleY, maxScaleY));
 
-        setDesignLayers((prev) =>
-          prev.map((d) =>
-            d.id === id
-              ? {
-                  ...d,
-                  scaleX: nextScaleX,
-                  scaleY: nextScaleY,
-                  scale: Math.min(nextScaleX, nextScaleY),
-                }
-              : d
-          )
-        );
+        const resizedLayer = {
+          ...liveLayer,
+          scaleX: nextScaleX,
+          scaleY: nextScaleY,
+          scale: Math.min(nextScaleX, nextScaleY),
+        };
+        latestLayerRef.current = resizedLayer;
+        setPreviewLayer(resizedLayer);
+        dragStateRef.current = {
+          ...st,
+          startX: e.clientX,
+          startY: e.clientY,
+          initialLayer: {
+            ...resizedLayer,
+            scaleX: nextScaleX,
+            scaleY: nextScaleY,
+            scale: Math.min(nextScaleX, nextScaleY),
+          },
+        };
       }
     },
-    [setDesignLayers, boundaries, canvasSize, zoneCandidates, layer?.zone, compact]
+    [setDesignLayers, boundaries, canvasSize, zoneCandidates, compact, specs, calibratedConfig, setDragTargetZoneKey]
   );
 
   const onPointerMove = useCallback(
@@ -2458,7 +2697,12 @@ function DesignOverlay({
   );
 
   const onPointerUp = useCallback(() => {
+    const finalLayer = latestLayerRef.current;
     dragStateRef.current = null;
+    setIsInteracting(false);
+    setDragTargetZoneKey?.(null);
+    setDesignInteractionActive?.(false);
+    setPreviewLayer(null);
     if (designMoveRafRef.current) {
       cancelAnimationFrame(designMoveRafRef.current);
       designMoveRafRef.current = null;
@@ -2466,7 +2710,12 @@ function DesignOverlay({
     pendingDesignEventRef.current = null;
     window.removeEventListener("pointermove", onPointerMove);
     window.removeEventListener("pointerup", onPointerUp);
-  }, [onPointerMove]);
+    if (finalLayer?.id === layer.id) {
+      setDesignLayers((prev) =>
+        prev.map((d) => (d.id === layer.id ? { ...d, ...finalLayer } : d))
+      );
+    }
+  }, [onPointerMove, setDragTargetZoneKey, setDesignInteractionActive, setDesignLayers, layer.id]);
 
   const startDrag = (e, mode = "move", handle = null) => {
     if (disabled) return;
@@ -2488,6 +2737,9 @@ function DesignOverlay({
       initialLayer: { ...layer },
     };
 
+    setIsInteracting(true);
+    setDragTargetZoneKey?.(layer?.zone || getBoundaryKeyForLayer(layer));
+    setDesignInteractionActive?.(true);
     setActiveDesignId(layer.id);
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
@@ -2501,19 +2753,23 @@ function DesignOverlay({
         designMoveRafRef.current = null;
       }
       pendingDesignEventRef.current = null;
+      setIsInteracting(false);
+      setDragTargetZoneKey?.(null);
+      setDesignInteractionActive?.(false);
     };
-  }, []);
+  }, [setDragTargetZoneKey, setDesignInteractionActive]);
 
   // ✅ prefer scaleX/scaleY with legacy fallback
-  const legacyScale = layer.scale ?? 0.35;
-  const sx = layer.scaleX ?? legacyScale;
-  const sy = layer.scaleY ?? legacyScale;
+  const displayLayer = previewLayer || layer;
+  const legacyScale = displayLayer.scale ?? 0.35;
+  const sx = displayLayer.scaleX ?? legacyScale;
+  const sy = displayLayer.scaleY ?? legacyScale;
 
   const widthPx = canvasSize?.width ? canvasSize.width * sx : 0;
   const heightPx = canvasSize?.height ? canvasSize.height * sy : 0;
   const compactHitPadding = 0;
-  const centerXPx = (layer.x ?? 0.5) * (canvasSize?.width || 0);
-  const centerYPx = (layer.y ?? 0.5) * (canvasSize?.height || 0);
+  const centerXPx = (displayLayer.x ?? 0.5) * (canvasSize?.width || 0);
+  const centerYPx = (displayLayer.y ?? 0.5) * (canvasSize?.height || 0);
   const leftPx = centerXPx - widthPx / 2;
   const topPx = centerYPx - heightPx / 2;
 
@@ -2528,20 +2784,25 @@ function DesignOverlay({
         animate={{
           left: `${leftPx}px`,
           top: `${topPx}px`,
-          transform: `rotate(${layer.rotation}deg)`,
+          rotate: displayLayer.rotation || 0,
+          scale: isInteracting ? 1.015 : 1,
         }}
         transition={
-          compact
-            ? { type: "spring", stiffness: 700, damping: 42, mass: 0.35 }
-            : { type: "spring", stiffness: 400, damping: 40 }
+          isInteracting
+            ? { duration: 0 }
+            : compact
+              ? { type: "spring", stiffness: 700, damping: 42, mass: 0.35 }
+              : { type: "spring", stiffness: 400, damping: 40 }
         }
         className="pointer-events-auto absolute"
         style={{
-          cursor: disabled ? "default" : "grab",
+          cursor: disabled ? "default" : isInteracting ? "grabbing" : "grab",
           touchAction: "none",
           willChange: "transform",
           width: `${widthPx}px`,
           height: `${heightPx}px`,
+          filter: isInteracting ? "drop-shadow(0 18px 30px rgba(15,23,42,0.22))" : "none",
+          zIndex: isInteracting ? 25 : undefined,
         }}
         onPointerDown={(e) => startDrag(e, "move")}
       >
@@ -2562,9 +2823,9 @@ function DesignOverlay({
           }}
           onPointerDown={(e) => startDrag(e, "move")}
         >
-          {layer.imageUrl && (
+          {displayLayer.imageUrl && (
             <img
-              src={normalizeImageUrl(layer.imageUrl)}
+              src={normalizeImageUrl(displayLayer.imageUrl)}
               alt="design"
               style={{
                 width: "100%",

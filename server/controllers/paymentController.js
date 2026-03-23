@@ -4,6 +4,7 @@ import Order from "../models/Order.js";
 import { Cart } from "../models/Cart.js";
 import Address from "../models/address.js";
 import { sendOrderStatusEmail } from "../services/orderEmailService.js";
+import { applyInventoryForOrder } from "../services/inventoryService.js";
 import {
   redeemCouponForOrder,
   validateCouponForCart,
@@ -161,6 +162,9 @@ export const verifyRazorpayPayment = async (req, res) => {
     const orderDoc = await Order.findOne({ _id: orderId, user: userId });
     if (!orderDoc) return res.status(404).json({ message: "Order not found" });
 
+    const alreadyVerified =
+      orderDoc.status === "PAID" && orderDoc.payment?.status === "PAID";
+
     if (orderDoc.payment?.razorpayOrderId !== razorpay_order_id) {
       return res.status(400).json({ message: "Razorpay order mismatch" });
     }
@@ -181,13 +185,36 @@ export const verifyRazorpayPayment = async (req, res) => {
       return res.status(400).json({ message: "Payment verification failed" });
     }
 
-    orderDoc.status = "PAID";
-    orderDoc.payment.status = "PAID";
-    orderDoc.orderStatus = "PROCESSING";
     orderDoc.payment.razorpayPaymentId = razorpay_payment_id;
     orderDoc.payment.razorpaySignature = razorpay_signature;
 
+    if (!alreadyVerified) {
+      orderDoc.status = "PAID";
+      orderDoc.payment.status = "PAID";
+    }
+
     await orderDoc.save();
+
+    let shouldSendConfirmationEmail = false;
+
+    if (!orderDoc.inventoryAdjustedAt) {
+      try {
+        await applyInventoryForOrder(orderDoc);
+      } catch (inventoryError) {
+        console.error("Inventory adjustment failed:", inventoryError);
+        return res.status(inventoryError.statusCode || 409).json({
+          message:
+            inventoryError.code === "INSUFFICIENT_STOCK"
+              ? "Payment verified, but one or more items are out of stock. Please contact support."
+              : "Payment verified, but inventory update failed.",
+        });
+      }
+
+      orderDoc.orderStatus = "PROCESSING";
+      orderDoc.inventoryAdjustedAt = new Date();
+      await orderDoc.save();
+      shouldSendConfirmationEmail = true;
+    }
 
     await redeemCouponForOrder({
       couponSnapshot: orderDoc.coupon,
@@ -195,8 +222,10 @@ export const verifyRazorpayPayment = async (req, res) => {
       orderId: orderDoc._id,
     });
 
-    const populatedOrder = await Order.findById(orderDoc._id).populate("user");
-    await sendOrderStatusEmail(populatedOrder, populatedOrder.user);
+    if (shouldSendConfirmationEmail) {
+      const populatedOrder = await Order.findById(orderDoc._id).populate("user");
+      await sendOrderStatusEmail(populatedOrder, populatedOrder.user);
+    }
 
     await Cart.findOneAndUpdate(
       { _id: orderDoc.cart, user: userId, status: "ACTIVE" },
@@ -211,7 +240,7 @@ export const verifyRazorpayPayment = async (req, res) => {
     );
 
     return res.status(200).json({
-      message: "Payment verified",
+      message: alreadyVerified ? "Payment already verified" : "Payment verified",
       order: orderDoc,
       cart: newActiveCart,
     });

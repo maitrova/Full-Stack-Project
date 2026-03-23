@@ -157,9 +157,11 @@ export default function CanvasRenderer({
         ref={containerRef}
         style={{
           width: "100%",
-          height: "100%",
-          minHeight: "clamp(280px, 62vw, 400px)",
+          minHeight: "clamp(260px, 52vw, 420px)",
           position: "relative",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
           backgroundColor: "#f8f9fa",
         }}
       />
