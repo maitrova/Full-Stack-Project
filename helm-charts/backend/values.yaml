@@ -25,7 +25,7 @@ envVars:
   NODE_ENV: production
   PYTHON_EXECUTABLE: "python3"
 
-# Secret Environment Variables (manage all secrets here)
+# Secret Environment Variables (non-sensitive enough for Helm, stored in cluster secret)
 envSecrets:
   JWT_SECRET: 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
   GOOGLE_CLIENT_ID: 777795975212-0kfni6fgt4036k9rplvf1l7n70hukngo.apps.googleusercontent.com
@@ -33,10 +33,16 @@ envSecrets:
   MONGOOSE_URL: "mongodb://maitrova:Saigollapalli%40122@mongodb:27017/appdb?authSource=admin"
   # MONGOOSE_URL: "mongodb+srv://hemanthnagala876_db_user:VRYnuUeDAbgNzdpp@cluster0.ru99jrx.mongodb.net/"
   API_URL: "https://maitrova.in/api"
-  BREVO_API_KEY: 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
   BREVO_RESET_PASSWORD_KEY: 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
   RAZORPAY_KEY_ID: rzp_live_SBONFp6WLKiUm2
   RAZORPAY_KEY_SECRET: MChErYsdAwX0FL1Ng3MWCGFs
+
+# Keys pulled from a pre-existing K8s secret (never committed to git).
+# Apply manually: kubectl apply -f helm-charts/backend/backend-secret.yaml -n <namespace>
+externalSecret:
+  name: backend-secret-brevo
+  keys:
+    - BREVO_API_KEY
 
   
 # Resource Limits
