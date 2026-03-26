@@ -5,6 +5,7 @@ const IMAGE_BASE_URL =
 
 const ABSOLUTE_URL_RE = /^(?:https?:)?\/\//i;
 const SPECIAL_URL_RE = /^(?:data:|blob:)/i;
+const OUTPUTS_SEGMENT_RE = /(?:^|\/)outputs\/.+$/i;
 
 export const getRawImagePath = (image) => {
   if (!image) return null;
@@ -22,11 +23,15 @@ export const buildImageUrl = (image) => {
     return rawPath;
   }
 
+  const normalizedRawPath = String(rawPath).replace(/\\/g, "/");
+  const outputsMatch = normalizedRawPath.match(OUTPUTS_SEGMENT_RE);
+  const publicPath = outputsMatch ? outputsMatch[0].replace(/^\/+/, "") : normalizedRawPath;
+
   const baseUrl = IMAGE_BASE_URL.endsWith("/")
     ? IMAGE_BASE_URL.slice(0, -1)
     : IMAGE_BASE_URL;
 
-  return `${baseUrl}${rawPath.startsWith("/") ? "" : "/"}${rawPath}`;
+  return `${baseUrl}${publicPath.startsWith("/") ? "" : "/"}${publicPath}`;
 };
 
 const buildVariantPath = (image, variant) => {

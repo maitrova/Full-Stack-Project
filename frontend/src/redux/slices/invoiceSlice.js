@@ -4,6 +4,27 @@ import { selectCurrentToken } from "./Userslice.js";
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 
+const getErrorMessage = async (response) => {
+  const contentType = response.headers.get("content-type") || "";
+
+  if (contentType.includes("application/json")) {
+    const error = await response.json();
+    return error.message || error.error || "Failed to download invoice";
+  }
+
+  const text = await response.text();
+  return text || "Failed to download invoice";
+};
+
+const getDownloadFilename = (response, fallbackName) => {
+  const disposition = response.headers.get("content-disposition") || "";
+  const match =
+    disposition.match(/filename\*=UTF-8''([^;]+)/i) ||
+    disposition.match(/filename="?([^"]+)"?/i);
+
+  return match?.[1] ? decodeURIComponent(match[1]) : fallbackName;
+};
+
 // 🔥 Async thunk to download invoice
 export const downloadInvoice = createAsyncThunk(
   "invoice/downloadInvoice",
@@ -23,8 +44,8 @@ export const downloadInvoice = createAsyncThunk(
       );
 
       if (!response.ok) {
-        const error = await response.json();
-        return rejectWithValue(error.message || "Failed to download invoice");
+        const errorMessage = await getErrorMessage(response);
+        return rejectWithValue(errorMessage);
       }
 
       // Convert to blob
@@ -34,12 +55,12 @@ export const downloadInvoice = createAsyncThunk(
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `invoice-${orderId}.pdf`;
+      link.download = getDownloadFilename(response, `invoice-${orderId}.pdf`);
       document.body.appendChild(link);
       link.click();
       
       // Cleanup
-      window.URL.revokeObjectURL(url);
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
       link.remove();
 
       return { success: true, orderId };

@@ -1,8 +1,12 @@
 import fs from "fs/promises";
 import path from "path";
 import sharp from "sharp";
+import { fileURLToPath } from "url";
 
-const OUTPUTS_ROOT = path.resolve("outputs");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const SERVER_ROOT = path.resolve(__dirname, "..");
+const OUTPUTS_ROOT = path.join(SERVER_ROOT, "outputs");
 const DEFAULT_WIDTHS = {
   small: 300,
   medium: 600,
@@ -14,16 +18,37 @@ const DEFAULT_QUALITIES = {
   blur: 42,
 };
 
-export const normalizeStoredPath = (filePath) =>
-  filePath?.replace(/\\/g, "/") || null;
+export const normalizeStoredPath = (filePath) => {
+  if (!filePath) return null;
+
+  const absolutePath = path.isAbsolute(filePath)
+    ? path.resolve(filePath)
+    : path.resolve(SERVER_ROOT, String(filePath));
+  const relativePath = path.relative(SERVER_ROOT, absolutePath).replace(/\\/g, "/");
+
+  if (relativePath && !relativePath.startsWith("..")) {
+    return relativePath;
+  }
+
+  return String(filePath).replace(/\\/g, "/");
+};
+
+const resolveStoredPath = (filePath) => {
+  const normalizedPath = normalizeStoredPath(filePath);
+  return {
+    normalizedPath,
+    absolutePath: path.resolve(SERVER_ROOT, normalizedPath || ""),
+  };
+};
 
 const ensureDirectory = async (relativeDir) => {
-  await fs.mkdir(path.resolve(relativeDir), { recursive: true });
+  await fs.mkdir(path.resolve(SERVER_ROOT, normalizeStoredPath(relativeDir) || ""), {
+    recursive: true,
+  });
 };
 
 const assertManagedOutputPath = (filePath) => {
-  const normalizedPath = normalizeStoredPath(filePath);
-  const absolutePath = path.resolve(normalizedPath || "");
+  const { normalizedPath, absolutePath } = resolveStoredPath(filePath);
 
   if (!normalizedPath || !absolutePath.startsWith(OUTPUTS_ROOT)) {
     throw new Error("Image path must be inside outputs/");
@@ -77,7 +102,7 @@ export const optimizeUploadedImage = async (
         withoutEnlargement: true,
       })
       .webp({ quality: qualities.small, effort: 4 })
-      .toFile(path.resolve(variants.small)),
+      .toFile(path.resolve(SERVER_ROOT, variants.small)),
     sharp(absolutePath)
       .rotate()
       .resize({
@@ -86,7 +111,7 @@ export const optimizeUploadedImage = async (
         withoutEnlargement: true,
       })
       .webp({ quality: qualities.medium, effort: 4 })
-      .toFile(path.resolve(variants.medium)),
+      .toFile(path.resolve(SERVER_ROOT, variants.medium)),
     sharp(absolutePath)
       .rotate()
       .resize({
@@ -96,7 +121,7 @@ export const optimizeUploadedImage = async (
       })
       .blur(6)
       .webp({ quality: qualities.blur, effort: 3 })
-      .toFile(path.resolve(variants.blur)),
+      .toFile(path.resolve(SERVER_ROOT, variants.blur)),
   ]);
 
   if (cleanupSource && !Object.values(variants).includes(normalizedPath)) {
@@ -131,7 +156,7 @@ export const deleteOptimizedImageSet = async (filePath) => {
   if (!filePath) return;
 
   const normalizedPath = normalizeStoredPath(filePath);
-  const absolutePath = path.resolve(normalizedPath);
+  const absolutePath = path.resolve(SERVER_ROOT, normalizedPath);
 
   if (!absolutePath.startsWith(OUTPUTS_ROOT)) {
     return;
@@ -149,7 +174,7 @@ export const deleteOptimizedImageSet = async (filePath) => {
   await Promise.all(
     [...new Set(pathsToDelete)].map(async (relativePath) => {
       try {
-        await fs.unlink(path.resolve(relativePath));
+        await fs.unlink(path.resolve(SERVER_ROOT, relativePath));
       } catch (error) {
         if (error.code !== "ENOENT") {
           throw error;

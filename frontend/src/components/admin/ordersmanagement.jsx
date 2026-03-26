@@ -391,6 +391,17 @@ const AdminOrders = () => {
     }, 0).toFixed(2);
   };
 
+  const getOrderStatusSummaryText = (summary) => {
+    if (!summary) return '';
+    if (typeof summary === 'string') return summary;
+
+    const totalProcessed = Number(summary.totalProcessed || 0);
+    const updated = Number(summary.updated || 0);
+    const skipped = Number(summary.skipped || 0);
+
+    return `${updated} updated, ${skipped} skipped, ${totalProcessed} processed`;
+  };
+
   const getPriceBreakdown = (item) => {
     if (item.kind === "DESIGN" && item.design?.priceBreakdown) {
       return item.design.priceBreakdown;
@@ -527,7 +538,7 @@ const AdminOrders = () => {
               </div>
               <div className="ml-3">
                 <p className="text-sm text-green-700">
-                  ✅ Order status updated successfully! {orderStatusSummary}
+                  ✅ Order status updated successfully! {getOrderStatusSummaryText(orderStatusSummary)}
                 </p>
               </div>
               <div className="ml-auto pl-3">

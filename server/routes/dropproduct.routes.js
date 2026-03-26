@@ -2,6 +2,7 @@ import express from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "url";
 
 import {
   createDropproduct,
@@ -12,9 +13,12 @@ import {
 } from "../controllers/dropproduct.controller.js";
 
 const droprouter = express.Router();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const serverRoot = path.resolve(__dirname, "..");
 
 /* 🔹 Use existing output folder */
-const uploadDir = path.join(process.cwd(), "outputs", "dropimages");
+const uploadDir = path.join(serverRoot, "outputs", "dropimages");
 
 /* 🔹 Create dropimages only if missing */
 if (!fs.existsSync(uploadDir)) {

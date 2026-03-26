@@ -36,7 +36,7 @@ import {
   Package,
   AlertCircle,
 } from "lucide-react";
-import { getResponsiveImageProps } from "../utils/responsiveImage.js";
+import { buildImageUrl, getResponsiveImageProps } from "../utils/responsiveImage.js";
 
 const DropProductDetailsPage = () => {
   const { id } = useParams();
@@ -56,16 +56,12 @@ const DropProductDetailsPage = () => {
   const [isFavorite, setIsFavorite] = useState(false);
   const [showShareOptions, setShowShareOptions] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
+  const [loadedImages, setLoadedImages] = useState({});
   const [showCartSuccess, setShowCartSuccess] = useState(false);
 
   const mainImageRef = useRef(null);
   const thumbnailContainerRef = useRef(null);
-  const assetUrl = (path) => {
-    if (!path) return null;
-    const base = import.meta.env.VITE_IMAGE_URL || "";
-    if (path.startsWith("http")) return path;
-    return path.startsWith("/") ? `${base}${path}` : `${base}/${path}`;
-  };
+  const assetUrl = (path) => buildImageUrl(path);
 
   useEffect(() => {
     if (id) dispatch(getDropproductById(id));
@@ -116,6 +112,19 @@ const DropProductDetailsPage = () => {
     return Math.round(selectedVariant.price * ratio * 100) / 100;
   }, [product, saleActive, selectedVariant]);
   const currentStock = selectedVariant?.stock ?? 0;
+  const productMetaLine = useMemo(
+    () => [product?.category, product?.subCategory].filter(Boolean).join(" • "),
+    [product?.category, product?.subCategory]
+  );
+  const productHighlights = useMemo(
+    () =>
+      [
+        selectedVariant?.sku ? `SKU: ${selectedVariant.sku}` : null,
+        variants.length ? `${variants.length} size option${variants.length > 1 ? "s" : ""}` : null,
+        product?.sizeChart ? "Size chart available" : null,
+      ].filter(Boolean),
+    [product?.sizeChart, selectedVariant?.sku, variants.length]
+  );
 
   // ✅ Keep size default when product loads
   useEffect(() => {
@@ -129,6 +138,12 @@ const DropProductDetailsPage = () => {
     setQuantity(1);
   }, [product?._id]); // intentionally only when product changes
 
+  useEffect(() => {
+    setSelectedImageIndex(0);
+    setLoadedImages({});
+    setImageLoading(true);
+  }, [product?._id]);
+
   // Auto-rotate images
   useEffect(() => {
     if (!product?.images || product.images.length <= 1) return;
@@ -139,7 +154,7 @@ const DropProductDetailsPage = () => {
 
   const scrollToImage = (index) => {
     setSelectedImageIndex(index);
-    setImageLoading(true);
+    setImageLoading(!loadedImages[index]);
 
     if (thumbnailContainerRef.current) {
       const thumbnailWidth = 80; // width + gap
@@ -390,7 +405,7 @@ const DropProductDetailsPage = () => {
           {/* Left Column - Images */}
           <div className="space-y-6">
             {/* Main Image */}
-            <div className="relative bg-white rounded-3xl shadow-xl overflow-hidden group">
+            <div className="relative rounded-3xl shadow-xl overflow-hidden group bg-gradient-to-br from-slate-100 via-white to-slate-100">
               <div className="relative h-[500px] md:h-[600px] overflow-hidden">
                 {product.images?.map((image, index) => {
                   const imageProps = getResponsiveImageProps(image, {
@@ -425,8 +440,18 @@ const DropProductDetailsPage = () => {
                             }
                           : undefined
                       }
-                      onLoad={() => setImageLoading(false)}
-                      onError={() => setImageLoading(false)}
+                      onLoad={() => {
+                        setLoadedImages((prev) => (prev[index] ? prev : { ...prev, [index]: true }));
+                        if (index === selectedImageIndex) {
+                          setImageLoading(false);
+                        }
+                      }}
+                      onError={() => {
+                        setLoadedImages((prev) => ({ ...prev, [index]: true }));
+                        if (index === selectedImageIndex) {
+                          setImageLoading(false);
+                        }
+                      }}
                       loading={imageProps.loading}
                       decoding={imageProps.decoding}
                       fetchPriority={imageProps.fetchPriority}
@@ -580,17 +605,10 @@ const DropProductDetailsPage = () => {
 
               <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4 leading-tight">{product.name}</h1>
 
-              <div className="flex items-center space-x-6 mb-6">
-                <div className="flex items-center">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star
-                      key={star}
-                      className={`w-6 h-6 ${star <= 4 ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`}
-                    />
-                  ))}
-                  <span className="ml-3 text-gray-600 font-medium">4.0 (128 reviews)</span>
-                </div>
-                <div className="h-4 w-px bg-gray-300"></div>
+              <div className="flex flex-wrap items-center gap-4 mb-6">
+                {productMetaLine && (
+                  <span className="text-base font-medium text-gray-600">{productMetaLine}</span>
+                )}
                 <span
                   className={`font-bold text-lg ${
                     currentStock > 10 ? "text-green-600" : currentStock > 0 ? "text-yellow-600" : "text-red-600"
@@ -598,6 +616,9 @@ const DropProductDetailsPage = () => {
                 >
                   {currentStock > 0 ? `${currentStock} in stock` : "Out of stock"}
                 </span>
+                {selectedVariant?.sku && (
+                  <span className="text-sm font-medium text-gray-500">SKU {selectedVariant.sku}</span>
+                )}
               </div>
 
               <div className="flex items-baseline mb-8">
@@ -618,20 +639,16 @@ const DropProductDetailsPage = () => {
                 className="text-gray-700 leading-relaxed text-lg mb-8"
                 dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(product.description || "") }}
               />
-              <div className="space-y-4">
-                <div className="flex items-center">
-                  <Check className="w-5 h-5 text-green-500 mr-3" />
-                  <span>Premium quality materials</span>
+              {productHighlights.length > 0 && (
+                <div className="space-y-4">
+                  {productHighlights.map((highlight) => (
+                    <div key={highlight} className="flex items-center">
+                      <Check className="w-5 h-5 text-green-500 mr-3" />
+                      <span>{highlight}</span>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center">
-                  <Check className="w-5 h-5 text-green-500 mr-3" />
-                  <span>30-day money-back guarantee</span>
-                </div>
-                <div className="flex items-center">
-                  <Check className="w-5 h-5 text-green-500 mr-3" />
-                  <span>Free lifetime updates</span>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Size Selector */}
@@ -747,15 +764,16 @@ const DropProductDetailsPage = () => {
               </button>
             </div>
 
-            {/* Features */}
-            <div className="grid grid-cols-2 gap-6 pt-8 border-t">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-8 border-t">
               <div className="flex items-center space-x-4 p-4 bg-blue-50 rounded-xl">
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                   <Truck className="w-6 h-6 text-blue-600" />
                 </div>
                 <div>
-                  <p className="font-bold text-gray-900">Free Shipping</p>
-                  <p className="text-sm text-gray-600">Delivery in 3-5 days</p>
+                  <p className="font-bold text-gray-900">Shipping Ready</p>
+                  <p className="text-sm text-gray-600">
+                    {currentStock > 0 ? "Available for checkout now" : "Currently unavailable"}
+                  </p>
                 </div>
               </div>
 
@@ -764,58 +782,10 @@ const DropProductDetailsPage = () => {
                   <Shield className="w-6 h-6 text-green-600" />
                 </div>
                 <div>
-                  <p className="font-bold text-gray-900">2-Year Warranty</p>
-                  <p className="text-sm text-gray-600">Free repairs included</p>
+                  <p className="font-bold text-gray-900">Secure Checkout</p>
+                  <p className="text-sm text-gray-600">Protected payment flow</p>
                 </div>
               </div>
-
-              <div className="flex items-center space-x-4 p-4 bg-purple-50 rounded-xl">
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <RotateCw className="w-6 h-6 text-purple-600" />
-                </div>
-                <div>
-                  <p className="font-bold text-gray-900">Easy Returns</p>
-                  <p className="text-sm text-gray-600">30-day return policy</p>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-4 p-4 bg-amber-50 rounded-xl">
-                <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
-                  <Package className="w-6 h-6 text-amber-600" />
-                </div>
-                <div>
-                  <p className="font-bold text-gray-900">In Stock</p>
-                  <p className="text-sm text-gray-600">Ready to ship</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Related Products (placeholder) */}
-        <div className="mt-20 pt-12 border-t">
-          <h2 className="text-3xl font-bold text-gray-900 mb-8">You Might Also Like</h2>
-          <div className="relative">
-            <div className="flex overflow-x-auto space-x-6 pb-6 scrollbar-hide">
-              <div className="flex-none w-64">
-                <div className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
-                  <div className="h-40 bg-gray-200 animate-pulse"></div>
-                  <div className="p-4">
-                    <div className="h-4 bg-gray-200 rounded mb-2 animate-pulse"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2 animate-pulse"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="absolute right-0 top-0 transform -translate-y-1/2">
-              <Link
-                to="/"
-                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full font-semibold hover:shadow-lg transition-all"
-              >
-                Explore More Products
-                <ArrowLeft className="w-5 h-5 ml-2 rotate-180" />
-              </Link>
             </div>
           </div>
         </div>

@@ -8,6 +8,28 @@ import {
   selectLoading,
 } from "../redux/slices/dropproducts.js";
 import { Package } from "lucide-react";
+import { buildImageUrl } from "../utils/responsiveImage.js";
+
+const hasActiveOffer = (product) => {
+  const mrp = Number(product?.minPrice || 0);
+  const sale = Number(product?.salePrice || 0);
+  if (!(mrp > 0) || !(sale > 0) || !(sale < mrp)) return false;
+
+  const now = new Date();
+  const start = product?.saleStartAt ? new Date(product.saleStartAt) : null;
+  const end = product?.saleEndAt ? new Date(product.saleEndAt) : null;
+
+  if (start && now < start) return false;
+  if (end && now > end) return false;
+  return true;
+};
+
+const getOfferDiscountPercent = (product) => {
+  const mrp = Number(product?.minPrice || 0);
+  const sale = Number(product?.salePrice || 0);
+  if (!(mrp > 0) || !(sale > 0) || !(sale < mrp)) return 0;
+  return Math.round(((mrp - sale) / mrp) * 100);
+};
 
 const Dropproduct = () => {
   const dispatch = useDispatch();
@@ -15,21 +37,12 @@ const Dropproduct = () => {
   const products = useSelector(selectAllProducts);
   const loading = useSelector(selectLoading);
 
-  const IMAGE_URL = import.meta.env.VITE_IMAGE_URL;
-
   useEffect(() => {
     dispatch(getAllDropproducts());
   }, [dispatch]);
 
   const handleProductClick = (productId) => {
     navigate(`/dropproducts/${productId}`);
-  };
-
-  const formatImageUrl = (path) => {
-    if (!path) return null;
-    if (path.startsWith("http")) return path;
-    if (path.startsWith("/")) return `${IMAGE_URL}${path}`;
-    return `${IMAGE_URL}/${path}`;
   };
 
   if (loading && products.length === 0) {
@@ -58,8 +71,10 @@ const Dropproduct = () => {
         {/* Products Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
           {products.map((product) => {
-            const imageUrl = formatImageUrl(product.thumbnail || product.images?.[0]);
+            const imageUrl = buildImageUrl(product.thumbnail || product.images?.[0]);
             const label = product.name || "Product";
+            const showOfferTag = hasActiveOffer(product);
+            const discountPercent = showOfferTag ? getOfferDiscountPercent(product) : 0;
 
             return (
               <div
@@ -75,6 +90,12 @@ const Dropproduct = () => {
                 <div className="bg-white border border-gray-100 rounded-xl overflow-hidden hover:border-gray-300 transition-all duration-200 hover:shadow-md">
                   {/* Product Image + overlay name */}
                   <div className="relative aspect-square w-full overflow-hidden">
+                    {showOfferTag && discountPercent > 0 ? (
+                      <div className="absolute left-2 top-2 z-10 rounded-full bg-red-500 px-2.5 py-1 text-[11px] font-bold text-white shadow">
+                        {discountPercent}% OFF
+                      </div>
+                    ) : null}
+
                     {imageUrl ? (
                       <img
                         src={imageUrl}

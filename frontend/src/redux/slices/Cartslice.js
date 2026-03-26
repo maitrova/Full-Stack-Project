@@ -5,6 +5,26 @@ import axios from "axios";
 // Import the selector from userSlice
 import { selectCurrentToken } from "./Userslice.js";
 
+const getPersistedToken = () => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const persistedUser = window.localStorage.getItem("persist:user");
+    if (!persistedUser) return null;
+
+    const parsedUser = JSON.parse(persistedUser);
+    const userInfo = parsedUser?.userInfo
+      ? JSON.parse(parsedUser.userInfo)
+      : null;
+
+    return userInfo?.token || null;
+  } catch {
+    return null;
+  }
+};
+
+const getAuthToken = (state) => selectCurrentToken(state) || getPersistedToken();
+
 // Create axios instance with common config
 const createApi = () => {
   const api = axios.create({
@@ -25,7 +45,7 @@ export const addToCart = createAsyncThunk(
     try {
       // Get token from Redux state
       const state = getState();
-      const token = selectCurrentToken(state);
+      const token = getAuthToken(state);
       
       if (!token) {
         return rejectWithValue({
@@ -77,7 +97,7 @@ export const getCart = createAsyncThunk(
     try {
       // Get token from Redux state
       const state = getState();
-      const token = selectCurrentToken(state);
+      const token = getAuthToken(state);
       
       if (!token) {
         return rejectWithValue({
@@ -130,7 +150,7 @@ export const updateCartItemQty = createAsyncThunk(
     try {
       // Get token from Redux state
       const state = getState();
-      const token = selectCurrentToken(state);
+      const token = getAuthToken(state);
       
       if (!token) {
         return rejectWithValue({
@@ -181,7 +201,7 @@ export const removeCartItem = createAsyncThunk(
     try {
       // Get token from Redux state
       const state = getState();
-      const token = selectCurrentToken(state);
+      const token = getAuthToken(state);
       
       if (!token) {
         return rejectWithValue({
@@ -228,7 +248,7 @@ export const clearCart = createAsyncThunk(
     try {
       // Get token from Redux state
       const state = getState();
-      const token = selectCurrentToken(state);
+      const token = getAuthToken(state);
       
       if (!token) {
         return rejectWithValue({

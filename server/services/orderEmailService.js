@@ -19,7 +19,9 @@ const subjectMap = {
 };
 
 const ORDER_EMAIL_POPULATE = [
-  { path: "user", select: "name email" },
+  { path: "user", select: "name email phone" },
+  { path: "deliveryAddress" },
+  { path: "billingAddress" },
   { path: "items.readymadeProduct", select: "title" },
   { path: "items.design", select: "title productName" },
   { path: "items.dropproduct", select: "name" },
@@ -27,6 +29,74 @@ const ORDER_EMAIL_POPULATE = [
 ];
 
 const formatAmount = (value) => Number(value || 0).toFixed(2);
+const formatCurrencyAmount = (value, currency = "INR") =>
+  `${currency === "INR" ? "Rs." : `${currency} `}${formatAmount(value)}`;
+
+const formatDateTime = (date) =>
+  new Date(date).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+const resolvePaymentMethod = (order) => {
+  if (order?.payment?.razorpayPaymentId || order?.payment?.razorpayOrderId) {
+    return "Razorpay";
+  }
+
+  return "Online Payment";
+};
+
+const buildAddressText = (address) => {
+  if (!address) return "";
+
+  const parts = [
+    address.fullName,
+    address.mobileNumber,
+    address.completeAddress,
+    address.landmark,
+    [address.city, address.state].filter(Boolean).join(", "),
+    address.pincode,
+  ].filter(Boolean);
+
+  return parts.join(", ");
+};
+
+const buildItemsText = (items = []) =>
+  items
+    .map((item, index) => {
+      const quantity = Number(item.qty || 0);
+      const unitPrice = formatAmount(item.unitPrice);
+      const size = item.size ? `, Size: ${item.size}` : "";
+      return `${index + 1}. ${getItemName(item, index)}${size}, Qty: ${quantity}, Price: Rs.${unitPrice}`;
+    })
+    .join("\n");
+
+const resolveOrderDateTime = (order) =>
+  order.inventoryAdjustedAt || order.updatedAt || order.createdAt || new Date();
+
+const getAdminRecipients = () => {
+  const rawRecipients =
+    process.env.ADMIN_NOTIFICATION_EMAILS ||
+    process.env.ADMIN_NOTIFICATION_EMAIL ||
+    process.env.BREVO_ADMIN_NOTIFICATION_EMAIL ||
+    process.env.BREVO_SENDER_EMAIL;
+
+  if (!rawRecipients) {
+    return [];
+  }
+
+  return rawRecipients
+    .split(",")
+    .map((email) => email.trim())
+    .filter(Boolean)
+    .map((email) => ({
+      email,
+      name: process.env.ADMIN_NOTIFICATION_NAME || "Maitrova Admin",
+    }));
+};
 
 const getItemName = (item, index) => {
   if (item?.readymadeProduct?.title) {
@@ -151,6 +221,39 @@ const buildOrderTemplateParams = (order, user, itemsHtml, orderDate) => {
   return params;
 };
 
+const buildAdminOrderTemplateParams = (order, user) => {
+  const orderDateTime = resolveOrderDateTime(order);
+  const deliveryAddress = buildAddressText(order.deliveryAddress);
+  const billingAddress = buildAddressText(order.billingAddress);
+  const productsText = buildItemsText(order.items);
+  const currency = order.currency || "INR";
+
+  return {
+    order_id: String(order._id || ""),
+    order_datetime: formatDateTime(orderDateTime),
+    order_status: order.orderStatus || order.status || "",
+    customer_name:
+      order.deliveryAddress?.fullName || order.billingAddress?.fullName || user?.name || "",
+    customer_email: user?.email || "",
+    customer_phone:
+      order.deliveryAddress?.mobileNumber ||
+      order.billingAddress?.mobileNumber ||
+      user?.phone ||
+      "",
+    shipping_address: deliveryAddress,
+    billing_address: billingAddress || deliveryAddress,
+    payment_method: resolvePaymentMethod(order),
+    payment_status: order.payment?.status || order.status || "",
+    transaction_id: order.payment?.razorpayPaymentId || order.payment?.razorpayOrderId || "N/A",
+    subtotal: formatCurrencyAmount(order.subtotal, currency),
+    shipping: formatCurrencyAmount(order.shipping, currency),
+    tax: formatCurrencyAmount(0, currency),
+    discount: formatCurrencyAmount(order.discount, currency),
+    total: formatCurrencyAmount(order.total, currency),
+    products_text: productsText,
+  };
+};
+
 export const sendOrderStatusEmail = async (order, user) => {
   const hydrated = await hydrateOrderForEmail(order, user);
   const emailOrder = hydrated.order || order;
@@ -223,5 +326,63 @@ export const sendOrderStatusEmail = async (order, user) => {
     console.log("Order email sent successfully");
   } catch (error) {
     console.error("Brevo Error:", error.response?.body || error);
+  }
+};
+
+export const sendAdminOrderNotification = async (order, user) => {
+  const recipients = getAdminRecipients();
+  if (!recipients.length) {
+    console.warn("Admin order notification skipped: no recipient configured");
+    return;
+  }
+
+  const hydrated = await hydrateOrderForEmail(order, user);
+  const emailOrder = hydrated.order || order;
+  const emailUser = hydrated.user || user || {};
+  const templateId = getBrevoTemplateId(
+    "BREVO_ADMIN_ORDER_TEMPLATE_ID",
+    "BREVO_ORDER_ADMIN_TEMPLATE_ID"
+  );
+  const subject = `New Order Received #${emailOrder._id}`;
+  const params = buildAdminOrderTemplateParams(emailOrder, emailUser);
+
+  const htmlContent = `
+  <div style="font-family:Arial,sans-serif;background:#f5f5f5;padding:20px;">
+    <div style="max-width:640px;margin:auto;background:#ffffff;border-radius:8px;overflow:hidden;">
+      <div style="background:#111827;color:#ffffff;padding:20px;">
+        <h2 style="margin:0;">New Order Received</h2>
+      </div>
+      <div style="padding:20px;color:#111827;">
+        <p>Order <strong>#${params.order_id}</strong> was placed on ${params.order_datetime}.</p>
+        <p><strong>Customer:</strong> ${params.customer_name} (${params.customer_email})</p>
+        <p><strong>Phone:</strong> ${params.customer_phone || "-"}</p>
+        <p><strong>Status:</strong> ${params.order_status}</p>
+        <p><strong>Payment:</strong> ${params.payment_method} / ${params.payment_status}</p>
+        <p><strong>Transaction ID:</strong> ${params.transaction_id}</p>
+        <p><strong>Shipping Address:</strong> ${params.shipping_address || "-"}</p>
+        <p><strong>Billing Address:</strong> ${params.billing_address || "-"}</p>
+        <pre style="white-space:pre-wrap;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px;">${params.products_text || "No items"}</pre>
+        <p><strong>Subtotal:</strong> ${params.subtotal}</p>
+        <p><strong>Shipping:</strong> ${params.shipping}</p>
+        <p><strong>Tax:</strong> ${params.tax}</p>
+        <p><strong>Discount:</strong> ${params.discount}</p>
+        <p><strong>Total Paid:</strong> ${params.total}</p>
+      </div>
+    </div>
+  </div>
+  `;
+
+  try {
+    await sendBrevoEmail({
+      to: recipients,
+      subject,
+      htmlContent,
+      templateId,
+      params,
+    });
+
+    console.log("Admin order notification sent successfully");
+  } catch (error) {
+    console.error("Admin Brevo Error:", error.response?.body || error);
   }
 };

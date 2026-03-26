@@ -6,6 +6,20 @@ import {
   optimizeUploadedImage,
 } from "../utils/imageOptimization.js";
 
+const normalizeDropproductPaths = (product) => {
+  if (!product) return product;
+
+  const normalized = product.toObject ? product.toObject() : { ...product };
+  return {
+    ...normalized,
+    images: Array.isArray(normalized.images)
+      ? normalized.images.map((imagePath) => normalizeStoredPath(imagePath))
+      : [],
+    thumbnail: normalizeStoredPath(normalized.thumbnail),
+    sizeChart: normalizeStoredPath(normalized.sizeChart),
+  };
+};
+
 const parseOptionalNumber = (value) => {
   if (Array.isArray(value)) value = value[0];
   if (value === undefined || value === null) return null;
@@ -177,7 +191,7 @@ export const createDropproduct = async (req, res) => {
       variants,
     });
 
-    return res.status(201).json(product);
+    return res.status(201).json(normalizeDropproductPaths(product));
   } catch (error) {
     return res.status(400).json({ message: error.message });
   }
@@ -272,13 +286,10 @@ export const updateDropproduct = async (req, res) => {
       ...(variants ? { variants } : {}),
     };
 
-    const updatedProduct = await Dropproduct.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true, runValidators: true }
-    );
+    Object.assign(product, updateData);
+    await product.save();
 
-    return res.json(updatedProduct);
+    return res.json(normalizeDropproductPaths(product));
   } catch (error) {
     return res.status(400).json({ message: error.message });
   }
@@ -306,7 +317,7 @@ export const getAllDropproducts = async (req, res) => {
 
     const products = await Dropproduct.find(filter).sort(sort);
 
-    return res.status(200).json(products);
+    return res.status(200).json(products.map(normalizeDropproductPaths));
   } catch (error) {
     return res.status(500).json({
       message: "Failed to fetch products",
@@ -323,7 +334,7 @@ export const getDropproductById = async (req, res) => {
       return res.status(404).json({ message: "Dropproduct not found" });
     }
 
-    return res.status(200).json(product);
+    return res.status(200).json(normalizeDropproductPaths(product));
   } catch (error) {
     return res.status(500).json({
       message: "Failed to fetch product",

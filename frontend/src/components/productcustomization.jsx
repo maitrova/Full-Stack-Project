@@ -31,7 +31,6 @@ const FONT_OPTIONS = [
 // Pricing constants
 const FIXED_SIZE_INCHES = 4;
 const PRICE_PER_SQ_INCH = 6;
-const SLEEVE_PRICE = 30;
 const MINIMUM_DESIGN_CHARGE = 30;
 const DISPLAY_DPI = 300;
 const PRINT_DPI = 300;
@@ -67,16 +66,22 @@ const TABS = {
 const ZONE_OPTIONS_BY_VIEW = {
   front: ["front-full", "pocket"],
   back: ["back-full"],
-  left: ["sleeve-left"],
-  right: ["sleeve-right"],
 };
 
 const ZONE_LABELS = {
   "front-full": "Front",
   pocket: "Pocket",
   "back-full": "Back",
-  "sleeve-left": "Left Sleeve",
-  "sleeve-right": "Right Sleeve",
+};
+
+const NON_CUSTOMIZABLE_VIEW_CODES = new Set(["left", "right"]);
+
+const isCustomizableViewCode = (viewCode) =>
+  !NON_CUSTOMIZABLE_VIEW_CODES.has(String(viewCode || "").toLowerCase());
+
+const getCustomizableViews = (views = []) => {
+  const filteredViews = (views || []).filter((view) => isCustomizableViewCode(view?.code));
+  return filteredViews.length > 0 ? filteredViews : (views || []);
 };
 
 const MOBILE_TOOL_TABS = [
@@ -236,7 +241,6 @@ const getSizeBasePrice = (prod, size) => {
     basePrice: BASE_PRICE,
     images: { count: 0, total: 0, items: [] },
     text: { count: 0, total: 0, items: [] },
-    sleeves: { count: 0, total: 0 },
     additionalArea: 0,
     minimumCharges: 0,
     totalPrice: BASE_PRICE
@@ -462,13 +466,15 @@ const restoreDesignLayerFromSaved = (d) => {
       const allZones = [];
 
       Object.entries(viewStates).forEach(([viewCode, viewState]) => {
+        if (!isCustomizableViewCode(viewCode)) {
+          return;
+        }
+
         if (viewState.designLayers) {
           viewState.designLayers.forEach(layer => {
             let zone = layer.zone;
             if (!zone) {
-              if (viewCode === 'left') zone = 'sleeve-left';
-              else if (viewCode === 'right') zone = 'sleeve-right';
-              else if (viewCode === 'back') zone = 'back-full';
+              if (viewCode === 'back') zone = 'back-full';
               else zone = 'front-full';
             }
             
@@ -522,7 +528,6 @@ const restoreDesignLayerFromSaved = (d) => {
       basePrice: basePrice,
       images: { count: 0, total: 0, items: [] },
       text: { count: 0, total: 0, items: [] },
-      sleeves: { count: 0, total: 0 },
       additionalArea: 0,
       minimumCharges: 0,
       totalPrice: basePrice
@@ -530,27 +535,6 @@ const restoreDesignLayerFromSaved = (d) => {
 
     designLayers.forEach((layer, index) => {
   const zone = layer.zone || zones[index] || "front-full";
-
-  // sleeves fixed
-  if (zone === "sleeve-left" || zone === "sleeve-right") {
-    breakdown.sleeves.count += 1;
-    breakdown.sleeves.total += SLEEVE_PRICE;
-    totalPrice += SLEEVE_PRICE;
-
-    breakdown.images.count += 1;
-    breakdown.images.total += SLEEVE_PRICE;
-
-    breakdown.images.items.push({
-      id: layer.id,
-      type: "sleeve",
-      price: SLEEVE_PRICE,
-      zone,
-      viewCode: layer.viewCode,
-      size: "Sleeve",
-      note: "Sleeve - fixed price",
-    });
-    return;
-  }
 
   // ✅ FIXED PRICE based on RecolorEditor inches
   const widthIn = Number(layer.renderedWidthInches || 0);
@@ -805,8 +789,12 @@ setPriceBreakdown((prev) => ({
         setIsEditMode(true);
         setEditModeInitialized(true);
         
-        if (design.views?.[0]?.code) {
-          setViewCode(design.views[0].code);
+        const firstEditableView =
+          design.views?.find((view) => isCustomizableViewCode(view.code))?.code ||
+          getCustomizableViews(product.views)[0]?.code;
+
+        if (firstEditableView) {
+          setViewCode(firstEditableView);
         }
         
         setTimeout(() => calculatePrice(), 0);
@@ -837,8 +825,10 @@ setPriceBreakdown((prev) => ({
 
     console.log("Initializing new design for product:", product.name);
     
+    const initialViews = getCustomizableViews(product.views);
     const initial = {};
-    product.views.forEach((v) => {
+
+    initialViews.forEach((v) => {
       initial[v.code] = {
         textLayers: [],          // ✅ no default text on load
         activeTextId: null,      // ✅ no active text selected
@@ -849,11 +839,21 @@ setPriceBreakdown((prev) => ({
 
 
     setViewStates(initial);
-    setViewCode(product.views[0].code);
+    setViewCode(initialViews[0].code);
     setIsEditMode(false);
     setEditModeInitialized(false);
     
   }, [product, isEditMode, editModeInitialized]);
+
+  useEffect(() => {
+    if (!product?.views?.length) return;
+    if (isCustomizableViewCode(viewCode)) return;
+
+    const fallbackView = getCustomizableViews(product.views)[0];
+    if (fallbackView?.code) {
+      setViewCode(fallbackView.code);
+    }
+  }, [product, viewCode]);
 
   useEffect(() => {
   if (!product) return;
@@ -1403,14 +1403,18 @@ const nudgeDesignScaleAxis = (axis, delta) => {
   };
 
   const captureAllViewPreviews = async () => {
-    if (!product?.views || product.views.length === 0 || !editorRef.current) {
+    const viewsToCapture = getCustomizableViews(product?.views);
+
+    if (viewsToCapture.length === 0 || !editorRef.current) {
       return {};
     }
 
     const previewsByCode = {};
-    const originalViewCode = viewCode;
+    const originalViewCode = isCustomizableViewCode(viewCode)
+      ? viewCode
+      : viewsToCapture[0]?.code;
 
-    for (const v of product.views) {
+    for (const v of viewsToCapture) {
       setViewCode(v.code);
       await new Promise((resolve) => setTimeout(resolve, 3000));
 
@@ -1420,7 +1424,9 @@ const nudgeDesignScaleAxis = (axis, delta) => {
       }
     }
 
-    setViewCode(originalViewCode);
+    if (originalViewCode) {
+      setViewCode(originalViewCode);
+    }
     return previewsByCode;
   };
 
@@ -1466,7 +1472,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
         }
       }
 
-      const viewsPayload = product.views?.map((v) => {
+      const viewsPayload = getCustomizableViews(product.views).map((v) => {
         const vs = processedViewStates[v.code] ? { ...baseViewState, ...processedViewStates[v.code] } : baseViewState;
 
         const textLayersPayload = (vs.textLayers || []).map(
@@ -1582,7 +1588,8 @@ const nudgeDesignScaleAxis = (axis, delta) => {
         };
       }) || [];
 
-      const mainPreview = previewsByCode["front"] || (product.views?.[0] && previewsByCode[product.views[0].code]) || null;
+      const primaryView = getCustomizableViews(product.views)[0];
+      const mainPreview = previewsByCode["front"] || (primaryView && previewsByCode[primaryView.code]) || null;
 
       const body = {
         productId: product._id || product.id,
@@ -1772,9 +1779,11 @@ const nudgeDesignScaleAxis = (axis, delta) => {
     );
   }
 
-  const currentView = product.views.find((v) => v.code === viewCode) || product.views[0];
+  const customizableViews = getCustomizableViews(product?.views);
+  const currentView = customizableViews.find((v) => v.code === viewCode) || customizableViews[0] || product.views[0];
   const mockupUrl = currentView?.mockupUrl;
   const maskUrl = currentView?.maskUrl;
+  const canAddSavedDesignToCart = Boolean(savedDesignId || editDesignId);
 
   return (
     <div className="flex h-[100dvh] min-h-[100dvh] flex-col overflow-hidden bg-gradient-to-b from-slate-100 via-white to-slate-100 text-slate-900 sm:min-h-screen sm:h-auto sm:overflow-visible">
@@ -1870,56 +1879,75 @@ const nudgeDesignScaleAxis = (axis, delta) => {
       </header>
 
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-2 py-2 backdrop-blur sm:hidden">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab(TABS.VIEWS)}
-            className={`flex h-11 w-11 items-center justify-center rounded-[16px] border text-lg font-semibold transition ${
-              activeTab === TABS.VIEWS
-                ? "border-sky-600 bg-sky-600 text-white"
-                : "border-slate-200 bg-white text-slate-700"
-            }`}
-          >
-            ≡
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab(TABS.DESIGNS)}
-            className={`rounded-full px-4 py-2 text-[12px] font-semibold transition ${
-              activeTab === TABS.DESIGNS
-                ? "bg-sky-600 text-white"
-                : "border border-slate-200 bg-white text-slate-700"
-            }`}
-          >
-            Designs
-          </button>
-          <button
-            type="button"
-            onClick={handleSaveDesign}
-            disabled={saving || addingToCart}
-            className="rounded-full border border-slate-200 px-4 py-2 text-[12px] font-semibold text-slate-700 disabled:opacity-50"
-          >
-            {saving ? "Saving..." : "Save"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab(TABS.DESIGN_LIBRARY)}
-            className={`rounded-full px-4 py-2 text-[12px] font-semibold transition ${
-              activeTab === TABS.DESIGN_LIBRARY
-                ? "bg-sky-600 text-white"
-                : "border border-slate-200 bg-white text-slate-700"
-            }`}
-          >
-            Library
-          </button>
-          <button
-            type="button"
-            onClick={handleSaveAndAddToCart}
-            disabled={saving || addingToCart}
-            className="ml-auto rounded-[16px] bg-sky-600 px-5 py-3 text-base font-semibold text-white disabled:opacity-50"
-          >
-            {addingToCart ? "Adding..." : savedDesignId ? "Cart" : "Next"}
-          </button>
+        <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab(TABS.VIEWS)}
+              className={`flex h-11 items-center justify-center rounded-[16px] border text-sm font-semibold transition ${
+                activeTab === TABS.VIEWS
+                  ? "border-sky-600 bg-sky-600 text-white"
+                  : "border-slate-200 bg-white text-slate-700"
+              }`}
+            >
+              Views
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab(TABS.DESIGNS)}
+              className={`rounded-[16px] px-4 py-2 text-[12px] font-semibold transition ${
+                activeTab === TABS.DESIGNS
+                  ? "bg-sky-600 text-white"
+                  : "border border-slate-200 bg-white text-slate-700"
+              }`}
+            >
+              Designs
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab(TABS.DESIGN_LIBRARY)}
+              className={`rounded-[16px] px-4 py-2 text-[12px] font-semibold transition ${
+                activeTab === TABS.DESIGN_LIBRARY
+                  ? "bg-sky-600 text-white"
+                  : "border border-slate-200 bg-white text-slate-700"
+              }`}
+            >
+              Library
+            </button>
+          </div>
+
+          <div className={`grid gap-2 ${canAddSavedDesignToCart ? "grid-cols-3" : "grid-cols-2"}`}>
+            <button
+              type="button"
+              onClick={() => setShowMobilePriceDetails((value) => !value)}
+              className={`rounded-[16px] border px-3 py-2 text-left transition ${
+                showMobilePriceDetails
+                  ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                  : "border-slate-200 bg-white text-slate-700"
+              }`}
+            >
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em]">Price</div>
+              <div className="mt-0.5 text-sm font-bold">₹{price.toFixed(2)}</div>
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveDesign}
+              disabled={saving || addingToCart}
+              className="rounded-[16px] border border-slate-200 bg-white px-4 py-2 text-[12px] font-semibold text-slate-700 disabled:opacity-50"
+            >
+              {saving ? "Saving..." : isEditMode ? "Update Design" : "Save Design"}
+            </button>
+            {canAddSavedDesignToCart && (
+              <button
+                type="button"
+                onClick={handleSaveAndAddToCart}
+                disabled={saving || addingToCart}
+                className="rounded-[16px] bg-sky-600 px-4 py-2 text-[12px] font-semibold text-white disabled:opacity-50"
+              >
+                {addingToCart ? "Adding..." : "Add to Cart"}
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -2362,7 +2390,6 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                         <p>• Drag to reposition, or use the resize handle</p>
                           <p>• Click "Remove BG" for transparent background</p>
                           <p>• Remove BG supports only {SUPPORTED_DESIGN_FORMATS_LABEL}</p>
-                          <p>• Sleeves have fixed pricing of ₹{SLEEVE_PRICE} each</p>
                       </div>
                     </>
                   )}
@@ -2447,7 +2474,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
             )}
 
             {/* Views Tab */}
-            {shouldShowToolSection(TABS.VIEWS) && product.views && product.views.length > 1 && (
+            {shouldShowToolSection(TABS.VIEWS) && customizableViews.length > 1 && (
               <section
                 id={`tool-section-${TABS.VIEWS}`}
                 className="mb-4 space-y-6 rounded-2xl border border-slate-200 bg-slate-50/40 p-4 scroll-mt-24 sm:mb-0 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0"
@@ -2457,7 +2484,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                   <p className="mb-3 text-xs text-slate-600">Switch between different views of the product to add designs/text on different areas.</p>
 
                   <div className="space-y-2">
-                    {product.views.map((v) => {
+                    {customizableViews.map((v) => {
                       const viewState = viewStates[v.code];
                       const hasLayers = viewState && (viewState.textLayers?.length > 0 || viewState.designLayers?.length > 0);
                       const isCurrent = v.code === viewCode;
@@ -2485,10 +2512,9 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                 </div>
 
                 <div className="hidden text-xs text-slate-600 space-y-2 sm:block">
-                  <p className="font-medium">Current View: {product.views.find(v => v.code === viewCode)?.label}</p>
+                  <p className="font-medium">Current View: {customizableViews.find(v => v.code === viewCode)?.label}</p>
                   <p>• Front: Main design area</p>
                   <p>• Back: Back of the product</p>
-                  <p>• Left/Right Sleeves: Sleeve designs</p>
                   <p>• Each view has separate text and design layers</p>
                 </div>
               </section>
@@ -2684,12 +2710,12 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                       {product?.name || "Custom Product"}
                     </h2>
                     <p className="text-xs text-slate-500">
-                      {productColorName} • {product?.views?.find((v) => v.code === viewCode)?.label || "Front view"} • Size {selectedSize}
+                      {productColorName} • {customizableViews.find((v) => v.code === viewCode)?.label || "Front view"} • Size {selectedSize}
                     </p>
                   </div>
-                  {product?.views?.length > 0 && (
+                  {customizableViews.length > 0 && (
                     <div className="flex flex-wrap gap-2 lg:justify-end">
-                      {product.views.map((v) => {
+                      {customizableViews.map((v) => {
                         const isCurrentView = v.code === viewCode;
                         return (
                           <button
@@ -2789,19 +2815,6 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                 </div>
               </div>
               
-              {/* Sleeves */}
-              {priceBreakdown.sleeves.total > 0 && (
-                <div className="pb-3 border-b border-slate-100">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs font-medium text-slate-700">Sleeves</span>
-                    <span className="text-sm font-semibold text-green-600">+₹{priceBreakdown.sleeves.total.toFixed(2)}</span>
-                  </div>
-                  <div className="text-[10px] text-slate-500">
-                    {priceBreakdown.sleeves.count} sleeve{priceBreakdown.sleeves.count !== 1 ? 's' : ''} × ₹{SLEEVE_PRICE} each
-                  </div>
-                </div>
-              )}
-              
               {/* Images/Designs */}
               {priceBreakdown.images.total > 0 && (
                 <div className="pb-3 border-b border-slate-100">
@@ -2816,15 +2829,9 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                           <span className="font-medium">Design {index + 1}</span>
                           <span>₹{item.price.toFixed(2)}</span>
                         </div>
-                        {item.type === 'sleeve' ? (
-                          <div className="text-slate-500 mt-1">Sleeve ({item.zone}) - Fixed price</div>
-                        ) : (
-                          <>
-                            <div className="text-slate-500 mt-1">Size: {item.displaySize}</div>
-                            <div className="text-slate-500">Print: {item.printSize}</div>
-                            <div className="text-amber-600 text-[9px] mt-1">{item.note}</div>
-                          </>
-                        )}
+                        <div className="text-slate-500 mt-1">Size: {item.displaySize}</div>
+                        <div className="text-slate-500">Print: {item.printSize}</div>
+                        <div className="text-amber-600 text-[9px] mt-1">{item.note}</div>
                       </div>
                     ))}
                   </div>
@@ -2898,7 +2905,6 @@ const nudgeDesignScaleAxis = (axis, delta) => {
               <p>• Base includes {FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}" design area</p>
               <p>• Minimum charge: ₹{MINIMUM_DESIGN_CHARGE} (≤{FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}")</p>
               <p>• Additional: ₹{PRICE_PER_SQ_INCH} per sq.inch beyond {FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}"</p>
-              <p>• Sleeves: Fixed ₹{SLEEVE_PRICE} each</p>
               <p>• Display: 72 DPI (screen preview)</p>
               <p>• Print: 300 DPI (production)</p>
             </div>

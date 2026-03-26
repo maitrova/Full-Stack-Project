@@ -1,6 +1,7 @@
 import Order from "../models/Order.js";
 import { generateInvoicePDF } from "../services/invoiceService.js";
 import fs from "fs";
+import path from "path";
 
 export const downloadInvoice = async (req, res) => {
   try {
@@ -26,7 +27,10 @@ export const downloadInvoice = async (req, res) => {
 
     // If invoice already exists → reuse
     if (order.invoicePdfUrl && fs.existsSync(order.invoicePdfUrl)) {
-      return res.download(order.invoicePdfUrl);
+      return res.download(
+        order.invoicePdfUrl,
+        path.basename(order.invoicePdfUrl)
+      );
     }
 
     // Generate invoice
@@ -38,10 +42,12 @@ export const downloadInvoice = async (req, res) => {
     order.invoicePdfUrl = pdfPath;
     await order.save();
 
-    return res.download(pdfPath);
+    return res.download(pdfPath, path.basename(pdfPath));
 
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Invoice generation failed" });
+    res.status(500).json({
+      message: error?.message || "Invoice generation failed",
+    });
   }
 };

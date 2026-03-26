@@ -18,16 +18,12 @@ import {
 } from '../redux/slices/dropproducts.js';
 import RichTextEditor from './RichTextEditor.jsx';
 import { AlertCircle, CheckCircle, Edit, Eye, Loader2, Plus, Save, Trash2, Upload, X } from 'lucide-react';
+import { buildImageUrl } from '../utils/responsiveImage.js';
 
-const imageBaseUrl = import.meta.env.VITE_IMAGE_URL || 'https://maitrova.in/backend';
 const sizeOptions = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 const emptyVariant = { size: '', price: '', stock: '', sku: '' };
 
-const imageUrl = (path) => {
-  if (!path) return null;
-  if (path.startsWith('http')) return path;
-  return path.startsWith('/') ? `${imageBaseUrl}${path}` : `${imageBaseUrl}/${path}`;
-};
+const imageUrl = (path) => buildImageUrl(path);
 
 const money = (value) =>
   `Rs. ${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { logoutUser } from '../redux/slices/Userslice.js';
+import { logoutUser, selectCurrentToken } from '../redux/slices/Userslice.js';
 import { 
   selectCartItemCount, 
   selectCart,
   getCart,
-  selectCartLoading
+  selectCartLoading,
+  resetCart
 } from '../redux/slices/Cartslice.js';
 
 const Header = () => {
@@ -25,19 +26,24 @@ const Header = () => {
   // Redux hooks
   const dispatch = useDispatch();
   const user = useSelector(state => state.user.userInfo);
+  const token = useSelector(selectCurrentToken);
   const cartItemCount = useSelector(selectCartItemCount);
   const cart = useSelector(selectCart);
   const cartLoading = useSelector(selectCartLoading);
-  const isAuthenticated = !!user;
+  const isAuthenticated = !!token;
 
-  // Fetch cart data when component mounts and user is authenticated
+  // Keep cart state in sync with auth state.
   useEffect(() => {
-    if (isAuthenticated) {
+    if (token) {
       dispatch(getCart());
+      return;
     }
-  }, [dispatch, isAuthenticated]);
+
+    dispatch(resetCart());
+  }, [dispatch, token]);
 
   const handleLogout = () => {
+    dispatch(resetCart());
     dispatch(logoutUser());
     setIsMobileMenuOpen(false);
   };

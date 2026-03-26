@@ -3,7 +3,10 @@ import { razorpay } from "../utils/razorpay.js";
 import Order from "../models/Order.js";
 import { Cart } from "../models/Cart.js";
 import Address from "../models/address.js";
-import { sendOrderStatusEmail } from "../services/orderEmailService.js";
+import {
+  sendAdminOrderNotification,
+  sendOrderStatusEmail,
+} from "../services/orderEmailService.js";
 import { applyInventoryForOrder } from "../services/inventoryService.js";
 import {
   redeemCouponForOrder,
@@ -224,7 +227,10 @@ export const verifyRazorpayPayment = async (req, res) => {
 
     if (shouldSendConfirmationEmail) {
       const populatedOrder = await Order.findById(orderDoc._id).populate("user");
-      await sendOrderStatusEmail(populatedOrder, populatedOrder.user);
+      await Promise.all([
+        sendOrderStatusEmail(populatedOrder, populatedOrder.user),
+        sendAdminOrderNotification(populatedOrder, populatedOrder.user),
+      ]);
     }
 
     await Cart.findOneAndUpdate(
