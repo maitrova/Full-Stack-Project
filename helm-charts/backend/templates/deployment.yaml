@@ -44,6 +44,14 @@ spec:
                   key: {{ $key }}
             {{- end }}
 
+            {{- range .Values.externalSecret.keys }}
+            - name: {{ . }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.externalSecret.name }}
+                  key: {{ . }}
+            {{- end }}
+
           {{- if .Values.livenessProbe.enabled }}
           livenessProbe:
             httpGet:
