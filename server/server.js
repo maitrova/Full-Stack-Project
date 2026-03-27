@@ -93,7 +93,7 @@ const staticOutputs = express.static(outputsDir, {
   },
 });
 
-app.use("/outputs", staticOutputs);
+// app.use("/outputs", staticOutputs);
 app.use("/api/outputs", staticOutputs);
 
 // Health check endpoint for Kubernetes

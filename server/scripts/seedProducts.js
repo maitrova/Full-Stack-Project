@@ -18,11 +18,11 @@ async function run() {
 
       // ✅ size-based pricing
       sizePricing: [
-        { size: "S", price: 900 },
-        { size: "M", price: 1000 },
-        { size: "L", price: 1100 },
-        { size: "XL", price: 1200 },
-        { size: "XXL", price: 1300 },
+        { size: "S", price: 899 },
+        { size: "M", price: 899 },
+        { size: "L", price: 899 },
+        { size: "XL", price: 899 },
+        { size: "XXL", price: 899 },
       ],
 
       views: [
@@ -41,11 +41,11 @@ async function run() {
       basePrice: 899,
 
       sizePricing: [
-        { size: "S", price: 850 },
-        { size: "M", price: 900 },
-        { size: "L", price: 950 },
-        { size: "XL", price: 999 },
-        { size: "XXL", price: 1050 },
+        { size: "S", price: 799 },
+        { size: "M", price: 799 },
+        { size: "L", price: 799 },
+        { size: "XL", price: 799 },
+        { size: "XXL", price: 799 },
       ],
 
       views: [
@@ -63,10 +63,10 @@ async function run() {
 
       sizePricing: [
         { size: "S", price: 699 },
-        { size: "M", price: 749 },
-        { size: "L", price: 799 },
-        { size: "XL", price: 849 },
-        { size: "XXL", price: 899 },
+        { size: "M", price: 699 },
+        { size: "L", price: 699 },
+        { size: "XL", price: 699 },
+        { size: "XXL", price: 699 },
       ],
 
       views: [
@@ -83,11 +83,11 @@ async function run() {
       basePrice: 899,
 
       sizePricing: [
-        { size: "S", price: 849 },
-        { size: "M", price: 899 },
-        { size: "L", price: 949 },
-        { size: "XL", price: 999 },
-        { size: "XXL", price: 1099 },
+        { size: "S", price: 699 },
+        { size: "M", price: 699 },
+        { size: "L", price: 699 },
+        { size: "XL", price: 699 },
+        { size: "XXL", price: 699 },
       ],
 
       views: [
@@ -104,11 +104,11 @@ async function run() {
       basePrice: 699,
 
       sizePricing: [
-        { size: "S", price: 599 },
-        { size: "M", price: 649 },
-        { size: "L", price: 699 },
-        { size: "XL", price: 749 },
-        { size: "XXL", price: 799 },
+        { size: "S", price: 499 },
+        { size: "M", price: 499 },
+        { size: "L", price: 499 },
+        { size: "XL", price: 499 },
+        { size: "XXL", price: 499 },
       ],
 
       views: [
@@ -125,11 +125,11 @@ async function run() {
       basePrice: 749,
 
       sizePricing: [
-        { size: "XS", price: 699 },
-        { size: "S", price: 749 },
-        { size: "M", price: 799 },
-        { size: "L", price: 849 },
-        { size: "XL", price: 899 },
+        { size: "XS", price: 349 },
+        { size: "S", price: 349 },
+        { size: "M", price: 349 },
+        { size: "L", price: 349 },
+        { size: "XL", price: 349 },
       ],
 
       views: [
@@ -146,11 +146,11 @@ async function run() {
       basePrice: 749,
 
       sizePricing: [
-        { size: "XS", price: 699 },
-        { size: "S", price: 749 },
-        { size: "M", price: 799 },
-        { size: "L", price: 849 },
-        { size: "XL", price: 899 },
+        { size: "XS", price: 499 },
+        { size: "S", price: 499 },
+        { size: "M", price: 499 },
+        { size: "L", price: 499 },
+        { size: "XL", price: 499 },
       ],
 
       views: [

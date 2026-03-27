@@ -143,6 +143,80 @@ const getReadymadeVariantSelection = (product, size) => {
   };
 };
 
+const findActiveCartWithDetails = (userId) =>
+  Cart.findOne({ user: userId, status: "ACTIVE" })
+    .populate({
+      path: "items.readymadeProduct",
+      populate: [
+        { path: "category", select: "name" },
+        { path: "subCategory", select: "name" },
+        { path: "brand", select: "name" },
+      ],
+    })
+    .populate("items.dropproduct")
+    .populate("items.design")
+    .populate("items.product")
+    .lean();
+
+const enrichCartItems = (items = []) =>
+  items.map((it) => {
+    let updatedItem = { ...it };
+
+    if (it.readymadeProduct) {
+      updatedItem.readymadeProduct = {
+        ...attachReadymadePricing({ ...it.readymadeProduct }),
+        category: it.readymadeProduct.category?.name || it.readymadeProduct.category,
+        subCategory: it.readymadeProduct.subCategory?.name || it.readymadeProduct.subCategory,
+        brand: it.readymadeProduct.brand?.name || it.readymadeProduct.brand,
+      };
+
+      if (!Array.isArray(it.readymadeProduct.variants) || it.readymadeProduct.variants.length === 0) {
+        const pricing = getReadymadePricing(it.readymadeProduct);
+        updatedItem.unitPrice = Number(pricing.effectivePrice || updatedItem.unitPrice || 0);
+        updatedItem.basePrice = Number(
+          pricing.mrp || updatedItem.basePrice || updatedItem.unitPrice || 0
+        );
+        updatedItem.priceDetails = {
+          ...(updatedItem.priceDetails || {}),
+          ...pricing,
+        };
+      }
+    }
+
+    if (it.kind === "READYMADE" && it.readymadeProduct?.variants) {
+      const variant = it.readymadeProduct.variants.find(
+        (entry) =>
+          String(entry.size).toUpperCase() === String(it.size || "M").toUpperCase()
+      );
+
+      updatedItem.activeVariant = variant || null;
+      if (updatedItem.activeVariant) {
+        updatedItem.unitPrice = Number(
+          updatedItem.activeVariant.effectivePrice || updatedItem.unitPrice || 0
+        );
+        updatedItem.basePrice = Number(
+          updatedItem.activeVariant.mrp || updatedItem.basePrice || updatedItem.unitPrice || 0
+        );
+        updatedItem.priceDetails = {
+          ...(updatedItem.priceDetails || {}),
+          ...getReadymadePricing(it.readymadeProduct, { variant }),
+        };
+      }
+    }
+
+    return updatedItem;
+  });
+
+const buildActiveCartResponse = async (userId) => {
+  const cart = await findActiveCartWithDetails(userId);
+  if (!cart) return null;
+
+  return {
+    ...cart,
+    items: enrichCartItems(cart.items || []),
+  };
+};
+
 export const addToCart = async (req, res) => {
   const userId = req.user?._id;
   let requestContext = buildAddToCartLogContext(req.body, {
@@ -379,12 +453,16 @@ export const addToCart = async (req, res) => {
       }
 
       await cart.save();
-      return res.status(200).json({ message: "Cart updated", cart });
+
+      const responseCart = await buildActiveCartResponse(userId);
+      return res.status(200).json({ message: "Cart updated", cart: responseCart });
     }
 
     cart.items.push(itemToInsert);
     await cart.save();
-    return res.status(201).json({ message: "Added to cart", cart });
+
+    const responseCart = await buildActiveCartResponse(userId);
+    return res.status(201).json({ message: "Added to cart", cart: responseCart });
   } catch (err) {
     console.error("[cart/add] Failed", {
       ...requestContext,
@@ -408,19 +486,7 @@ export const getCart = async (req, res) => {
     if (!userId)
       return res.status(401).json({ message: "Unauthorized" });
 
-    const cart = await Cart.findOne({ user: userId, status: "ACTIVE" })
-      .populate({
-        path: "items.readymadeProduct",
-        populate: [
-          { path: "category", select: "name" },
-          { path: "subCategory", select: "name" },
-          { path: "brand", select: "name" }, // ✅ brand populate
-        ],
-      })
-      .populate("items.dropproduct")
-      .populate("items.design")
-      .populate("items.product")
-      .lean();
+    const cart = await buildActiveCartResponse(userId);
 
     if (!cart) {
       return res.status(200).json({
@@ -429,67 +495,7 @@ export const getCart = async (req, res) => {
       });
     }
 
-    const enrichedItems = (cart.items || []).map((it) => {
-      let updatedItem = { ...it };
-
-      if (it.readymadeProduct) {
-        updatedItem.readymadeProduct = {
-          ...attachReadymadePricing({ ...it.readymadeProduct }),
-
-          category:
-            it.readymadeProduct.category?.name ||
-            it.readymadeProduct.category,
-
-          subCategory:
-            it.readymadeProduct.subCategory?.name ||
-            it.readymadeProduct.subCategory,
-
-          brand:
-            it.readymadeProduct.brand?.name ||
-            it.readymadeProduct.brand,
-        };
-
-        if (!Array.isArray(it.readymadeProduct.variants) || it.readymadeProduct.variants.length === 0) {
-          const pricing = getReadymadePricing(it.readymadeProduct);
-          updatedItem.unitPrice = Number(pricing.effectivePrice || updatedItem.unitPrice || 0);
-          updatedItem.basePrice = Number(pricing.mrp || updatedItem.basePrice || updatedItem.unitPrice || 0);
-          updatedItem.priceDetails = {
-            ...(updatedItem.priceDetails || {}),
-            ...pricing,
-          };
-        }
-      }
-
-      if (
-        it.kind === "READYMADE" &&
-        it.readymadeProduct?.variants
-      ) {
-        const v = it.readymadeProduct.variants.find(
-          (x) =>
-            String(x.size).toUpperCase() ===
-            String(it.size || "M").toUpperCase()
-        );
-
-        updatedItem.activeVariant = v || null;
-        if (updatedItem.activeVariant) {
-          updatedItem.unitPrice = Number(updatedItem.activeVariant.effectivePrice || updatedItem.unitPrice || 0);
-          updatedItem.basePrice = Number(updatedItem.activeVariant.mrp || updatedItem.basePrice || updatedItem.unitPrice || 0);
-          updatedItem.priceDetails = {
-            ...(updatedItem.priceDetails || {}),
-            ...getReadymadePricing(it.readymadeProduct, { variant: v }),
-          };
-        }
-      }
-
-      return updatedItem;
-    });
-
-    return res.status(200).json({
-      cart: {
-        ...cart,
-        items: enrichedItems,
-      },
-    });
+    return res.status(200).json({ cart });
 
   } catch (err) {
     console.error("getCart error:", err);
@@ -583,23 +589,13 @@ export const updateCartItemQty = async (req, res) => {
           return res.status(404).json({ message: "Readymade product not found or inactive" });
         }
 
-        const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
-
-        let availableStock = Number(p.stock || p.totalStock || 0);
-        let unitPrice = Number(p.price || 0);
-
-        if (hasVariants) {
-          const variant = p.variants.find(
-            (v) => String(v.size || "").toUpperCase() === cartSize
-          );
-
-          if (!variant) {
-            return res.status(400).json({ message: "Selected size is not available" });
-          }
-
-          availableStock = Number(variant.stock || 0);
-          unitPrice = Number(variant.price || 0);
+        const selection = getReadymadeVariantSelection(p, cartSize);
+        if (!selection) {
+          return res.status(400).json({ message: "Selected size is not available" });
         }
+
+        const availableStock = Number(selection.availableStock || 0);
+        const unitPrice = Number(selection.unitPrice || 0);
 
         if (availableStock < parsedQty) {
           return res.status(400).json({ message: "Not enough stock" });
@@ -609,10 +605,9 @@ export const updateCartItemQty = async (req, res) => {
         item.currency = p.currency || "INR";
         item.previewImage = sanitizePreviewImage(extractProductPreviewImage(p));
 
-        item.basePrice = unitPrice;
-        item.priceDetails = null;
-
-        item.size = cartSize;
+        item.basePrice = selection.basePrice;
+        item.priceDetails = selection.priceDetails;
+        item.size = selection.size;
       }
     }
 
@@ -656,7 +651,9 @@ export const updateCartItemQty = async (req, res) => {
     item.qty = parsedQty;
 
     await cart.save();
-    return res.status(200).json({ message: "Quantity updated", cart });
+
+    const responseCart = await buildActiveCartResponse(userId);
+    return res.status(200).json({ message: "Quantity updated", cart: responseCart });
   } catch (err) {
     console.error("updateCartItemQty error:", err);
     return res.status(500).json({ message: "Server error" });
@@ -685,7 +682,8 @@ export const removeCartItem = async (req, res) => {
     item.deleteOne(); // remove subdocument
     await cart.save();
 
-    return res.status(200).json({ message: "Item removed", cart });
+    const responseCart = await buildActiveCartResponse(userId);
+    return res.status(200).json({ message: "Item removed", cart: responseCart });
   } catch (err) {
     console.error("removeCartItem error:", err);
     return res.status(500).json({ message: "Server error" });

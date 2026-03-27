@@ -68,10 +68,23 @@ const ZONE_OPTIONS_BY_VIEW = {
   back: ["back-full"],
 };
 
+const getZoneOptionsForView = (viewCode, { supportsPocketZone = false } = {}) => {
+  const zoneOptions = ZONE_OPTIONS_BY_VIEW[viewCode] || ["front-full"];
+  return supportsPocketZone
+    ? zoneOptions
+    : zoneOptions.filter((zoneKey) => zoneKey !== "pocket");
+};
+
 const ZONE_LABELS = {
   "front-full": "Front",
   pocket: "Pocket",
   "back-full": "Back",
+};
+
+const INITIAL_ZONE_BOUNDARIES = {
+  "front-full": { minX: 0.3, maxX: 0.7, minY: 0.25, maxY: 0.65 },
+  pocket: { minX: 0.365, maxX: 0.635, minY: 0.67, maxY: 0.87 },
+  "back-full": { minX: 0.3, maxX: 0.7, minY: 0.25, maxY: 0.75 },
 };
 
 const NON_CUSTOMIZABLE_VIEW_CODES = new Set(["left", "right"]);
@@ -143,6 +156,27 @@ const withCacheBust = (url = "") => {
   return `${url}${joiner}t=${Date.now()}`;
 };
 
+const stripApiSuffix = (url = "") => String(url || "").replace(/\/$/, "").replace(/\/api$/, "");
+
+const resolveOutputAssetUrl = (relativePath = "") => {
+  if (!relativePath) return "";
+  if (/^(https?:)?\/\//i.test(relativePath)) return relativePath;
+
+  const normalizedPath = relativePath.startsWith("/") ? relativePath : `/${relativePath}`;
+  const apiBase = (API_URL || window.location.origin).replace(/\/$/, "");
+  const publicBase = stripApiSuffix(IMAGE_URL || API_URL || window.location.origin);
+
+  if (normalizedPath.startsWith("/api/")) {
+    return `${publicBase}${normalizedPath}`;
+  }
+
+  if (normalizedPath.startsWith("/outputs/")) {
+    return `${apiBase}${normalizedPath}`;
+  }
+
+  return `${publicBase}${normalizedPath}`;
+};
+
 const isSupportedDesignSource = ({ name = "", type = "" } = {}) => {
   const normalizedType = String(type || "").toLowerCase();
   if (SUPPORTED_DESIGN_MIME_TYPES.has(normalizedType)) return true;
@@ -167,14 +201,36 @@ const createDefaultTextLayer = () => ({
   initialTextSized: false,
 });
 
-const createDesignLayer = (id, imageUrl, file, width, height, isFromLibrary = false) => {
+const getInitialZoneKey = (viewCode, preferredZone = null) => {
+  if (preferredZone) return preferredZone;
+  if (viewCode === "back") return "back-full";
+  return "front-full";
+};
+
+const createDesignLayer = (
+  id,
+  imageUrl,
+  file,
+  width,
+  height,
+  options = {}
+) => {
+  const { isFromLibrary = false, viewCode = "front", zone = null } = options;
   const displayWidthInches = width / DISPLAY_DPI;
   const displayHeightInches = height / DISPLAY_DPI;
 
   const printWidthInches = width / PRINT_DPI;
   const printHeightInches = height / PRINT_DPI;
 
-  const initialScale = 0.80;
+  const zoneKey = getInitialZoneKey(viewCode, zone);
+  const boundary =
+    INITIAL_ZONE_BOUNDARIES[zoneKey] || INITIAL_ZONE_BOUNDARIES["front-full"];
+  const boundaryWidth = Math.max(0.02, boundary.maxX - boundary.minX);
+  const boundaryHeight = Math.max(0.02, boundary.maxY - boundary.minY);
+  const initialScale = Math.max(
+    0.12,
+    Math.min(0.8, boundaryWidth * 0.78, boundaryHeight * 0.78)
+  );
 
   const initialWidthIn = printWidthInches * initialScale;
   const initialHeightIn = printHeightInches * initialScale;
@@ -188,9 +244,12 @@ const createDesignLayer = (id, imageUrl, file, width, height, isFromLibrary = fa
     file,
     sourceFile: file,
     hasBgRemoved: false,
-    x: 0.5,
-    y: 0.5,
+    x: (boundary.minX + boundary.maxX) / 2,
+    y: (boundary.minY + boundary.maxY) / 2,
+    zone: zoneKey,
     scale: initialScale,
+    scaleX: initialScale,
+    scaleY: initialScale,
     rotation: 0,
 
     originalWidthPx: width,
@@ -298,6 +357,9 @@ const getSizeBasePrice = (prod, size) => {
   const editorRef = useRef(null);
   const viewStatesRef = useRef({});
   const removeBgRequestSeqRef = useRef(0);
+  const supportsPocketZone = String(slug || product?.slug || "")
+    .trim()
+    .toLowerCase() === "hoodie";
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
@@ -949,7 +1011,7 @@ setPriceBreakdown((prev) => ({
   const activeTextLayer = textLayers.find((l) => l.id === activeTextId) || textLayers[0];
   const activeDesign = designLayers.find((d) => d.id === activeDesignId) || null;
   const selectedOrLatestDesign = activeDesign || designLayers[designLayers.length - 1] || null;
-  const availableZonesForView = ZONE_OPTIONS_BY_VIEW[viewCode] || ["front-full"];
+  const availableZonesForView = getZoneOptionsForView(viewCode, { supportsPocketZone });
   const activeDesignZone = activeDesign?.zone || availableZonesForView[0] || "front-full";
 
   const moveActiveDesignToZone = (zoneKey) => {
@@ -1034,7 +1096,13 @@ const handleDesignUpload = async (e) => {
       console.log("Pixels source: local file", { filename: file.name, width, height });
       console.log("Server URL:", serverUrl);
 
-      newLayers.push(createDesignLayer(id, serverUrl, file, width, height, false));
+      newLayers.push(
+        createDesignLayer(id, serverUrl, file, width, height, {
+          isFromLibrary: false,
+          viewCode,
+          zone: availableZonesForView[0] || getInitialZoneKey(viewCode),
+        })
+      );
     }
 
     if (!newLayers.length) {
@@ -1104,7 +1172,11 @@ const handleDesignUpload = async (e) => {
         height,
       });
       
-      const newLayer = createDesignLayer(id, imageUrl, file, width, height, true);
+      const newLayer = createDesignLayer(id, imageUrl, file, width, height, {
+        isFromLibrary: true,
+        viewCode,
+        zone: availableZonesForView[0] || getInitialZoneKey(viewCode),
+      });
       
       setViewStates((prev) => {
         const existing = prev[viewCode];
@@ -1226,10 +1298,7 @@ const handleDesignUpload = async (e) => {
         throw new Error("Background removal failed: no output URL");
       }
 
-      const assetBaseUrl = (IMAGE_URL || API_URL || window.location.origin)
-        .replace(/\/$/, "")
-        .replace(/\/api$/, "");
-      const outputAssetUrl = `${assetBaseUrl}${data.outputUrl}`;
+      const outputAssetUrl = resolveOutputAssetUrl(data.outputUrl);
       const outputPreviewUrl = withCacheBust(outputAssetUrl);
       console.log("Constructed background removed image URL:", outputAssetUrl);
 
@@ -1267,25 +1336,29 @@ const handleDesignUpload = async (e) => {
         URL.revokeObjectURL(targetDesign.imageUrl);
       }
 
-      const nextDesignId = `${targetDesign.id}-bg-${Date.now()}`;
-
       setViewStates((prev) => {
-        const existing = prev[viewCode];
+        const existing = prev[targetViewCode];
         const current = existing ? { ...baseViewState, ...existing } : baseViewState;
+        let didUpdateTargetLayer = false;
         const updatedLayers = (current.designLayers || []).map((layer) =>
           layer.id === targetDesignId
             ? {
                 ...layer,
-                id: nextDesignId,
                 imageUrl: previewUrl,
                 hasBgRemoved: true,
                 file: processedFile,
                 originalFile: processedFile,
-                sourceFile: layer.sourceFile || fileToUse,
+                sourceFile: processedFile,
                 isFromLibrary: false,
               }
             : layer
         );
+
+        didUpdateTargetLayer = updatedLayers.some((layer) => layer.id === targetDesignId);
+
+        if (!didUpdateTargetLayer) {
+          return prev;
+        }
 
         console.log("Updated layers with background removed:", updatedLayers);
 
@@ -1294,7 +1367,7 @@ const handleDesignUpload = async (e) => {
           [targetViewCode]: {
             ...current,
             designLayers: updatedLayers,
-            activeDesignId: nextDesignId,
+            activeDesignId: targetDesignId,
           },
         };
       });
@@ -2343,7 +2416,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                           </button>
                         </div>
 
-                        {availableZonesForView.length > 0 && (
+                        {availableZonesForView.length > 1 && (
                           <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
                             <div className="mb-2 flex items-center justify-between">
                               <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">

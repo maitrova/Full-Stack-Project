@@ -1861,10 +1861,35 @@ async function drawAll() {
 
       if (updates.length) {
         setDesignLayers((prev) =>
-          prev.map((l) => {
-            const u = updates.find((x) => x.id === l.id);
-            return u ? { ...l, ...u.patch } : l;
-          })
+          {
+            let hasMeaningfulChange = false;
+            const updatesById = new Map(updates.map((entry) => [entry.id, entry.patch]));
+
+            const nextLayers = prev.map((layer) => {
+              const patch = updatesById.get(layer.id);
+              if (!patch) return layer;
+
+              const nextLayer = { ...layer, ...patch };
+              const changed =
+                Math.abs((nextLayer.renderedWidthPx ?? 0) - (layer.renderedWidthPx ?? 0)) > 0.5 ||
+                Math.abs((nextLayer.renderedHeightPx ?? 0) - (layer.renderedHeightPx ?? 0)) > 0.5 ||
+                Math.abs((nextLayer.renderedWidthInches ?? 0) - (layer.renderedWidthInches ?? 0)) > 1e-4 ||
+                Math.abs((nextLayer.renderedHeightInches ?? 0) - (layer.renderedHeightInches ?? 0)) > 1e-4 ||
+                Math.abs((nextLayer.printableAreaWidthInches ?? 0) - (layer.printableAreaWidthInches ?? 0)) > 1e-4 ||
+                Math.abs((nextLayer.printableAreaHeightInches ?? 0) - (layer.printableAreaHeightInches ?? 0)) > 1e-4 ||
+                Math.abs((nextLayer.scaleX ?? nextLayer.scale ?? 0) - (layer.scaleX ?? layer.scale ?? 0)) > 1e-4 ||
+                Math.abs((nextLayer.scaleY ?? nextLayer.scale ?? 0) - (layer.scaleY ?? layer.scale ?? 0)) > 1e-4 ||
+                Math.abs((nextLayer.scale ?? 0) - (layer.scale ?? 0)) > 1e-4 ||
+                (nextLayer.zone || null) !== (layer.zone || null) ||
+                (nextLayer.zoneKey || null) !== (layer.zoneKey || null);
+
+              if (!changed) return layer;
+              hasMeaningfulChange = true;
+              return nextLayer;
+            });
+
+            return hasMeaningfulChange ? nextLayers : prev;
+          }
         );
       }
     }
