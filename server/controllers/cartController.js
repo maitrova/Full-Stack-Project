@@ -9,11 +9,25 @@ import { attachReadymadePricing, getReadymadePricing } from "../utils/readymadeP
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 const getOrCreateActiveCart = async (userId) => {
-  let cart = await Cart.findOne({ user: userId, status: "ACTIVE" });
-  if (!cart) {
-    cart = await Cart.create({ user: userId, status: "ACTIVE", items: [] });
+  try {
+    return await Cart.findOneAndUpdate(
+      { user: userId, status: "ACTIVE" },
+      { $setOnInsert: { user: userId, status: "ACTIVE", items: [] } },
+      {
+        new: true,
+        upsert: true,
+      }
+    );
+  } catch (error) {
+    // If two requests race on first cart creation, the unique ACTIVE-cart
+    // index can reject one insert. Fetch the winner instead of surfacing 500.
+    if (error?.code === 11000) {
+      const existingCart = await Cart.findOne({ user: userId, status: "ACTIVE" });
+      if (existingCart) return existingCart;
+    }
+
+    throw error;
   }
-  return cart;
 };
 
 const computeDesignUnitPrice = (designDoc) => {
