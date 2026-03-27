@@ -775,6 +775,18 @@ export default function UnifiedProductHub() {
     }
   }, [autoSlideIntervals]);
 
+  const getDefaultReadymadeSize = (item) => {
+    const variantSize =
+      item?.raw?.variants?.[0]?.size ||
+      item?.variants?.[0]?.size;
+
+    if (typeof variantSize === "string" && variantSize.trim()) {
+      return variantSize.trim().toUpperCase();
+    }
+
+    return "M";
+  };
+
   // Cart handler for common saved data
   const handleAddCommonToCart = async (item) => {
     if (!token) {
@@ -809,7 +821,7 @@ export default function UnifiedProductHub() {
           unitPrice: item.price || 0,
           basePrice: item.raw?.originalPrice || item.raw?.mrp || item.price || 0,
           previewImage: item.previewImage || null,
-          size: item.raw?.sizes?.[0] || 'M',
+          size: getDefaultReadymadeSize(item),
           color: item.raw?.colors?.[0] || 'Black'
         };
       }
@@ -1126,7 +1138,7 @@ export default function UnifiedProductHub() {
     const currentImageIndex = imageIndices[product._id] || 0;
     const currentImage = images[currentImageIndex];
     const imageProps = getResponsiveImageProps(currentImage, {
-      sizes: "(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw",
+      sizes: "(max-width: 640px) 50vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw",
     });
     const hasMultipleImages = images.length > 1;
     const isLoadingImage = imageLoading[product._id] !== false;
@@ -1149,7 +1161,7 @@ export default function UnifiedProductHub() {
     return (
       <div
         key={product._id}
-        className={`group bg-white border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all duration-200 overflow-hidden ${
+        className={`group bg-white border-gray-200 hover:border-gray-300 hover:shadow-lg transition-all duration-200 overflow-hidden rounded-xl sm:rounded-2xl ${
           isCustom ? "cursor-pointer" : ""
         }`}
         onClick={() => {
@@ -1165,7 +1177,7 @@ export default function UnifiedProductHub() {
         }}
       >
         {/* Image */}
-        <div className="relative aspect-[4/5] bg-gray-50 overflow-hidden">
+        <div className="relative aspect-square sm:aspect-[4/5] bg-white overflow-hidden">
           {/* Badges */}
           <div className="absolute top-2 left-2 z-10 flex flex-wrap gap-1">
             {discountPercent > 0 && (
@@ -1293,7 +1305,7 @@ export default function UnifiedProductHub() {
         </div>
 
         {/* Info */}
-        <div className="p-4">
+        <div className="p-3 sm:p-4">
           {/* Category + Rating */}
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -1394,8 +1406,8 @@ export default function UnifiedProductHub() {
 
   // Skeleton loader
   const ProductSkeleton = () => (
-    <div className="bg-white rounded-xl border border-gray-100 p-4 animate-pulse">
-      <div className="h-72 bg-gradient-to-br from-gray-100 to-gray-50 rounded-lg mb-4"></div>
+      <div className="bg-white rounded-xl border border-gray-100 p-3 sm:p-4 animate-pulse">
+      <div className="aspect-square sm:h-72 bg-gradient-to-br from-gray-100 to-gray-50 rounded-lg mb-4"></div>
       <div className="space-y-3">
         <div className="flex gap-2">
           <div className="h-6 bg-gray-100 rounded-full w-20"></div>
@@ -1414,7 +1426,7 @@ export default function UnifiedProductHub() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="animate-pulse">
             <div className="h-10 bg-gray-100 rounded-lg w-1/4 mb-8"></div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
               {Array.from({ length: 8 }).map((_, index) => (
                 <ProductSkeleton key={index} />
               ))}
@@ -2163,7 +2175,7 @@ export default function UnifiedProductHub() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-5">
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
                   {visibleProducts.map((product) => renderProductCard(product))}
                 </div>
                 {productsToDisplay.length > visibleProducts.length && (

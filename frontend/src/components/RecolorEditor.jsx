@@ -2064,7 +2064,6 @@ return () => {
           onAnyTextClick={() => setActiveDesignId(null)}
           canvasSize={canvasSize}
           boundaries={boundaries}
-          zonesForView={zonesForActiveView}
           specs={specs}
           calibratedConfig={calibratedConfig}
         />
@@ -2073,8 +2072,8 @@ return () => {
       {renderer &&
         canvasSize &&
         (designLayers || []).map((layer) => (
-          <><DesignOverlay
-            key={layer.id}
+          <DesignOverlay
+            key={`${layer.id}:${layer.imageUrl || ""}`}
             layer={layer}
             canvasSize={canvasSize}
             renderCanvasSize={renderCanvasSize}
@@ -2089,9 +2088,7 @@ return () => {
             calibratedConfig={calibratedConfig}
             setDragTargetZoneKey={setDragTargetZoneKey}
             setDesignInteractionActive={setDesignInteractionActive}
-          />{/*
-      zonesForView={zonesForActiveView}   // ✅ ADD THIS
-          />*/}</>
+          />
         ))}
       </div>
       )}
@@ -2201,6 +2198,8 @@ function clampFontSizeToBoundary({
 
   const text = layer.text || "";
   const fontFamily = layer.fontFamily || "Impact, sans-serif";
+  const scaleX = layer.scaleX ?? 1;
+  const scaleY = layer.scaleY ?? 1;
 
   // If empty text, just clamp numeric range
   if (!text.trim()) return Math.max(minFontSize, Math.min(maxFontSize, desiredFontSize));
@@ -2224,7 +2223,7 @@ function clampFontSizeToBoundary({
     const { w, h } = measureTextBoxPx({ text, fontSize: mid, fontFamily });
 
     // must fit fully inside boundary at current x,y
-    const fits = (w / 2) <= maxHalfWPx && (h / 2) <= maxHalfHPx;
+    const fits = ((w * scaleX) / 2) <= maxHalfWPx && ((h * scaleY) / 2) <= maxHalfHPx;
 
     if (fits) {
       best = mid;
@@ -2236,6 +2235,180 @@ function clampFontSizeToBoundary({
 
   return best;
 }
+
+  function normalizeTextLayerToBoundary(layer, overrides = {}) {
+    const targetLayer = { ...layer, ...overrides };
+    if (!targetLayer || !canvasSize) return layer;
+    const canvasReady = canvasSize.width >= 200 && canvasSize.height >= 200;
+
+    // Avoid shrinking a fresh text layer against a transient tiny canvas.
+    // Wait for a real measured editor size, then apply the intended initial fit.
+    if (!canvasReady && !targetLayer.initialTextSized) {
+      return layer;
+    }
+
+    const zoneKey = targetLayer.zone || getBoundaryKeyForTextLayer(targetLayer);
+    const boundary =
+      boundaries?.[zoneKey] ||
+      FALLBACK_BOUNDARIES?.[zoneKey] ||
+      FALLBACK_BOUNDARIES["front-full"];
+    const zonePx = getPrintableAreaPx(canvasSize, boundary);
+    const spec = getZoneSpec(zoneKey, specs, calibratedConfig);
+
+    let initialScaleX = targetLayer.scaleX ?? 1;
+    let initialScaleY = targetLayer.scaleY ?? 1;
+    let resolvedFontSize = targetLayer.fontSize || 20;
+
+    const didApplyInitialTarget =
+      canvasReady &&
+      !targetLayer.initialTextSized &&
+      targetLayer.initialTargetWidthInches &&
+      targetLayer.initialTargetHeightInches;
+
+    if (
+      canvasReady &&
+      !targetLayer.initialTextSized &&
+      targetLayer.initialTargetWidthInches &&
+      targetLayer.initialTargetHeightInches
+    ) {
+      resolvedFontSize = Math.max(
+        72,
+        Math.min(160, Number(targetLayer.initialBaseFontSize || targetLayer.fontSize || 120))
+      );
+      const initialMeasure = measureTextBoxPx({
+        text: targetLayer.text || "",
+        fontSize: resolvedFontSize,
+        fontFamily: targetLayer.fontFamily,
+      });
+
+      const desiredWidthPx =
+        (Number(targetLayer.initialTargetWidthInches || 0) / Math.max(spec?.maxW || 1, 1e-6)) *
+        zonePx.widthPx;
+      const desiredHeightPx =
+        (Number(targetLayer.initialTargetHeightInches || 0) / Math.max(spec?.maxH || 1, 1e-6)) *
+        zonePx.heightPx;
+
+      if (initialMeasure.w > 0 && desiredWidthPx > 0) {
+        initialScaleX = desiredWidthPx / initialMeasure.w;
+      }
+      if (initialMeasure.h > 0 && desiredHeightPx > 0) {
+        initialScaleY = desiredHeightPx / initialMeasure.h;
+      }
+    }
+
+    const normalizedX =
+      typeof targetLayer.x === "number"
+        ? targetLayer.x
+        : (boundary.minX + boundary.maxX) / 2;
+    const normalizedY =
+      typeof targetLayer.y === "number"
+        ? targetLayer.y
+        : (boundary.minY + boundary.maxY) / 2;
+
+    if (!didApplyInitialTarget) {
+      resolvedFontSize = clampFontSizeToBoundary({
+        desiredFontSize: targetLayer.fontSize || 20,
+        layer: {
+          ...targetLayer,
+          x: normalizedX,
+          y: normalizedY,
+          scaleX: initialScaleX,
+          scaleY: initialScaleY,
+        },
+        canvasSize,
+        boundary,
+      });
+    }
+
+    const { w, h } = measureTextBoxPx({
+      text: targetLayer.text || "",
+      fontSize: resolvedFontSize,
+      fontFamily: targetLayer.fontFamily,
+    });
+
+    const availableWidthPx =
+      Math.max(0, Math.min(normalizedX - boundary.minX, boundary.maxX - normalizedX)) *
+      2 *
+      canvasSize.width;
+    const availableHeightPx =
+      Math.max(0, Math.min(normalizedY - boundary.minY, boundary.maxY - normalizedY)) *
+      2 *
+      canvasSize.height;
+
+    const rawScaleX = initialScaleX;
+    const rawScaleY = initialScaleY;
+    const maxScaleX = w > 0 ? Math.max(0.2, availableWidthPx / w) : 5;
+    const maxScaleY = h > 0 ? Math.max(0.2, availableHeightPx / h) : 5;
+    const scaleX = Math.max(0.2, Math.min(5, rawScaleX, maxScaleX));
+    const scaleY = Math.max(0.2, Math.min(5, rawScaleY, maxScaleY));
+
+    const halfW = ((w * scaleX) / canvasSize.width) / 2;
+    const halfH = ((h * scaleY) / canvasSize.height) / 2;
+    const constrained = constrainCenterToBoundary(
+      normalizedX,
+      normalizedY,
+      boundary,
+      halfW,
+      halfH
+    );
+
+    const measurementPatch =
+      buildTextMeasurementPatch(targetLayer, {
+        x: constrained.x,
+        y: constrained.y,
+        fontSize: resolvedFontSize,
+        scaleX,
+        scaleY,
+        zone: zoneKey,
+      }) || {};
+
+    const nextLayer = {
+      ...targetLayer,
+      x: constrained.x,
+      y: constrained.y,
+      zone: zoneKey,
+      fontSize: resolvedFontSize,
+      scaleX,
+      scaleY,
+      scale: Math.min(scaleX, scaleY),
+      initialTextSized: Boolean(targetLayer.initialTextSized || didApplyInitialTarget),
+      initialBaseFontSize: targetLayer.initialBaseFontSize,
+      initialTargetWidthInches: targetLayer.initialTargetWidthInches,
+      initialTargetHeightInches: targetLayer.initialTargetHeightInches,
+      ...measurementPatch,
+    };
+
+    const unchanged =
+      nextLayer.x === layer.x &&
+      nextLayer.y === layer.y &&
+      nextLayer.zone === layer.zone &&
+      nextLayer.fontSize === layer.fontSize &&
+      nextLayer.scaleX === (layer.scaleX ?? 1) &&
+      nextLayer.scaleY === (layer.scaleY ?? 1) &&
+      nextLayer.initialTextSized === layer.initialTextSized &&
+      nextLayer.renderedWidthPx === layer.renderedWidthPx &&
+      nextLayer.renderedHeightPx === layer.renderedHeightPx &&
+      nextLayer.renderedWidthInches === layer.renderedWidthInches &&
+      nextLayer.renderedHeightInches === layer.renderedHeightInches;
+
+    return unchanged ? layer : nextLayer;
+  }
+
+  useEffect(() => {
+    if (!canvasSize || !Array.isArray(textLayers) || textLayers.length === 0) return;
+    if (canvasSize.width < 200 || canvasSize.height < 200) return;
+
+    let changed = false;
+    const nextLayers = textLayers.map((layer) => {
+      const normalized = normalizeTextLayerToBoundary(layer);
+      if (normalized !== layer) changed = true;
+      return normalized;
+    });
+
+    if (changed) {
+      setTextLayers(nextLayers);
+    }
+  }, [canvasSize, textLayers, setTextLayers, boundaries, specs, calibratedConfig]);
 
 
   const handlePointerMove = useCallback(
@@ -2289,22 +2462,16 @@ function clampFontSizeToBoundary({
         const constrainedY = constrained.y;
 
         const measurementPatch =
-          buildTextMeasurementPatch(textLayer, {
+          normalizeTextLayerToBoundary(textLayer, {
             x: constrainedX,
             y: constrainedY,
             zone: detectedFittingZone,
-          }) || {};
+          });
 
         setTextLayers((prev) =>
           prev.map((layer) =>
             layer.id === id
-              ? {
-                  ...layer,
-                  x: constrainedX,
-                  y: constrainedY,
-                  zone: detectedFittingZone,
-                  ...measurementPatch,
-                }
+              ? measurementPatch
               : layer
           )
         );
@@ -2324,30 +2491,24 @@ function clampFontSizeToBoundary({
         if (handle === "right") nextScaleX = baseScaleX + dx * kx;
         if (handle === "left") nextScaleX = baseScaleX - dx * kx;
 
-        if (handle === "bottom") nextScaleY = baseScaleY + dy * ky;
-        if (handle === "top") nextScaleY = baseScaleY - dy * ky;
+        const verticalResizeBoost = 1.8;
+        if (handle === "bottom") nextScaleY = baseScaleY + dy * ky * verticalResizeBoost;
+        if (handle === "top") nextScaleY = baseScaleY - dy * ky * verticalResizeBoost;
 
         nextScaleX = Math.max(0.2, Math.min(5, nextScaleX));
         nextScaleY = Math.max(0.2, Math.min(5, nextScaleY));
 
         const zoneKeyForResize = layerNow.zone || getBoundaryKeyForTextLayer(layerNow);
-        const measurementPatchResize =
-          buildTextMeasurementPatch(layerNow, {
-            scaleX: nextScaleX,
-            scaleY: nextScaleY,
-            zone: zoneKeyForResize,
-          }) || {};
+        const measurementPatchResize = normalizeTextLayerToBoundary(layerNow, {
+          scaleX: nextScaleX,
+          scaleY: nextScaleY,
+          zone: zoneKeyForResize,
+        });
 
         setTextLayers((prev) =>
           prev.map((layer) =>
             layer.id === id
-              ? {
-                  ...layer,
-                  scaleX: nextScaleX,
-                  scaleY: nextScaleY,
-                  scale: Math.min(nextScaleX, nextScaleY),
-                  ...measurementPatchResize,
-                }
+              ? measurementPatchResize
               : layer
           )
         );
@@ -2432,6 +2593,8 @@ function clampFontSizeToBoundary({
         const top = `${layer.y * 100}%`;
         const sx = layer.scaleX ?? 1;
         const sy = layer.scaleY ?? 1;
+        const boxWidthPx = Math.max(1, layer.renderedWidthPx || 0);
+        const boxHeightPx = Math.max(1, layer.renderedHeightPx || 0);
         const formattedWidth = formatInches(layer.renderedWidthInches);
         const formattedHeight = formatInches(layer.renderedHeightInches);
         const formattedMaxW = formatInches(layer.printableAreaWidthInches);
@@ -2443,7 +2606,7 @@ function clampFontSizeToBoundary({
             animate={{
               left,
               top,
-              transform: `translate(-50%, -50%) rotate(${layer.rotation}deg) scale(${sx}, ${sy})`,
+              transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)`,
             }}
             transition={{ type: "spring", stiffness: 450, damping: 45 }}
             className="pointer-events-auto absolute"
@@ -2451,18 +2614,30 @@ function clampFontSizeToBoundary({
             onPointerDown={(e) => startDrag(e, layer.id, "drag")}
           >
             <div
-              className={`relative inline-block border ${isActive ? "border-blue-500 bg-blue-50/30" : "border-transparent"} bg-transparent px-2 py-1 rounded`}
+              className={`relative border ${isActive ? "border-blue-500 bg-blue-50/30" : "border-transparent"} bg-transparent rounded`}
               style={{
-                fontFamily: layer.fontFamily,
-                fontSize: layer.fontSize,
-                color: layer.color,
                 willChange: "transform",
-                whiteSpace: "nowrap",
                 cursor: "move",
                 userSelect: "none",
+                width: `${boxWidthPx}px`,
+                height: `${boxHeightPx}px`,
               }}
             >
-              {layer.text || " "}
+              <div
+                className="absolute left-1/2 top-1/2 whitespace-nowrap"
+                style={{
+                  fontFamily: layer.fontFamily,
+                  fontSize: layer.fontSize,
+                  fontWeight: 700,
+                  color: layer.color,
+                  lineHeight: 1.2,
+                  transform: `translate(-50%, -50%) scale(${sx}, ${sy})`,
+                  transformOrigin: "center center",
+                }}
+              >
+                {layer.text || " "}
+              </div>
+
               {isActive && (
   <>
                 {/* X handles */}
@@ -2825,6 +3000,7 @@ function DesignOverlay({
         >
           {displayLayer.imageUrl && (
             <img
+              key={`${displayLayer.id}:${displayLayer.imageUrl || ""}`}
               src={normalizeImageUrl(displayLayer.imageUrl)}
               alt="design"
               style={{

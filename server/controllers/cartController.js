@@ -45,6 +45,55 @@ const parsePriceDetails = (value) => {
   return null;
 };
 
+const extractProductPreviewImage = (product) => {
+  if (!product) return null;
+
+  if (typeof product.thumbnail === "string" && product.thumbnail.trim()) {
+    return product.thumbnail;
+  }
+
+  const firstImage = product.images?.[0];
+  if (typeof firstImage === "string" && firstImage.trim()) {
+    return firstImage;
+  }
+  if (typeof firstImage?.url === "string" && firstImage.url.trim()) {
+    return firstImage.url;
+  }
+
+  return null;
+};
+
+const sanitizePreviewImage = (value) => {
+  if (typeof value !== "string") return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  // Avoid storing large inline data URLs in cart documents.
+  if (trimmed.startsWith("data:")) {
+    return null;
+  }
+
+  return trimmed;
+};
+
+const buildAddToCartLogContext = (body = {}, extra = {}) => ({
+  kind: body.kind || null,
+  qty: body.qty ?? 1,
+  size: body.size || null,
+  selectedSize: body.selectedSize || null,
+  designId: body.designId || body.design || null,
+  readymadeProductId: body.readymadeProductId || null,
+  dropproductId: body.dropproductId || null,
+  productId: body.productId || null,
+  hasUnitPrice: Number.isFinite(Number(body.unitPrice)),
+  hasBasePrice: Number.isFinite(Number(body.basePrice)),
+  hasPriceDetails: Boolean(body.priceDetails),
+  hasPreviewImage: Boolean(body.previewImage),
+  signature: body.signature || null,
+  ...extra,
+});
+
 const getReadymadeVariantSelection = (product, size) => {
   const normalizedSize = String(size || "").trim().toUpperCase();
   const hasVariants = Array.isArray(product?.variants) && product.variants.length > 0;
@@ -81,8 +130,12 @@ const getReadymadeVariantSelection = (product, size) => {
 };
 
 export const addToCart = async (req, res) => {
+  const userId = req.user?._id;
+  let requestContext = buildAddToCartLogContext(req.body, {
+    userId: userId ? String(userId) : null,
+  });
+
   try {
-    const userId = req.user?._id;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     const {
@@ -93,6 +146,16 @@ export const addToCart = async (req, res) => {
       designId,
       size,
     } = req.body;
+    const effectiveDesignId = designId || req.body.design;
+    const requestedSize = size || req.body.selectedSize;
+
+    requestContext = buildAddToCartLogContext(req.body, {
+      userId: String(userId),
+      designId: effectiveDesignId || null,
+      size: requestedSize || null,
+    });
+
+    console.info("[cart/add] Request received", requestContext);
 
     const requestedUnitPrice = parsePositiveNumber(req.body.unitPrice);
     const requestedBasePrice = parsePositiveNumber(req.body.basePrice);
@@ -107,7 +170,8 @@ export const addToCart = async (req, res) => {
       return res.status(400).json({ message: "kind must be READYMADE or DESIGN" });
     }
 
-    const normalizedSize = size && String(size).trim() ? String(size).trim() : "";
+    const normalizedSize =
+      requestedSize && String(requestedSize).trim() ? String(requestedSize).trim() : "";
 
     let signature = "";
     let itemToInsert = null;
@@ -180,7 +244,7 @@ export const addToCart = async (req, res) => {
         basePrice: selection.basePrice,
         priceDetails: sourceType === "READYMADE" ? selection.priceDetails : null,
         currency: product.currency || "INR",
-        previewImage: product.images?.[0]?.url || null,
+        previewImage: sanitizePreviewImage(extractProductPreviewImage(product)),
         signature,
       };
     }
@@ -189,11 +253,11 @@ export const addToCart = async (req, res) => {
     // DESIGN
     // =========================
     if (kind === "DESIGN") {
-      if (!designId || !isValidObjectId(designId)) {
+      if (!effectiveDesignId || !isValidObjectId(effectiveDesignId)) {
         return res.status(400).json({ message: "Valid designId is required" });
       }
 
-      const design = await Design.findById(designId).lean();
+      const design = await Design.findById(effectiveDesignId).lean();
       if (!design) return res.status(404).json({ message: "Design not found" });
 
       const fallbackUnitPrice = computeDesignUnitPrice(design);
@@ -228,7 +292,7 @@ export const addToCart = async (req, res) => {
         basePrice: finalDesignBasePrice,
         priceDetails: priceDetailsPayload,
         currency: "INR",
-        previewImage: design.previewImage || null,
+        previewImage: sanitizePreviewImage(design.previewImage),
         signature,
       };
     }
@@ -283,7 +347,7 @@ export const addToCart = async (req, res) => {
 
         cart.items[idx].currency = p.currency || cart.items[idx].currency;
         cart.items[idx].previewImage =
-  p.images?.[0]?.url || cart.items[idx].previewImage;
+          sanitizePreviewImage(extractProductPreviewImage(p)) || cart.items[idx].previewImage;
 
         if (isDropItem) {
           cart.items[idx].basePrice = cart.items[idx].unitPrice;
@@ -308,7 +372,11 @@ export const addToCart = async (req, res) => {
     await cart.save();
     return res.status(201).json({ message: "Added to cart", cart });
   } catch (err) {
-    console.error("addToCart error:", err);
+    console.error("[cart/add] Failed", {
+      ...requestContext,
+      errorMessage: err.message,
+      stack: err.stack,
+    });
     return res.status(500).json({ message: "Server error" });
   }
 };
@@ -485,7 +553,7 @@ export const updateCartItemQty = async (req, res) => {
         // refresh snapshot fields
         item.unitPrice = unitPrice;
         item.currency = p.currency || "INR";
-        item.previewImage = p.images?.[0]?.url || null;
+        item.previewImage = sanitizePreviewImage(extractProductPreviewImage(p));
 
         item.basePrice = selection.basePrice;
         item.priceDetails = selection.priceDetails;
@@ -525,7 +593,7 @@ export const updateCartItemQty = async (req, res) => {
 
         item.unitPrice = unitPrice;
         item.currency = p.currency || "INR";
-        item.previewImage = p.images?.[0]?.url || null;
+        item.previewImage = sanitizePreviewImage(extractProductPreviewImage(p));
 
         item.basePrice = unitPrice;
         item.priceDetails = null;
@@ -566,7 +634,7 @@ export const updateCartItemQty = async (req, res) => {
       }
 
       item.currency = "INR";
-      item.previewImage = d.previewImage || item.previewImage;
+      item.previewImage = sanitizePreviewImage(d.previewImage) || item.previewImage;
       item.product = d.product || item.product;
       item.size = cartSize;
     }

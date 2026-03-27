@@ -344,6 +344,18 @@ export default function UnifiedDashboard() {
     return item ? item.qty : 0;
   };
 
+  const getDefaultReadymadeSize = (item) => {
+    const variantSize =
+      item?.variants?.[0]?.size ||
+      item?.raw?.variants?.[0]?.size;
+
+    if (typeof variantSize === "string" && variantSize.trim()) {
+      return variantSize.trim().toUpperCase();
+    }
+
+    return "M";
+  };
+
   const handleAddToCart = async (item, type) => {
     if (!token) {
       alert("Please login to add items to cart");
@@ -380,7 +392,8 @@ export default function UnifiedDashboard() {
         cartData = {
           kind: "READYMADE",
           qty: 1,
-          readymadeProductId: item._id
+          readymadeProductId: item._id,
+          size: getDefaultReadymadeSize(item),
         };
 
         // Optimistic update
@@ -826,7 +839,7 @@ export default function UnifiedDashboard() {
             </div>
 
             {/* Items Grid - Unified Layout */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
               {filteredItems.map((item) => {
                 // Common props for all item types
                 const isDesign = activeTab === "designs";
@@ -852,7 +865,7 @@ export default function UnifiedDashboard() {
                 return (
                   <div
                     key={itemId}
-                    className="group bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl hover:border-indigo-100 transition-all duration-300 overflow-hidden hover:-translate-y-1"
+                    className="group bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl hover:border-indigo-100 transition-all duration-300 overflow-hidden hover:-translate-y-1"
                   >
                     <div className="relative">
                       {/* Kind/Badge */}
@@ -878,13 +891,13 @@ export default function UnifiedDashboard() {
                       )}
 
                       {/* Main Image */}
-                      <div className="relative h-64 bg-gradient-to-br from-gray-50 to-white overflow-hidden">
+                      <div className="relative h-44 sm:h-64 bg-white sm:bg-gradient-to-br sm:from-gray-50 sm:to-white overflow-hidden">
                         {isDesign ? (
                           item.previewImage ? (
                             <img
                               src={item.previewImage}
                               alt={item.title || item.productName}
-                              className="w-full h-full object-contain p-4 transition-transform duration-500 group-hover:scale-105"
+                              className="w-full h-full object-contain p-2 sm:p-4 transition-transform duration-500 group-hover:scale-105"
                             />
                           ) : (
                             <div className="flex items-center justify-center h-full">
@@ -981,7 +994,7 @@ export default function UnifiedDashboard() {
 
                       {/* Side Previews for Designs */}
                       {isDesign && item.views && item.views.some(v => v.previewImage) && (
-                        <div className="px-4 py-3 bg-gray-50/50 border-t border-gray-100">
+                        <div className="hidden sm:block px-4 py-3 bg-gray-50/50 border-t border-gray-100">
                           <p className="text-xs text-gray-500 font-medium mb-2">Views</p>
                           <div className="grid grid-cols-4 gap-2">
                             {item.views.slice(0, 4).map((v) =>
@@ -1000,7 +1013,7 @@ export default function UnifiedDashboard() {
                       )}
 
                       {/* Info */}
-                      <div className="p-5">
+                      <div className="p-3 sm:p-5">
                         <div className="mb-3">
                           <h2 className="font-bold text-gray-900 line-clamp-1 mb-1 group-hover:text-indigo-600 transition-colors">
                             {isDesign ? item.title || item.productName :

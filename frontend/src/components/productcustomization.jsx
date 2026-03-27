@@ -38,13 +38,13 @@ const IMAGE_FIXED_INCH = 4;
 const IMAGE_PRICE_SMALL = 40;   // <= 4x4
 const IMAGE_PRICE_LARGE = 100; 
 const SUPPORTED_DESIGN_MIME_TYPES = new Set([
-  "image/jpeg",
   "image/png",
-  "image/webp",
 ]);
-const SUPPORTED_DESIGN_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"]);
-const SUPPORTED_DESIGN_FORMATS_LABEL = "JPG, JPEG, PNG, and WEBP";
-const SUPPORTED_DESIGN_ACCEPT = ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp";
+const SUPPORTED_DESIGN_EXTENSIONS = new Set(["png"]);
+const SUPPORTED_DESIGN_FORMATS_LABEL = "PNG";
+const SUPPORTED_DESIGN_ACCEPT = ".png,image/png";
+const REMOVE_BG_RECOMMENDATION =
+  "Use PNG files only. PNG gives the most reliable remove-background result and cleaner edges.";
 
 
 
@@ -124,6 +124,25 @@ const getFileExtension = (name = "") => {
   return parts.length > 1 ? parts.pop() : "";
 };
 
+const getFilenameFromUrl = (url = "", fallback = "design.png") => {
+  try {
+    const parsed = new URL(url, window.location.origin);
+    const pathname = parsed.pathname || "";
+    const candidate = pathname.split("/").pop();
+    return candidate || fallback;
+  } catch {
+    const pathname = String(url || "").split("?")[0];
+    const candidate = pathname.split("/").pop();
+    return candidate || fallback;
+  }
+};
+
+const withCacheBust = (url = "") => {
+  if (!url) return url;
+  const joiner = url.includes("?") ? "&" : "?";
+  return `${url}${joiner}t=${Date.now()}`;
+};
+
 const isSupportedDesignSource = ({ name = "", type = "" } = {}) => {
   const normalizedType = String(type || "").toLowerCase();
   if (SUPPORTED_DESIGN_MIME_TYPES.has(normalizedType)) return true;
@@ -135,10 +154,17 @@ const createDefaultTextLayer = () => ({
   text: "YOUR TEXT",
   x: 0.5,
   y: 0.5,
-  fontSize: 42,
+  zone: "front-full",
+  fontSize: 120,
   color: "#000000",
   fontFamily: "Impact, sans-serif",
   rotation: 0,
+  scaleX: 1,
+  scaleY: 1,
+  initialTargetWidthInches: 11.6,
+  initialTargetHeightInches: 5.6,
+  initialBaseFontSize: 120,
+  initialTextSized: false,
 });
 
 const createDesignLayer = (id, imageUrl, file, width, height, isFromLibrary = false) => {
@@ -148,7 +174,7 @@ const createDesignLayer = (id, imageUrl, file, width, height, isFromLibrary = fa
   const printWidthInches = width / PRINT_DPI;
   const printHeightInches = height / PRINT_DPI;
 
-  const initialScale = 0.35;
+  const initialScale = 0.80;
 
   const initialWidthIn = printWidthInches * initialScale;
   const initialHeightIn = printHeightInches * initialScale;
@@ -160,6 +186,7 @@ const createDesignLayer = (id, imageUrl, file, width, height, isFromLibrary = fa
     id,
     imageUrl,
     file,
+    sourceFile: file,
     hasBgRemoved: false,
     x: 0.5,
     y: 0.5,
@@ -270,6 +297,7 @@ const getSizeBasePrice = (prod, size) => {
 
   const editorRef = useRef(null);
   const viewStatesRef = useRef({});
+  const removeBgRequestSeqRef = useRef(0);
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
@@ -1111,29 +1139,37 @@ const handleDesignUpload = async (e) => {
       return;
     }
 
+    let requestSeq = 0;
     try {
+      requestSeq = ++removeBgRequestSeqRef.current;
+      const targetViewCode = viewCode;
+      const targetDesignId = targetDesign.id;
       setBgRemovalLoading(true);
       setError("");
       console.log("Starting background removal for:", targetDesign.id);
       
-      let fileToUse = targetDesign.originalFile || targetDesign.file;
+      if (targetDesign.hasBgRemoved) {
+        setError("Background is already removed for this design");
+        setBgRemovalLoading(false);
+        return;
+      }
+
+      let fileToUse = targetDesign.sourceFile || targetDesign.originalFile || targetDesign.file;
       
       // If no file object exists (design came from library or was previously loaded without file), fetch it
       if (!fileToUse && targetDesign.imageUrl) {
         console.log("No file object found, fetching image from URL...");
         
         try {
-          // Fetch the image from the URL
-          const response = await fetch(targetDesign.imageUrl);
+          const response = await fetch(withCacheBust(targetDesign.imageUrl), {
+            cache: "no-store",
+          });
           if (!response.ok) {
             throw new Error(`Failed to fetch image: ${response.statusText}`);
           }
           
-          // Convert response to blob
           const blob = await response.blob();
-          
-          // Create a File object from the blob
-          const filename = targetDesign.imageUrl.split('/').pop() || 'design.png';
+          const filename = getFilenameFromUrl(targetDesign.imageUrl, "design.png");
           fileToUse = new File([blob], filename, { type: blob.type });
           console.log("Created file from image URL:", filename);
           
@@ -1181,6 +1217,10 @@ const handleDesignUpload = async (e) => {
       const data = await res.json();
       console.log("Response data:", data);
 
+      if (requestSeq !== removeBgRequestSeqRef.current) {
+        return;
+      }
+
       if (!data.outputUrl) {
         console.log("Output URL is missing in the response");
         throw new Error("Background removal failed: no output URL");
@@ -1190,14 +1230,16 @@ const handleDesignUpload = async (e) => {
         .replace(/\/$/, "")
         .replace(/\/api$/, "");
       const outputAssetUrl = `${assetBaseUrl}${data.outputUrl}`;
-      const outputPreviewUrl = `${outputAssetUrl}?t=${Date.now()}`;
+      const outputPreviewUrl = withCacheBust(outputAssetUrl);
       console.log("Constructed background removed image URL:", outputAssetUrl);
 
       let previewUrl = outputPreviewUrl;
       let processedFile = fileToUse;
 
       try {
-        const processedResponse = await fetch(outputAssetUrl, { cache: "no-store" });
+        const processedResponse = await fetch(outputPreviewUrl, {
+          cache: "no-store",
+        });
         if (!processedResponse.ok) {
           throw new Error(`Failed to fetch processed image: ${processedResponse.status}`);
         }
@@ -1209,9 +1251,12 @@ const handleDesignUpload = async (e) => {
         processedFile = new File([processedBlob], processedName, {
           type: processedBlob.type || "image/png",
         });
-        previewUrl = URL.createObjectURL(processedBlob);
       } catch (fetchProcessedErr) {
         console.warn("Falling back to direct processed image URL:", fetchProcessedErr);
+      }
+
+      if (requestSeq !== removeBgRequestSeqRef.current) {
+        return;
       }
 
       if (
@@ -1222,17 +1267,21 @@ const handleDesignUpload = async (e) => {
         URL.revokeObjectURL(targetDesign.imageUrl);
       }
 
+      const nextDesignId = `${targetDesign.id}-bg-${Date.now()}`;
+
       setViewStates((prev) => {
         const existing = prev[viewCode];
         const current = existing ? { ...baseViewState, ...existing } : baseViewState;
         const updatedLayers = (current.designLayers || []).map((layer) =>
-          layer.id === targetDesign.id
+          layer.id === targetDesignId
             ? {
                 ...layer,
+                id: nextDesignId,
                 imageUrl: previewUrl,
                 hasBgRemoved: true,
                 file: processedFile,
                 originalFile: processedFile,
+                sourceFile: layer.sourceFile || fileToUse,
                 isFromLibrary: false,
               }
             : layer
@@ -1242,10 +1291,10 @@ const handleDesignUpload = async (e) => {
 
         return {
           ...prev,
-          [viewCode]: {
+          [targetViewCode]: {
             ...current,
             designLayers: updatedLayers,
-            activeDesignId: targetDesign.id,
+            activeDesignId: nextDesignId,
           },
         };
       });
@@ -1257,25 +1306,45 @@ const handleDesignUpload = async (e) => {
       console.error("Remove BG error:", err);
       setError(err.message || "Background removal failed");
     } finally {
-      setBgRemovalLoading(false);
+      if (requestSeq === removeBgRequestSeqRef.current) {
+        setBgRemovalLoading(false);
+      }
       console.log("Background removal process completed");
     }
   };
 
   const clearActiveDesign = () => {
-    if (!activeDesign) return;
-    setError("");
+    const targetDesign = activeDesign || selectedOrLatestDesign;
+    if (!targetDesign) return;
 
-    if (activeDesign.imageUrl && activeDesign.imageUrl.startsWith("blob:")) {
-      URL.revokeObjectURL(activeDesign.imageUrl);
+    const targetViewCode = viewCode;
+    const targetDesignId = targetDesign.id;
+    setError("");
+    removeBgRequestSeqRef.current += 1;
+    setBgRemovalLoading(false);
+
+    if (targetDesign.imageUrl && targetDesign.imageUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(targetDesign.imageUrl);
     }
 
-    const remaining = designLayers.filter((d) => d.id !== activeDesign.id);
-    const newActiveId = remaining[0]?.id ?? null;
+    setViewStates((prev) => {
+      const existing = prev[targetViewCode];
+      const current = existing ? { ...baseViewState, ...existing } : baseViewState;
+      const remaining = (current.designLayers || []).filter((layer) => layer.id !== targetDesignId);
+      const nextActiveId = remaining.length
+        ? current.activeDesignId === targetDesignId
+          ? remaining[remaining.length - 1].id
+          : current.activeDesignId
+        : null;
 
-    updateCurrentViewState({
-      designLayers: remaining,
-      activeDesignId: newActiveId,
+      return {
+        ...prev,
+        [targetViewCode]: {
+          ...current,
+          designLayers: remaining,
+          activeDesignId: nextActiveId,
+        },
+      };
     });
 
     setDesignRenderWidth(null);
@@ -1436,7 +1505,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
     if (!token) {
       setSaveError("Please login to save your design.");
       setSaveSuccess(false);
-      return;
+      return null;
     }
 
     setSaving(true);
@@ -1638,12 +1707,17 @@ const nudgeDesignScaleAxis = (axis, delta) => {
 
         setSaveSuccess(true);
         alert(isEditMode ? "Design updated successfully!" : "Design saved successfully!");
+        return {
+          designId: newDesignId,
+          previewImage: mainPreview,
+        };
       // ✅ keep these after successful save
 
 
     } catch (err) {
       console.error("Save design error:", err);
       setSaveError(err.message || "Failed to save design");
+      return null;
     } finally {
       setSaving(false);
     }
@@ -1655,19 +1729,19 @@ const nudgeDesignScaleAxis = (axis, delta) => {
     return;
   }
 
+  let designIdToUse = savedDesignId;
+
   try {
     setAddingToCart(true);
     setError("");
 
     // If not saved yet, save first
-    let designIdToUse = savedDesignId;
-
     if (!designIdToUse) {
-      await handleSaveDesign();
+      const savedDesign = await handleSaveDesign();
 
       // handleSaveDesign sets savedDesignId; wait a tick for state
       await new Promise((r) => setTimeout(r, 0));
-      designIdToUse = savedDesignId || editDesignId;
+      designIdToUse = savedDesign?.designId || savedDesignId || editDesignId;
     }
 
     if (!designIdToUse) {
@@ -1680,6 +1754,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
       design: designIdToUse,
       productId: product?._id || product?.id,
       qty: 1,
+      size: selectedSize,
       selectedSize,
       productColor,
       productColorName,
@@ -1689,12 +1764,34 @@ const nudgeDesignScaleAxis = (axis, delta) => {
       signature: `${product?._id || product?.id}|${selectedSize}|${productColor}|${designIdToUse}`,
     };
 
-    await dispatch(addToCart(cartPayload)).unwrap();
+    console.info("[productcustomization] add to cart request", {
+      productId: product?._id || product?.id || null,
+      designId: designIdToUse,
+      selectedSize,
+      productColor,
+      price,
+      payload: cartPayload,
+    });
+
+    const addToCartResult = await dispatch(addToCart(cartPayload)).unwrap();
+
+    console.info("[productcustomization] add to cart success", {
+      designId: designIdToUse,
+      itemCount: addToCartResult?.cart?.items?.length ?? null,
+      message: addToCartResult?.message || null,
+    });
 
     // optional: go to cart page
     navigate("/cart");
   } catch (e) {
-    setError(e?.message || "Failed to add to cart");
+    console.error("[productcustomization] add to cart failed", {
+      productId: product?._id || product?.id || null,
+      designId: designIdToUse || null,
+      selectedSize,
+      productColor,
+      error: e,
+    });
+    setError(e?.message || e?.data?.message || "Failed to add to cart");
   } finally {
     setAddingToCart(false);
   }
@@ -2175,6 +2272,9 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                 <div>
                   <h3 className="mb-3 font-semibold text-sm">Upload Designs</h3>
                   <p className="mb-2 text-xs text-slate-600">Upload one or more images. They will be saved to the server automatically.</p>
+                  <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+                    {REMOVE_BG_RECOMMENDATION}
+                  </div>
 
                   <div className="mb-3 text-xs">
                     <input type="file" accept={SUPPORTED_DESIGN_ACCEPT} multiple onChange={handleDesignUpload} className="w-full text-xs border border-slate-300 rounded px-3 py-2" />
@@ -2222,8 +2322,21 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                         </div>
 
                         <div className="flex gap-2">
-                          <button type="button" onClick={handleRemoveBackground} disabled={bgRemovalLoading} className={`flex-1 rounded border px-2 py-1 text-xs font-medium ${bgRemovalLoading ? "border-slate-300 text-slate-400" : "border-sky-500 text-sky-700 hover:bg-sky-50"}`}>
-                            {bgRemovalLoading ? "Removing…" : "Remove BG"}
+                          <button
+                            type="button"
+                            onClick={handleRemoveBackground}
+                            disabled={bgRemovalLoading || activeDesign.hasBgRemoved}
+                            className={`flex-1 rounded border px-2 py-1 text-xs font-medium ${
+                              bgRemovalLoading || activeDesign.hasBgRemoved
+                                ? "border-slate-300 text-slate-400"
+                                : "border-sky-500 text-sky-700 hover:bg-sky-50"
+                            }`}
+                          >
+                            {bgRemovalLoading
+                              ? "Removing…"
+                              : activeDesign.hasBgRemoved
+                                ? "BG Removed"
+                                : "Remove BG"}
                           </button>
                           <button type="button" onClick={clearActiveDesign} className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">
                             Clear
@@ -2388,8 +2501,9 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                       <div className="hidden text-xs text-slate-600 space-y-1 sm:block">
                         <p>• Click on a design in the editor to select it</p>
                         <p>• Drag to reposition, or use the resize handle</p>
-                          <p>• Click "Remove BG" for transparent background</p>
-                          <p>• Remove BG supports only {SUPPORTED_DESIGN_FORMATS_LABEL}</p>
+                        <p>• Click "Remove BG" for transparent background</p>
+                        <p>• Best result: use PNG artwork with a plain background</p>
+                        <p>• Supported formats: {SUPPORTED_DESIGN_FORMATS_LABEL}</p>
                       </div>
                     </>
                   )}
@@ -2606,6 +2720,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                       className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs"
                     />
                     <p className="mt-2 text-[11px] text-slate-500">Uploaded files go straight into your editable design layers.</p>
+                    <p className="mt-1 text-[11px] text-amber-700">{REMOVE_BG_RECOMMENDATION}</p>
                     <p className="mt-1 text-[11px] text-slate-500">Supported formats: {SUPPORTED_DESIGN_FORMATS_LABEL}.</p>
                     </div>
 

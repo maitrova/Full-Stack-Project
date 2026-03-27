@@ -76,6 +76,8 @@ export default function ProductDetailPage() {
   const [activeTab, setActiveTab] = useState('specifications');
   const [sizeError, setSizeError] = useState('');
   const [showLoginPrompt, setShowLoginPrompt] = useState(false); // New state for login prompt
+  const [relatedProducts, setRelatedProducts] = useState([]);
+  const [relatedLoading, setRelatedLoading] = useState(false);
 
   // Redux state
   const token = useSelector(selectCurrentToken);
@@ -144,6 +146,113 @@ export default function ProductDetailPage() {
       setSizeError('');
     }
   }, [product, isReadymade]);
+
+  useEffect(() => {
+    if (!isReadymade || !itemData?._id) {
+      setRelatedProducts([]);
+      setRelatedLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const normalizeMatchValue = (value) =>
+      String(value || "")
+        .trim()
+        .toLowerCase();
+
+    const loadPublicProducts = async (params) => {
+      const query = new URLSearchParams();
+
+      Object.entries(params).forEach(([key, value]) => {
+        if (value) {
+          query.append(key, value);
+        }
+      });
+
+      const response = await fetch(`${API_URL}/readymadeproducts/public?${query.toString()}`, {
+        signal: controller.signal,
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.message || 'Failed to load related products');
+      }
+
+      if (Array.isArray(data?.data)) return data.data;
+      if (Array.isArray(data?.products)) return data.products;
+      return [];
+    };
+
+    const fetchRelatedProducts = async () => {
+      setRelatedLoading(true);
+
+      try {
+        const currentId = String(itemData._id);
+        const currentCategory = normalizeMatchValue(itemData.category);
+        const currentSubCategory = normalizeMatchValue(itemData.subCategory);
+        const currentPrice = Number(itemData.effectivePrice ?? itemData.price ?? 0);
+
+        const publicProducts = await loadPublicProducts({ limit: 48 });
+        const rankedProducts = publicProducts
+          .filter((relatedItem) => String(relatedItem._id) !== currentId)
+          .map((relatedItem) => {
+            const relatedCategory = normalizeMatchValue(relatedItem.category);
+            const relatedSubCategory = normalizeMatchValue(relatedItem.subCategory);
+            const relatedPrice = Number(
+              relatedItem.effectivePrice ?? relatedItem.price ?? 0
+            );
+
+            let score = 0;
+
+            if (currentCategory && relatedCategory === currentCategory) {
+              score += 3;
+            }
+
+            if (currentSubCategory && relatedSubCategory === currentSubCategory) {
+              score += 5;
+            }
+
+            if (currentPrice > 0 && relatedPrice > 0) {
+              const priceGap = Math.abs(relatedPrice - currentPrice) / currentPrice;
+
+              if (priceGap <= 0.15) score += 2;
+              else if (priceGap <= 0.3) score += 1;
+            }
+
+            if (relatedItem.bestSeller) score += 1;
+            if (relatedItem.newArrival) score += 1;
+
+            return { ...relatedItem, _relatedScore: score };
+          })
+          .sort((a, b) => {
+            if (b._relatedScore !== a._relatedScore) {
+              return b._relatedScore - a._relatedScore;
+            }
+
+            return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+          })
+          .slice(0, 4);
+
+        setRelatedProducts(rankedProducts);
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Failed to load related products:', err);
+          setRelatedProducts([]);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setRelatedLoading(false);
+        }
+      }
+    };
+
+    fetchRelatedProducts();
+
+    return () => {
+      controller.abort();
+    };
+  }, [isReadymade, itemData?._id, itemData?.category, itemData?.subCategory]);
 
   // Handle notifications
   useEffect(() => {
@@ -563,6 +672,7 @@ export default function ProductDetailPage() {
     sizes: "100vw",
   });
   const sizeChartUrl = sizeChartImageProps.src;
+  const shouldShowRelatedProducts = isReadymade && (relatedLoading || relatedProducts.length > 0);
   
   if (loading) {
     return (
@@ -1587,6 +1697,98 @@ export default function ProductDetailPage() {
           )}
         </div>
       </div>
+      {shouldShowRelatedProducts && (
+        <section className="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6 lg:px-8">
+          <div className="mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">You may also like</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Similar picks{displayData?.category ? ` in ${displayData.category}` : ''}. Swipe to explore.
+              </p>
+            </div>
+          </div>
+
+          {relatedLoading ? (
+            <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-3 sm:gap-4">
+              {[...Array(4)].map((_, index) => (
+                <div
+                  key={index}
+                  className="w-[10rem] flex-none overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm sm:w-[11rem]"
+                >
+                  <div className="aspect-square animate-pulse bg-gray-100" />
+                  <div className="space-y-2 p-3">
+                    <div className="h-3 animate-pulse rounded bg-gray-100" />
+                    <div className="h-3 w-1/2 animate-pulse rounded bg-gray-100" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-3 sm:gap-4">
+              {relatedProducts.map((relatedItem) => {
+                const relatedImage = Array.isArray(relatedItem.images)
+                  ? relatedItem.images.find((image) => Boolean(getRawImagePath(image)))
+                  : null;
+                const relatedImageProps = getResponsiveImageProps(relatedImage, {
+                  sizes: "(max-width: 640px) 160px, 176px",
+                  loading: "lazy",
+                });
+                const relatedPrice = Number(
+                  relatedItem.effectivePrice ?? relatedItem.price ?? 0
+                );
+                const relatedOriginalPrice = Number(
+                  relatedItem.mrp ?? relatedItem.price ?? relatedPrice
+                );
+                const showRelatedDiscount =
+                  relatedOriginalPrice > relatedPrice && relatedPrice > 0;
+
+                return (
+                  <Link
+                    key={relatedItem._id}
+                    to={`/readymade/${relatedItem._id}`}
+                    className="group w-[10rem] flex-none snap-start overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg sm:w-[11rem]"
+                  >
+                    <div className="relative aspect-square overflow-hidden bg-gray-50">
+                      {showRelatedDiscount && (
+                        <span className="absolute left-2 top-2 z-10 rounded-full bg-emerald-600 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                          {Math.round(((relatedOriginalPrice - relatedPrice) / relatedOriginalPrice) * 100)}% off
+                        </span>
+                      )}
+                      <img
+                        src={relatedImageProps.src || buildImageUrl(relatedImage)}
+                        srcSet={relatedImageProps.srcSet}
+                        sizes={relatedImageProps.sizes}
+                        alt={relatedItem.title}
+                        loading="lazy"
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 p-2.5">
+                      <div className="line-clamp-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-indigo-600">
+                        {relatedItem.category || 'Readymade'}
+                      </div>
+                      <h3 className="line-clamp-1 min-h-[1.25rem] text-sm font-medium leading-5 text-gray-900">
+                        {relatedItem.title}
+                      </h3>
+                      <div className="flex items-center gap-1">
+                        <span className="text-sm font-semibold text-gray-900">
+                          {formatPrice(relatedPrice, relatedItem.currency || 'INR')}
+                        </span>
+                        {showRelatedDiscount && (
+                          <span className="text-[11px] text-gray-400 line-through">
+                            {formatPrice(relatedOriginalPrice, relatedItem.currency || 'INR')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
       <Footer/>
     </div>
   );

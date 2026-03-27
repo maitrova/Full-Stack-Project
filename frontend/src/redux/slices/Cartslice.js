@@ -25,13 +25,127 @@ const getPersistedToken = () => {
 
 const getAuthToken = (state) => selectCurrentToken(state) || getPersistedToken();
 
+const CART_ADD_DEBUG_PREFIX = "[cart/addToCart]";
+
+const isFormDataPayload = (value) =>
+  typeof FormData !== "undefined" && value instanceof FormData;
+
+const truncateValue = (value, maxLength = 300) => {
+  if (typeof value !== "string") return value;
+  return value.length > maxLength
+    ? `${value.slice(0, maxLength)}...<truncated>`
+    : value;
+};
+
+const summarizePayloadValue = (value) => {
+  if (typeof File !== "undefined" && value instanceof File) {
+    return {
+      type: "file",
+      name: value.name,
+      size: value.size,
+      mimeType: value.type,
+    };
+  }
+
+  if (typeof Blob !== "undefined" && value instanceof Blob) {
+    return {
+      type: "blob",
+      size: value.size,
+      mimeType: value.type,
+    };
+  }
+
+  if (typeof value === "string") {
+    return truncateValue(value);
+  }
+
+  if (value && typeof value === "object") {
+    const summary = {};
+    Object.entries(value).forEach(([key, nestedValue]) => {
+      summary[key] = summarizePayloadValue(nestedValue);
+    });
+    return summary;
+  }
+
+  return value;
+};
+
+const summarizeCartPayload = (cartData) => {
+  if (isFormDataPayload(cartData)) {
+    const entries = {};
+    cartData.forEach((value, key) => {
+      entries[key] = summarizePayloadValue(value);
+    });
+
+    return {
+      type: "FormData",
+      entries,
+    };
+  }
+
+  if (cartData && typeof cartData === "object") {
+    return summarizePayloadValue(cartData);
+  }
+
+  return cartData;
+};
+
+const extractErrorMessage = (data) => {
+  if (!data) return null;
+  if (typeof data === "string") return data;
+  if (typeof data.message === "string" && data.message.trim()) return data.message;
+  if (typeof data.error === "string" && data.error.trim()) return data.error;
+
+  if (Array.isArray(data.errors) && data.errors.length > 0) {
+    return data.errors
+      .map((entry) => entry?.message || entry?.msg || entry)
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  return null;
+};
+
+const buildCartErrorPayload = (error) => {
+  let errorMessage = "Failed to add item to cart";
+  let statusCode = 500;
+
+  if (error.response) {
+    statusCode = error.response.status;
+    errorMessage = extractErrorMessage(error.response.data) || errorMessage;
+
+    if (statusCode === 401) {
+      errorMessage = "Please login again";
+    }
+  } else if (error.request) {
+    errorMessage = "No response from server. Please check your connection.";
+  } else {
+    errorMessage = error.message || errorMessage;
+  }
+
+  return {
+    message: errorMessage,
+    status: statusCode,
+    code: error.code || null,
+    data: error.response?.data || null,
+    request: error.config
+      ? {
+          baseURL: error.config.baseURL || null,
+          url: error.config.url || null,
+          method: error.config.method || null,
+          timeout: error.config.timeout || null,
+        }
+      : null,
+  };
+};
+
 // Create axios instance with common config
 const createApi = () => {
   const api = axios.create({
     baseURL: `${import.meta.env.VITE_API_URL}`,
     timeout: 10000,
     headers: {
-      "Content-Type": "application/json",
+      Accept: "application/json",
     },
   });
   
@@ -55,38 +169,35 @@ export const addToCart = createAsyncThunk(
       }
       
       const api = createApi();
+      const requestDebug = {
+        baseURL: api.defaults.baseURL || null,
+        endpoint: "/cart/add",
+        hasToken: Boolean(token),
+        payload: summarizeCartPayload(cartData),
+      };
+
+      console.info(CART_ADD_DEBUG_PREFIX, "Request", requestDebug);
       
       const response = await api.post("/cart/add", cartData, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
+      console.info(CART_ADD_DEBUG_PREFIX, "Success", {
+        status: response.status,
+        message: response.data?.message || null,
+        itemCount: response.data?.cart?.items?.length ?? null,
+      });
       
       return response.data;
     } catch (error) {
-      // Handle different error scenarios
-      let errorMessage = "Failed to add item to cart";
-      let statusCode = 500;
-      
-      if (error.response) {
-        // Server responded with error
-        statusCode = error.response.status;
-        errorMessage = error.response.data?.message || errorMessage;
-        
-        // Handle authentication errors
-        if (statusCode === 401) {
-          errorMessage = "Please login again";
-        }
-      } else if (error.request) {
-        // Request was made but no response
-        errorMessage = "No response from server. Please check your connection.";
-      } else {
-        // Other errors
-        errorMessage = error.message || errorMessage;
-      }
-      
-      return rejectWithValue({
-        message: errorMessage,
-        status: statusCode,
+      const errorPayload = buildCartErrorPayload(error);
+
+      console.error(CART_ADD_DEBUG_PREFIX, "Failed", {
+        ...errorPayload,
+        payload: summarizeCartPayload(cartData),
       });
+
+      return rejectWithValue(errorPayload);
     }
   }
 );

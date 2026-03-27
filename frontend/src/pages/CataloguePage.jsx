@@ -539,7 +539,7 @@ export default function CataloguePage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
               {filteredDesigns.map((d) => {
                 const inCart = isDesignInCart(d._id);
                 const quantity = getCartQuantityForDesign(d._id);
@@ -550,7 +550,7 @@ export default function CataloguePage() {
                 return (
                   <div 
                     key={d._id}
-                    className="group bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl hover:border-indigo-100 transition-all duration-300 overflow-hidden hover:-translate-y-1"
+                    className="group bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl hover:border-indigo-100 transition-all duration-300 overflow-hidden hover:-translate-y-1"
                   >
                     <div className="relative">
                       {/* Kind Badge */}
@@ -577,13 +577,13 @@ export default function CataloguePage() {
                       )}
                       
                       {/* Main Preview */}
-                      <div className="relative h-64 bg-gradient-to-br from-gray-50 to-white overflow-hidden">
+                      <div className="relative h-44 sm:h-64 bg-white sm:bg-gradient-to-br sm:from-gray-50 sm:to-white overflow-hidden">
                         {d.previewImage ? (
                           <>
                             <img
                               src={d.previewImage}
                               alt={d.title || d.productName}
-                              className="w-full h-full object-contain p-4 transition-transform duration-500 group-hover:scale-105"
+                              className="w-full h-full object-contain p-2 sm:p-4 transition-transform duration-500 group-hover:scale-105"
                               onError={(e) => {
                                 e.target.style.display = 'none';
                                 e.target.parentElement.innerHTML = `
@@ -671,7 +671,7 @@ export default function CataloguePage() {
 
                       {/* Side Previews */}
                       {d.views && d.views.some(v => v.previewImage) && (
-                        <div className="px-4 py-3 bg-gray-50/50 border-t border-gray-100">
+                        <div className="hidden sm:block px-4 py-3 bg-gray-50/50 border-t border-gray-100">
                           <p className="text-xs text-gray-500 font-medium mb-2">Views</p>
                           <div className="grid grid-cols-4 gap-2">
                             {d.views.slice(0, 4).map((v) =>
@@ -690,7 +690,7 @@ export default function CataloguePage() {
                       )}
 
                       {/* Info */}
-                      <div className="p-5">
+                      <div className="p-3 sm:p-5">
                         <Link to={`/catalogue/${d._id}`} className="block">
                           <div className="mb-3">
                             <h2 className="font-bold text-gray-900 line-clamp-1 mb-1 group-hover:text-indigo-600 transition-colors">

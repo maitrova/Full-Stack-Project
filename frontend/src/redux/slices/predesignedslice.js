@@ -7,7 +7,7 @@ export const fetchReadymadeProducts = createAsyncThunk(
   'readymade/fetchProducts',
   async () => {
     const response = await axios.get(`${import.meta.env.VITE_API_URL}/readymadeproducts`);
-    return response.data.products;
+    return response.data.data;
   }
 );
 
@@ -15,8 +15,8 @@ export const fetchReadymadeProductById = createAsyncThunk(
   'readymade/fetchProductById',
   async (productId) => {
     const response = await axios.get(`${import.meta.env.VITE_API_URL}/readymadeproducts/${productId}`);
-    console.log("Fetched Product:", response.data.product);
-    return response.data.product;
+    console.log("Fetched Product:", response.data.data);
+    return response.data.data;
   }
 );
 
