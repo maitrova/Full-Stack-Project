@@ -2087,48 +2087,41 @@ const nudgeDesignScaleAxis = (axis, delta) => {
       </header>
 
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-2 py-2 backdrop-blur sm:hidden">
-        <div className="flex flex-col gap-2">
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveTab(TABS.VIEWS)}
-              className={`flex h-11 items-center justify-center rounded-[16px] border text-sm font-semibold transition ${
-                activeTab === TABS.VIEWS
-                  ? "border-sky-600 bg-sky-600 text-white"
-                  : "border-slate-200 bg-white text-slate-700"
-              }`}
-            >
-              Views
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab(TABS.DESIGNS)}
-              className={`rounded-[16px] px-4 py-2 text-[12px] font-semibold transition ${
-                activeTab === TABS.DESIGNS
-                  ? "bg-sky-600 text-white"
-                  : "border border-slate-200 bg-white text-slate-700"
-              }`}
-            >
-              Designs
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab(TABS.DESIGN_LIBRARY)}
-              className={`rounded-[16px] px-4 py-2 text-[12px] font-semibold transition ${
-                activeTab === TABS.DESIGN_LIBRARY
-                  ? "bg-sky-600 text-white"
-                  : "border border-slate-200 bg-white text-slate-700"
-              }`}
-            >
-              Library
-            </button>
+        <div className="rounded-[20px] border border-slate-200 bg-white px-3 py-2 shadow-sm">
+          <div className="grid grid-cols-5 gap-1 border-b border-slate-100 pb-2">
+            {MOBILE_TOOL_TABS.map((item) => {
+              const isActive = activeTab === item.key;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setActiveTab(item.key)}
+                  className={`rounded-[14px] px-2 py-2 text-[10px] font-semibold transition ${
+                    isActive
+                      ? "bg-sky-600 text-white shadow-sm"
+                      : "border border-slate-200 bg-white text-slate-600"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
           </div>
 
-          <div className={`grid gap-2 ${canAddSavedDesignToCart ? "grid-cols-3" : "grid-cols-2"}`}>
+          <div className="mt-2 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Live price</div>
+              <div className="text-lg font-bold text-emerald-700">Rs.{price.toFixed(2)}</div>
+              <div className="truncate text-[11px] text-slate-500">
+                {productColorName} / {customizableViews.find((v) => v.code === viewCode)?.label || "Front view"} / {selectedSize || "Default"}
+              </div>
+            </div>
+
+          <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
               onClick={() => setShowMobilePriceDetails((value) => !value)}
-              className={`rounded-[16px] border px-3 py-2 text-left transition ${
+              className={`rounded-full border px-3 py-1.5 text-left transition ${
                 showMobilePriceDetails
                   ? "border-emerald-600 bg-emerald-50 text-emerald-700"
                   : "border-slate-200 bg-white text-slate-700"
@@ -2141,20 +2134,21 @@ const nudgeDesignScaleAxis = (axis, delta) => {
               type="button"
               onClick={handleSaveDesign}
               disabled={saving || addingToCart}
-              className="rounded-[16px] border border-slate-200 bg-white px-4 py-2 text-[12px] font-semibold text-slate-700 disabled:opacity-50"
+              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 disabled:opacity-50"
             >
-              {saving ? "Saving..." : isEditMode ? "Update Design" : "Save Design"}
+              {saving ? "Saving..." : isEditMode ? "Update" : "Save"}
             </button>
             {canAddSavedDesignToCart && (
               <button
                 type="button"
                 onClick={handleSaveAndAddToCart}
                 disabled={saving || addingToCart}
-                className="rounded-[16px] bg-sky-600 px-4 py-2 text-[12px] font-semibold text-white disabled:opacity-50"
+                className="rounded-full bg-sky-600 px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50"
               >
-                {addingToCart ? "Adding..." : "Add to Cart"}
+                {addingToCart ? "Adding..." : "Cart"}
               </button>
             )}
+          </div>
           </div>
         </div>
       </header>
@@ -2225,7 +2219,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
             </div>
           </div>
           {/* Left sidebar - Controls */}
-          <aside className="order-2 flex h-[min(24vh,220px)] w-full flex-col gap-4 overflow-hidden rounded-[22px] border border-slate-200 bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.08)] min-h-0 sm:h-auto sm:rounded-2xl sm:p-4 sm:shadow-sm lg:order-1 lg:w-auto lg:gap-6">
+          <aside className="order-1 flex w-full flex-col gap-4 overflow-hidden rounded-[22px] border border-slate-200 bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.08)] min-h-[220px] max-h-[42vh] sm:h-auto sm:max-h-none sm:rounded-2xl sm:p-4 sm:shadow-sm lg:order-1 lg:w-auto lg:gap-6">
           {/* Edit mode indicator */}
           {isEditMode && (
             <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2">
@@ -2926,7 +2920,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
         )}
 
         {/* Center workspace */}
-        <main className="order-1 flex min-h-0 flex-1 flex-col overflow-visible sm:overflow-auto lg:order-2">
+        <main className="order-2 flex min-h-0 flex-1 flex-col overflow-visible sm:overflow-auto lg:order-2">
           <div className="flex-1 min-h-0 p-0">
             <div className="mx-auto flex h-auto min-h-[52vh] flex-col overflow-visible rounded-[28px] border border-slate-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.08)] sm:h-full sm:min-h-0 sm:overflow-hidden sm:rounded-[28px]">
               <div className="hidden border-b border-slate-200 bg-white px-3 py-3 sm:block sm:px-5">
@@ -3139,7 +3133,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
       </div>
       </div>
 
-      <nav className="grid shrink-0 grid-cols-5 gap-1 border-t border-slate-900/90 bg-slate-950 px-2 py-2 shadow-[0_-14px_30px_rgba(15,23,42,0.28)] sm:hidden">
+      <nav className="hidden">
         {MOBILE_TOOL_TABS.map((item) => {
           const isActive = activeTab === item.key;
           return (
