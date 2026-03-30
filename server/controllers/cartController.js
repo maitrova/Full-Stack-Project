@@ -160,7 +160,8 @@ const findActiveCartWithDetails = (userId) =>
 
 const enrichCartItems = (items = []) =>
   items.map((it) => {
-    let updatedItem = { ...it };
+    const updatedItem = { ...it };
+    const sourceProduct = it.readymadeProduct || it.dropproduct || null;
 
     if (it.readymadeProduct) {
       updatedItem.readymadeProduct = {
@@ -169,37 +170,24 @@ const enrichCartItems = (items = []) =>
         subCategory: it.readymadeProduct.subCategory?.name || it.readymadeProduct.subCategory,
         brand: it.readymadeProduct.brand?.name || it.readymadeProduct.brand,
       };
-
-      if (!Array.isArray(it.readymadeProduct.variants) || it.readymadeProduct.variants.length === 0) {
-        const pricing = getReadymadePricing(it.readymadeProduct);
-        updatedItem.unitPrice = Number(pricing.effectivePrice || updatedItem.unitPrice || 0);
-        updatedItem.basePrice = Number(
-          pricing.mrp || updatedItem.basePrice || updatedItem.unitPrice || 0
-        );
-        updatedItem.priceDetails = {
-          ...(updatedItem.priceDetails || {}),
-          ...pricing,
-        };
-      }
     }
 
-    if (it.kind === "READYMADE" && it.readymadeProduct?.variants) {
-      const variant = it.readymadeProduct.variants.find(
-        (entry) =>
-          String(entry.size).toUpperCase() === String(it.size || "M").toUpperCase()
-      );
+    if (it.dropproduct) {
+      updatedItem.dropproduct = attachReadymadePricing({ ...it.dropproduct });
+    }
 
-      updatedItem.activeVariant = variant || null;
-      if (updatedItem.activeVariant) {
-        updatedItem.unitPrice = Number(
-          updatedItem.activeVariant.effectivePrice || updatedItem.unitPrice || 0
-        );
+    if (it.kind === "READYMADE" && sourceProduct) {
+      const selection = getReadymadeVariantSelection(sourceProduct, it.size || "M");
+
+      if (selection) {
+        updatedItem.activeVariant = selection.variant || null;
+        updatedItem.unitPrice = Number(selection.unitPrice || updatedItem.unitPrice || 0);
         updatedItem.basePrice = Number(
-          updatedItem.activeVariant.mrp || updatedItem.basePrice || updatedItem.unitPrice || 0
+          selection.basePrice || updatedItem.basePrice || updatedItem.unitPrice || 0
         );
         updatedItem.priceDetails = {
           ...(updatedItem.priceDetails || {}),
-          ...getReadymadePricing(it.readymadeProduct, { variant }),
+          ...(selection.priceDetails || {}),
         };
       }
     }
@@ -330,7 +318,7 @@ export const addToCart = async (req, res) => {
         size: finalSize,
         unitPrice,
         basePrice: selection.basePrice,
-        priceDetails: sourceType === "READYMADE" ? selection.priceDetails : null,
+        priceDetails: selection.priceDetails,
         currency: product.currency || "INR",
         previewImage: sanitizePreviewImage(extractProductPreviewImage(product)),
         signature,
@@ -405,42 +393,28 @@ export const addToCart = async (req, res) => {
           return res.status(404).json({ message: "Product not found or inactive" });
         }
 
-        const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
-        const selection = !isDropItem
-          ? getReadymadeVariantSelection(p, String(cart.items[idx].size || "").trim())
-          : null;
+        const selection = getReadymadeVariantSelection(
+          p,
+          String(cart.items[idx].size || "").trim()
+        );
+        if (!selection) {
+          return res.status(400).json({ message: "Selected size is not available" });
+        }
 
-        let availableStock = isDropItem
-          ? Number(p.stock || 0)
-          : Number(selection?.availableStock || 0);
+        const availableStock = Number(selection.availableStock || 0);
 
         if (availableStock < nextQty) {
           return res.status(400).json({ message: "Not enough stock" });
         }
 
         // refresh snapshot price as well
-        if (!isDropItem && selection) {
-          cart.items[idx].unitPrice = Number(selection.unitPrice || cart.items[idx].unitPrice);
-          cart.items[idx].basePrice = Number(selection.basePrice || cart.items[idx].basePrice);
-          cart.items[idx].priceDetails = selection.priceDetails;
-        } else if (hasVariants) {
-          const cartSize = String(cart.items[idx].size || "").trim();
-          const variant = p.variants.find(
-            (v) => String(v.size).toUpperCase() === cartSize.toUpperCase()
-          );
-          if (variant) cart.items[idx].unitPrice = Number(variant.price || cart.items[idx].unitPrice);
-        } else {
-          cart.items[idx].unitPrice = Number(p.price || cart.items[idx].unitPrice);
-        }
+        cart.items[idx].unitPrice = Number(selection.unitPrice || cart.items[idx].unitPrice);
+        cart.items[idx].basePrice = Number(selection.basePrice || cart.items[idx].basePrice);
+        cart.items[idx].priceDetails = selection.priceDetails;
 
         cart.items[idx].currency = p.currency || cart.items[idx].currency;
         cart.items[idx].previewImage =
           sanitizePreviewImage(extractProductPreviewImage(p)) || cart.items[idx].previewImage;
-
-        if (isDropItem) {
-          cart.items[idx].basePrice = cart.items[idx].unitPrice;
-          cart.items[idx].priceDetails = null;
-        }
       }
 
       cart.items[idx].qty = nextQty;

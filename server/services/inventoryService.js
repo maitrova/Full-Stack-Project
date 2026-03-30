@@ -8,7 +8,8 @@ const buildInventoryAdjustments = (order) => {
   const adjustments = new Map();
 
   for (const item of order?.items || []) {
-    if (item?.kind !== "READYMADE") continue;
+    const itemKind = String(item?.kind || "").trim().toUpperCase();
+    if (!["READYMADE", "DROPPRODUCT"].includes(itemKind)) continue;
 
     const qty = Number(item.qty || 0);
     if (!Number.isFinite(qty) || qty <= 0) continue;

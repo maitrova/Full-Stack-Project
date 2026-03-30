@@ -105,7 +105,7 @@ const MOBILE_TOOL_TABS = [
   { key: TABS.DESIGN_LIBRARY, label: "Library" },
 ];
 
-const COLOR_OPTIONS = [
+const DEFAULT_COLOR_OPTIONS = [
   { value: "#FFFFFF", label: "White" },
   { value: "#000000", label: "Black" },
   { value: "#FF6B6B", label: "Coral" },
@@ -120,15 +120,17 @@ const COLOR_OPTIONS = [
   { value: "#FF9F43", label: "Orange" },
 ];
 
-const COLOR_NAME_MAP = COLOR_OPTIONS.reduce((acc, option) => {
-  acc[option.value.toLowerCase()] = option.label;
-  return acc;
-}, {});
+const buildColorNameMap = (colorOptions = []) =>
+  colorOptions.reduce((acc, option) => {
+    acc[String(option?.value || "").toLowerCase()] = option?.label;
+    return acc;
+  }, {});
 
-const getColorLabel = (colorValue) => {
+const getColorLabel = (colorValue, colorOptions = DEFAULT_COLOR_OPTIONS) => {
   if (!colorValue) return "Custom Color";
+  const colorNameMap = buildColorNameMap(colorOptions);
   const normalized = colorValue.trim().toLowerCase();
-  const label = COLOR_NAME_MAP[normalized];
+  const label = colorNameMap[normalized];
   return label ? label : `Custom (${colorValue.toUpperCase()})`;
 };
 
@@ -182,6 +184,9 @@ const isSupportedDesignSource = ({ name = "", type = "" } = {}) => {
   if (SUPPORTED_DESIGN_MIME_TYPES.has(normalizedType)) return true;
   return SUPPORTED_DESIGN_EXTENSIONS.has(getFileExtension(name));
 };
+
+const shouldBypassRemoveBgFormatValidation = (designLayer) =>
+  Boolean(designLayer?.isFromLibrary);
 
 const createDefaultTextLayer = () => ({
   id: "text-" + Date.now() + "-" + Math.random().toString(36).slice(2),
@@ -307,9 +312,12 @@ const getSizeBasePrice = (prod, size) => {
   const [lastSavedPreview, setLastSavedPreview] = useState(null);
   const [addingToCart, setAddingToCart] = useState(false);
 
-  const defaultColorValue = COLOR_OPTIONS[0]?.value || "#FFFFFF";
-  
-  const defaultColorLabel = getColorLabel(defaultColorValue);
+  const productColorOptions =
+    Array.isArray(product?.colors) && product.colors.length > 0
+      ? product.colors
+      : DEFAULT_COLOR_OPTIONS;
+  const defaultColorValue = productColorOptions[0]?.value || "#FFFFFF";
+  const defaultColorLabel = getColorLabel(defaultColorValue, productColorOptions);
   const [productColor, setProductColor] = useState(defaultColorValue);
   const [productColorName, setProductColorName] = useState(defaultColorLabel);
   const [viewStates, setViewStates] = useState({});
@@ -334,8 +342,13 @@ const getSizeBasePrice = (prod, size) => {
   
 
 // ✅ Available sizes (prefer from DB)
-  const availableSizes = (product?.sizePricing?.length ? product.sizePricing : [])
-  .map((x) => x.size);
+  const availableSizePricing = Array.isArray(product?.sizePricing) ? product.sizePricing : [];
+  const inStockSizePricing = availableSizePricing.filter(
+    (entry) => entry?.stock === undefined || Number(entry.stock) > 0
+  );
+  const availableSizes = (inStockSizePricing.length > 0 ? inStockSizePricing : availableSizePricing).map(
+    (x) => x.size
+  );
   // Edit mode state
   const editDesignId = searchParams.get("edit");
   const [isEditMode, setIsEditMode] = useState(false);
@@ -388,8 +401,32 @@ const getSizeBasePrice = (prod, size) => {
 
   const handleColorChange = (color, label = null) => {
     setProductColor(color);
-    setProductColorName(label || getColorLabel(color));
+    setProductColorName(label || getColorLabel(color, productColorOptions));
   };
+
+  useEffect(() => {
+    const matchedColor = productColorOptions.find(
+      (option) => String(option?.value || "").toLowerCase() === String(productColor || "").toLowerCase()
+    );
+
+    if (matchedColor) {
+      const nextLabel = matchedColor.label || getColorLabel(matchedColor.value, productColorOptions);
+      if (productColorName !== nextLabel) {
+        setProductColorName(nextLabel);
+      }
+      return;
+    }
+
+    if (isEditMode && originalDesign?.productColor) {
+      return;
+    }
+
+    const fallbackColor = productColorOptions[0];
+    if (fallbackColor) {
+      setProductColor(fallbackColor.value);
+      setProductColorName(fallbackColor.label || getColorLabel(fallbackColor.value, productColorOptions));
+    }
+  }, [isEditMode, originalDesign, productColor, productColorName, productColorOptions]);
 
   const getImageSizeFromFile = (file) =>
   new Promise((resolve, reject) => {
@@ -840,7 +877,9 @@ setPriceBreakdown((prev) => ({
 
         const resolvedColor = design.productColor || defaultColorValue;
         setProductColor(resolvedColor);
-        setProductColorName(design.productColorName || getColorLabel(resolvedColor));
+        setProductColorName(
+          design.productColorName || getColorLabel(resolvedColor, productColorOptions)
+        );
 
         const loadedViewStates = {};
         design.views?.forEach((view) => {
@@ -951,7 +990,11 @@ setPriceBreakdown((prev) => ({
   // ✅ If editing and the design already has a saved size, DO NOT override it
   if (isEditMode && originalDesign?.selectedSize) return;
 
-  const sizes = (product.sizePricing || []).map((x) => x.size);
+  const sizeRows = Array.isArray(product.sizePricing) ? product.sizePricing : [];
+  const sizesInStock = sizeRows
+    .filter((entry) => entry?.stock === undefined || Number(entry.stock) > 0)
+    .map((entry) => entry.size);
+  const sizes = sizesInStock.length > 0 ? sizesInStock : sizeRows.map((entry) => entry.size);
   if (sizes.length === 0) return;
 
   // keep existing selection if valid
@@ -1141,11 +1184,6 @@ const handleDesignUpload = async (e) => {
     const handleSelectFromLibrary = async (image) => {
       try {
         setError("");
-
-        if (!isSupportedDesignSource({ name: image.filename })) {
-          setError(`Only ${SUPPORTED_DESIGN_FORMATS_LABEL} files are allowed for background removal.`);
-          return;
-        }
         
         // Construct full URL for the image from design library
         const imageUrl = `${IMAGE_URL}/outputs/adminuploadeddesigns/${currentFolder}/${image.filename}`;
@@ -1159,9 +1197,6 @@ const handleDesignUpload = async (e) => {
         
         const blob = await response.blob();
         const file = new File([blob], image.filename, { type: blob.type });
-        if (!isSupportedDesignSource(file)) {
-          throw new Error(`Only ${SUPPORTED_DESIGN_FORMATS_LABEL} files are allowed for background removal`);
-        }
         console.log("Created file object from library image:", image.filename);
       
       const id = `design-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -1260,14 +1295,15 @@ const handleDesignUpload = async (e) => {
         return;
       }
 
-      if (
-        !isSupportedDesignSource(fileToUse) &&
-        !isSupportedDesignSource({ name: targetDesign.imageUrl?.split("/").pop() || "" })
-      ) {
-        setError(`Remove BG supports only ${SUPPORTED_DESIGN_FORMATS_LABEL} files`);
-        setBgRemovalLoading(false);
-        return;
-      }
+        if (
+          !shouldBypassRemoveBgFormatValidation(targetDesign) &&
+          !isSupportedDesignSource(fileToUse) &&
+          !isSupportedDesignSource({ name: targetDesign.imageUrl?.split("/").pop() || "" })
+        ) {
+          setError(`Remove BG supports only ${SUPPORTED_DESIGN_FORMATS_LABEL} files`);
+          setBgRemovalLoading(false);
+          return;
+        }
 
       console.log("Preparing FormData with image");
       const formData = new FormData();
@@ -1910,7 +1946,9 @@ const nudgeDesignScaleAxis = (axis, delta) => {
     setViewStates(restoredViewStates);
     const resolvedColor = originalDesign.productColor || defaultColorValue;
     setProductColor(resolvedColor);
-    setProductColorName(originalDesign.productColorName || getColorLabel(resolvedColor));
+    setProductColorName(
+      originalDesign.productColorName || getColorLabel(resolvedColor, productColorOptions)
+    );
     calculatePrice();
     alert("Design reset to original!");
   };
@@ -1956,7 +1994,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
   const canAddSavedDesignToCart = Boolean(savedDesignId || editDesignId);
 
   return (
-    <div className="flex h-[100dvh] min-h-[100dvh] flex-col overflow-hidden bg-gradient-to-b from-slate-100 via-white to-slate-100 text-slate-900 sm:min-h-screen sm:h-auto sm:overflow-visible">
+    <div className="flex min-h-[100dvh] flex-col overflow-x-hidden bg-gradient-to-b from-slate-100 via-white to-slate-100 text-slate-900 sm:min-h-screen sm:overflow-visible">
       {/* Top bar */}
       <header className="sticky top-0 z-20 hidden flex-col gap-3 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:flex sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:gap-4">
@@ -2122,8 +2160,8 @@ const nudgeDesignScaleAxis = (axis, delta) => {
       </header>
 
       {/* Main area */}
-      <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-hidden px-2 pb-2 pt-2 sm:gap-6 sm:overflow-visible sm:px-6 sm:pb-6 sm:pt-3">
-        <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-hidden lg:grid lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)_minmax(0,320px)] lg:items-start lg:gap-6 lg:overflow-visible">
+      <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-x-hidden px-2 pb-2 pt-2 sm:gap-6 sm:overflow-visible sm:px-6 sm:pb-6 sm:pt-3">
+        <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-x-hidden lg:grid lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)_minmax(0,320px)] lg:items-start lg:gap-6 lg:overflow-visible">
           {/* Mobile helper card */}
           <div className="hidden">
             <div className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 text-[11px] text-slate-600 shadow-sm">
@@ -2249,17 +2287,6 @@ const nudgeDesignScaleAxis = (axis, delta) => {
               >
                 <div>
                   <h3 className="mb-3 font-semibold text-sm">Product Colors</h3>
-                  <div className="mb-4">
-                    <label className="mb-2 block text-xs font-medium">Current Color</label>
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded border border-slate-300" style={{ backgroundColor: productColor }} />
-                      <input type="color" className="h-10 w-full cursor-pointer" value={productColor} onChange={(e) => handleColorChange(e.target.value)} />
-                    </div>
-                    <p className="text-[11px] text-slate-500 mt-2 flex items-center gap-2">
-                      <span>{productColorName}</span>
-                      <span className="font-mono text-[10px] text-slate-400">{productColor?.toUpperCase()}</span>
-                    </p>
-                  </div>
 
                  
                   {/* ✅ Size Selection */}
@@ -2271,22 +2298,33 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                         <label className="mb-2 block text-xs font-medium">Select Size</label>
 
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                          {availableSizes.map((size) => {
+                          {(inStockSizePricing.length > 0 ? inStockSizePricing : availableSizePricing).map((sizeEntry) => {
+                            const size = sizeEntry.size;
                             const isActive = selectedSize === size;
                             const sizePrice = getSizeBasePrice(product, size);
+                            const stock = Number(sizeEntry?.stock ?? 0);
+                            const isOutOfStock = sizeEntry?.stock !== undefined && stock <= 0;
 
                             return (
                               <button
                                 key={size}
                                 type="button"
                                 onClick={() => setSelectedSize(size)}
+                                disabled={isOutOfStock}
                                 className={`rounded border px-2 py-2 text-xs font-semibold transition ${
                                   isActive
                                     ? "border-sky-500 bg-sky-50 text-sky-700"
                                     : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                                }`}
+                                } ${isOutOfStock ? "cursor-not-allowed opacity-50" : ""}`}
                               >
                                 <div>{size}</div>
+                                <div className="text-[10px] font-normal text-slate-400">
+                                  {sizeEntry?.stock === undefined
+                                    ? "Stock not set"
+                                    : isOutOfStock
+                                      ? "Out of stock"
+                                      : `${stock} in stock`}
+                                </div>
                                 <div className="text-[10px] font-normal text-slate-500">₹{sizePrice}</div>
                               </button>
                             );
@@ -2309,7 +2347,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                   <div className="mb-2">
                     <label className="mb-2 block text-xs font-medium">Quick Select</label>
                     <div className="grid grid-cols-5 gap-2 sm:grid-cols-6">
-                      {COLOR_OPTIONS.map((option) => {
+                      {productColorOptions.map((option) => {
                         const currentColorKey = productColor?.toLowerCase() || "";
                         const isActive = option.value.toLowerCase() === currentColorKey;
                         return (
@@ -2888,9 +2926,9 @@ const nudgeDesignScaleAxis = (axis, delta) => {
         )}
 
         {/* Center workspace */}
-        <main className="order-1 flex min-h-0 flex-1 flex-col overflow-hidden sm:overflow-auto lg:order-2">
+        <main className="order-1 flex min-h-0 flex-1 flex-col overflow-visible sm:overflow-auto lg:order-2">
           <div className="flex-1 min-h-0 p-0">
-            <div className="mx-auto flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.08)] sm:rounded-[28px]">
+            <div className="mx-auto flex h-auto min-h-[52vh] flex-col overflow-visible rounded-[28px] border border-slate-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.08)] sm:h-full sm:min-h-0 sm:overflow-hidden sm:rounded-[28px]">
               <div className="hidden border-b border-slate-200 bg-white px-3 py-3 sm:block sm:px-5">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
@@ -2924,7 +2962,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                   )}
                 </div>
               </div>
-              <div className="mx-auto flex min-h-0 flex-1 w-full items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(14,116,214,0.05),_transparent_45%),linear-gradient(180deg,_#f8fafc_0%,_#ffffff_100%)] p-1 sm:max-w-6xl sm:p-5 lg:p-6">
+              <div className="mx-auto flex min-h-[44vh] flex-1 w-full items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(14,116,214,0.05),_transparent_45%),linear-gradient(180deg,_#f8fafc_0%,_#ffffff_100%)] p-2 sm:min-h-0 sm:max-w-6xl sm:p-5 lg:p-6">
                 <div className="mx-auto w-full max-w-[960px]">
                 {mockupUrl && maskUrl ? (
                   <RecolorEditor

@@ -83,6 +83,7 @@ import DropproductAdmin from '../components/dropproducts.jsx';
 import AdminOrders from '../components/admin/ordersmanagement.jsx';
 // Import HomepageAdmin
 import HomepageAdmin from '../pages/setHomepage.jsx';
+import ProductPricingManager from './productpricingmanager.jsx';
 // Import ProductSearch
 import ProductSearch from '../components/searchproductdetail.jsx';
 // Import Admin Designs component
@@ -608,7 +609,7 @@ const AdminDashboard = () => {
     { id: 'coupons', label: 'Coupon Management', icon: <DollarSign className="w-5 h-5" /> },
     { id: 'newArrival', label: 'New Arrivals', icon: <TrendingUp className="w-5 h-5" /> },
     { id: 'bestSeller', label: 'Best Sellers', icon: <BarChart3 className="w-5 h-5" /> },
-    { id: 'prices', label: 'Prices', icon: <DollarSign className="w-5 h-5" /> },
+    { id: 'prices', label: 'Price Management', icon: <DollarSign className="w-5 h-5" /> },
     { id: 'users', label: 'Users', icon: <Users className="w-5 h-5" /> },
     { id: 'analytics', label: 'Analytics', icon: <BarChart3 className="w-5 h-5" /> },
     { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
@@ -1118,6 +1119,10 @@ const AdminDashboard = () => {
 
           {activeSidebarItem === 'coupons' && (
             <CouponManagement />
+          )}
+
+          {activeSidebarItem === 'prices' && (
+            <ProductPricingManager />
           )}
 
           {/* Search and Filters for Products */}
@@ -1691,7 +1696,8 @@ const AdminDashboard = () => {
      activeSidebarItem !== 'search' && 
      activeSidebarItem !== 'adminDesigns' &&
      activeSidebarItem !== 'adminUploads' &&
-     activeSidebarItem !== 'coupons' ? (            /* View Mode for Products (excluding dropproducts, orders, homepage, search, and adminDesigns) */
+     activeSidebarItem !== 'coupons' &&
+     activeSidebarItem !== 'prices' ? (            /* View Mode for Products (excluding dropproducts, orders, homepage, search, and adminDesigns) */
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
               {productsLoading ? (
                 <div className="flex justify-center items-center h-64">

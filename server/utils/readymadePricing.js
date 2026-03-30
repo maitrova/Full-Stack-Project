@@ -10,8 +10,24 @@ const normalizeDate = (value) => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
+const getBaseProductMrp = (product, variant = null) => {
+  const directPrice = roundCurrency(product?.price || 0);
+  if (directPrice > 0) return directPrice;
+
+  const minVariantPrice = roundCurrency(product?.minPrice || 0);
+  if (minVariantPrice > 0) return minVariantPrice;
+
+  const variantPrice = roundCurrency(variant?.price || 0);
+  if (variantPrice > 0) return variantPrice;
+
+  const firstVariantPrice = roundCurrency(product?.variants?.[0]?.price || 0);
+  if (firstVariantPrice > 0) return firstVariantPrice;
+
+  return 0;
+};
+
 export const isReadymadeOfferActive = (product, now = new Date()) => {
-  const mrp = Number(product?.price || 0);
+  const mrp = getBaseProductMrp(product);
   const salePrice = Number(product?.salePrice || 0);
 
   if (!(mrp > 0) || !(salePrice > 0) || !(salePrice < mrp)) {
@@ -31,8 +47,9 @@ export const getReadymadePricing = (product, options = {}) => {
   const now = options.now || new Date();
   const variant = options.variant || null;
 
-  const productMrp = roundCurrency(product?.price || 0);
-  const variantMrp = roundCurrency(variant?.price ?? productMrp);
+  const productMrp = getBaseProductMrp(product, variant);
+  const variantPrice = roundCurrency(variant?.price || 0);
+  const variantMrp = variantPrice > 0 ? variantPrice : productMrp;
   const saleActive = isReadymadeOfferActive(product, now);
 
   let effectivePrice = variantMrp;

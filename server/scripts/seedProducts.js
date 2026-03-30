@@ -8,6 +8,18 @@ import connectDB from "../config/db.js";
 connectDB();
 
 async function run() {
+  const defaultColors = [
+    { value: "#FFFFFF", label: "White" },
+    { value: "#000000", label: "Black" },
+    { value: "#1D4ED8", label: "Royal Blue" },
+    { value: "#DC2626", label: "Red" },
+    { value: "#16A34A", label: "Green" },
+    { value: "#F59E0B", label: "Mustard" },
+  ];
+
+  const buildSizePricing = (entries) =>
+    entries.map(({ size, price, stock = 100 }) => ({ size, price, stock }));
+
   const products = [
     {
       name: "Hoodie",
@@ -17,13 +29,14 @@ async function run() {
       basePrice: 999,
 
       // ✅ size-based pricing
-      sizePricing: [
-        { size: "S", price: 899 },
-        { size: "M", price: 899 },
-        { size: "L", price: 899 },
-        { size: "XL", price: 899 },
-        { size: "XXL", price: 899 },
-      ],
+      colors: defaultColors,
+      sizePricing: buildSizePricing([
+        { size: "S", price: 899, stock: 60 },
+        { size: "M", price: 899, stock: 75 },
+        { size: "L", price: 899, stock: 75 },
+        { size: "XL", price: 899, stock: 50 },
+        { size: "XXL", price: 899, stock: 35 },
+      ]),
 
       views: [
         { code: "front", label: "Front", mockupUrl: "/mockups/hoodie/front.png", maskUrl: "/masks/hoodie/front_mask.png" },
@@ -40,13 +53,14 @@ async function run() {
       subCategory: "outerwear",
       basePrice: 899,
 
-      sizePricing: [
-        { size: "S", price: 799 },
-        { size: "M", price: 799 },
-        { size: "L", price: 799 },
-        { size: "XL", price: 799 },
-        { size: "XXL", price: 799 },
-      ],
+      colors: defaultColors,
+      sizePricing: buildSizePricing([
+        { size: "S", price: 799, stock: 65 },
+        { size: "M", price: 799, stock: 80 },
+        { size: "L", price: 799, stock: 80 },
+        { size: "XL", price: 799, stock: 50 },
+        { size: "XXL", price: 799, stock: 30 },
+      ]),
 
       views: [
         { code: "front", label: "Front", mockupUrl: "/mockups/sweatshirt/front.png", maskUrl: "/masks/sweatshirt/front_mask.png" },
@@ -61,13 +75,14 @@ async function run() {
       subCategory: "casual",
       basePrice: 799,
 
-      sizePricing: [
-        { size: "S", price: 699 },
-        { size: "M", price: 699 },
-        { size: "L", price: 699 },
-        { size: "XL", price: 699 },
-        { size: "XXL", price: 699 },
-      ],
+      colors: defaultColors,
+      sizePricing: buildSizePricing([
+        { size: "S", price: 699, stock: 70 },
+        { size: "M", price: 699, stock: 90 },
+        { size: "L", price: 699, stock: 90 },
+        { size: "XL", price: 699, stock: 55 },
+        { size: "XXL", price: 699, stock: 35 },
+      ]),
 
       views: [
         { code: "front", label: "Front", mockupUrl: "/mockups/oversized-comfort-tee/front.png", maskUrl: "/masks/oversized-comfort-tee/front_mask.png" },
@@ -82,13 +97,14 @@ async function run() {
       subCategory: "formal",
       basePrice: 899,
 
-      sizePricing: [
-        { size: "S", price: 699 },
-        { size: "M", price: 699 },
-        { size: "L", price: 699 },
-        { size: "XL", price: 699 },
-        { size: "XXL", price: 699 },
-      ],
+      colors: defaultColors,
+      sizePricing: buildSizePricing([
+        { size: "S", price: 699, stock: 45 },
+        { size: "M", price: 699, stock: 60 },
+        { size: "L", price: 699, stock: 60 },
+        { size: "XL", price: 699, stock: 40 },
+        { size: "XXL", price: 699, stock: 20 },
+      ]),
 
       views: [
         { code: "front", label: "Front", mockupUrl: "/mockups/premium-polo/front.png", maskUrl: "/masks/premium-polo/front_mask.png" },
@@ -103,13 +119,14 @@ async function run() {
       subCategory: "casual",
       basePrice: 699,
 
-      sizePricing: [
-        { size: "S", price: 499 },
-        { size: "M", price: 499 },
-        { size: "L", price: 499 },
-        { size: "XL", price: 499 },
-        { size: "XXL", price: 499 },
-      ],
+      colors: defaultColors,
+      sizePricing: buildSizePricing([
+        { size: "S", price: 499, stock: 80 },
+        { size: "M", price: 499, stock: 100 },
+        { size: "L", price: 499, stock: 100 },
+        { size: "XL", price: 499, stock: 70 },
+        { size: "XXL", price: 499, stock: 40 },
+      ]),
 
       views: [
         { code: "front", label: "Front", mockupUrl: "/mockups/classic-round-tee/front.png", maskUrl: "/masks/classic-round-tee/front_mask.png" },
@@ -124,13 +141,14 @@ async function run() {
       subCategory: "casual",
       basePrice: 749,
 
-      sizePricing: [
-        { size: "XS", price: 349 },
-        { size: "S", price: 349 },
-        { size: "M", price: 349 },
-        { size: "L", price: 349 },
-        { size: "XL", price: 349 },
-      ],
+      colors: defaultColors,
+      sizePricing: buildSizePricing([
+        { size: "XS", price: 349, stock: 30 },
+        { size: "S", price: 349, stock: 45 },
+        { size: "M", price: 349, stock: 45 },
+        { size: "L", price: 349, stock: 35 },
+        { size: "XL", price: 349, stock: 20 },
+      ]),
 
       views: [
         { code: "front", label: "Front", mockupUrl: "/mockups/womens-crop-top/front.png", maskUrl: "/masks/womens-crop-top/front_mask.png" },
@@ -145,13 +163,14 @@ async function run() {
       subCategory: "casual",
       basePrice: 749,
 
-      sizePricing: [
-        { size: "XS", price: 499 },
-        { size: "S", price: 499 },
-        { size: "M", price: 499 },
-        { size: "L", price: 499 },
-        { size: "XL", price: 499 },
-      ],
+      colors: defaultColors,
+      sizePricing: buildSizePricing([
+        { size: "XS", price: 499, stock: 35 },
+        { size: "S", price: 499, stock: 50 },
+        { size: "M", price: 499, stock: 50 },
+        { size: "L", price: 499, stock: 40 },
+        { size: "XL", price: 499, stock: 25 },
+      ]),
 
       views: [
         { code: "front", label: "Front", mockupUrl: "/mockups/womens-round-tee/front.png", maskUrl: "/masks/womens-round-tee/front_mask.png" },

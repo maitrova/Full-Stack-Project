@@ -432,10 +432,9 @@ const calculateCartSummary = (cart) => {
     return sum + (item.unitPrice || 0) * (item.qty || 0);
   }, 0);
 
-  // You can add your own shipping and tax calculation logic here
-  const shipping = subtotal > 500 ? 0 : 50; // Free shipping above 500
-  const tax = subtotal * 0.18; // 18% GST
-  const total = subtotal + shipping + tax;
+  const shipping = 0;
+  const tax = 0;
+  const total = subtotal;
 
   return {
     totalItems: cart.items.reduce((sum, item) => sum + (item.qty || 0), 0),

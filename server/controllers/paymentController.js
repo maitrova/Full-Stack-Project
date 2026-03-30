@@ -18,22 +18,76 @@ const toPaise = (rupees) => Math.round(Number(rupees) * 100);
 const getRefId = (value) => value?._id || value || null;
 
 const refreshCartItemPricing = (item) => {
-  if (item.kind !== "READYMADE" || !item.readymadeProduct) {
+  if (item.kind !== "READYMADE") {
     return item;
   }
 
+  const sourceProduct = item.dropproduct || item.readymadeProduct;
+  if (!sourceProduct) return item;
+
   const selectedSize = String(item.size || "").trim().toUpperCase();
-  const variant = Array.isArray(item.readymadeProduct.variants)
-    ? item.readymadeProduct.variants.find(
+  const variant = Array.isArray(sourceProduct.variants)
+    ? sourceProduct.variants.find(
         (entry) => String(entry.size).toUpperCase() === selectedSize
       )
     : null;
-  const pricing = getReadymadePricing(item.readymadeProduct, { variant });
+  const pricing = getReadymadePricing(sourceProduct, { variant });
 
   item.unitPrice = pricing.effectivePrice;
   item.basePrice = pricing.mrp;
   item.priceDetails = pricing;
   return item;
+};
+
+const getItemTitle = (item) =>
+  item?.dropproduct?.name ||
+  item?.readymadeProduct?.title ||
+  item?.readymadeProduct?.name ||
+  item?.design?.name ||
+  "Item";
+
+const validateCartInventory = (cart) => {
+  for (const item of cart?.items || []) {
+    if (item?.kind !== "READYMADE") continue;
+
+    const sourceProduct = item.dropproduct || item.readymadeProduct;
+    if (!sourceProduct) {
+      const error = new Error(`${getItemTitle(item)} is no longer available`);
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const selectedSize = String(item.size || "").trim().toUpperCase();
+    const qty = Number(item.qty || 0);
+    const variants = Array.isArray(sourceProduct.variants) ? sourceProduct.variants : [];
+
+    if (variants.length > 0) {
+      const variant = variants.find(
+        (entry) => String(entry.size || "").trim().toUpperCase() === selectedSize
+      );
+
+      if (!variant) {
+        const error = new Error(`${getItemTitle(item)} size ${selectedSize || "selected"} is unavailable`);
+        error.statusCode = 400;
+        throw error;
+      }
+
+      if (Number(variant.stock || 0) < qty) {
+        const error = new Error(`${getItemTitle(item)} is out of stock for size ${selectedSize}`);
+        error.statusCode = 409;
+        throw error;
+      }
+
+      continue;
+    }
+
+    const stock = Number(sourceProduct.stock ?? sourceProduct.totalStock ?? 0);
+    if (stock < qty) {
+      const error = new Error(`${getItemTitle(item)} is out of stock`);
+      error.statusCode = 409;
+      throw error;
+    }
+  }
 };
 
 export const createRazorpayOrderFromCart = async (req, res) => {
@@ -60,6 +114,7 @@ export const createRazorpayOrderFromCart = async (req, res) => {
     }
 
     cart.items = cart.items.map((item) => refreshCartItemPricing(item));
+    validateCartInventory(cart);
 
     const delivery = await Address.findOne({ user: userId, type: "delivery" });
     const billing = await Address.findOne({ user: userId, type: "billing" });

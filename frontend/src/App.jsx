@@ -217,6 +217,14 @@ function App() {
           </MainLayout>
         } />
 
+        <Route path="/adminpage/price-management" element={
+          <MainLayout>
+            <AdminRoute>
+              <ProductPricingManager />
+            </AdminRoute>
+          </MainLayout>
+        } />
+
         
 
         <Route path="/usersaved_designs" element={
@@ -317,7 +325,9 @@ function App() {
 
         <Route path="/price" element={
           <MainLayout>
-            <ProductPricingManager />
+            <AdminRoute>
+              <ProductPricingManager />
+            </AdminRoute>
           </MainLayout>
         } />
 

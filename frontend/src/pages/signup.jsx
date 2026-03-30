@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FiUser, FiPhone, FiMail, FiLock } from "react-icons/fi";
+import { FiUser, FiPhone, FiMail, FiLock, FiEye, FiEyeOff } from "react-icons/fi";
 import { useDispatch, useSelector } from "react-redux";
 import { registerUser, googleLogin } from "../redux/slices/Userslice.js";
 import { GoogleLogin } from "@react-oauth/google";
@@ -11,11 +11,15 @@ const SignupPage = () => {
     phone: "",
     email: "",
     password: "",
+    confirmPassword: "",
     role: "user",
   });
   
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsError, setTermsError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -31,6 +35,9 @@ const SignupPage = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    if (name === "password" || name === "confirmPassword") {
+      setPasswordError("");
+    }
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -48,8 +55,14 @@ const SignupPage = () => {
       setTermsError("Please accept the terms and conditions to continue");
       return;
     }
+
+    if (formData.password !== formData.confirmPassword) {
+      setPasswordError("Passwords do not match");
+      return;
+    }
     
     setTermsError("");
+    setPasswordError("");
     dispatch(registerUser(formData));
   };
 
@@ -93,6 +106,12 @@ const SignupPage = () => {
           {termsError && (
             <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">
               {termsError}
+            </div>
+          )}
+
+          {passwordError && (
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">
+              {passwordError}
             </div>
           )}
 
@@ -149,8 +168,9 @@ const SignupPage = () => {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
+                  required
                   className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-violet-600"
-                  placeholder="Enter email (optional)"
+                  placeholder="Enter email"
                 />
               </div>
             </div>
@@ -163,15 +183,51 @@ const SignupPage = () => {
               <div className="relative">
                 <FiLock className="absolute left-3 top-3.5 text-gray-400" />
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
                   required
                   minLength={6}
-                  className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-violet-600"
+                  className="w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-violet-600"
                   placeholder="Create password"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((value) => !value)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-violet-600 transition"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <FiEyeOff className="h-5 w-5" /> : <FiEye className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Confirm Password */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Confirm Password
+              </label>
+              <div className="relative">
+                <FiLock className="absolute left-3 top-3.5 text-gray-400" />
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  name="confirmPassword"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  required
+                  minLength={6}
+                  className="w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-violet-600"
+                  placeholder="Confirm password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((value) => !value)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-violet-600 transition"
+                  aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                >
+                  {showConfirmPassword ? <FiEyeOff className="h-5 w-5" /> : <FiEye className="h-5 w-5" />}
+                </button>
               </div>
             </div>
 
@@ -182,12 +238,13 @@ const SignupPage = () => {
                 id="terms"
                 checked={termsAccepted}
                 onChange={handleTermsChange}
+                required
                 className="mt-1 h-4 w-4 text-violet-600 focus:ring-violet-500 border-gray-300 rounded"
               />
               <label htmlFor="terms" className="text-sm text-gray-600">
                 I accept the{" "}
                 <Link 
-                  to="/company/terms-and-conditions" 
+                  to="/terms-and-conditions" 
                   className="text-violet-600 hover:text-violet-800 font-medium"
                   target="_blank"
                   rel="noopener noreferrer"

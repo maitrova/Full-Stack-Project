@@ -163,13 +163,22 @@ const LoginPage = () => {
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
-                  <FiPhone className="text-gray-400" />
+                  {String(formData.identifier || "").includes("@") ? (
+                    <FiMail className="text-gray-400" />
+                  ) : (
+                    <FiPhone className="text-gray-400" />
+                  )}
                 </div>
                 <input
-                  type="tel"
+                  type="text"
                   name="identifier"
                   value={formData.identifier}
                   onChange={handleChange}
+                  inputMode="email"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   placeholder="Enter phone or email"
                   required

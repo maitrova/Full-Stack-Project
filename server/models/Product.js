@@ -13,6 +13,27 @@ const sizePricingSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    stock: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+  },
+  { _id: false }
+);
+
+const productColorSchema = new mongoose.Schema(
+  {
+    label: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    value: {
+      type: String,
+      required: true,
+      trim: true,
+    },
   },
   { _id: false }
 );
@@ -40,6 +61,24 @@ const productSchema = new mongoose.Schema(
     subCategory: { type: String, default: "" },
 
     views: { type: [productViewSchema], default: [] },
+
+    colors: {
+      type: [productColorSchema],
+      default: [
+        { value: "#FFFFFF", label: "White" },
+        { value: "#000000", label: "Black" },
+        { value: "#FF6B6B", label: "Coral" },
+        { value: "#4ECDC4", label: "Mint" },
+        { value: "#45B7D1", label: "Sky" },
+        { value: "#96CEB4", label: "Seafoam" },
+        { value: "#FECA57", label: "Sunshine" },
+        { value: "#FF9FF3", label: "Pink" },
+        { value: "#54A0FF", label: "Azure" },
+        { value: "#5F27CD", label: "Violet" },
+        { value: "#00D2D3", label: "Teal" },
+        { value: "#FF9F43", label: "Orange" },
+      ],
+    },
 
     /* 🔥 Size-based pricing */
     sizePricing: {

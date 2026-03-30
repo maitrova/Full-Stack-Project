@@ -72,7 +72,7 @@ const cartSchema = new mongoose.Schema(
 // ✅ Only ONE ACTIVE cart per user, but multiple ORDERED carts allowed
 cartSchema.index(
   { user: 1, status: 1 },
-  { unique: true, partialFilterExpression: { status: "ACTIVE" } }
+  { partialFilterExpression: { status: "ACTIVE" } }
 );
 
 export const Cart = mongoose.model("Cart", cartSchema);

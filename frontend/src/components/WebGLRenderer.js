@@ -16,7 +16,7 @@ export class WebGLRenderer {
       this.canvas.style.width = "auto";
       this.canvas.style.height = "auto";
       this.canvas.style.maxWidth = "100%";
-      this.canvas.style.maxHeight = "min(68vh, 620px)";
+      this.canvas.style.maxHeight = "min(74svh, 700px)";
       container.appendChild(this.canvas);
 
       this.gl = this.canvas.getContext("webgl", { preserveDrawingBuffer: true });

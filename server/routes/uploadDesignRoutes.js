@@ -4,6 +4,10 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import {
+  optimizeUploadedImage,
+  normalizeStoredPath,
+} from "../utils/imageOptimization.js";
 
 const designsrouters = express.Router();
 
@@ -46,19 +50,28 @@ const upload = multer({
   }
 });
 
-designsrouters.post("/upload-design", upload.single("designImage"), (req, res) => {
+designsrouters.post("/upload-design", upload.single("designImage"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    // this will be served by app.use("/outputs", ...)
-    const relativeUrl = `/outputs/designs/${req.file.filename}`;
+    const optimized = await optimizeUploadedImage(
+      normalizeStoredPath(req.file.path),
+      {
+        outputDir: "outputs/designs",
+        baseName: path.basename(req.file.filename, path.extname(req.file.filename)),
+        cleanupSource: true,
+      }
+    );
+
+    const relativeUrl = `/${String(optimized.url || "").replace(/^\/+/, "")}`;
 
     return res.status(200).json({
       message: "Design image uploaded successfully",
       imageUrl: relativeUrl,
-      filename: req.file.filename
+      filename: path.basename(relativeUrl),
+      variants: optimized.variants,
     });
   } catch (error) {
     console.error("Upload design error:", error);

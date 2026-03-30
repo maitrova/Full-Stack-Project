@@ -410,7 +410,7 @@ const CartPage = () => {
                 Browse Products
               </Link>
               <Link
-                to="/designs"
+                to="/customproducts"
                 className="px-6 py-3 border-2 border-blue-600 text-blue-600 rounded-lg font-medium hover:bg-blue-50 transition duration-200 w-full sm:w-auto text-center"
               >
                 Explore Designs
@@ -733,7 +733,7 @@ const CartPage = () => {
                                 </div>
                                 <button
                                   onClick={() => handleQuantityChange(item._id, item.qty + 1)}
-                                  disabled={isUpdating}
+                                  disabled={isUpdating || (typeof maxStock === 'number' && item.qty >= maxStock)}
                                   className="w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center border border-gray-300 rounded-r-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
                                 >
                                   <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -826,18 +826,6 @@ const OrderSummaryContent = ({
         <span className="text-sm sm:text-base font-medium">{formatPrice(cartSummary.subtotal, 'INR')}</span>
       </div>
       
-      <div className="flex justify-between">
-        <span className="text-sm sm:text-base text-gray-600">Shipping</span>
-        <span className="text-sm sm:text-base font-medium">
-          {cartSummary.shipping === 0 ? 'FREE' : formatPrice(cartSummary.shipping, 'INR')}
-        </span>
-      </div>
-      
-      <div className="flex justify-between">
-        <span className="text-sm sm:text-base text-gray-600">Tax (18% GST)</span>
-        <span className="text-sm sm:text-base font-medium">{formatPrice(cartSummary.tax, 'INR')}</span>
-      </div>
-      
       <div className="border-t border-gray-200 pt-3 sm:pt-4">
         <div className="flex justify-between">
           <span className="text-base sm:text-lg font-semibold text-gray-900">Total</span>
@@ -845,7 +833,6 @@ const OrderSummaryContent = ({
             {formatPrice(cartSummary.total, 'INR')}
           </span>
         </div>
-        <p className="text-xs sm:text-sm text-gray-500 mt-2">Including all taxes</p>
       </div>
     </div>
 
@@ -873,12 +860,6 @@ const OrderSummaryContent = ({
     {/* Additional Info - Mobile Optimized */}
     <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200">
       <div className="flex items-center text-xs sm:text-sm text-gray-500">
-        <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-        </svg>
-        <span>Free shipping on orders over ₹500</span>
-      </div>
-      <div className="flex items-center text-xs sm:text-sm text-gray-500 mt-2">
         <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
         </svg>

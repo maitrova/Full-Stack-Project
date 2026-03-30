@@ -32,6 +32,35 @@ const formatAmount = (value) => Number(value || 0).toFixed(2);
 const formatCurrencyAmount = (value, currency = "INR") =>
   `${currency === "INR" ? "Rs." : `${currency} `}${formatAmount(value)}`;
 
+const getEmailAssetBaseUrl = () =>
+  String(
+    process.env.EMAIL_ASSET_BASE_URL ||
+      process.env.API_URL ||
+      process.env.BACKEND_URL ||
+      "https://maitrova.in"
+  )
+    .trim()
+    .replace(/\/+$/, "");
+
+const resolveEmailImageUrl = (value) => {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) return "";
+
+  if (/^https?:\/\//i.test(rawValue)) {
+    return rawValue;
+  }
+
+  const normalizedPath = rawValue.startsWith("/")
+    ? rawValue
+    : rawValue.startsWith("outputs/")
+      ? `/api/${rawValue}`
+      : rawValue.startsWith("api/")
+        ? `/${rawValue}`
+        : `/api/outputs/${rawValue.replace(/^\.?\/+/, "")}`;
+
+  return `${getEmailAssetBaseUrl()}${normalizedPath}`;
+};
+
 const formatDateTime = (date) =>
   new Date(date).toLocaleString("en-IN", {
     day: "2-digit",
@@ -139,11 +168,12 @@ const hydrateOrderForEmail = async (order, user) => {
 
 const buildItemsHtml = (items = []) =>
   items
-    .map(
-      (item, index) => `
+    .map((item, index) => {
+      const previewImageUrl = resolveEmailImageUrl(item.previewImage);
+      return `
       <tr>
         <td style="padding:10px;border-bottom:1px solid #eee;">
-          <img src="${item.previewImage || ""}" width="60" />
+          <img src="${previewImageUrl}" width="60" />
         </td>
         <td style="padding:10px;border-bottom:1px solid #eee;">
           <strong>${getItemName(item, index)}</strong><br/>
@@ -154,15 +184,15 @@ const buildItemsHtml = (items = []) =>
           Rs.${formatAmount(item.unitPrice)}
         </td>
       </tr>
-    `
-    )
+    `;
+    })
     .join("");
 
 const buildOrderTemplateParams = (order, user, itemsHtml, orderDate) => {
   const normalizedItems = (order.items || []).map((item, index) => ({
     index: index + 1,
     name: getItemName(item, index),
-    previewImage: item.previewImage || "",
+    previewImage: resolveEmailImageUrl(item.previewImage),
     size: item.size || "",
     quantity: Number(item.qty || 0),
     unitPrice: formatAmount(item.unitPrice),
@@ -227,8 +257,17 @@ const buildAdminOrderTemplateParams = (order, user) => {
   const billingAddress = buildAddressText(order.billingAddress);
   const productsText = buildItemsText(order.items);
   const currency = order.currency || "INR";
+  const normalizedItems = (order.items || []).map((item, index) => ({
+    index: index + 1,
+    name: getItemName(item, index),
+    previewImage: resolveEmailImageUrl(item.previewImage),
+    rawPreviewImage: item.previewImage || "",
+    size: item.size || "",
+    quantity: Number(item.qty || 0),
+    unitPrice: formatCurrencyAmount(item.unitPrice, item.currency || currency),
+  }));
 
-  return {
+  const params = {
     order_id: String(order._id || ""),
     order_datetime: formatDateTime(orderDateTime),
     order_status: order.orderStatus || order.status || "",
@@ -251,7 +290,19 @@ const buildAdminOrderTemplateParams = (order, user) => {
     discount: formatCurrencyAmount(order.discount, currency),
     total: formatCurrencyAmount(order.total, currency),
     products_text: productsText,
+    items: normalizedItems,
   };
+
+  normalizedItems.forEach((item) => {
+    params[`product_name_${item.index}`] = item.name;
+    params[`preview_image_${item.index}`] = item.previewImage;
+    params[`preview_image_raw_${item.index}`] = item.rawPreviewImage;
+    params[`size_${item.index}`] = item.size;
+    params[`qty_${item.index}`] = item.quantity;
+    params[`price_${item.index}`] = item.unitPrice;
+  });
+
+  return params;
 };
 
 export const sendOrderStatusEmail = async (order, user) => {
@@ -345,6 +396,17 @@ export const sendAdminOrderNotification = async (order, user) => {
   );
   const subject = `New Order Received #${emailOrder._id}`;
   const params = buildAdminOrderTemplateParams(emailOrder, emailUser);
+
+  console.info("[email/admin-order] Item image URLs", {
+    orderId: String(emailOrder._id || ""),
+    assetBaseUrl: getEmailAssetBaseUrl(),
+    items: (emailOrder.items || []).map((item, index) => ({
+      index: index + 1,
+      name: getItemName(item, index),
+      rawPreviewImage: item.previewImage || "",
+      resolvedPreviewImage: resolveEmailImageUrl(item.previewImage),
+    })),
+  });
 
   const htmlContent = `
   <div style="font-family:Arial,sans-serif;background:#f5f5f5;padding:20px;">

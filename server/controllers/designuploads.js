@@ -1,6 +1,11 @@
 import fs from "fs";
 import path from "path";
 import { sanitizeFolderName } from "../middleware/outputUpload.js";
+import {
+  deleteOptimizedImageSet,
+  normalizeStoredPath,
+  optimizeUploadedImage,
+} from "../utils/imageOptimization.js";
 
 const BASE_DIR = path.join(process.cwd(), "outputs", "adminuploadeddesigns");
 
@@ -143,19 +148,30 @@ export const uploadImagesToFolder = async (req, res) => {
       });
     }
 
-    const uploaded = files.map(file => ({
+    const uploaded = await Promise.all(
+      files.map(async (file) => {
+        const optimized = await optimizeUploadedImage(
+          normalizeStoredPath(file.path),
+          {
+            outputDir: `outputs/adminuploadeddesigns/${clean}`,
+            baseName: path.basename(file.filename, path.extname(file.filename)),
+            cleanupSource: true,
+          }
+        );
 
-      filename: file.filename,
+        const visibleAsset = optimized.url;
+        const filename = path.basename(visibleAsset);
 
-      originalname: file.originalname,
-
-      size: file.size,
-
-      mimetype: file.mimetype,
-
-      url: `/outputs/adminuploadeddesigns/${clean}/${file.filename}`,
-
-    }));
+        return {
+          filename,
+          originalname: file.originalname,
+          size: file.size,
+          mimetype: "image/webp",
+          url: `/${String(visibleAsset).replace(/^\/+/, "")}`,
+          variants: optimized.variants,
+        };
+      })
+    );
 
     res.json({
 
@@ -210,6 +226,7 @@ export const listImagesInFolder = async (req, res) => {
     const items = fs.readdirSync(full);
 
     const files = items
+      .filter((name) => !/-blur\.webp$/i.test(name) && !/-sm\.webp$/i.test(name))
       .map(name => {
 
         const filePath = path.join(full, name);
@@ -300,7 +317,12 @@ export const deleteImageFromFolder = async (req, res) => {
 
     }
 
-    fs.unlinkSync(filePath);
+    const relativeFilePath = normalizeStoredPath(filePath);
+    if (/-md\.webp$/i.test(filename) || /-(blur|sm|md)\.webp$/i.test(filename)) {
+      await deleteOptimizedImageSet(relativeFilePath);
+    } else {
+      fs.unlinkSync(filePath);
+    }
 
     res.json({
 
