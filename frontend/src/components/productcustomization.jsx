@@ -3087,10 +3087,12 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                     setTextLayers={handleSetTextLayers}
                     activeTextId={activeTextId}
                     setActiveTextId={handleSetActiveTextId}
+                    onRemoveActiveText={removeActiveText}
                     designLayers={designLayers}
                     setDesignLayers={handleSetDesignLayers}
                     activeDesignId={activeDesignId}
                     setActiveDesignId={handleSetActiveDesignId}
+                    onRemoveActiveDesign={clearActiveDesign}
                     bgRemovalLoading={bgRemovalLoading}
                     onDesignRenderWidthChange={setDesignRenderWidth}
                     isAdmin={isAdmin}

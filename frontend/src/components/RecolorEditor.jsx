@@ -1387,11 +1387,13 @@ const RecolorEditor = forwardRef(function RecolorEditor(
     setTextLayers,
     activeTextId,
     setActiveTextId,
+    onRemoveActiveText,
 
     designLayers,
     setDesignLayers,
     activeDesignId,
     setActiveDesignId,
+    onRemoveActiveDesign,
 
     bgRemovalLoading,
     onDesignRenderWidthChange,
@@ -2050,6 +2052,7 @@ return () => {
           setTextLayers={setTextLayers}
           activeTextId={activeTextId}
           setActiveTextId={setActiveTextId}
+          onRemoveActiveText={onRemoveActiveText}
           onAnyTextClick={() => setActiveDesignId(null)}
           canvasSize={canvasSize}
           boundaries={boundaries}
@@ -2070,6 +2073,7 @@ return () => {
             setDesignLayers={setDesignLayers}
             isActive={layer.id === activeDesignId}
             setActiveDesignId={setActiveDesignId}
+            onRemoveActiveDesign={onRemoveActiveDesign}
             disabled={bgRemovalLoading}
             boundaries={boundaries}
             zonesForView={zonesForActiveView}
@@ -2104,6 +2108,7 @@ function TextOverlay({
   setTextLayers, 
   activeTextId, 
   setActiveTextId, 
+  onRemoveActiveText,
   onAnyTextClick, 
   canvasSize,
   boundaries,
@@ -2628,7 +2633,25 @@ function clampFontSizeToBoundary({
               </div>
 
               {isActive && (
-  <>
+              <>
+                <button
+                  type="button"
+                  className="absolute -left-4 -top-4 flex h-8 w-8 items-center justify-center rounded-full border border-rose-200 bg-white text-base font-semibold leading-none text-rose-600 shadow-md"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onRemoveActiveText?.();
+                  }}
+                  aria-label="Remove text"
+                >
+                  X
+                </button>
+
+                <>
                 {/* X handles */}
                 <div
                   className="absolute top-1/2 -translate-y-1/2 -left-2 h-4 w-4 rounded-full border-2 border-blue-500 bg-white shadow-sm"
@@ -2652,6 +2675,7 @@ function clampFontSizeToBoundary({
                   style={{ cursor: "ns-resize" }}
                   onPointerDown={(e) => startDrag(e, layer.id, "resize", "bottom")}
                 />
+              </>
               </>
               )}
             </div>
@@ -2679,6 +2703,7 @@ function DesignOverlay({
   setDesignLayers,
   isActive,
   setActiveDesignId,
+  onRemoveActiveDesign,
   disabled,
   boundaries,
   zonesForView,
@@ -2970,6 +2995,28 @@ function DesignOverlay({
         }}
         onPointerDown={(e) => startDrag(e, "move")}
       >
+        {isActive && !disabled && (
+          <button
+            type="button"
+            className="absolute -left-4 -top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/90 bg-white text-rose-600 shadow-lg ring-1 ring-slate-900/10"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRemoveActiveDesign?.();
+            }}
+            aria-label="Remove design"
+          >
+            <span className="pointer-events-none relative block h-4 w-4">
+              <span className="absolute left-1/2 top-0 h-full w-[2px] -translate-x-1/2 rotate-45 rounded-full bg-current" />
+              <span className="absolute left-1/2 top-0 h-full w-[2px] -translate-x-1/2 -rotate-45 rounded-full bg-current" />
+            </span>
+          </button>
+        )}
+
         <div
           className={`relative overflow-hidden rounded-sm ${
             isActive
