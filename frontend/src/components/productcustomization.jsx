@@ -101,7 +101,6 @@ const MOBILE_TOOL_TABS = [
   { key: TABS.PRODUCT_COLORS, label: "Color" },
   { key: TABS.DESIGNS, label: "Design" },
   { key: TABS.TEXT, label: "Text" },
-  { key: TABS.VIEWS, label: "View" },
   { key: TABS.DESIGN_LIBRARY, label: "Library" },
 ];
 
@@ -150,6 +149,28 @@ const getFilenameFromUrl = (url = "", fallback = "design.png") => {
     const candidate = pathname.split("/").pop();
     return candidate || fallback;
   }
+};
+
+const getDesignLayerDisplayName = (layer, index = 0) => {
+  const rawName =
+    layer?.sourceFile?.name ||
+    layer?.originalFile?.name ||
+    layer?.file?.name ||
+    getFilenameFromUrl(layer?.imageUrl || "", `Design ${index + 1}`);
+
+  const cleaned = String(rawName || "")
+    .split("?")[0]
+    .replace(/\.[^.]+$/, "")
+    .replace(/[_-]+/g, " ")
+    .trim();
+
+  return cleaned || `Design ${index + 1}`;
+};
+
+const getTextLayerDisplayName = (layer, index = 0) => {
+  const text = String(layer?.text || "").replace(/\s+/g, " ").trim();
+  if (!text) return `Text ${index + 1}`;
+  return text.length > 24 ? `${text.slice(0, 24)}...` : text;
 };
 
 const withCacheBust = (url = "") => {
@@ -396,6 +417,10 @@ const getSizeBasePrice = (prod, size) => {
   const shouldShowToolSection = (tabKey) => activeTab === tabKey;
 
   const jumpToToolSection = (tabKey) => {
+    setActiveTab(tabKey);
+  };
+
+  const handleToolTabChange = (tabKey) => {
     setActiveTab(tabKey);
   };
 
@@ -1056,6 +1081,15 @@ setPriceBreakdown((prev) => ({
   const selectedOrLatestDesign = activeDesign || designLayers[designLayers.length - 1] || null;
   const availableZonesForView = getZoneOptionsForView(viewCode, { supportsPocketZone });
   const activeDesignZone = activeDesign?.zone || availableZonesForView[0] || "front-full";
+  const shouldUseFolderDropdown = folders.length > 6;
+  const customizationNames = [
+    ...designLayers.map((layer, index) => getDesignLayerDisplayName(layer, index)),
+    ...textLayers.map((layer, index) => getTextLayerDisplayName(layer, index)),
+  ]
+    .filter(Boolean)
+    .filter((value, index, array) => array.indexOf(value) === index);
+  const visibleCustomizationNames = customizationNames.slice(0, 3);
+  const remainingCustomizationCount = Math.max(0, customizationNames.length - visibleCustomizationNames.length);
 
   const moveActiveDesignToZone = (zoneKey) => {
     if (!activeDesign || !zoneKey) return;
@@ -2086,73 +2120,6 @@ const nudgeDesignScaleAxis = (axis, delta) => {
         </div>
       </header>
 
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-2 py-2 backdrop-blur sm:hidden">
-        <div className="rounded-[20px] border border-slate-200 bg-white px-3 py-2 shadow-sm">
-          <div className="grid grid-cols-5 gap-1 border-b border-slate-100 pb-2">
-            {MOBILE_TOOL_TABS.map((item) => {
-              const isActive = activeTab === item.key;
-              return (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => setActiveTab(item.key)}
-                  className={`rounded-[14px] px-2 py-2 text-[10px] font-semibold transition ${
-                    isActive
-                      ? "bg-sky-600 text-white shadow-sm"
-                      : "border border-slate-200 bg-white text-slate-600"
-                  }`}
-                >
-                  {item.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-2 flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Live price</div>
-              <div className="text-lg font-bold text-emerald-700">Rs.{price.toFixed(2)}</div>
-              <div className="truncate text-[11px] text-slate-500">
-                {productColorName} / {customizableViews.find((v) => v.code === viewCode)?.label || "Front view"} / {selectedSize || "Default"}
-              </div>
-            </div>
-
-          <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowMobilePriceDetails((value) => !value)}
-              className={`rounded-full border px-3 py-1.5 text-left transition ${
-                showMobilePriceDetails
-                  ? "border-emerald-600 bg-emerald-50 text-emerald-700"
-                  : "border-slate-200 bg-white text-slate-700"
-              }`}
-            >
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em]">Price</div>
-              <div className="mt-0.5 text-sm font-bold">₹{price.toFixed(2)}</div>
-            </button>
-            <button
-              type="button"
-              onClick={handleSaveDesign}
-              disabled={saving || addingToCart}
-              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 disabled:opacity-50"
-            >
-              {saving ? "Saving..." : isEditMode ? "Update" : "Save"}
-            </button>
-            {canAddSavedDesignToCart && (
-              <button
-                type="button"
-                onClick={handleSaveAndAddToCart}
-                disabled={saving || addingToCart}
-                className="rounded-full bg-sky-600 px-3 py-1.5 text-[11px] font-semibold text-white disabled:opacity-50"
-              >
-                {addingToCart ? "Adding..." : "Cart"}
-              </button>
-            )}
-          </div>
-          </div>
-        </div>
-      </header>
-
       {/* Main area */}
       <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-x-hidden px-2 pb-2 pt-2 sm:gap-6 sm:overflow-visible sm:px-6 sm:pb-6 sm:pt-3">
         <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-x-hidden lg:grid lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)_minmax(0,320px)] lg:items-start lg:gap-6 lg:overflow-visible">
@@ -2218,8 +2185,55 @@ const nudgeDesignScaleAxis = (axis, delta) => {
               </div>
             </div>
           </div>
+
           {/* Left sidebar - Controls */}
-          <aside className="order-1 flex w-full flex-col gap-4 overflow-hidden rounded-[22px] border border-slate-200 bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.08)] min-h-[220px] max-h-[42vh] sm:h-auto sm:max-h-none sm:rounded-2xl sm:p-4 sm:shadow-sm lg:order-1 lg:w-auto lg:gap-6">
+          <aside
+            className={`${
+              isDesktopToolsLayout
+                ? "order-1 flex w-full min-h-[220px] max-h-[42vh] flex-col gap-4 overflow-hidden rounded-[22px] border border-slate-200 bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.08)] sm:h-auto sm:max-h-none sm:rounded-2xl sm:p-4 sm:shadow-sm lg:order-1 lg:w-auto lg:gap-6"
+                : "order-2 flex w-full flex-col gap-4 overflow-hidden rounded-[22px] border border-slate-200 bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.08)]"
+            }`}
+          >
+          <div className="grid grid-cols-4 gap-1 border-b border-slate-100 pb-3 sm:hidden">
+            {MOBILE_TOOL_TABS.map((item) => {
+              const isActive = activeTab === item.key;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => handleToolTabChange(item.key)}
+                  className={`rounded-[14px] px-2 py-2 text-[10px] font-semibold transition ${
+                    isActive
+                      ? "bg-sky-600 text-white shadow-sm"
+                      : "border border-slate-200 bg-white text-slate-600"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-3 sm:hidden">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Total</p>
+                <p className="text-base font-bold text-emerald-800">Rs.{price.toFixed(2)}</p>
+                <p className="truncate text-[11px] text-emerald-700/80">
+                  {productColorName} / {customizableViews.find((v) => v.code === viewCode)?.label || "Front view"} / {selectedSize || "Default"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => calculatePrice()}
+                disabled={calculatingPrice}
+                className="rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-emerald-700 disabled:opacity-50"
+              >
+                {calculatingPrice ? "Refreshing..." : "Refresh"}
+              </button>
+            </div>
+          </div>
+
           {/* Edit mode indicator */}
           {isEditMode && (
             <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2">
@@ -2240,31 +2254,31 @@ const nudgeDesignScaleAxis = (axis, delta) => {
           {/* Tab navigation */}
           <div className="hidden gap-1 overflow-x-auto border-b border-slate-200 pb-2 text-[10px] sm:flex sm:gap-2">
             <button
-              onClick={() => setActiveTab(TABS.PRODUCT_COLORS)}
+              onClick={() => handleToolTabChange(TABS.PRODUCT_COLORS)}
               className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium ${activeTab === TABS.PRODUCT_COLORS ? 'bg-sky-50 text-sky-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
             >
               Product Colors
             </button>
             <button
-              onClick={() => setActiveTab(TABS.DESIGNS)}
+              onClick={() => handleToolTabChange(TABS.DESIGNS)}
               className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium ${activeTab === TABS.DESIGNS ? 'bg-sky-50 text-sky-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
             >
               Designs
             </button>
             <button
-              onClick={() => setActiveTab(TABS.TEXT)}
+              onClick={() => handleToolTabChange(TABS.TEXT)}
               className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium ${activeTab === TABS.TEXT ? 'bg-sky-50 text-sky-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
             >
               Text
             </button>
             <button
-              onClick={() => setActiveTab(TABS.VIEWS)}
+              onClick={() => handleToolTabChange(TABS.VIEWS)}
               className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium ${activeTab === TABS.VIEWS ? 'bg-sky-50 text-sky-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
             >
               Views
             </button>
             <button
-              onClick={() => setActiveTab(TABS.DESIGN_LIBRARY)}
+              onClick={() => handleToolTabChange(TABS.DESIGN_LIBRARY)}
               className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium ${activeTab === TABS.DESIGN_LIBRARY ? 'bg-sky-50 text-sky-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
             >
               Design Library
@@ -2766,7 +2780,9 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                       </div>
                       <button
                         type="button"
-                        onClick={() => setIsLibraryModalOpen(true)}
+                        onClick={() => {
+                          setIsLibraryModalOpen(true);
+                        }}
                         className="rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-100"
                       >
                         Open Library
@@ -2831,22 +2847,44 @@ const nudgeDesignScaleAxis = (axis, delta) => {
 
                   <div className="mt-5">
                     <label className="mb-2 block text-xs font-medium text-slate-700">Folders</label>
-                    <div className="flex max-h-[220px] flex-wrap gap-2 overflow-y-auto pr-1 lg:max-h-[420px]">
-                      {folders.map((folder) => (
-                        <button
-                          key={folder}
-                          type="button"
-                          onClick={() => dispatch(setCurrentFolder(folder))}
-                          className={`rounded-full border px-3 py-1.5 text-xs ${
-                            currentFolder === folder
-                              ? "border-sky-300 bg-sky-100 text-sky-700"
-                              : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
-                          }`}
+                    {shouldUseFolderDropdown ? (
+                      <div className="space-y-2">
+                        <select
+                          value={currentFolder || ""}
+                          onChange={(e) => dispatch(setCurrentFolder(e.target.value))}
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-sky-400"
                         >
-                          {folder}
-                        </button>
-                      ))}
-                    </div>
+                          <option value="" disabled>
+                            Select a folder
+                          </option>
+                          {folders.map((folder) => (
+                            <option key={folder} value={folder}>
+                              {folder}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-[11px] text-slate-500">
+                          {folders.length} folders available. Use the dropdown to switch quickly without hiding the designs.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex max-h-[220px] flex-wrap gap-2 overflow-y-auto pr-1 lg:max-h-[420px]">
+                        {folders.map((folder) => (
+                          <button
+                            key={folder}
+                            type="button"
+                            onClick={() => dispatch(setCurrentFolder(folder))}
+                            className={`rounded-full border px-3 py-1.5 text-xs ${
+                              currentFolder === folder
+                                ? "border-sky-300 bg-sky-100 text-sky-700"
+                                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                            }`}
+                          >
+                            {folder}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -2877,7 +2915,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                         Loading designs...
                       </div>
                     ) : currentFolder && images.length > 0 ? (
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                         {images.map((image) => (
                           <button
                             key={image.filename}
@@ -2920,7 +2958,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
         )}
 
         {/* Center workspace */}
-        <main className="order-2 flex min-h-0 flex-1 flex-col overflow-visible sm:overflow-auto lg:order-2">
+        <main className="order-1 flex min-h-0 flex-1 flex-col overflow-visible sm:overflow-auto lg:order-2">
           <div className="flex-1 min-h-0 p-0">
             <div className="mx-auto flex h-auto min-h-[52vh] flex-col overflow-visible rounded-[28px] border border-slate-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.08)] sm:h-full sm:min-h-0 sm:overflow-hidden sm:rounded-[28px]">
               <div className="hidden border-b border-slate-200 bg-white px-3 py-3 sm:block sm:px-5">
@@ -2930,32 +2968,112 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                       {product?.name || "Custom Product"}
                     </h2>
                     <p className="text-xs text-slate-500">
-                      {productColorName} • {customizableViews.find((v) => v.code === viewCode)?.label || "Front view"} • Size {selectedSize}
+                      {productColorName} • Size {selectedSize}
                     </p>
                   </div>
                   {customizableViews.length > 0 && (
-                    <div className="flex flex-wrap gap-2 lg:justify-end">
-                      {customizableViews.map((v) => {
-                        const isCurrentView = v.code === viewCode;
-                        return (
-                          <button
-                            key={v.code}
-                            type="button"
-                            onClick={() => setViewCode(v.code)}
-                            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                              isCurrentView
-                                ? "bg-sky-600 text-white shadow-sm"
-                                : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                            }`}
-                          >
-                            {v.label || v.code}
-                          </button>
-                        );
-                      })}
+                    <div className="flex flex-col gap-2 lg:items-end">
+                      <div className="flex flex-wrap gap-2 lg:justify-end">
+                        {customizableViews.map((v) => {
+                          const isCurrentView = v.code === viewCode;
+                          return (
+                            <button
+                              key={v.code}
+                              type="button"
+                              onClick={() => setViewCode(v.code)}
+                              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                                isCurrentView
+                                  ? "bg-sky-600 text-white shadow-sm"
+                                  : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                              }`}
+                            >
+                              {v.label || v.code}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 lg:max-w-[360px]">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          Customized Names
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2 lg:justify-end">
+                          {visibleCustomizationNames.length > 0 ? (
+                            <>
+                              {visibleCustomizationNames.map((name) => (
+                                <span
+                                  key={name}
+                                  className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-700"
+                                >
+                                  {name}
+                                </span>
+                              ))}
+                              {remainingCustomizationCount > 0 && (
+                                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-500">
+                                  +{remainingCustomizationCount} more
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-[11px] text-slate-500">No customized names yet</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
+              {customizableViews.length > 0 && (
+                <div className="border-b border-slate-200 bg-white px-3 py-2 sm:hidden">
+                  <div className="mb-1.5 flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">View</p>
+                      <p className="text-[11px] font-medium leading-none text-slate-700">
+                        {customizableViews.find((v) => v.code === viewCode)?.label || "Front view"}
+                      </p>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <div className="min-w-0 text-right">
+                        <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          Customize
+                        </p>
+                        <p className="truncate text-[11px] font-medium leading-none text-slate-700">
+                          {product?.name || "Custom Product"}
+                        </p>
+                        <p className="truncate text-[10px] leading-none text-slate-500">
+                          {productColorName} / {selectedSize || "Default"}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleSaveDesign}
+                        disabled={saving || addingToCart}
+                        className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-700 disabled:opacity-50"
+                      >
+                        {saving ? "Saving..." : isEditMode ? "Update" : "Save"}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+                    {customizableViews.map((v) => {
+                      const isCurrentView = v.code === viewCode;
+                      return (
+                        <button
+                          key={v.code}
+                          type="button"
+                          onClick={() => setViewCode(v.code)}
+                          className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+                            isCurrentView
+                              ? "bg-sky-600 text-white shadow-sm"
+                              : "border border-slate-300 bg-white text-slate-700"
+                          }`}
+                        >
+                          {v.label || v.code}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <div className="mx-auto flex min-h-[44vh] flex-1 w-full items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(14,116,214,0.05),_transparent_45%),linear-gradient(180deg,_#f8fafc_0%,_#ffffff_100%)] p-2 sm:min-h-0 sm:max-w-6xl sm:p-5 lg:p-6">
                 <div className="mx-auto w-full max-w-[960px]">
                 {mockupUrl && maskUrl ? (

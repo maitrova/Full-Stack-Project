@@ -1710,11 +1710,9 @@ const zonesForActiveView = useMemo(() => {
     if (!w || !h) return;
 
     const hasText = textLayers?.some((l) => l.text && l.text.trim().length > 0);
-    const imageLayers = (designLayers || []).filter(
-      (l) =>
-        !!l.imageUrl &&
-        !(designInteractionActive && activeDesignId && l.id === activeDesignId)
-    );
+    // Design images are rendered by the interactive overlay layer below.
+    // If we also paint them into the composited texture here, each design appears twice.
+    const imageLayers = [];
     const hasImages = imageLayers.length > 0;
 
     if (!hasText && !hasImages) {
@@ -2032,40 +2030,6 @@ return () => {
               compact={false}
             />
           )}
-
-          {activeDesign && zonesForActiveView.length > 1 && (
-            <div className="pointer-events-none absolute inset-x-0 top-3 z-40 flex justify-center px-3">
-              <motion.div
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ type: "spring", stiffness: 320, damping: 28 }}
-                className="pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-2 rounded-full border border-slate-200 bg-white/92 px-3 py-2 shadow-lg backdrop-blur"
-              >
-                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                  Move Selected Design
-                </span>
-                {zonesForActiveView.map((zoneKey) => {
-                  const isCurrentZone = (activeDesign.zone || getBoundaryKeyForLayer(activeDesign)) === zoneKey;
-                  return (
-                    <button
-                      key={zoneKey}
-                      type="button"
-                      onClick={() => moveActiveDesignToZone(zoneKey)}
-                      disabled={isCurrentZone}
-                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                        isCurrentZone
-                          ? "cursor-default bg-sky-100 text-sky-700"
-                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                      }`}
-                    >
-                      {isCurrentZone ? `In ${getZoneLabel(zoneKey, calibratedConfig)}` : `Move to ${getZoneLabel(zoneKey, calibratedConfig)}`}
-                    </button>
-                  );
-                })}
-              </motion.div>
-            </div>
-          )}
-       
 
       {calibrationMode && canvasSize && (
         <CalibrationOverlay
