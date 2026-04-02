@@ -91,6 +91,67 @@ const sanitizePreviewImage = (value) => {
   return trimmed;
 };
 
+const buildCartItemSignature = (item = {}) => {
+  const normalizedSize = String(item.size || "M").trim().toUpperCase() || "M";
+
+  if (item.kind === "DESIGN" && item.design) {
+    return `DESIGN:${String(item.design)}:SIZE:${normalizedSize}`;
+  }
+
+  if (item.dropproduct) {
+    return `DROP:${String(item.dropproduct)}:SIZE:${normalizedSize}`;
+  }
+
+  if (item.readymadeProduct) {
+    return `READYMADE:${String(item.readymadeProduct)}:SIZE:${normalizedSize}`;
+  }
+
+  if (item.product) {
+    return `READYMADE:${String(item.product)}:SIZE:${normalizedSize}`;
+  }
+
+  return `LEGACY:${normalizedSize}`;
+};
+
+const normalizeLegacyCartItem = (item) => {
+  if (!item) return;
+
+  if (!item.kind) {
+    item.kind = item.design ? "DESIGN" : "READYMADE";
+  }
+
+  if (!item.size || !String(item.size).trim()) {
+    item.size = "M";
+  } else {
+    item.size = String(item.size).trim().toUpperCase();
+  }
+
+  if (!(Number(item.unitPrice) >= 0)) {
+    item.unitPrice = 0;
+  }
+
+  if (!(Number(item.basePrice) >= 0)) {
+    item.basePrice = Number(item.unitPrice || 0);
+  }
+
+  if (!item.currency || !String(item.currency).trim()) {
+    item.currency = "INR";
+  }
+
+  if (!item.signature || !String(item.signature).trim()) {
+    item.signature = buildCartItemSignature(item);
+  }
+
+  if (item.previewImage && typeof item.previewImage === "string") {
+    item.previewImage = sanitizePreviewImage(item.previewImage);
+  }
+};
+
+const normalizeLegacyCart = (cart) => {
+  if (!cart?.items?.length) return;
+  cart.items.forEach(normalizeLegacyCartItem);
+};
+
 const buildAddToCartLogContext = (body = {}, extra = {}) => ({
   kind: body.kind || null,
   qty: body.qty ?? 1,
@@ -207,7 +268,8 @@ const buildActiveCartResponse = async (userId) => {
 
 export const addToCart = async (req, res) => {
   const userId = req.user?._id;
-  let requestContext = buildAddToCartLogContext(req.body, {
+  const body = req.body || {};
+  let requestContext = buildAddToCartLogContext(body, {
     userId: userId ? String(userId) : null,
   });
 
@@ -221,11 +283,11 @@ export const addToCart = async (req, res) => {
       dropproductId,          // ✅ NEW
       designId,
       size,
-    } = req.body;
-    const effectiveDesignId = designId || req.body.design;
-    const requestedSize = size || req.body.selectedSize;
+    } = body;
+    const effectiveDesignId = designId || body.design;
+    const requestedSize = size || body.selectedSize;
 
-    requestContext = buildAddToCartLogContext(req.body, {
+    requestContext = buildAddToCartLogContext(body, {
       userId: String(userId),
       designId: effectiveDesignId || null,
       size: requestedSize || null,
@@ -233,9 +295,9 @@ export const addToCart = async (req, res) => {
 
     console.info("[cart/add] Request received", requestContext);
 
-    const requestedUnitPrice = parsePositiveNumber(req.body.unitPrice);
-    const requestedBasePrice = parsePositiveNumber(req.body.basePrice);
-    const priceDetailsPayload = parsePriceDetails(req.body.priceDetails);
+    const requestedUnitPrice = parsePositiveNumber(body.unitPrice);
+    const requestedBasePrice = parsePositiveNumber(body.basePrice);
+    const priceDetailsPayload = parsePriceDetails(body.priceDetails);
     let designPriceSnapshot = null;
 
     const parsedQty = Number(qty);
@@ -377,6 +439,7 @@ export const addToCart = async (req, res) => {
     // CART MERGE / INSERT
     // =========================
     const cart = await getOrCreateActiveCart(userId);
+    normalizeLegacyCart(cart);
 
     const idx = cart.items.findIndex((it) => it.signature === signature);
     if (idx >= 0) {

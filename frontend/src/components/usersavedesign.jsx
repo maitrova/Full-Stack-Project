@@ -553,49 +553,7 @@ export default function Usersaveddesigns() {
         </div>
       )}
 
-      {/* Top bar - Mobile Optimized */}
-      <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4 sticky top-0 z-40">
-        <div className="flex items-center gap-2">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="text-lg font-extrabold tracking-wide text-orange-500">
-              MYPRINT
-            </div>
-          </Link>
-          {isMobile && (
-            <span className="text-xs bg-slate-100 px-2 py-1 rounded-full text-slate-600">
-              Designs
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Link 
-            to="/" 
-            className="text-sky-700 hover:bg-sky-50 p-2 rounded-lg transition-colors"
-            aria-label="Back to Designer"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z" />
-            </svg>
-            {!isMobile && <span className="ml-1">Back to Designer</span>}
-          </Link>
-          <Link 
-            to="/cart" 
-            className="text-sky-700 hover:bg-sky-50 p-2 rounded-lg transition-colors flex items-center relative"
-            aria-label="View Cart"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-            </svg>
-            {!isMobile && <span className="ml-1">Cart</span>}
-            {cartItems.length > 0 && (
-              <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
-                {cartItems.length}
-              </span>
-            )}
-          </Link>
-        </div>
-      </header>
+   
 
       {/* Mobile Header Toggle - Improved */}
       {isMobile && (

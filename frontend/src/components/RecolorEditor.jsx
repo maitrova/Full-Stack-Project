@@ -127,6 +127,67 @@ function normalizeImageUrl(url) {
   return `${base}${path}`;
 }
 
+function normalizeImageCrop(crop = {}) {
+  const rawZoom = Number(crop?.zoom);
+  const zoom = Number.isFinite(rawZoom) ? Math.min(3, Math.max(1, rawZoom)) : 1;
+  const rawOffsetX = Number(crop?.offsetX);
+  const rawOffsetY = Number(crop?.offsetY);
+
+  if (zoom <= 1.001) {
+    return { zoom: 1, offsetX: 0, offsetY: 0 };
+  }
+
+  return {
+    zoom,
+    offsetX: Number.isFinite(rawOffsetX) ? Math.min(1, Math.max(-1, rawOffsetX)) : 0,
+    offsetY: Number.isFinite(rawOffsetY) ? Math.min(1, Math.max(-1, rawOffsetY)) : 0,
+  };
+}
+
+function getImageCropSourceRect(img, crop = {}) {
+  const normalizedCrop = normalizeImageCrop(crop);
+  const naturalWidth = Math.max(1, img?.naturalWidth || img?.width || 1);
+  const naturalHeight = Math.max(1, img?.naturalHeight || img?.height || 1);
+
+  if (normalizedCrop.zoom <= 1.001) {
+    return {
+      srcX: 0,
+      srcY: 0,
+      srcWidth: naturalWidth,
+      srcHeight: naturalHeight,
+    };
+  }
+
+  const srcWidth = naturalWidth / normalizedCrop.zoom;
+  const srcHeight = naturalHeight / normalizedCrop.zoom;
+  const maxShiftX = Math.max(0, (naturalWidth - srcWidth) / 2);
+  const maxShiftY = Math.max(0, (naturalHeight - srcHeight) / 2);
+
+  return {
+    srcX: maxShiftX + normalizedCrop.offsetX * maxShiftX,
+    srcY: maxShiftY + normalizedCrop.offsetY * maxShiftY,
+    srcWidth,
+    srcHeight,
+  };
+}
+
+function getImageCropViewportStyle(crop = {}) {
+  const normalizedCrop = normalizeImageCrop(crop);
+  const zoom = normalizedCrop.zoom;
+  const widthPercent = zoom * 100;
+  const heightPercent = zoom * 100;
+  const leftPercent = ((1 - zoom) * 50) + normalizedCrop.offsetX * ((zoom - 1) * 50);
+  const topPercent = ((1 - zoom) * 50) + normalizedCrop.offsetY * ((zoom - 1) * 50);
+
+  return {
+    position: "absolute",
+    left: `${leftPercent}%`,
+    top: `${topPercent}%`,
+    width: `${widthPercent}%`,
+    height: `${heightPercent}%`,
+  };
+}
+
 
 function pointInBoundary(x, y, b) {
   return x >= b.minX && x <= b.maxX && y >= b.minY && y <= b.maxY;
@@ -579,10 +640,10 @@ function MeasurementOverlay({
               className="absolute inset-0"
               style={{
                 border: compact
-                  ? "1.5px solid rgba(59, 130, 246, 0.95)"
-                  : "2px solid rgba(59, 130, 246, 0.95)",
+                  ? "1px solid rgba(96, 165, 250, 0.7)"
+                  : "1.5px solid rgba(96, 165, 250, 0.72)",
                 borderRadius: compact ? "12px" : "8px",
-                boxShadow: "0 0 0 1px rgba(59,130,246,0.15) inset",
+                boxShadow: "0 0 0 1px rgba(191,219,254,0.35) inset",
               }}
             />
 
@@ -590,14 +651,14 @@ function MeasurementOverlay({
               <>
                 <div
                   className="absolute left-1/2 -bottom-6 -translate-x-1/2 text-[12px] font-medium"
-                  style={{ color: "rgba(30, 64, 175, 0.95)" }}
+                  style={{ color: "rgba(96, 165, 250, 0.9)" }}
                 >
                   {spec.maxW} inches
                 </div>
 
                 <div
                   className="absolute -left-12 top-1/2 -translate-y-1/2 text-[12px] font-medium"
-                  style={{ color: "rgba(30, 64, 175, 0.95)" }}
+                  style={{ color: "rgba(96, 165, 250, 0.9)" }}
                 >
                   {spec.maxH} inches
                 </div>
@@ -609,7 +670,7 @@ function MeasurementOverlay({
               style={{
                 background: "rgba(255,255,255,0.85)",
                 color: "rgba(15, 23, 42, 0.95)",
-                border: "1px solid rgba(59,130,246,0.4)",
+                border: "1px solid rgba(147,197,253,0.5)",
               }}
             >
               {compact
@@ -658,10 +719,10 @@ function MeasurementOverlayPlain({
               className="absolute inset-0"
               style={{
                 border: compact
-                  ? "1.5px solid rgba(59, 130, 246, 0.95)"
-                  : "2px solid rgba(59, 130, 246, 0.95)",
+                  ? "1px solid rgba(96, 165, 250, 0.7)"
+                  : "1.5px solid rgba(96, 165, 250, 0.72)",
                 borderRadius: compact ? "12px" : "8px",
-                boxShadow: "0 0 0 1px rgba(59,130,246,0.15) inset",
+                boxShadow: "0 0 0 1px rgba(191,219,254,0.35) inset",
               }}
             />
 
@@ -669,14 +730,14 @@ function MeasurementOverlayPlain({
               <>
                 <div
                   className="absolute left-1/2 -bottom-6 -translate-x-1/2 text-[12px] font-medium"
-                  style={{ color: "rgba(30, 64, 175, 0.95)" }}
+                  style={{ color: "rgba(96, 165, 250, 0.9)" }}
                 >
                   {spec.maxW} inches
                 </div>
 
                 <div
                   className="absolute -left-12 top-1/2 -translate-y-1/2 text-[12px] font-medium"
-                  style={{ color: "rgba(30, 64, 175, 0.95)" }}
+                  style={{ color: "rgba(96, 165, 250, 0.9)" }}
                 >
                   {spec.maxH} inches
                 </div>
@@ -1214,9 +1275,9 @@ const startPanelDrag = (e) => {
                 onPointerDown={(e) => startDrag(e, zoneKey, "move")}
                 style={{
                   border: isActive
-                    ? "3px solid rgba(59,130,246,1)"
-                    : "2px solid rgba(59,130,246,0.7)",
-                  background: isActive ? "rgba(59,130,246,0.08)" : "transparent",
+                    ? "2px solid rgba(96,165,250,0.82)"
+                    : "1.5px solid rgba(96,165,250,0.58)",
+                  background: isActive ? "rgba(191,219,254,0.12)" : "transparent",
                   cursor: "move",
                 }}
               />
@@ -1234,7 +1295,7 @@ const startPanelDrag = (e) => {
                     <div
                       key={h}
                       onPointerDown={(e) => startDrag(e, zoneKey, "resize", h)}
-                      className="absolute w-3 h-3 bg-white border-2 border-blue-600 rounded"
+                      className="absolute h-2.5 w-2.5 rounded border border-blue-300 bg-white"
                       style={{
                         cursor: h === "nw" || h === "se" ? "nwse-resize" : "nesw-resize",
                         left: h.includes("w") ? "-6px" : "auto",
@@ -1399,6 +1460,9 @@ const RecolorEditor = forwardRef(function RecolorEditor(
     onDesignRenderWidthChange,
     isAdmin,
     selectedView = "front", 
+    zoneOptions = [],
+    activeDesignZone = null,
+    onMoveActiveDesignToZone = null,
     
     // OPTIONAL: you can pass your tested front boundaries here if you want to force them
     // Example: { "front-full": {minX, minY, maxX, maxY} }
@@ -1681,11 +1745,22 @@ const zonesForActiveView = useMemo(() => {
               const drawH = previewCanvas.height * scaleY;
               const px = (layer.x ?? 0.5) * previewCanvas.width;
               const py = (layer.y ?? 0.5) * previewCanvas.height;
+              const { srcX, srcY, srcWidth, srcHeight } = getImageCropSourceRect(img, layer.crop);
 
               ctx.save();
               ctx.translate(px, py);
               ctx.rotate((((layer.rotation || 0) * Math.PI) / 180) || 0);
-              ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+              ctx.drawImage(
+                img,
+                srcX,
+                srcY,
+                srcWidth,
+                srcHeight,
+                -drawW / 2,
+                -drawH / 2,
+                drawW,
+                drawH
+              );
               ctx.restore();
             });
           }
@@ -1853,7 +1928,18 @@ async function drawAll() {
         ctx.save();
         ctx.translate(px, py);
         ctx.rotate((((layer.rotation || 0) * Math.PI) / 180) || 0);
-        ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+        const { srcX, srcY, srcWidth, srcHeight } = getImageCropSourceRect(img, layer.crop);
+        ctx.drawImage(
+          img,
+          srcX,
+          srcY,
+          srcWidth,
+          srcHeight,
+          -drawW / 2,
+          -drawH / 2,
+          drawW,
+          drawH
+        );
         ctx.restore();
       });
 
@@ -1989,6 +2075,30 @@ return () => {
         >
           {showMeasurements ? "Hide Measurements" : "Show Measurements"}
         </button>
+        {activeDesignId && zoneOptions.length > 1 && onMoveActiveDesignToZone && (
+          <>
+            {zoneOptions.map((zoneKey) => {
+              const isCurrentZone = activeDesignZone === zoneKey;
+              return (
+                <button
+                  key={zoneKey}
+                  type="button"
+                  onClick={() => onMoveActiveDesignToZone(zoneKey)}
+                  disabled={isCurrentZone}
+                  className={`rounded border px-3 py-1.5 text-xs shadow-sm transition ${
+                    isCurrentZone
+                      ? "cursor-default border-sky-200 bg-sky-50 text-sky-700"
+                      : "border-slate-300 bg-white hover:bg-slate-50"
+                  }`}
+                >
+                  {isCurrentZone
+                    ? `In ${ZONE_LABELS[zoneKey] || zoneKey}`
+                    : `Move to ${ZONE_LABELS[zoneKey] || zoneKey}`}
+                </button>
+              );
+            })}
+          </>
+        )}
         {isAdmin && (
           <button
             onClick={() => setCalibrationMode(true)}
@@ -2608,7 +2718,7 @@ function clampFontSizeToBoundary({
             onPointerDown={(e) => startDrag(e, layer.id, "drag")}
           >
             <div
-              className={`relative border ${isActive ? "border-blue-500 bg-blue-50/30" : "border-transparent"} bg-transparent rounded`}
+              className={`relative rounded border bg-transparent ${isActive ? "border-blue-300/90 bg-blue-50/10" : "border-transparent"}`}
               style={{
                 willChange: "transform",
                 cursor: "move",
@@ -2636,7 +2746,7 @@ function clampFontSizeToBoundary({
               <>
                 <button
                   type="button"
-                  className="absolute -left-4 -top-4 flex h-8 w-8 items-center justify-center rounded-full border border-rose-200 bg-white text-base font-semibold leading-none text-rose-600 shadow-md"
+                  className="absolute -left-2.5 -top-2.5 flex h-5 w-5 items-center justify-center rounded-full border border-rose-200 bg-white text-[10px] font-semibold leading-none text-rose-500 shadow-sm"
                   onPointerDown={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -2654,24 +2764,24 @@ function clampFontSizeToBoundary({
                 <>
                 {/* X handles */}
                 <div
-                  className="absolute top-1/2 -translate-y-1/2 -left-2 h-4 w-4 rounded-full border-2 border-blue-500 bg-white shadow-sm"
+                  className="absolute top-1/2 -left-1.5 h-2.5 w-2.5 -translate-y-1/2 rounded-full border border-blue-300 bg-white shadow-sm"
                   style={{ cursor: "ew-resize" }}
                   onPointerDown={(e) => startDrag(e, layer.id, "resize", "left")}
                 />
                 <div
-                  className="absolute top-1/2 -translate-y-1/2 -right-2 h-4 w-4 rounded-full border-2 border-blue-500 bg-white shadow-sm"
+                  className="absolute top-1/2 -right-1.5 h-2.5 w-2.5 -translate-y-1/2 rounded-full border border-blue-300 bg-white shadow-sm"
                   style={{ cursor: "ew-resize" }}
                   onPointerDown={(e) => startDrag(e, layer.id, "resize", "right")}
                 />
 
                 {/* Y handles */}
                 <div
-                  className="absolute left-1/2 -translate-x-1/2 -top-2 h-4 w-4 rounded-full border-2 border-blue-500 bg-white shadow-sm"
+                  className="absolute left-1/2 -top-1.5 h-2.5 w-2.5 -translate-x-1/2 rounded-full border border-blue-300 bg-white shadow-sm"
                   style={{ cursor: "ns-resize" }}
                   onPointerDown={(e) => startDrag(e, layer.id, "resize", "top")}
                 />
                 <div
-                  className="absolute left-1/2 -translate-x-1/2 -bottom-2 h-4 w-4 rounded-full border-2 border-blue-500 bg-white shadow-sm"
+                  className="absolute left-1/2 -bottom-1.5 h-2.5 w-2.5 -translate-x-1/2 rounded-full border border-blue-300 bg-white shadow-sm"
                   style={{ cursor: "ns-resize" }}
                   onPointerDown={(e) => startDrag(e, layer.id, "resize", "bottom")}
                 />
@@ -2680,7 +2790,7 @@ function clampFontSizeToBoundary({
               )}
             </div>
             {isActive && (
-              <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black/75 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap">
+              <div className="absolute -top-7 left-1/2 -translate-x-1/2 rounded bg-slate-700/70 px-1.5 py-0.5 text-[9px] whitespace-nowrap text-white/90">
                 {formattedWidth}″ × {formattedHeight}″ (max {formattedMaxW}″ × {formattedMaxH}″)
               </div>
             )}
@@ -2953,6 +3063,7 @@ function DesignOverlay({
   const legacyScale = displayLayer.scale ?? 0.35;
   const sx = displayLayer.scaleX ?? legacyScale;
   const sy = displayLayer.scaleY ?? legacyScale;
+  const cropStyle = getImageCropViewportStyle(displayLayer.crop);
 
   const widthPx = canvasSize?.width ? canvasSize.width * sx : 0;
   const heightPx = canvasSize?.height ? canvasSize.height * sy : 0;
@@ -2998,7 +3109,7 @@ function DesignOverlay({
         {isActive && !disabled && (
           <button
             type="button"
-            className="absolute -left-4 -top-4 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/90 bg-white text-rose-600 shadow-lg ring-1 ring-slate-900/10"
+            className="absolute -left-2.5 -top-2.5 z-20 flex h-6 w-6 items-center justify-center rounded-full border border-white/90 bg-white text-rose-500 shadow-md ring-1 ring-slate-900/10"
             onPointerDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -3010,9 +3121,9 @@ function DesignOverlay({
             }}
             aria-label="Remove design"
           >
-            <span className="pointer-events-none relative block h-4 w-4">
-              <span className="absolute left-1/2 top-0 h-full w-[2px] -translate-x-1/2 rotate-45 rounded-full bg-current" />
-              <span className="absolute left-1/2 top-0 h-full w-[2px] -translate-x-1/2 -rotate-45 rounded-full bg-current" />
+            <span className="pointer-events-none relative block h-2.5 w-2.5">
+              <span className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 rotate-45 rounded-full bg-current" />
+              <span className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 -rotate-45 rounded-full bg-current" />
             </span>
           </button>
         )}
@@ -3020,7 +3131,7 @@ function DesignOverlay({
         <div
           className={`relative overflow-hidden rounded-sm ${
             isActive
-              ? "border-2 border-blue-500"
+              ? "border border-blue-300"
               : compact
                 ? "border border-blue-400/70"
                 : "border border-slate-300/40"
@@ -3040,9 +3151,7 @@ function DesignOverlay({
               src={normalizeImageUrl(displayLayer.imageUrl)}
               alt="design"
               style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "fill",
+                ...cropStyle,
                 opacity: isActive ? 0.96 : 0.9,
                 pointerEvents: "none",
               }}
@@ -3055,24 +3164,24 @@ function DesignOverlay({
             <>
               {/* X handles */}
               <div
-                className={`absolute top-1/2 -translate-y-1/2 -left-2 rounded bg-white border-2 border-blue-500 shadow ${compact ? "w-4 h-4" : "w-3 h-3"}`}
+                className={`absolute top-1/2 -left-1.5 -translate-y-1/2 rounded border border-blue-300 bg-white shadow-sm ${compact ? "h-2.5 w-2.5" : "h-2 w-2"}`}
                 style={{ cursor: "ew-resize" }}
                 onPointerDown={(e) => startDrag(e, "resize", "left")}
               />
               <div
-                className={`absolute top-1/2 -translate-y-1/2 -right-2 rounded bg-white border-2 border-blue-500 shadow ${compact ? "w-4 h-4" : "w-3 h-3"}`}
+                className={`absolute top-1/2 -right-1.5 -translate-y-1/2 rounded border border-blue-300 bg-white shadow-sm ${compact ? "h-2.5 w-2.5" : "h-2 w-2"}`}
                 style={{ cursor: "ew-resize" }}
                 onPointerDown={(e) => startDrag(e, "resize", "right")}
               />
 
               {/* Y handles */}
               <div
-                className={`absolute left-1/2 -translate-x-1/2 -top-2 rounded bg-white border-2 border-blue-500 shadow ${compact ? "w-4 h-4" : "w-3 h-3"}`}
+                className={`absolute left-1/2 -top-1.5 -translate-x-1/2 rounded border border-blue-300 bg-white shadow-sm ${compact ? "h-2.5 w-2.5" : "h-2 w-2"}`}
                 style={{ cursor: "ns-resize" }}
                 onPointerDown={(e) => startDrag(e, "resize", "top")}
               />
               <div
-                className={`absolute left-1/2 -translate-x-1/2 -bottom-2 rounded bg-white border-2 border-blue-500 shadow ${compact ? "w-4 h-4" : "w-3 h-3"}`}
+                className={`absolute left-1/2 -bottom-1.5 -translate-x-1/2 rounded border border-blue-300 bg-white shadow-sm ${compact ? "h-2.5 w-2.5" : "h-2 w-2"}`}
                 style={{ cursor: "ns-resize" }}
                 onPointerDown={(e) => startDrag(e, "resize", "bottom")}
               />

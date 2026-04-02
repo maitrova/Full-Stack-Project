@@ -227,6 +227,23 @@ const createDefaultTextLayer = () => ({
   initialTextSized: false,
 });
 
+const normalizeImageCrop = (crop = {}) => {
+  const rawZoom = Number(crop?.zoom);
+  const zoom = Number.isFinite(rawZoom) ? Math.min(3, Math.max(1, rawZoom)) : 1;
+  const rawOffsetX = Number(crop?.offsetX);
+  const rawOffsetY = Number(crop?.offsetY);
+
+  if (zoom <= 1.001) {
+    return { zoom: 1, offsetX: 0, offsetY: 0 };
+  }
+
+  return {
+    zoom,
+    offsetX: Number.isFinite(rawOffsetX) ? Math.min(1, Math.max(-1, rawOffsetX)) : 0,
+    offsetY: Number.isFinite(rawOffsetY) ? Math.min(1, Math.max(-1, rawOffsetY)) : 0,
+  };
+};
+
 const getInitialZoneKey = (viewCode, preferredZone = null) => {
   if (preferredZone) return preferredZone;
   if (viewCode === "back") return "back-full";
@@ -297,6 +314,7 @@ const createDesignLayer = (
 
     layerPrice,
     minimumChargeApplied: layerPrice === IMAGE_PRICE_SMALL,
+    crop: normalizeImageCrop(options.crop),
   };
 };
 
@@ -316,6 +334,7 @@ export default function DesignerPage() {
   // Design uploads state
   const DEFAULT_SIZE = "M";
   const [selectedSize, setSelectedSize] = useState(DEFAULT_SIZE);
+  const [selectedQuantity, setSelectedQuantity] = useState(1);
   const { 
     folders, 
     images, 
@@ -381,6 +400,7 @@ const getSizeBasePrice = (prod, size) => {
   const [activeTab, setActiveTab] = useState(TABS.PRODUCT_COLORS);
   const [showMobilePriceDetails, setShowMobilePriceDetails] = useState(false);
   const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
+  const [showCropControls, setShowCropControls] = useState(false);
   const [isDesktopToolsLayout, setIsDesktopToolsLayout] = useState(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
       return true;
@@ -599,6 +619,7 @@ const restoreDesignLayerFromSaved = (d) => {
     displayHeightInches: originalHeightPx / DISPLAY_DPI,
     printWidthInches: originalWidthPx / PRINT_DPI,
     printHeightInches: originalHeightPx / PRINT_DPI,
+    crop: normalizeImageCrop(d.crop),
   };
 
   // 4) recompute all dependent fields in ONE place
@@ -1078,10 +1099,23 @@ setPriceBreakdown((prev) => ({
   const { textLayers, activeTextId, designLayers, activeDesignId } = getCurrentViewState();
   const activeTextLayer = textLayers.find((l) => l.id === activeTextId) || textLayers[0];
   const activeDesign = designLayers.find((d) => d.id === activeDesignId) || null;
+  const activeDesignCrop = normalizeImageCrop(activeDesign?.crop);
   const selectedOrLatestDesign = activeDesign || designLayers[designLayers.length - 1] || null;
   const availableZonesForView = getZoneOptionsForView(viewCode, { supportsPocketZone });
   const activeDesignZone = activeDesign?.zone || availableZonesForView[0] || "front-full";
+
+  useEffect(() => {
+    if (!activeDesignId) {
+      setShowCropControls(false);
+    }
+  }, [activeDesignId]);
   const shouldUseFolderDropdown = folders.length > 6;
+  const selectedSizeStockEntry = availableSizePricing.find(
+    (entry) => String(entry?.size || "").toUpperCase() === String(selectedSize || "").toUpperCase()
+  );
+  const selectedSizeStock = selectedSizeStockEntry?.stock;
+  const maxOrderQuantity =
+    selectedSizeStock !== undefined && Number(selectedSizeStock) > 0 ? Number(selectedSizeStock) : 99;
   const customizationNames = [
     ...designLayers.map((layer, index) => getDesignLayerDisplayName(layer, index)),
     ...textLayers.map((layer, index) => getTextLayerDisplayName(layer, index)),
@@ -1090,6 +1124,10 @@ setPriceBreakdown((prev) => ({
     .filter((value, index, array) => array.indexOf(value) === index);
   const visibleCustomizationNames = customizationNames.slice(0, 3);
   const remainingCustomizationCount = Math.max(0, customizationNames.length - visibleCustomizationNames.length);
+  const refreshPriceLabel = calculatingPrice ? "Refreshing..." : "Refresh price";
+
+  const getLibraryImageUrl = (folderName, filename) =>
+    `${IMAGE_URL}/outputs/adminuploadeddesigns/${folderName}/${filename}`;
 
   const moveActiveDesignToZone = (zoneKey) => {
     if (!activeDesign || !zoneKey) return;
@@ -1134,6 +1172,25 @@ setPriceBreakdown((prev) => ({
       textLayers: remaining,
       activeTextId: newActiveId,
     });
+  };
+
+  useEffect(() => {
+    setSelectedQuantity((prev) => {
+      const next = Number(prev || 1);
+      if (next < 1) return 1;
+      return Math.min(next, maxOrderQuantity);
+    });
+  }, [maxOrderQuantity]);
+
+  const updateSelectedQuantity = (nextValue) => {
+    const parsed = Number(nextValue);
+    if (!Number.isFinite(parsed)) {
+      setSelectedQuantity(1);
+      return;
+    }
+
+    const normalized = Math.max(1, Math.min(Math.floor(parsed), maxOrderQuantity));
+    setSelectedQuantity(normalized);
   };
 
 const handleDesignUpload = async (e) => {
@@ -1220,7 +1277,7 @@ const handleDesignUpload = async (e) => {
         setError("");
         
         // Construct full URL for the image from design library
-        const imageUrl = `${IMAGE_URL}/outputs/adminuploadeddesigns/${currentFolder}/${image.filename}`;
+        const imageUrl = getLibraryImageUrl(currentFolder, image.filename);
       
       // Fetch the image to create a file object for background removal
       console.log("Fetching image from library...");
@@ -1554,6 +1611,27 @@ const nudgeDesignScaleAxis = (axis, delta) => {
   handleDesignScaleYChange(next);
 };
 
+const handleActiveDesignCropChange = (patch) => {
+  if (!activeDesign) return;
+
+  const updated = designLayers.map((designLayer) => {
+    if (designLayer.id !== activeDesign.id) return designLayer;
+    return {
+      ...designLayer,
+      crop: normalizeImageCrop({
+        ...(designLayer.crop || {}),
+        ...patch,
+      }),
+    };
+  });
+
+  updateCurrentViewState({ designLayers: updated });
+};
+
+const handleResetActiveDesignCrop = () => {
+  handleActiveDesignCropChange({ zoom: 1, offsetX: 0, offsetY: 0 });
+};
+
   const handleSetTextLayers = (updater) => {
     setViewStates((prev) => {
       const existing = prev[viewCode];
@@ -1701,8 +1779,11 @@ const nudgeDesignScaleAxis = (axis, delta) => {
     x,
     y,
     scale,
+    scaleX,
+    scaleY,
     rotation,
     zone,
+    crop,
     insideSafeArea,
 
     originalWidthPx,
@@ -1746,7 +1827,10 @@ const nudgeDesignScaleAxis = (axis, delta) => {
     x,
     y,
     scale,
+    scaleX,
+    scaleY,
     rotation,
+    crop: normalizeImageCrop(crop),
 
     zone: zone === "pocket" ? "front-pocket" : (zone || null),
 
@@ -1896,7 +1980,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
       kind: "DESIGN",
       design: designIdToUse,
       productId: product?._id || product?.id,
-      qty: 1,
+      qty: selectedQuantity,
       size: selectedSize,
       selectedSize,
       productColor,
@@ -1911,6 +1995,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
       productId: product?._id || product?.id || null,
       designId: designIdToUse,
       selectedSize,
+      qty: selectedQuantity,
       productColor,
       price,
       payload: cartPayload,
@@ -1931,6 +2016,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
       productId: product?._id || product?.id || null,
       designId: designIdToUse || null,
       selectedSize,
+      qty: selectedQuantity,
       productColor,
       error: e,
     });
@@ -2180,7 +2266,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                   disabled={calculatingPrice}
                   className="mt-1 text-[11px] font-medium text-emerald-700 disabled:opacity-60"
                 >
-                  {calculatingPrice ? "Refreshing..." : "Refresh price"}
+                  {refreshPriceLabel}
                 </button>
               </div>
             </div>
@@ -2229,7 +2315,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                 disabled={calculatingPrice}
                 className="rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-emerald-700 disabled:opacity-50"
               >
-                {calculatingPrice ? "Refreshing..." : "Refresh"}
+                {refreshPriceLabel}
               </button>
             </div>
           </div>
@@ -2351,8 +2437,50 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                     )}
                   </div>
 
+                  <div className="mt-5">
+                    <h3 className="mb-2 font-semibold text-sm">Quantity</h3>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-medium text-slate-700">Order quantity</p>
+                          <p className="mt-1 text-[11px] text-slate-500">
+                            {selectedSizeStock !== undefined
+                              ? `${maxOrderQuantity} item${maxOrderQuantity === 1 ? "" : "s"} available for size ${selectedSize || "Default"}`
+                              : "Choose how many customized pieces you want to order."}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => updateSelectedQuantity(selectedQuantity - 1)}
+                            disabled={selectedQuantity <= 1}
+                            className="h-9 w-9 rounded-full border border-slate-300 bg-white text-base font-semibold text-slate-700 disabled:opacity-40"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min={1}
+                            max={maxOrderQuantity}
+                            value={selectedQuantity}
+                            onChange={(e) => updateSelectedQuantity(e.target.value)}
+                            className="w-16 rounded-xl border border-slate-300 px-2 py-2 text-center text-sm font-semibold text-slate-800 outline-none focus:border-sky-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => updateSelectedQuantity(selectedQuantity + 1)}
+                            disabled={selectedQuantity >= maxOrderQuantity}
+                            className="h-9 w-9 rounded-full border border-slate-300 bg-white text-base font-semibold text-slate-700 disabled:opacity-40"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Quick Select */}
-                  <div className="mb-2">
+                  <div className="mb-2 hidden sm:block">
                     <label className="mb-2 block text-xs font-medium">Quick Select</label>
                     <div className="grid grid-cols-5 gap-2 sm:grid-cols-6">
                       {productColorOptions.map((option) => {
@@ -2455,47 +2583,24 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                               ? "Removing…"
                               : activeDesign.hasBgRemoved
                                 ? "BG Removed"
-                                : "Remove BG"}
+                              : "Remove BG"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowCropControls((prev) => !prev)}
+                            className={`rounded border px-2 py-1 text-xs font-medium ${
+                              showCropControls
+                                ? "border-sky-500 bg-sky-50 text-sky-700"
+                                : "border-slate-300 text-slate-600 hover:bg-slate-50"
+                            }`}
+                          >
+                            {showCropControls ? "Hide Crop" : "Crop"}
                           </button>
                           <button type="button" onClick={clearActiveDesign} className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">
                             Clear
                           </button>
                         </div>
 
-                        {availableZonesForView.length > 1 && (
-                          <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
-                            <div className="mb-2 flex items-center justify-between">
-                              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                                Move To Zone
-                              </span>
-                              <span className="text-[11px] text-slate-500">
-                                Current: {ZONE_LABELS[activeDesignZone] || activeDesignZone}
-                              </span>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {availableZonesForView.map((zoneKey) => {
-                                const isCurrentZone = activeDesignZone === zoneKey;
-                                return (
-                                  <button
-                                    key={zoneKey}
-                                    type="button"
-                                    onClick={() => moveActiveDesignToZone(zoneKey)}
-                                    disabled={isCurrentZone}
-                                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                                      isCurrentZone
-                                        ? "cursor-default bg-sky-100 text-sky-700"
-                                        : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                                    }`}
-                                  >
-                                    {isCurrentZone
-                                      ? `In ${ZONE_LABELS[zoneKey] || zoneKey}`
-                                      : `Move to ${ZONE_LABELS[zoneKey] || zoneKey}`}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
                       </div>
 
                       <div className="mb-4">
@@ -2509,6 +2614,77 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                           <div>Print: {activeDesign.currentPrintWidthInches?.toFixed(2)}" × {activeDesign.currentPrintHeightInches?.toFixed(2)}"</div>
                         </div>
                       </div>
+
+                      {showCropControls && (
+                      <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50/60 p-3">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-xs font-medium text-slate-700">Crop Image</div>
+                            <div className="text-[10px] text-slate-500">Zoom in, then shift the visible area inside the design box.</div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleResetActiveDesignCrop}
+                            disabled={activeDesignCrop.zoom === 1 && activeDesignCrop.offsetX === 0 && activeDesignCrop.offsetY === 0}
+                            className="rounded border border-slate-300 bg-white px-2 py-1 text-[10px] font-medium text-slate-600 disabled:opacity-40"
+                          >
+                            Reset crop
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div>
+                            <div className="mb-1 flex items-center justify-between text-[11px] text-slate-600">
+                              <span>Crop zoom</span>
+                              <span>{activeDesignCrop.zoom.toFixed(2)}x</span>
+                            </div>
+                            <input
+                              type="range"
+                              min={1}
+                              max={3}
+                              step={0.05}
+                              value={activeDesignCrop.zoom}
+                              onChange={(e) => handleActiveDesignCropChange({ zoom: parseFloat(e.target.value) || 1 })}
+                              className="w-full"
+                            />
+                          </div>
+
+                          <div>
+                            <div className="mb-1 flex items-center justify-between text-[11px] text-slate-600">
+                              <span>Crop left / right</span>
+                              <span>{Math.round(activeDesignCrop.offsetX * 100)}%</span>
+                            </div>
+                            <input
+                              type="range"
+                              min={-1}
+                              max={1}
+                              step={0.01}
+                              value={activeDesignCrop.offsetX}
+                              disabled={activeDesignCrop.zoom <= 1.01}
+                              onChange={(e) => handleActiveDesignCropChange({ offsetX: parseFloat(e.target.value) || 0 })}
+                              className="w-full disabled:opacity-40"
+                            />
+                          </div>
+
+                          <div>
+                            <div className="mb-1 flex items-center justify-between text-[11px] text-slate-600">
+                              <span>Crop up / down</span>
+                              <span>{Math.round(activeDesignCrop.offsetY * 100)}%</span>
+                            </div>
+                            <input
+                              type="range"
+                              min={-1}
+                              max={1}
+                              step={0.01}
+                              value={activeDesignCrop.offsetY}
+                              disabled={activeDesignCrop.zoom <= 1.01}
+                              onChange={(e) => handleActiveDesignCropChange({ offsetY: parseFloat(e.target.value) || 0 })}
+                              className="w-full disabled:opacity-40"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      )}
 
                       <div className="mb-4 space-y-3 sm:hidden">
                         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -2813,12 +2989,12 @@ const nudgeDesignScaleAxis = (axis, delta) => {
         </aside>
 
         {isLibraryModalOpen && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/55 p-3 sm:p-6">
-            <div className="flex h-[min(88vh,760px)] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/55 p-0 sm:p-6">
+            <div className="flex h-full w-full max-w-none flex-col overflow-hidden rounded-none border-0 bg-white shadow-2xl sm:h-[min(88vh,760px)] sm:max-w-5xl sm:rounded-[28px] sm:border sm:border-slate-200">
               <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-6">
                 <div>
                   <h3 className="text-base font-semibold text-slate-900">Design Library</h3>
-                  <p className="mt-1 text-xs text-slate-500">Browse folders, upload a design, or pick one from the library.</p>
+                  <p className="mt-1 text-xs text-slate-500">Pick a folder and tap any image to use it.</p>
                 </div>
                 <button
                   type="button"
@@ -2829,62 +3005,69 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                 </button>
               </div>
 
-              <div className="grid gap-0 overflow-hidden lg:grid-cols-[280px_minmax(0,1fr)]">
+              <div className="grid gap-0 overflow-hidden lg:grid-cols-[260px_minmax(0,1fr)]">
                 <div className="border-b border-slate-200 bg-slate-50/80 p-4 lg:border-b-0 lg:border-r">
                   <div>
-                    <label className="mb-2 block text-xs font-medium text-slate-700">Upload a design</label>
-                    <input
-                      type="file"
-                      accept={SUPPORTED_DESIGN_ACCEPT}
-                      multiple
-                      onChange={handleDesignUpload}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs"
-                    />
-                    <p className="mt-2 text-[11px] text-slate-500">Uploaded files go straight into your editable design layers.</p>
-                    <p className="mt-1 text-[11px] text-amber-700">{REMOVE_BG_RECOMMENDATION}</p>
-                    <p className="mt-1 text-[11px] text-slate-500">Supported formats: {SUPPORTED_DESIGN_FORMATS_LABEL}.</p>
-                    </div>
-
-                  <div className="mt-5">
                     <label className="mb-2 block text-xs font-medium text-slate-700">Folders</label>
-                    {shouldUseFolderDropdown ? (
-                      <div className="space-y-2">
-                        <select
-                          value={currentFolder || ""}
-                          onChange={(e) => dispatch(setCurrentFolder(e.target.value))}
-                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-sky-400"
-                        >
-                          <option value="" disabled>
-                            Select a folder
-                          </option>
-                          {folders.map((folder) => (
-                            <option key={folder} value={folder}>
-                              {folder}
-                            </option>
-                          ))}
-                        </select>
-                        <p className="text-[11px] text-slate-500">
-                          {folders.length} folders available. Use the dropdown to switch quickly without hiding the designs.
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="flex max-h-[220px] flex-wrap gap-2 overflow-y-auto pr-1 lg:max-h-[420px]">
+                    <div className="space-y-2 sm:hidden">
+                      <select
+                        value={currentFolder || ""}
+                        onChange={(e) => dispatch(setCurrentFolder(e.target.value))}
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-sky-400"
+                      >
+                        <option value="" disabled>
+                          Select a folder
+                        </option>
                         {folders.map((folder) => (
-                          <button
-                            key={folder}
-                            type="button"
-                            onClick={() => dispatch(setCurrentFolder(folder))}
-                            className={`rounded-full border px-3 py-1.5 text-xs ${
-                              currentFolder === folder
-                                ? "border-sky-300 bg-sky-100 text-sky-700"
-                                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
-                            }`}
-                          >
+                          <option key={folder} value={folder}>
                             {folder}
-                          </button>
+                          </option>
                         ))}
-                      </div>
-                    )}
+                      </select>
+                      <p className="text-[11px] text-slate-500">
+                        Browse folders from the dropdown to keep the gallery easy to scan on mobile.
+                      </p>
+                    </div>
+                    <div className="hidden sm:block">
+                      {shouldUseFolderDropdown ? (
+                        <div className="space-y-2">
+                          <select
+                            value={currentFolder || ""}
+                            onChange={(e) => dispatch(setCurrentFolder(e.target.value))}
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-sky-400"
+                          >
+                            <option value="" disabled>
+                              Select a folder
+                            </option>
+                            {folders.map((folder) => (
+                              <option key={folder} value={folder}>
+                                {folder}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="text-[11px] text-slate-500">
+                            {folders.length} folders available. Use the dropdown to switch quickly without hiding the designs.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex max-h-[180px] flex-wrap gap-2 overflow-y-auto pr-1 lg:max-h-[220px]">
+                          {folders.map((folder) => (
+                            <button
+                              key={folder}
+                              type="button"
+                              onClick={() => dispatch(setCurrentFolder(folder))}
+                              className={`rounded-full border px-3 py-1.5 text-xs ${
+                                currentFolder === folder
+                                  ? "border-sky-300 bg-sky-100 text-sky-700"
+                                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                              }`}
+                            >
+                              {folder}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -2915,23 +3098,27 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                         Loading designs...
                       </div>
                     ) : currentFolder && images.length > 0 ? (
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
                         {images.map((image) => (
                           <button
                             key={image.filename}
                             type="button"
                             onClick={() => handleSelectFromLibrary(image)}
-                            className="group text-left"
+                            className="overflow-hidden rounded-[22px] border border-slate-200 bg-slate-50 text-left transition hover:border-sky-300 hover:bg-sky-50/60"
                           >
-                            <div className="aspect-square overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                            <div className="aspect-square overflow-hidden bg-white p-3">
                               <img
-                                src={`${IMAGE_URL}/outputs/adminuploadeddesigns/${currentFolder}/${image.filename}`}
+                                src={getLibraryImageUrl(currentFolder, image.filename)}
                                 alt={image.filename}
-                                className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+                                className="h-full w-full rounded-2xl object-cover"
                                 loading="lazy"
                               />
                             </div>
-                            <div className="mt-2 truncate text-[11px] text-slate-600">{image.filename}</div>
+
+                            <div className="px-3 pb-3 pt-2">
+                              <p className="truncate text-xs font-medium text-slate-700">{image.filename}</p>
+                              <p className="mt-1 text-[11px] text-slate-500">Tap image to use</p>
+                            </div>
                           </button>
                         ))}
                       </div>
@@ -2939,7 +3126,7 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                       <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
                         <div>
                           <p className="text-sm font-medium text-slate-700">No designs in this folder</p>
-                          <p className="mt-1 text-xs text-slate-500">Upload a design above or choose another folder.</p>
+                          <p className="mt-1 text-xs text-slate-500">Choose another folder from the left.</p>
                         </div>
                       </div>
                     ) : (
@@ -3025,31 +3212,58 @@ const nudgeDesignScaleAxis = (axis, delta) => {
               {customizableViews.length > 0 && (
                 <div className="border-b border-slate-200 bg-white px-3 py-2 sm:hidden">
                   <div className="mb-1.5 flex items-start justify-between gap-2">
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">View</p>
                       <p className="text-[11px] font-medium leading-none text-slate-700">
                         {customizableViews.find((v) => v.code === viewCode)?.label || "Front view"}
                       </p>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <div className="min-w-0 text-right">
-                        <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          Customize
-                        </p>
-                        <p className="truncate text-[11px] font-medium leading-none text-slate-700">
-                          {product?.name || "Custom Product"}
-                        </p>
-                        <p className="truncate text-[10px] leading-none text-slate-500">
-                          {productColorName} / {selectedSize || "Default"}
-                        </p>
+                      <div className="mt-1.5 flex items-center gap-2 overflow-x-auto pb-0.5">
+                        <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          Color
+                        </span>
+                        {productColorOptions.map((option) => {
+                          const currentColorKey = productColor?.toLowerCase() || "";
+                          const isActive = option.value.toLowerCase() === currentColorKey;
+
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              aria-label={option.label}
+                              title={option.label}
+                              onClick={() => handleColorChange(option.value, option.label)}
+                              className={`h-5 w-5 shrink-0 rounded-full border ${
+                                isActive ? "border-sky-500 ring-1 ring-sky-200" : "border-slate-300"
+                              }`}
+                              style={{ backgroundColor: option.value }}
+                            />
+                          );
+                        })}
                       </div>
+                      <p className="truncate text-[10px] text-slate-500">
+                        {productColorName} / {selectedSize || "Default"} / Qty {selectedQuantity}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1.5">
                       <button
                         type="button"
                         onClick={handleSaveDesign}
                         disabled={saving || addingToCart}
-                        className="shrink-0 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-700 disabled:opacity-50"
+                        className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-700 disabled:opacity-50"
                       >
                         {saving ? "Saving..." : isEditMode ? "Update" : "Save"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveAndAddToCart}
+                        disabled={saving || addingToCart}
+                        className="rounded-full border border-emerald-600 bg-emerald-600 px-2.5 py-1 text-[10px] font-semibold text-white disabled:opacity-50"
+                      >
+                        {addingToCart
+                          ? "Adding..."
+                          : savedDesignId
+                            ? "Add to Cart"
+                            : "Save & Cart"}
                       </button>
                     </div>
                   </div>
@@ -3097,6 +3311,9 @@ const nudgeDesignScaleAxis = (axis, delta) => {
                     onDesignRenderWidthChange={setDesignRenderWidth}
                     isAdmin={isAdmin}
                     selectedView={viewCode}
+                    zoneOptions={availableZonesForView}
+                    activeDesignZone={activeDesignZone}
+                    onMoveActiveDesignToZone={moveActiveDesignToZone}
                   />
                 ) : (
                   <div className="text-sm text-slate-500 text-center">{product?.name ? `No view configuration found for ${product.name}` : "Product not loaded"}</div>
@@ -3114,8 +3331,13 @@ const nudgeDesignScaleAxis = (axis, delta) => {
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-green-800">Price Breakdown</h3>
               
-              <button onClick={() => calculatePrice()} disabled={calculatingPrice} className="text-xs text-green-600 hover:text-green-800">
-                {calculatingPrice ? "Calculating..." : "↻"}
+              <button
+                type="button"
+                onClick={() => calculatePrice()}
+                disabled={calculatingPrice}
+                className="rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-emerald-700 disabled:opacity-50"
+              >
+                {refreshPriceLabel}
               </button>
             </div>
             <div className="text-xs text-slate-500 mt-1">Real-time price calculation</div>

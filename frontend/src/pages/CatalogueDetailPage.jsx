@@ -257,26 +257,23 @@ export default function CatalogueDetailPage() {
       const designKind = design.kind || "DESIGN";
       const kind = designKind.toUpperCase() === "READYMADE" ? "READYMADE" : "DESIGN";
 
-      const fd = new FormData();
-      fd.append("designId", design._id);
-      fd.append("productId", design.product?._id || design.productId || "");
-      fd.append("title", design.title || design.productName || "");
-      fd.append("unitPrice", String(currentPrice));
-      fd.append("basePrice", String(design.product?.basePrice || currentPrice));
-      fd.append("qty", "1");
-      fd.append("previewImage", design.previewImage || design.views?.[0]?.previewImage || "");
-      fd.append("signature", `${design._id}-${design.product?._id || design.productId || ""}-${selectedSize}`);
-      fd.append("kind", kind);
-      fd.append("size", selectedSize);
-      fd.append("views", JSON.stringify(design.views || []));
-      
-      // Add price details if available
-      if (priceDetails) {
-        fd.append("priceDetails", JSON.stringify(priceDetails));
-      }
+      const cartData = {
+        designId: design._id,
+        productId: design.product?._id || design.productId || "",
+        title: design.title || design.productName || "",
+        unitPrice: currentPrice,
+        basePrice: design.product?.basePrice || currentPrice,
+        qty: 1,
+        previewImage: design.previewImage || design.views?.[0]?.previewImage || "",
+        signature: `${design._id}-${design.product?._id || design.productId || ""}-${selectedSize}`,
+        kind,
+        size: selectedSize,
+        views: design.views || [],
+        ...(priceDetails ? { priceDetails } : {}),
+      };
 
       setLocalCartQuantity(1);
-      await dispatch(addToCart(fd)).unwrap();
+      await dispatch(addToCart(cartData)).unwrap();
       setTimeout(() => setLocalCartQuantity(0), 2000);
     } catch (error) {
       console.error("Failed to add to cart:", error);

@@ -262,7 +262,7 @@ const Header = () => {
             </div>
             <p className="text-gray-600 mb-6">Your cart is empty</p>
             <Link 
-              to="/products"
+              to="/allproducts"
               className="inline-block bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
               onClick={() => setShowDropdown(false)}
             >
