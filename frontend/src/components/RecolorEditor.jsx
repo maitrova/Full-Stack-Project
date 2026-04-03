@@ -128,19 +128,45 @@ function normalizeImageUrl(url) {
 }
 
 function normalizeImageCrop(crop = {}) {
-  const rawZoom = Number(crop?.zoom);
-  const zoom = Number.isFinite(rawZoom) ? Math.min(3, Math.max(1, rawZoom)) : 1;
+  const legacyZoom = Number(crop?.zoom);
+  const derivedWidthRatio =
+    Number.isFinite(Number(crop?.widthRatio))
+      ? Number(crop.widthRatio)
+      : Number.isFinite(legacyZoom) && legacyZoom > 1
+        ? 1 / legacyZoom
+        : 1;
+  const derivedHeightRatio =
+    Number.isFinite(Number(crop?.heightRatio))
+      ? Number(crop.heightRatio)
+      : Number.isFinite(legacyZoom) && legacyZoom > 1
+        ? 1 / legacyZoom
+        : 1;
+  const widthRatio = Math.min(1, Math.max(0.15, derivedWidthRatio));
+  const heightRatio = Math.min(1, Math.max(0.15, derivedHeightRatio));
   const rawOffsetX = Number(crop?.offsetX);
   const rawOffsetY = Number(crop?.offsetY);
-
-  if (zoom <= 1.001) {
-    return { zoom: 1, offsetX: 0, offsetY: 0 };
-  }
+  const normalizedOffsetX = Number.isFinite(rawOffsetX) ? Math.min(1, Math.max(-1, rawOffsetX)) : 0;
+  const normalizedOffsetY = Number.isFinite(rawOffsetY) ? Math.min(1, Math.max(-1, rawOffsetY)) : 0;
+  const sideMarginX = (1 - widthRatio) / 2;
+  const sideMarginY = (1 - heightRatio) / 2;
+  const rawLeftRatio = Number(crop?.leftRatio);
+  const rawTopRatio = Number(crop?.topRatio);
+  const leftRatio = Number.isFinite(rawLeftRatio)
+    ? Math.max(0, Math.min(1 - widthRatio, rawLeftRatio))
+    : Math.max(0, Math.min(1 - widthRatio, sideMarginX + normalizedOffsetX * sideMarginX));
+  const topRatio = Number.isFinite(rawTopRatio)
+    ? Math.max(0, Math.min(1 - heightRatio, rawTopRatio))
+    : Math.max(0, Math.min(1 - heightRatio, sideMarginY + normalizedOffsetY * sideMarginY));
+  const offsetX = sideMarginX <= 1e-6 ? 0 : (leftRatio - sideMarginX) / sideMarginX;
+  const offsetY = sideMarginY <= 1e-6 ? 0 : (topRatio - sideMarginY) / sideMarginY;
 
   return {
-    zoom,
-    offsetX: Number.isFinite(rawOffsetX) ? Math.min(1, Math.max(-1, rawOffsetX)) : 0,
-    offsetY: Number.isFinite(rawOffsetY) ? Math.min(1, Math.max(-1, rawOffsetY)) : 0,
+    widthRatio,
+    heightRatio,
+    leftRatio,
+    topRatio,
+    offsetX,
+    offsetY,
   };
 }
 
@@ -149,23 +175,14 @@ function getImageCropSourceRect(img, crop = {}) {
   const naturalWidth = Math.max(1, img?.naturalWidth || img?.width || 1);
   const naturalHeight = Math.max(1, img?.naturalHeight || img?.height || 1);
 
-  if (normalizedCrop.zoom <= 1.001) {
-    return {
-      srcX: 0,
-      srcY: 0,
-      srcWidth: naturalWidth,
-      srcHeight: naturalHeight,
-    };
-  }
-
-  const srcWidth = naturalWidth / normalizedCrop.zoom;
-  const srcHeight = naturalHeight / normalizedCrop.zoom;
+  const srcWidth = naturalWidth * normalizedCrop.widthRatio;
+  const srcHeight = naturalHeight * normalizedCrop.heightRatio;
   const maxShiftX = Math.max(0, (naturalWidth - srcWidth) / 2);
   const maxShiftY = Math.max(0, (naturalHeight - srcHeight) / 2);
 
   return {
-    srcX: maxShiftX + normalizedCrop.offsetX * maxShiftX,
-    srcY: maxShiftY + normalizedCrop.offsetY * maxShiftY,
+    srcX: naturalWidth * normalizedCrop.leftRatio,
+    srcY: naturalHeight * normalizedCrop.topRatio,
     srcWidth,
     srcHeight,
   };
@@ -173,11 +190,10 @@ function getImageCropSourceRect(img, crop = {}) {
 
 function getImageCropViewportStyle(crop = {}) {
   const normalizedCrop = normalizeImageCrop(crop);
-  const zoom = normalizedCrop.zoom;
-  const widthPercent = zoom * 100;
-  const heightPercent = zoom * 100;
-  const leftPercent = ((1 - zoom) * 50) + normalizedCrop.offsetX * ((zoom - 1) * 50);
-  const topPercent = ((1 - zoom) * 50) + normalizedCrop.offsetY * ((zoom - 1) * 50);
+  const widthPercent = (1 / normalizedCrop.widthRatio) * 100;
+  const heightPercent = (1 / normalizedCrop.heightRatio) * 100;
+  const leftPercent = -((normalizedCrop.leftRatio / Math.max(normalizedCrop.widthRatio, 1e-6)) * 100);
+  const topPercent = -((normalizedCrop.topRatio / Math.max(normalizedCrop.heightRatio, 1e-6)) * 100);
 
   return {
     position: "absolute",
@@ -506,6 +522,17 @@ function getPrintableAreaPx(canvasSize, boundary) {
 function inchesFromPx(px, zonePx, zoneInches) {
   if (!zonePx || zonePx <= 0) return 0;
   return (px / zonePx) * zoneInches;
+}
+
+function resolveZoneKeyForActiveView(layer, zonesForView = []) {
+  const fallbackZone = zonesForView[0] || getBoundaryKeyForTextLayer(layer);
+  const requestedZone = layer?.zone || fallbackZone;
+
+  if (!Array.isArray(zonesForView) || zonesForView.length === 0) {
+    return requestedZone;
+  }
+
+  return zonesForView.includes(requestedZone) ? requestedZone : fallbackZone;
 }
 
 function clampScaleToMaxInches({
@@ -1363,6 +1390,9 @@ function normalizeImageLayerToBoundary(
 
   let scaleX = layer.scaleX ?? layer.scale ?? 0.35;
   let scaleY = layer.scaleY ?? layer.scale ?? 0.35;
+  const crop = normalizeImageCrop(layer.crop);
+  const cropWidthRatio = crop.widthRatio || 1;
+  const cropHeightRatio = crop.heightRatio || 1;
 
   scaleX = Math.max(0.02, Math.min(scaleX, boundaryWidth));
   scaleY = Math.max(0.02, Math.min(scaleY, boundaryHeight));
@@ -1376,12 +1406,18 @@ function normalizeImageLayerToBoundary(
       ? layer.y
       : (boundary.minY + boundary.maxY) / 2;
 
-  const constrained = constrainCenterToBoundary(x, y, boundary, scaleX / 2, scaleY / 2);
+  const constrained = constrainCenterToBoundary(
+    x,
+    y,
+    boundary,
+    (scaleX * cropWidthRatio) / 2,
+    (scaleY * cropHeightRatio) / 2
+  );
   x = constrained.x;
   y = constrained.y;
 
-  let renderedWidthPx = canvasSize.width * scaleX;
-  let renderedHeightPx = canvasSize.height * scaleY;
+  let renderedWidthPx = canvasSize.width * scaleX * cropWidthRatio;
+  let renderedHeightPx = canvasSize.height * scaleY * cropHeightRatio;
   const zonePx = getPrintableAreaPx(canvasSize, boundary);
   let renderedWidthInches = inchesFromPx(renderedWidthPx, zonePx.widthPx, spec.maxW);
   let renderedHeightInches = inchesFromPx(renderedHeightPx, zonePx.heightPx, spec.maxH);
@@ -1396,12 +1432,18 @@ function normalizeImageLayerToBoundary(
   scaleX = Math.max(0.02, Math.min(scaleX, boundaryWidth));
   scaleY = Math.max(0.02, Math.min(scaleY, boundaryHeight));
 
-  const reconstrained = constrainCenterToBoundary(x, y, boundary, scaleX / 2, scaleY / 2);
+  const reconstrained = constrainCenterToBoundary(
+    x,
+    y,
+    boundary,
+    (scaleX * cropWidthRatio) / 2,
+    (scaleY * cropHeightRatio) / 2
+  );
   x = reconstrained.x;
   y = reconstrained.y;
 
-  renderedWidthPx = canvasSize.width * scaleX;
-  renderedHeightPx = canvasSize.height * scaleY;
+  renderedWidthPx = canvasSize.width * scaleX * cropWidthRatio;
+  renderedHeightPx = canvasSize.height * scaleY * cropHeightRatio;
   renderedWidthInches = inchesFromPx(renderedWidthPx, zonePx.widthPx, spec.maxW);
   renderedHeightInches = inchesFromPx(renderedHeightPx, zonePx.heightPx, spec.maxH);
 
@@ -1860,10 +1902,13 @@ async function drawAll() {
         const legacyScale = layer.scale ?? 0.35;
         const scaleX = layer.scaleX ?? legacyScale;
         const scaleY = layer.scaleY ?? legacyScale;
+        const crop = normalizeImageCrop(layer.crop);
+        const cropWidthRatio = crop.widthRatio || 1;
+        const cropHeightRatio = crop.heightRatio || 1;
 
         // ✅ Independent draw size from canvas dims
-        let drawW = baseCanvasW * scaleX;
-        let drawH = baseCanvasH * scaleY;
+        let drawW = baseCanvasW * scaleX * cropWidthRatio;
+        let drawH = baseCanvasH * scaleY * cropHeightRatio;
 
         const zoneKey = getBoundaryKeyForLayer(layer);
         const zoneBoundary =
@@ -2351,7 +2396,7 @@ function clampFontSizeToBoundary({
       return layer;
     }
 
-    const zoneKey = targetLayer.zone || getBoundaryKeyForTextLayer(targetLayer);
+    const zoneKey = resolveZoneKeyForActiveView(targetLayer, zonesForView);
     const boundary =
       boundaries?.[zoneKey] ||
       FALLBACK_BOUNDARIES?.[zoneKey] ||
@@ -2531,7 +2576,7 @@ function clampFontSizeToBoundary({
         const textLayer = textLayers.find((l) => l.id === id);
         if (!textLayer || !canvasSize) return;
 
-        const currentZoneKey = getBoundaryKeyForTextLayer(textLayer);
+        const currentZoneKey = resolveZoneKeyForActiveView(textLayer, zonesForView);
 
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
@@ -2602,7 +2647,7 @@ function clampFontSizeToBoundary({
         nextScaleX = Math.max(0.2, Math.min(5, nextScaleX));
         nextScaleY = Math.max(0.2, Math.min(5, nextScaleY));
 
-        const zoneKeyForResize = layerNow.zone || getBoundaryKeyForTextLayer(layerNow);
+        const zoneKeyForResize = resolveZoneKeyForActiveView(layerNow, zonesForView);
         const measurementPatchResize = normalizeTextLayerToBoundary(layerNow, {
           scaleX: nextScaleX,
           scaleY: nextScaleY,
@@ -2876,9 +2921,12 @@ function DesignOverlay({
         const legacyScale = liveLayer.scale ?? initialLayer.scale ?? 0.35;
         const scaleX = liveLayer.scaleX ?? legacyScale;
         const scaleY = liveLayer.scaleY ?? legacyScale;
+        const crop = normalizeImageCrop(liveLayer.crop);
+        const cropWidthRatio = crop.widthRatio || 1;
+        const cropHeightRatio = crop.heightRatio || 1;
 
-        const halfW = scaleX / 2;
-        const halfH = scaleY / 2;
+        const halfW = (scaleX * cropWidthRatio) / 2;
+        const halfH = (scaleY * cropHeightRatio) / 2;
         const allowedZones = zoneSource.length ? zoneSource : [currentZoneKey];
         const fittingZone =
           pickZoneForLayerRect(
@@ -2931,24 +2979,27 @@ function DesignOverlay({
         const legacy = initialLayer.scale ?? 0.35;
         let nextScaleX = initialLayer.scaleX ?? legacy;
         let nextScaleY = initialLayer.scaleY ?? legacy;
+        const crop = normalizeImageCrop(initialLayer.crop);
+        const cropWidthRatio = crop.widthRatio || 1;
+        const cropHeightRatio = crop.heightRatio || 1;
 
         const maxHalfWNorm = Math.max(0, Math.min(cx - boundary.minX, boundary.maxX - cx));
         const maxHalfHNorm = Math.max(0, Math.min(cy - boundary.minY, boundary.maxY - cy));
-        const maxScaleX = Math.max(0.02, 2 * maxHalfWNorm);
-        const maxScaleY = Math.max(0.02, 2 * maxHalfHNorm);
+        const maxScaleX = Math.max(0.02, (2 * maxHalfWNorm) / Math.max(cropWidthRatio, 1e-6));
+        const maxScaleY = Math.max(0.02, (2 * maxHalfHNorm) / Math.max(cropHeightRatio, 1e-6));
 
         if (handle === "right") {
-          const newWpx = baseW * nextScaleX + dxPx;
-          nextScaleX = baseW ? newWpx / baseW : nextScaleX;
+          const newWpx = baseW * nextScaleX * cropWidthRatio + dxPx;
+          nextScaleX = baseW ? newWpx / Math.max(baseW * cropWidthRatio, 1e-6) : nextScaleX;
         } else if (handle === "left") {
-          const newWpx = baseW * nextScaleX - dxPx;
-          nextScaleX = baseW ? newWpx / baseW : nextScaleX;
+          const newWpx = baseW * nextScaleX * cropWidthRatio - dxPx;
+          nextScaleX = baseW ? newWpx / Math.max(baseW * cropWidthRatio, 1e-6) : nextScaleX;
         } else if (handle === "bottom") {
-          const newHpx = baseH * nextScaleY + dyPx;
-          nextScaleY = baseH ? newHpx / baseH : nextScaleY;
+          const newHpx = baseH * nextScaleY * cropHeightRatio + dyPx;
+          nextScaleY = baseH ? newHpx / Math.max(baseH * cropHeightRatio, 1e-6) : nextScaleY;
         } else if (handle === "top") {
-          const newHpx = baseH * nextScaleY - dyPx;
-          nextScaleY = baseH ? newHpx / baseH : nextScaleY;
+          const newHpx = baseH * nextScaleY * cropHeightRatio - dyPx;
+          nextScaleY = baseH ? newHpx / Math.max(baseH * cropHeightRatio, 1e-6) : nextScaleY;
         }
 
         nextScaleX = Math.max(0.02, Math.min(nextScaleX, maxScaleX));
@@ -3063,10 +3114,11 @@ function DesignOverlay({
   const legacyScale = displayLayer.scale ?? 0.35;
   const sx = displayLayer.scaleX ?? legacyScale;
   const sy = displayLayer.scaleY ?? legacyScale;
+  const displayCrop = normalizeImageCrop(displayLayer.crop);
   const cropStyle = getImageCropViewportStyle(displayLayer.crop);
 
-  const widthPx = canvasSize?.width ? canvasSize.width * sx : 0;
-  const heightPx = canvasSize?.height ? canvasSize.height * sy : 0;
+  const widthPx = canvasSize?.width ? canvasSize.width * sx * displayCrop.widthRatio : 0;
+  const heightPx = canvasSize?.height ? canvasSize.height * sy * displayCrop.heightRatio : 0;
   const compactHitPadding = 0;
   const centerXPx = (displayLayer.x ?? 0.5) * (canvasSize?.width || 0);
   const centerYPx = (displayLayer.y ?? 0.5) * (canvasSize?.height || 0);

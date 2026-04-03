@@ -34,9 +34,10 @@ const PRICE_PER_SQ_INCH = 6;
 const MINIMUM_DESIGN_CHARGE = 30;
 const DISPLAY_DPI = 300;
 const PRINT_DPI = 300;
-const IMAGE_FIXED_INCH = 4;
-const IMAGE_PRICE_SMALL = 40;   // <= 4x4
-const IMAGE_PRICE_LARGE = 100; 
+const DEFAULT_IMAGE_PRICE_RULES = [
+  { maxSideInches: 4, price: 40 },
+  { maxSideInches: null, price: 100 },
+];
 const SUPPORTED_DESIGN_MIME_TYPES = new Set([
   "image/png",
 ]);
@@ -48,11 +49,54 @@ const REMOVE_BG_RECOMMENDATION =
 
 
 
-const getFixedImageLayerPrice = (wIn, hIn) => {
-  const w = Number(wIn || 0);
-  const h = Number(hIn || 0);
-  if (!w || !h) return 0; // unknown yet
-  return (w <= IMAGE_FIXED_INCH && h <= IMAGE_FIXED_INCH) ? IMAGE_PRICE_SMALL : IMAGE_PRICE_LARGE;
+const normalizeImagePriceRules = (rules = DEFAULT_IMAGE_PRICE_RULES) => {
+  const source = Array.isArray(rules) && rules.length > 0 ? rules : DEFAULT_IMAGE_PRICE_RULES;
+  return source
+    .map((entry) => {
+      const rawMax = entry?.maxSideInches;
+      const hasFiniteMax =
+        rawMax !== null &&
+        rawMax !== undefined &&
+        String(rawMax).trim() !== "";
+      const maxSideInches = hasFiniteMax ? Number(rawMax) : null;
+      const price = Number(entry?.price || 0);
+
+      if (hasFiniteMax && (!Number.isFinite(maxSideInches) || maxSideInches < 0)) {
+        return null;
+      }
+
+      if (!Number.isFinite(price) || price < 0) {
+        return null;
+      }
+
+      return { maxSideInches, price };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (a.maxSideInches === null) return 1;
+      if (b.maxSideInches === null) return -1;
+      return a.maxSideInches - b.maxSideInches;
+    });
+};
+
+const resolveImagePriceRule = (wIn, hIn, rules = DEFAULT_IMAGE_PRICE_RULES) => {
+  const largestSide = Math.max(Number(wIn || 0), Number(hIn || 0));
+  if (!largestSide) return null;
+
+  const normalizedRules = normalizeImagePriceRules(rules);
+  return (
+    normalizedRules.find(
+      (rule) => rule.maxSideInches === null || largestSide <= rule.maxSideInches
+    ) || normalizedRules[normalizedRules.length - 1] || null
+  );
+};
+
+const getFixedImageLayerPricing = (wIn, hIn, rules = DEFAULT_IMAGE_PRICE_RULES) => {
+  const matchedRule = resolveImagePriceRule(wIn, hIn, rules);
+  return {
+    matchedRule,
+    price: Number(matchedRule?.price || 0),
+  };
 };
 // Tab options
 const TABS = {
@@ -209,12 +253,13 @@ const isSupportedDesignSource = ({ name = "", type = "" } = {}) => {
 const shouldBypassRemoveBgFormatValidation = (designLayer) =>
   Boolean(designLayer?.isFromLibrary);
 
-const createDefaultTextLayer = () => ({
+const createDefaultTextLayer = ({ zone = "front-full", viewCode = "front" } = {}) => ({
   id: "text-" + Date.now() + "-" + Math.random().toString(36).slice(2),
   text: "YOUR TEXT",
   x: 0.5,
   y: 0.5,
-  zone: "front-full",
+  zone,
+  viewCode,
   fontSize: 120,
   color: "#000000",
   fontFamily: "Impact, sans-serif",
@@ -228,20 +273,247 @@ const createDefaultTextLayer = () => ({
 });
 
 const normalizeImageCrop = (crop = {}) => {
-  const rawZoom = Number(crop?.zoom);
-  const zoom = Number.isFinite(rawZoom) ? Math.min(3, Math.max(1, rawZoom)) : 1;
+  const legacyZoom = Number(crop?.zoom);
+  const derivedWidthRatio =
+    Number.isFinite(Number(crop?.widthRatio))
+      ? Number(crop.widthRatio)
+      : Number.isFinite(legacyZoom) && legacyZoom > 1
+        ? 1 / legacyZoom
+        : 1;
+  const derivedHeightRatio =
+    Number.isFinite(Number(crop?.heightRatio))
+      ? Number(crop.heightRatio)
+      : Number.isFinite(legacyZoom) && legacyZoom > 1
+        ? 1 / legacyZoom
+        : 1;
+  const widthRatio = Math.min(1, Math.max(0.15, derivedWidthRatio));
+  const heightRatio = Math.min(1, Math.max(0.15, derivedHeightRatio));
   const rawOffsetX = Number(crop?.offsetX);
   const rawOffsetY = Number(crop?.offsetY);
-
-  if (zoom <= 1.001) {
-    return { zoom: 1, offsetX: 0, offsetY: 0 };
-  }
+  const normalizedOffsetX = Number.isFinite(rawOffsetX) ? Math.min(1, Math.max(-1, rawOffsetX)) : 0;
+  const normalizedOffsetY = Number.isFinite(rawOffsetY) ? Math.min(1, Math.max(-1, rawOffsetY)) : 0;
+  const sideMarginX = (1 - widthRatio) / 2;
+  const sideMarginY = (1 - heightRatio) / 2;
+  const rawLeftRatio = Number(crop?.leftRatio);
+  const rawTopRatio = Number(crop?.topRatio);
+  const leftRatio = Number.isFinite(rawLeftRatio)
+    ? Math.max(0, Math.min(1 - widthRatio, rawLeftRatio))
+    : Math.max(0, Math.min(1 - widthRatio, sideMarginX + normalizedOffsetX * sideMarginX));
+  const topRatio = Number.isFinite(rawTopRatio)
+    ? Math.max(0, Math.min(1 - heightRatio, rawTopRatio))
+    : Math.max(0, Math.min(1 - heightRatio, sideMarginY + normalizedOffsetY * sideMarginY));
+  const offsetX = sideMarginX <= 1e-6 ? 0 : (leftRatio - sideMarginX) / sideMarginX;
+  const offsetY = sideMarginY <= 1e-6 ? 0 : (topRatio - sideMarginY) / sideMarginY;
 
   return {
-    zoom,
-    offsetX: Number.isFinite(rawOffsetX) ? Math.min(1, Math.max(-1, rawOffsetX)) : 0,
-    offsetY: Number.isFinite(rawOffsetY) ? Math.min(1, Math.max(-1, rawOffsetY)) : 0,
+    widthRatio,
+    heightRatio,
+    leftRatio,
+    topRatio,
+    offsetX,
+    offsetY,
   };
+};
+
+const getImageCropViewportStyle = (crop = {}) => {
+  const normalizedCrop = normalizeImageCrop(crop);
+  const widthPercent = (1 / normalizedCrop.widthRatio) * 100;
+  const heightPercent = (1 / normalizedCrop.heightRatio) * 100;
+  const leftPercent = -((normalizedCrop.leftRatio / Math.max(normalizedCrop.widthRatio, 1e-6)) * 100);
+  const topPercent = -((normalizedCrop.topRatio / Math.max(normalizedCrop.heightRatio, 1e-6)) * 100);
+
+  return {
+    position: "absolute",
+    left: `${leftPercent}%`,
+    top: `${topPercent}%`,
+    width: `${widthPercent}%`,
+    height: `${heightPercent}%`,
+  };
+};
+
+const getCropBoxRect = (crop = {}) => {
+  const normalizedCrop = normalizeImageCrop(crop);
+
+  return {
+    left: normalizedCrop.leftRatio,
+    top: normalizedCrop.topRatio,
+    width: normalizedCrop.widthRatio,
+    height: normalizedCrop.heightRatio,
+  };
+};
+
+const cropRectToDraft = (rect) => {
+  const widthRatio = Math.min(1, Math.max(0.15, rect.width));
+  const heightRatio = Math.min(1, Math.max(0.15, rect.height));
+  const sideMarginX = (1 - widthRatio) / 2;
+  const sideMarginY = (1 - heightRatio) / 2;
+  const offsetX = sideMarginX <= 1e-6 ? 0 : (rect.left - sideMarginX) / sideMarginX;
+  const offsetY = sideMarginY <= 1e-6 ? 0 : (rect.top - sideMarginY) / sideMarginY;
+
+  return normalizeImageCrop({
+    widthRatio,
+    heightRatio,
+    leftRatio: Math.max(0, Math.min(1 - widthRatio, rect.left)),
+    topRatio: Math.max(0, Math.min(1 - heightRatio, rect.top)),
+    offsetX,
+    offsetY,
+  });
+};
+
+const getImageCropSourceRectForDraft = (img, crop = {}) => {
+  const normalizedCrop = normalizeImageCrop(crop);
+  const naturalWidth = Math.max(1, img?.naturalWidth || img?.width || 1);
+  const naturalHeight = Math.max(1, img?.naturalHeight || img?.height || 1);
+  const srcWidth = naturalWidth * normalizedCrop.widthRatio;
+  const srcHeight = naturalHeight * normalizedCrop.heightRatio;
+  const maxShiftX = Math.max(0, (naturalWidth - srcWidth) / 2);
+  const maxShiftY = Math.max(0, (naturalHeight - srcHeight) / 2);
+
+  return {
+    naturalWidth,
+    naturalHeight,
+    srcX: naturalWidth * normalizedCrop.leftRatio,
+    srcY: naturalHeight * normalizedCrop.topRatio,
+    srcWidth,
+    srcHeight,
+  };
+};
+
+const loadImageForCrop = (src) =>
+  new Promise((resolve, reject) => {
+    if (!src) {
+      reject(new Error("Missing image source"));
+      return;
+    }
+
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
+    img.src = src;
+  });
+
+const resolveTrimImageSource = async (layer) => {
+  if (layer?.sourceFile instanceof Blob) {
+    const objectUrl = URL.createObjectURL(layer.sourceFile);
+    return { src: objectUrl, revoke: () => URL.revokeObjectURL(objectUrl) };
+  }
+
+  if (layer?.originalFile instanceof Blob) {
+    const objectUrl = URL.createObjectURL(layer.originalFile);
+    return { src: objectUrl, revoke: () => URL.revokeObjectURL(objectUrl) };
+  }
+
+  if (layer?.file instanceof Blob) {
+    const objectUrl = URL.createObjectURL(layer.file);
+    return { src: objectUrl, revoke: () => URL.revokeObjectURL(objectUrl) };
+  }
+
+  const imageUrl = layer?.imageUrl;
+  if (!imageUrl) {
+    throw new Error("Missing layer image source");
+  }
+
+  try {
+    const response = await fetch(imageUrl, { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status}`);
+    }
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    return { src: objectUrl, revoke: () => URL.revokeObjectURL(objectUrl) };
+  } catch (error) {
+    console.warn("Trim source fetch failed, falling back to direct URL:", error);
+    return { src: imageUrl, revoke: null };
+  }
+};
+
+const trimCropDraftToVisiblePixels = async (layer, cropDraft) => {
+  let cleanup = null;
+  try {
+    const { src, revoke } = await resolveTrimImageSource(layer);
+    cleanup = revoke;
+    const img = await loadImageForCrop(src);
+    const { naturalWidth, naturalHeight, srcX, srcY, srcWidth, srcHeight } =
+      getImageCropSourceRectForDraft(img, cropDraft);
+
+    const maxSampleEdge = 1024;
+    const sampleScale = Math.min(1, maxSampleEdge / Math.max(srcWidth, srcHeight, 1));
+    const sampleWidth = Math.max(1, Math.round(srcWidth * sampleScale));
+    const sampleHeight = Math.max(1, Math.round(srcHeight * sampleScale));
+    const canvas = document.createElement("canvas");
+    canvas.width = sampleWidth;
+    canvas.height = sampleHeight;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return normalizeImageCrop(cropDraft);
+
+    ctx.clearRect(0, 0, sampleWidth, sampleHeight);
+    ctx.drawImage(img, srcX, srcY, srcWidth, srcHeight, 0, 0, sampleWidth, sampleHeight);
+    const { data } = ctx.getImageData(0, 0, sampleWidth, sampleHeight);
+
+    let minX = sampleWidth;
+    let minY = sampleHeight;
+    let maxX = -1;
+    let maxY = -1;
+
+    for (let y = 0; y < sampleHeight; y += 1) {
+      for (let x = 0; x < sampleWidth; x += 1) {
+        const alpha = data[(y * sampleWidth + x) * 4 + 3];
+        if (alpha > 8) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+
+    if (maxX < minX || maxY < minY) {
+      return normalizeImageCrop(cropDraft);
+    }
+
+    const trimmedLeft = srcX + minX / sampleScale;
+    const trimmedTop = srcY + minY / sampleScale;
+    const trimmedWidth = (maxX - minX + 1) / sampleScale;
+    const trimmedHeight = (maxY - minY + 1) / sampleScale;
+
+    return cropRectToDraft({
+      left: trimmedLeft / naturalWidth,
+      top: trimmedTop / naturalHeight,
+      width: trimmedWidth / naturalWidth,
+      height: trimmedHeight / naturalHeight,
+    });
+  } catch (error) {
+    console.warn("Failed to trim crop to visible pixels:", error);
+    return normalizeImageCrop(cropDraft);
+  } finally {
+    cleanup?.();
+  }
+};
+
+const getCropMeasurementInches = (layer, draftCrop, axis = "width") => {
+  if (!layer) return 0;
+
+  const currentCrop = normalizeImageCrop(layer.crop);
+  const targetCrop = normalizeImageCrop(draftCrop);
+  const currentRatio = axis === "width" ? (currentCrop.widthRatio || 1) : (currentCrop.heightRatio || 1);
+  const targetRatio = axis === "width" ? (targetCrop.widthRatio || 1) : (targetCrop.heightRatio || 1);
+
+  const currentMeasured =
+    axis === "width"
+      ? Number(layer.currentPrintWidthInches ?? layer.renderedWidthInches)
+      : Number(layer.currentPrintHeightInches ?? layer.renderedHeightInches);
+
+  const fallbackBase =
+    axis === "width"
+      ? Number(layer.printWidthInches || 0) * Number(layer.scaleX ?? layer.scale ?? 1)
+      : Number(layer.printHeightInches || 0) * Number(layer.scaleY ?? layer.scale ?? 1);
+
+  const safeCurrentMeasured = Number.isFinite(currentMeasured) ? currentMeasured : fallbackBase;
+  const uncroppedBase = safeCurrentMeasured / Math.max(currentRatio, 1e-6);
+  const nextValue = uncroppedBase * targetRatio;
+
+  return Number.isFinite(nextValue) ? nextValue : 0;
 };
 
 const getInitialZoneKey = (viewCode, preferredZone = null) => {
@@ -259,6 +531,7 @@ const createDesignLayer = (
   options = {}
 ) => {
   const { isFromLibrary = false, viewCode = "front", zone = null } = options;
+  const normalizedPriceRules = normalizeImagePriceRules(options.priceRules);
   const displayWidthInches = width / DISPLAY_DPI;
   const displayHeightInches = height / DISPLAY_DPI;
 
@@ -279,7 +552,11 @@ const createDesignLayer = (
   const initialHeightIn = printHeightInches * initialScale;
 
   // ✅ FIXED PRICE here too
-  const layerPrice = getFixedImageLayerPrice(initialWidthIn, initialHeightIn);
+  const { price: layerPrice, matchedRule } = getFixedImageLayerPricing(
+    initialWidthIn,
+    initialHeightIn,
+    normalizedPriceRules
+  );
 
   return {
     id,
@@ -313,7 +590,8 @@ const createDesignLayer = (
     renderedHeightInches: initialHeightIn,
 
     layerPrice,
-    minimumChargeApplied: layerPrice === IMAGE_PRICE_SMALL,
+    minimumChargeApplied: Boolean(matchedRule?.maxSideInches !== null),
+    priceRules: normalizedPriceRules,
     crop: normalizeImageCrop(options.crop),
   };
 };
@@ -347,6 +625,7 @@ const getSizeBasePrice = (prod, size) => {
   return found?.price ?? prod?.basePrice ?? 600;
   };
   const BASE_PRICE = getSizeBasePrice(product, selectedSize);
+  const productImagePriceRules = normalizeImagePriceRules(product?.normalPricing?.imagePriceRules);
 
   const [savedDesignId, setSavedDesignId] = useState(null);
   const [lastSavedPreview, setLastSavedPreview] = useState(null);
@@ -400,7 +679,8 @@ const getSizeBasePrice = (prod, size) => {
   const [activeTab, setActiveTab] = useState(TABS.PRODUCT_COLORS);
   const [showMobilePriceDetails, setShowMobilePriceDetails] = useState(false);
   const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
-  const [showCropControls, setShowCropControls] = useState(false);
+  const [isCropModalOpen, setIsCropModalOpen] = useState(false);
+  const [cropDraft, setCropDraft] = useState(() => normalizeImageCrop());
   const [isDesktopToolsLayout, setIsDesktopToolsLayout] = useState(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
       return true;
@@ -411,6 +691,8 @@ const getSizeBasePrice = (prod, size) => {
   const editorRef = useRef(null);
   const viewStatesRef = useRef({});
   const removeBgRequestSeqRef = useRef(0);
+  const cropPreviewFrameRef = useRef(null);
+  const cropDragStateRef = useRef(null);
   const supportsPocketZone = String(slug || product?.slug || "")
     .trim()
     .toLowerCase() === "hoodie";
@@ -523,23 +805,30 @@ const updateDesignLayerDimensions = (layer, opts = {}) => {
   // Keep legacy `scale` for backward compatibility
   // (use avg so old places still work)
   const nextScale = (nextScaleX + nextScaleY) / 2;
+  const crop = normalizeImageCrop(layer.crop);
+  const cropWidthRatio = crop.widthRatio || 1;
+  const cropHeightRatio = crop.heightRatio || 1;
 
   // Inches should be derived from PRINT inches * scale
-  const currentDisplayWidthInches = (layer.displayWidthInches || 0) * nextScaleX;
-  const currentDisplayHeightInches = (layer.displayHeightInches || 0) * nextScaleY;
+  const currentDisplayWidthInches = (layer.displayWidthInches || 0) * nextScaleX * cropWidthRatio;
+  const currentDisplayHeightInches = (layer.displayHeightInches || 0) * nextScaleY * cropHeightRatio;
 
-  const currentPrintWidthInches = (layer.printWidthInches || 0) * nextScaleX;
-  const currentPrintHeightInches = (layer.printHeightInches || 0) * nextScaleY;
+  const currentPrintWidthInches = (layer.printWidthInches || 0) * nextScaleX * cropWidthRatio;
+  const currentPrintHeightInches = (layer.printHeightInches || 0) * nextScaleY * cropHeightRatio;
 
   // Pixels
-  const renderedWidthPx = (layer.originalWidthPx || 0) * nextScaleX;
-  const renderedHeightPx = (layer.originalHeightPx || 0) * nextScaleY;
+  const renderedWidthPx = (layer.originalWidthPx || 0) * nextScaleX * cropWidthRatio;
+  const renderedHeightPx = (layer.originalHeightPx || 0) * nextScaleY * cropHeightRatio;
 
   // ✅ ALWAYS recompute inches from print inches so it updates immediately
   const widthIn = Number(currentPrintWidthInches || 0);
   const heightIn = Number(currentPrintHeightInches || 0);
 
-  const layerPrice = getFixedImageLayerPrice(widthIn, heightIn);
+  const { price: layerPrice, matchedRule } = getFixedImageLayerPricing(
+    widthIn,
+    heightIn,
+    layer.priceRules
+  );
 
   return {
     ...layer,
@@ -563,7 +852,7 @@ const updateDesignLayerDimensions = (layer, opts = {}) => {
     renderedHeightInches: heightIn,
 
     layerPrice,
-    minimumChargeApplied: layerPrice === IMAGE_PRICE_SMALL,
+    minimumChargeApplied: Boolean(matchedRule?.maxSideInches !== null),
 
     currentAdditionalArea: 0,
   };
@@ -574,7 +863,7 @@ const _num = (v, fallback = 0) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
-const restoreDesignLayerFromSaved = (d) => {
+const restoreDesignLayerFromSaved = (d, pricingRules = DEFAULT_IMAGE_PRICE_RULES) => {
   // 1) restore scaleX/scaleY safely (support legacy scale)
   const scaleX = typeof d.scaleX === "number" ? d.scaleX : (typeof d.scale === "number" ? d.scale : 0.35);
   const scaleY = typeof d.scaleY === "number" ? d.scaleY : (typeof d.scale === "number" ? d.scale : 0.35);
@@ -608,6 +897,7 @@ const restoreDesignLayerFromSaved = (d) => {
   // 3) rebuild base layer (no derived fields trusted yet)
   const baseLayer = {
     ...d,
+    priceRules: d.priceRules || normalizeImagePriceRules(pricingRules),
     scale,
     scaleX,
     scaleY,
@@ -713,7 +1003,11 @@ const restoreDesignLayerFromSaved = (d) => {
   const widthIn = Number(layer.renderedWidthInches || 0);
   const heightIn = Number(layer.renderedHeightInches || 0);
 
-  const price = getFixedImageLayerPrice(widthIn, heightIn);
+  const { price, matchedRule } = getFixedImageLayerPricing(
+    widthIn,
+    heightIn,
+    layer.priceRules || productImagePriceRules
+  );
 
   breakdown.images.count += 1;
   breakdown.images.total += price;
@@ -726,7 +1020,10 @@ const restoreDesignLayerFromSaved = (d) => {
     zone,
     viewCode: layer.viewCode,
     size: `${widthIn.toFixed(2)}" × ${heightIn.toFixed(2)}"`,
-    note: "Fixed price (from RecolorEditor inches)",
+    note:
+      matchedRule?.maxSideInches === null
+        ? "Catch-all image price rule"
+        : `Up to ${matchedRule?.maxSideInches}" max side`,
   });
 });
 
@@ -952,7 +1249,7 @@ setPriceBreakdown((prev) => ({
     file: null,
     originalFile: null,
     isFromLibrary: d.isFromLibrary || false,
-  });
+  }, productImagePriceRules);
 
   return restored;
               }) || [],
@@ -1099,16 +1396,35 @@ setPriceBreakdown((prev) => ({
   const { textLayers, activeTextId, designLayers, activeDesignId } = getCurrentViewState();
   const activeTextLayer = textLayers.find((l) => l.id === activeTextId) || textLayers[0];
   const activeDesign = designLayers.find((d) => d.id === activeDesignId) || null;
-  const activeDesignCrop = normalizeImageCrop(activeDesign?.crop);
+  const cropDraftValue = normalizeImageCrop(cropDraft);
+  const cropBoxRect = getCropBoxRect(cropDraftValue);
   const selectedOrLatestDesign = activeDesign || designLayers[designLayers.length - 1] || null;
   const availableZonesForView = getZoneOptionsForView(viewCode, { supportsPocketZone });
   const activeDesignZone = activeDesign?.zone || availableZonesForView[0] || "front-full";
 
   useEffect(() => {
     if (!activeDesignId) {
-      setShowCropControls(false);
+      setIsCropModalOpen(false);
+      setCropDraft(normalizeImageCrop());
     }
   }, [activeDesignId]);
+
+  useEffect(() => {
+    if (!isCropModalOpen) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setIsCropModalOpen(false);
+        setCropDraft(normalizeImageCrop(activeDesign?.crop));
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      stopCropPreviewPan();
+    };
+  }, [isCropModalOpen, activeDesign]);
   const shouldUseFolderDropdown = folders.length > 6;
   const selectedSizeStockEntry = availableSizePricing.find(
     (entry) => String(entry?.size || "").toUpperCase() === String(selectedSize || "").toUpperCase()
@@ -1157,7 +1473,15 @@ setPriceBreakdown((prev) => ({
 
   const addNewText = () => {
     const id = `text-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const newLayer = { ...createDefaultTextLayer(), id, text: "New Text" };
+    const defaultZoneForView = availableZonesForView[0] || getInitialZoneKey(viewCode);
+    const newLayer = {
+      ...createDefaultTextLayer({
+        zone: defaultZoneForView,
+        viewCode,
+      }),
+      id,
+      text: "New Text",
+    };
     updateCurrentViewState({
       textLayers: [...textLayers, newLayer],
       activeTextId: id,
@@ -1235,6 +1559,7 @@ const handleDesignUpload = async (e) => {
           isFromLibrary: false,
           viewCode,
           zone: availableZonesForView[0] || getInitialZoneKey(viewCode),
+          priceRules: productImagePriceRules,
         })
       );
     }
@@ -1302,6 +1627,7 @@ const handleDesignUpload = async (e) => {
         isFromLibrary: true,
         viewCode,
         zone: availableZonesForView[0] || getInitialZoneKey(viewCode),
+        priceRules: productImagePriceRules,
       });
       
       setViewStates((prev) => {
@@ -1616,20 +1942,111 @@ const handleActiveDesignCropChange = (patch) => {
 
   const updated = designLayers.map((designLayer) => {
     if (designLayer.id !== activeDesign.id) return designLayer;
-    return {
+    return updateDesignLayerDimensions({
       ...designLayer,
       crop: normalizeImageCrop({
         ...(designLayer.crop || {}),
         ...patch,
       }),
-    };
+    });
   });
 
   updateCurrentViewState({ designLayers: updated });
+  calculatePrice();
 };
 
-const handleResetActiveDesignCrop = () => {
-  handleActiveDesignCropChange({ zoom: 1, offsetX: 0, offsetY: 0 });
+const openCropModal = () => {
+  if (!activeDesign) return;
+  setCropDraft(normalizeImageCrop(activeDesign.crop));
+  setIsCropModalOpen(true);
+};
+
+const closeCropModal = () => {
+  stopCropPreviewPan();
+  setIsCropModalOpen(false);
+  setCropDraft(normalizeImageCrop(activeDesign?.crop));
+};
+
+const applyCropDraft = async () => {
+  if (!activeDesign) return;
+  stopCropPreviewPan();
+  const trimmedCrop = await trimCropDraftToVisiblePixels(activeDesign, cropDraftValue);
+  handleActiveDesignCropChange(trimmedCrop);
+  setIsCropModalOpen(false);
+};
+
+const resetCropDraft = () => {
+  setCropDraft(normalizeImageCrop());
+};
+
+const updateCropDraft = (updater) => {
+  setCropDraft((prev) => {
+    const current = normalizeImageCrop(prev);
+    const nextValue =
+      typeof updater === "function" ? updater(current) : { ...current, ...updater };
+    return normalizeImageCrop(nextValue);
+  });
+};
+
+const stopCropPreviewPan = () => {
+  cropDragStateRef.current = null;
+  window.removeEventListener("pointermove", handleCropPreviewPointerMove);
+  window.removeEventListener("pointerup", stopCropPreviewPan);
+  window.removeEventListener("pointercancel", stopCropPreviewPan);
+};
+
+function handleCropPreviewPointerMove(event) {
+  const state = cropDragStateRef.current;
+  if (!state) return;
+  const nextDx = (event.clientX - state.startX) / Math.max(state.rectWidth, 1);
+  const nextDy = (event.clientY - state.startY) / Math.max(state.rectHeight, 1);
+  const minRatio = 0.15;
+  let nextRect = { ...state.startRect };
+
+  if (state.mode === "move") {
+    nextRect.left = Math.max(0, Math.min(1 - state.startRect.width, state.startRect.left + nextDx));
+    nextRect.top = Math.max(0, Math.min(1 - state.startRect.height, state.startRect.top + nextDy));
+  } else if (state.mode === "resize-left") {
+    const right = state.startRect.left + state.startRect.width;
+    const proposedLeft = Math.max(0, Math.min(right - minRatio, state.startRect.left + nextDx));
+    nextRect.left = proposedLeft;
+    nextRect.width = right - proposedLeft;
+  } else if (state.mode === "resize-right") {
+    const proposedWidth = Math.max(minRatio, Math.min(1 - state.startRect.left, state.startRect.width + nextDx));
+    nextRect.width = proposedWidth;
+  } else if (state.mode === "resize-top") {
+    const bottom = state.startRect.top + state.startRect.height;
+    const proposedTop = Math.max(0, Math.min(bottom - minRatio, state.startRect.top + nextDy));
+    nextRect.top = proposedTop;
+    nextRect.height = bottom - proposedTop;
+  } else if (state.mode === "resize-bottom") {
+    const proposedHeight = Math.max(minRatio, Math.min(1 - state.startRect.top, state.startRect.height + nextDy));
+    nextRect.height = proposedHeight;
+  }
+
+  setCropDraft(cropRectToDraft(nextRect));
+}
+
+const startCropPreviewPan = (event, mode = "move") => {
+  event.preventDefault();
+  event.stopPropagation();
+  const rect = cropPreviewFrameRef.current?.getBoundingClientRect();
+  if (!rect) return;
+
+  cropDragStateRef.current = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    rectWidth: rect.width,
+    rectHeight: rect.height,
+    startRect: getCropBoxRect(cropDraftValue),
+    mode,
+  };
+
+  window.addEventListener("pointermove", handleCropPreviewPointerMove);
+  window.addEventListener("pointerup", stopCropPreviewPan);
+  window.addEventListener("pointercancel", stopCropPreviewPan);
+  event.currentTarget?.setPointerCapture?.(event.pointerId);
 };
 
   const handleSetTextLayers = (updater) => {
@@ -2057,7 +2474,7 @@ const handleResetActiveDesignCrop = () => {
     file: null,
     originalFile: null,
     isFromLibrary: d.isFromLibrary || false,
-  });
+  }, productImagePriceRules);
         }) || [],
         activeDesignId: view.designLayers?.[0]?.id || null,
       };
@@ -2120,9 +2537,9 @@ const handleResetActiveDesignCrop = () => {
         <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:gap-4">
           <div className="flex items-center gap-3">
             <div className="text-lg font-extrabold tracking-wide text-orange-500">
-              MYPRINT
+              Customization
             </div>
-
+            
             <Link
               to="/usersaved_designs"
               className="rounded-full border border-sky-600 px-3 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-50 transition"
@@ -2587,14 +3004,10 @@ const handleResetActiveDesignCrop = () => {
                           </button>
                           <button
                             type="button"
-                            onClick={() => setShowCropControls((prev) => !prev)}
-                            className={`rounded border px-2 py-1 text-xs font-medium ${
-                              showCropControls
-                                ? "border-sky-500 bg-sky-50 text-sky-700"
-                                : "border-slate-300 text-slate-600 hover:bg-slate-50"
-                            }`}
+                            onClick={openCropModal}
+                            className="rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
                           >
-                            {showCropControls ? "Hide Crop" : "Crop"}
+                            Crop
                           </button>
                           <button type="button" onClick={clearActiveDesign} className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">
                             Clear
@@ -2614,77 +3027,6 @@ const handleResetActiveDesignCrop = () => {
                           <div>Print: {activeDesign.currentPrintWidthInches?.toFixed(2)}" × {activeDesign.currentPrintHeightInches?.toFixed(2)}"</div>
                         </div>
                       </div>
-
-                      {showCropControls && (
-                      <div className="mb-4 rounded-xl border border-sky-200 bg-sky-50/60 p-3">
-                        <div className="mb-3 flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-xs font-medium text-slate-700">Crop Image</div>
-                            <div className="text-[10px] text-slate-500">Zoom in, then shift the visible area inside the design box.</div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleResetActiveDesignCrop}
-                            disabled={activeDesignCrop.zoom === 1 && activeDesignCrop.offsetX === 0 && activeDesignCrop.offsetY === 0}
-                            className="rounded border border-slate-300 bg-white px-2 py-1 text-[10px] font-medium text-slate-600 disabled:opacity-40"
-                          >
-                            Reset crop
-                          </button>
-                        </div>
-
-                        <div className="space-y-3">
-                          <div>
-                            <div className="mb-1 flex items-center justify-between text-[11px] text-slate-600">
-                              <span>Crop zoom</span>
-                              <span>{activeDesignCrop.zoom.toFixed(2)}x</span>
-                            </div>
-                            <input
-                              type="range"
-                              min={1}
-                              max={3}
-                              step={0.05}
-                              value={activeDesignCrop.zoom}
-                              onChange={(e) => handleActiveDesignCropChange({ zoom: parseFloat(e.target.value) || 1 })}
-                              className="w-full"
-                            />
-                          </div>
-
-                          <div>
-                            <div className="mb-1 flex items-center justify-between text-[11px] text-slate-600">
-                              <span>Crop left / right</span>
-                              <span>{Math.round(activeDesignCrop.offsetX * 100)}%</span>
-                            </div>
-                            <input
-                              type="range"
-                              min={-1}
-                              max={1}
-                              step={0.01}
-                              value={activeDesignCrop.offsetX}
-                              disabled={activeDesignCrop.zoom <= 1.01}
-                              onChange={(e) => handleActiveDesignCropChange({ offsetX: parseFloat(e.target.value) || 0 })}
-                              className="w-full disabled:opacity-40"
-                            />
-                          </div>
-
-                          <div>
-                            <div className="mb-1 flex items-center justify-between text-[11px] text-slate-600">
-                              <span>Crop up / down</span>
-                              <span>{Math.round(activeDesignCrop.offsetY * 100)}%</span>
-                            </div>
-                            <input
-                              type="range"
-                              min={-1}
-                              max={1}
-                              step={0.01}
-                              value={activeDesignCrop.offsetY}
-                              disabled={activeDesignCrop.zoom <= 1.01}
-                              onChange={(e) => handleActiveDesignCropChange({ offsetY: parseFloat(e.target.value) || 0 })}
-                              className="w-full disabled:opacity-40"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      )}
 
                       <div className="mb-4 space-y-3 sm:hidden">
                         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -2979,7 +3321,7 @@ const handleResetActiveDesignCrop = () => {
           </div>
 
           {/* Error messages */}
-          {(error || saveError || saveSuccess) && (
+        {(error || saveError || saveSuccess) && (
             <div className="mt-4">
               {error && <div className="rounded border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</div>}
               {saveError && <div className="rounded border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{saveError}</div>}
@@ -2987,6 +3329,180 @@ const handleResetActiveDesignCrop = () => {
             </div>
           )}
         </aside>
+
+        {isCropModalOpen && activeDesign && (
+          <div
+            className="fixed inset-0 z-[210] flex items-center justify-center bg-slate-950/60 p-0 sm:p-4"
+            onClick={closeCropModal}
+          >
+            <div
+              className="flex h-[100dvh] w-full max-w-none flex-col overflow-hidden rounded-none border-0 bg-white shadow-2xl sm:h-auto sm:max-h-[92dvh] sm:max-w-4xl sm:rounded-[28px] sm:border sm:border-slate-200"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-6">
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900">Crop image</h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Drag the image with your finger, or use the controls below, then click OK.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeCropModal}
+                  className="min-h-10 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="grid min-h-0 flex-1 gap-0 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="border-b border-slate-200 bg-slate-50/70 p-4 sm:p-5 lg:border-b-0 lg:border-r lg:p-6">
+                  <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="mb-3 flex items-center justify-between text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">
+                      <span>Crop Preview</span>
+                      <span>
+                        {Math.round(cropDraftValue.widthRatio * 100)}% × {Math.round(cropDraftValue.heightRatio * 100)}%
+                      </span>
+                    </div>
+                    <div className="relative mx-auto w-full max-w-[520px] rounded-[24px] bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.14),_transparent_48%),linear-gradient(180deg,_#f8fafc_0%,_#e2e8f0_100%)] p-4">
+                      <div
+                        ref={cropPreviewFrameRef}
+                        className="relative mx-auto w-full overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-inner"
+                        style={{
+                          aspectRatio: `${Math.max(activeDesign.originalWidthPx || 1, 1)} / ${Math.max(activeDesign.originalHeightPx || 1, 1)}`,
+                          touchAction: "none",
+                        }}
+                      >
+                        <img
+                          src={activeDesign.imageUrl}
+                          alt="Crop editor"
+                          className="absolute inset-0 h-full w-full select-none object-fill"
+                          draggable={false}
+                        />
+
+                        <div className="absolute inset-0 bg-slate-950/45 pointer-events-none" />
+
+                        <div
+                          className="absolute border-2 border-sky-400 bg-transparent shadow-[0_0_0_9999px_rgba(2,6,23,0.38)] cursor-move"
+                          style={{
+                            left: `${cropBoxRect.left * 100}%`,
+                            top: `${cropBoxRect.top * 100}%`,
+                            width: `${cropBoxRect.width * 100}%`,
+                            height: `${cropBoxRect.height * 100}%`,
+                          }}
+                          onPointerDown={(event) => startCropPreviewPan(event, "move")}
+                        >
+                          <div className="pointer-events-none absolute inset-0 border border-white/80" />
+                          <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-white/50" />
+                          <div className="absolute top-1/2 left-0 h-px w-full -translate-y-1/2 bg-white/50" />
+
+                          <button
+                            type="button"
+                            aria-label="Crop left"
+                            className="absolute left-0 top-1/2 h-10 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-sky-500 shadow"
+                            onPointerDown={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              startCropPreviewPan(event, "resize-left");
+                            }}
+                          />
+                          <button
+                            type="button"
+                            aria-label="Crop right"
+                            className="absolute right-0 top-1/2 h-10 w-5 translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-sky-500 shadow"
+                            onPointerDown={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              startCropPreviewPan(event, "resize-right");
+                            }}
+                          />
+                          <button
+                            type="button"
+                            aria-label="Crop top"
+                            className="absolute left-1/2 top-0 h-5 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-sky-500 shadow"
+                            onPointerDown={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              startCropPreviewPan(event, "resize-top");
+                            }}
+                          />
+                          <button
+                            type="button"
+                            aria-label="Crop bottom"
+                            className="absolute bottom-0 left-1/2 h-5 w-10 -translate-x-1/2 translate-y-1/2 rounded-full border border-white bg-sky-500 shadow"
+                            onPointerDown={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              startCropPreviewPan(event, "resize-bottom");
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-4 rounded-2xl bg-white/88 px-3 py-2 text-center text-[11px] font-medium text-slate-600 shadow-sm backdrop-blur">
+                        Drag inside the box to move the crop. Drag the side handles to crop width or height.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-5 p-4 pb-24 sm:p-6 sm:pb-6">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">Crop details</div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        Cropping now changes the actual printed size and inches.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={resetCropDraft}
+                      disabled={cropDraftValue.widthRatio === 1 && cropDraftValue.heightRatio === 1 && cropDraftValue.offsetX === 0 && cropDraftValue.offsetY === 0}
+                      className="min-h-10 rounded-full border border-slate-300 px-4 py-2 text-[11px] font-semibold text-slate-600 disabled:opacity-40"
+                    >
+                      Reset
+                    </button>
+                  </div>
+
+                  <div className="grid gap-3">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Cropped Width</div>
+                      <div className="mt-1 text-lg font-semibold text-slate-900">
+                        {getCropMeasurementInches(activeDesign, cropDraftValue, "width").toFixed(2)}"
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Cropped Height</div>
+                      <div className="mt-1 text-lg font-semibold text-slate-900">
+                        {getCropMeasurementInches(activeDesign, cropDraftValue, "height").toFixed(2)}"
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                      This behaves like phone crop: crop inline on the image itself, and the final inches reduce with the crop box.
+                    </div>
+                  </div>
+
+                  <div className="fixed inset-x-0 bottom-0 z-10 flex gap-2 border-t border-slate-200 bg-white/96 px-4 py-3 backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
+                    <button
+                      type="button"
+                      onClick={closeCropModal}
+                      className="min-h-11 flex-1 rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 sm:flex-none"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={applyCropDraft}
+                      className="min-h-11 flex-1 rounded-full border border-sky-600 bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-700 sm:flex-none"
+                    >
+                      OK
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {isLibraryModalOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/55 p-0 sm:p-6">

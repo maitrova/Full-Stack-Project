@@ -77,6 +77,7 @@ import {
   selectIsSizeSelected,
   resetProductSizeSelection
 } from "../redux/slices/productsizeselection.js";
+import ProductImageLightbox from "../components/ProductImageLightbox.jsx";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
 
@@ -95,6 +96,7 @@ export default function CatalogueDetailPage() {
   const [localCartQuantity, setLocalCartQuantity] = useState(0);
   const [activeTab, setActiveTab] = useState("specifications");
   const [notification, setNotification] = useState({ show: false, message: "", type: "" });
+  const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
   
   // Redux selectors
   const cartItems = useSelector(selectCartItems);
@@ -483,11 +485,77 @@ export default function CatalogueDetailPage() {
   if (!design) return null;
 
   const views = design.views || [];
+  const galleryViewIndexes = views.reduce((acc, view, index) => {
+    if (view?.previewImage) {
+      acc.push(index);
+    }
+    return acc;
+  }, []);
+  const galleryItems = galleryViewIndexes.map((viewIndex, index) => {
+    const view = views[viewIndex];
+    return {
+      src: view.previewImage,
+      alt: view.code || `${design.title || design.productName} view ${index + 1}`,
+      label: view.code?.toUpperCase() || `VIEW ${index + 1}`,
+    };
+  });
+  const currentGalleryIndex = Math.max(0, galleryViewIndexes.indexOf(activeView));
   const stats = {
     totalTextLayers: views.reduce((acc, view) => acc + (view.textLayers?.length || 0), 0),
     totalImageLayers: views.reduce((acc, view) => acc + (view.designLayers?.length || 0), 0),
     totalViews: views.length
   };
+  const hasPriceDiscount = Boolean(design.product?.basePrice && currentPrice < design.product.basePrice);
+  const cartTotal = (quantity * currentPrice).toFixed(2);
+
+  const renderSizeSelector = ({ compact = false } = {}) => (
+    <div id={compact ? "catalogue-mobile-size-selection" : undefined} className={compact ? "space-y-2" : "mb-8"}>
+      <div className="flex items-center justify-between mb-3">
+        <span className={`font-medium text-gray-700 tracking-tight ${compact ? "text-xs uppercase" : "text-sm"}`}>
+          Select Size
+        </span>
+        <div className="flex items-center gap-2">
+          <Layers className={`${compact ? "w-3.5 h-3.5" : "w-4 h-4"} text-gray-400`} />
+          {priceLoading && selectedSize && (
+            <Loader2 className={`${compact ? "w-3 h-3" : "w-3 h-3"} text-gray-500 animate-spin`} />
+          )}
+        </div>
+      </div>
+
+      {!compact && design.description && (
+        <div className="mb-3">
+          <p className="text-xs text-gray-500 tracking-tight leading-relaxed">{design.description}</p>
+        </div>
+      )}
+
+      <div className={`grid ${compact ? "grid-cols-5 gap-1.5" : "grid-cols-5 gap-2"}`}>
+        {SIZES.map((s) => {
+          const active = selectedSize === s;
+          return (
+            <button
+              key={s}
+              type="button"
+              onClick={() => handleSizeSelect(s)}
+              disabled={priceLoading}
+              className={`${compact ? "py-2 text-xs" : "py-3 text-sm"} rounded-lg border font-medium tracking-tight transition-all ${
+                active
+                  ? "border-gray-900 bg-gray-900 text-white"
+                  : "border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+              } ${priceLoading ? "opacity-50" : ""}`}
+            >
+              {s}
+            </button>
+          );
+        })}
+      </div>
+
+      {!selectedSize && (
+        <p className={`font-medium tracking-tight text-gray-500 ${compact ? "text-[11px]" : "text-xs mt-3"}`}>
+          Select a size to continue
+        </p>
+      )}
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-white">
@@ -541,33 +609,33 @@ export default function CatalogueDetailPage() {
               <div className="w-8 h-8 border border-gray-300 rounded-lg flex items-center justify-center group-hover:border-gray-400 transition-colors">
                 <ArrowLeft className="w-4 h-4" />
               </div>
-              <span className="font-medium tracking-tight text-sm">BACK</span>
+              <span className="hidden sm:inline font-medium tracking-tight text-sm">BACK</span>
             </button>
 
             <div className="flex items-center gap-2">
               <button
                 onClick={copyToClipboard}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium tracking-tight"
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium tracking-tight"
               >
                 {copied ? (
                   <>
                     <Check className="w-4 h-4 text-green-600" />
-                    <span>COPIED</span>
+                    <span className="hidden sm:inline">COPIED</span>
                   </>
                 ) : (
                   <>
                     <Share2 className="w-4 h-4" />
-                    <span>SHARE</span>
+                    <span className="hidden sm:inline">SHARE</span>
                   </>
                 )}
               </button>
               
               <Link
                 to="/cart"
-                className="flex items-center gap-2 px-4 py-2 border border-gray-900 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium tracking-tight"
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 border border-gray-900 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium tracking-tight"
               >
                 <ShoppingCart className="w-4 h-4" />
-                <span>CART</span>
+                <span className="hidden sm:inline">CART</span>
               </Link>
             </div>
           </div>
@@ -575,9 +643,9 @@ export default function CatalogueDetailPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 pb-40 lg:pb-8">
         {/* Breadcrumb */}
-        <div className="mb-8">
+        <div className="hidden md:block mb-8">
           <nav className="flex" aria-label="Breadcrumb">
             <ol className="inline-flex items-center space-x-1 md:space-x-2 text-sm">
               <li className="inline-flex items-center">
@@ -608,14 +676,14 @@ export default function CatalogueDetailPage() {
           </nav>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           {/* Left Column - Preview & Actions */}
           <div className="lg:col-span-2 space-y-6">
             {/* Main Preview */}
-            <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
+            <div className="border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-sm">
+              <div className="relative p-4 sm:p-6">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4 sm:mb-6">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                     <div className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium tracking-tight">
                       ID: {design._id.slice(-8)}
                     </div>
@@ -631,21 +699,22 @@ export default function CatalogueDetailPage() {
                   </div>
                   
                   {isInCart && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 rounded-full bg-green-50 px-3 py-1.5">
                       <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                      <span className="text-sm font-medium text-gray-700 tracking-tight">
+                      <span className="text-xs sm:text-sm font-medium text-gray-700 tracking-tight">
                         IN CART • {quantity} ITEMS • SIZE: {selectedSize}
                       </span>
                     </div>
                   )}
                 </div>
 
-                <div className="relative h-[500px] bg-gradient-to-br from-gray-50 to-white border border-gray-100 rounded-lg overflow-hidden">
+                <div className="relative h-[320px] sm:h-[420px] lg:h-[500px] bg-gradient-to-br from-gray-50 to-white border border-gray-100 rounded-xl overflow-hidden">
                   {views[activeView]?.previewImage ? (
                     <img
                       src={views[activeView].previewImage}
                       alt={views[activeView].code}
-                      className="w-full h-full object-contain"
+                      className="w-full h-full cursor-zoom-in object-contain"
+                      onClick={() => setIsImageViewerOpen(true)}
                       onError={(e) => {
                         e.target.style.display = 'none';
                         e.target.parentElement.innerHTML = `
@@ -658,8 +727,8 @@ export default function CatalogueDetailPage() {
                         `;
                       }}
                     />
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
+                ) : (
+                  <div className="flex items-center justify-center h-full">
                       <div className="text-center">
                         <Cpu className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                         <p className="text-gray-400 font-medium tracking-tight">NO PREVIEW AVAILABLE</p>
@@ -672,31 +741,38 @@ export default function CatalogueDetailPage() {
                     <>
                       <button
                         onClick={() => setActiveView(prev => (prev - 1 + views.length) % views.length)}
-                        className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-50 transition-colors shadow-sm"
+                        className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-10 sm:h-10 bg-white border border-gray-300 rounded-full flex items-center justify-center hover:bg-gray-50 transition-colors shadow-sm"
                       >
-                        <ChevronLeft className="w-5 h-5 text-gray-700" />
+                        <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
                       </button>
                       <button
                         onClick={() => setActiveView(prev => (prev + 1) % views.length)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white border border-gray-300 rounded-lg flex items-center justify-center hover:bg-gray-50 transition-colors shadow-sm"
+                        className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 w-9 h-9 sm:w-10 sm:h-10 bg-white border border-gray-300 rounded-full flex items-center justify-center hover:bg-gray-50 transition-colors shadow-sm"
                       >
-                        <ChevronRight className="w-5 h-5 text-gray-700" />
+                        <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
                       </button>
                     </>
+                  )}
+                  {views[activeView]?.previewImage && (
+                    <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
+                      <span className="rounded-full bg-white/90 px-4 py-2 text-[11px] sm:text-xs font-semibold tracking-tight text-gray-800 shadow-lg">
+                        Tap image to open full screen
+                      </span>
+                    </div>
                   )}
                 </div>
 
                 {/* View Thumbnails */}
                 {views.length > 1 && (
-                  <div className="mt-8">
+                  <div className="mt-6 sm:mt-8">
                     <div className="flex items-center justify-between mb-4">
                       <p className="text-sm font-medium text-gray-700 tracking-tight">VIEWS ({views.length})</p>
-                      <div className="flex items-center gap-2 text-gray-500">
+                      <div className="hidden sm:flex items-center gap-2 text-gray-500">
                         <Eye className="w-4 h-4" />
                         <span className="text-xs tracking-tight">360° PERSPECTIVE</span>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
                       {views.map((view, index) => (
                         <button
                           key={view.code}
@@ -736,7 +812,7 @@ export default function CatalogueDetailPage() {
             </div>
 
             {/* Action Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="hidden lg:grid grid-cols-1 sm:grid-cols-2 gap-4">
               {isInCart ? (
                 <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
                   <button
@@ -803,7 +879,7 @@ export default function CatalogueDetailPage() {
           </div>
 
           {/* Right Column - Details */}
-          <div className="space-y-6">
+          <div className="hidden lg:block space-y-6">
             {/* Product Info Card */}
             <div className="border border-gray-200 rounded-xl p-6 bg-white">
               <div className="mb-8">
@@ -957,7 +1033,7 @@ export default function CatalogueDetailPage() {
                 )}
                 
                 <p className="text-xs text-gray-500 mt-2 tracking-tight">Inclusive of all taxes</p>
-                <h2 class="bg-red-50 text-red-700 border-l-4 border-red-600 
+                <h2 className="bg-red-50 text-red-700 border-l-4 border-red-600 
                           p-4 rounded-md font-semibold text-lg my-4">
                   Customized Products Are Not Eligible for Return
                 </h2>
@@ -1028,15 +1104,139 @@ export default function CatalogueDetailPage() {
           </div>
         </div>
 
+        <div className="lg:hidden space-y-4 pb-4">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">{design.title || design.productName}</h1>
+                <div className="mt-2 flex items-center gap-2 text-gray-500">
+                  <Package className="w-4 h-4" />
+                  <span className="text-sm font-medium">{design.productName}</span>
+                </div>
+              </div>
+              {design.kind && (
+                <span className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold tracking-tight ${
+                  design.kind.toUpperCase() === "DESIGN"
+                    ? "bg-blue-50 text-blue-700"
+                    : "bg-green-50 text-green-700"
+                }`}>
+                  {design.kind.toUpperCase()}
+                </span>
+              )}
+            </div>
+
+            <div className="mt-4 flex items-end justify-between gap-3">
+              <div>
+                <div className="text-2xl font-bold text-gray-900 tracking-tight">
+                  ₹{currentPrice}
+                  {priceLoading && selectedSize && (
+                    <span className="ml-2 text-sm font-normal text-gray-500">(loading...)</span>
+                  )}
+                </div>
+                {hasPriceDiscount && (
+                  <div className="mt-1 text-sm text-gray-400 line-through">₹{design.product.basePrice}</div>
+                )}
+                {selectedSize && (
+                  <div className="mt-1 text-xs font-medium text-gray-600">Size: {selectedSize}</div>
+                )}
+              </div>
+              <button
+                onClick={copyToClipboard}
+                className="rounded-full border border-gray-200 bg-gray-50 p-2.5 text-gray-600"
+                aria-label="Share design"
+              >
+                {copied ? <Check className="w-4 h-4 text-green-600" /> : <Share2 className="w-4 h-4" />}
+              </button>
+            </div>
+
+            {isLocalPrice && (
+              <div className="mt-3 rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-xs font-medium text-yellow-800">
+                Using estimated price. Live price calculation is temporarily unavailable.
+              </div>
+            )}
+
+            {isInCart && (
+              <div className="mt-3 rounded-lg bg-blue-50 p-3">
+                <p className="text-xs text-blue-800">
+                  <span className="font-semibold">{quantity} item(s)</span> in cart • Total ₹{cartTotal}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {design.productColor && (
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Product Color</h3>
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-xl border border-gray-300"
+                  style={{ backgroundColor: design.productColor }}
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  {design.productColorName || design.productColor}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Description</h3>
+            <p className="text-sm leading-relaxed text-gray-600">
+              {design.description || `Custom design for ${design.productName}`}
+            </p>
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
+              Customized products are not eligible for return
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Design Metrics</h3>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-xl bg-gray-50 p-3 text-center">
+                <Type className="w-5 h-5 text-gray-600 mx-auto mb-2" />
+                <p className="text-lg font-bold text-gray-900">{stats.totalTextLayers}</p>
+                <p className="text-[11px] font-medium text-gray-500">Text</p>
+              </div>
+              <div className="rounded-xl bg-gray-50 p-3 text-center">
+                <ImageIcon className="w-5 h-5 text-gray-600 mx-auto mb-2" />
+                <p className="text-lg font-bold text-gray-900">{stats.totalImageLayers}</p>
+                <p className="text-[11px] font-medium text-gray-500">Layers</p>
+              </div>
+              <div className="rounded-xl bg-gray-50 p-3 text-center">
+                <Eye className="w-5 h-5 text-gray-600 mx-auto mb-2" />
+                <p className="text-lg font-bold text-gray-900">{stats.totalViews}</p>
+                <p className="text-[11px] font-medium text-gray-500">Views</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Key Features</h3>
+            <div className="space-y-2.5 text-sm text-gray-700">
+              {[
+                "300 DPI Resolution",
+                "Vector & Raster Files",
+                "CMYK Print Ready",
+                "Commercial License",
+              ].map((item) => (
+                <div key={item} className="flex items-center gap-3">
+                  <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
         {/* Tabs Section */}
-        <div className="mt-8">
+        <div className="mt-6 lg:mt-8">
           <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
             {/* Tabs Header */}
             <div className="border-b border-gray-200">
-              <div className="flex">
+              <div className="flex overflow-x-auto">
                 <button
                   onClick={() => setActiveTab('specifications')}
-                  className={`px-8 py-4 text-sm font-medium tracking-tight border-b-2 transition-colors ${
+                  className={`shrink-0 px-4 sm:px-8 py-4 text-xs sm:text-sm font-medium tracking-tight border-b-2 transition-colors ${
                     activeTab === 'specifications' 
                       ? 'border-gray-900 text-gray-900' 
                       : 'text-gray-500 hover:text-gray-700'
@@ -1046,7 +1246,7 @@ export default function CatalogueDetailPage() {
                 </button>
                 <button
                   onClick={() => setActiveTab('details')}
-                  className={`px-8 py-4 text-sm font-medium tracking-tight border-b-2 transition-colors ${
+                  className={`shrink-0 px-4 sm:px-8 py-4 text-xs sm:text-sm font-medium tracking-tight border-b-2 transition-colors ${
                     activeTab === 'details' 
                       ? 'border-gray-900 text-gray-900' 
                       : 'text-gray-500 hover:text-gray-700'
@@ -1056,7 +1256,7 @@ export default function CatalogueDetailPage() {
                 </button>
                 <button
                   onClick={() => setActiveTab('shipping')}
-                  className={`px-8 py-4 text-sm font-medium tracking-tight border-b-2 transition-colors ${
+                  className={`shrink-0 px-4 sm:px-8 py-4 text-xs sm:text-sm font-medium tracking-tight border-b-2 transition-colors ${
                     activeTab === 'shipping' 
                       ? 'border-gray-900 text-gray-900' 
                       : 'text-gray-500 hover:text-gray-700'
@@ -1068,7 +1268,7 @@ export default function CatalogueDetailPage() {
             </div>
 
             {/* Tab Content */}
-            <div className="p-8">
+            <div className="p-4 sm:p-6 lg:p-8">
               {activeTab === 'specifications' && (
                 <div className="space-y-8">
                   <div>
@@ -1261,6 +1461,94 @@ export default function CatalogueDetailPage() {
           </div>
         </div>
       </div>
+
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white shadow-lg">
+        <div className="space-y-2 p-3">
+          {renderSizeSelector({ compact: true })}
+
+          {!token && (
+            <div className="rounded-lg border border-purple-100 bg-purple-50 p-2">
+              <p className="text-center text-xs text-purple-700">
+                Login to add this design to cart or buy now.
+              </p>
+            </div>
+          )}
+
+          {token && selectedSize && (
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-gray-700">Qty</span>
+              <div className="flex items-center">
+                <button
+                  onClick={handleDecrement}
+                  disabled={!isInCart || isUpdating || priceLoading}
+                  className={`flex h-7 w-7 items-center justify-center rounded-l-lg border border-gray-300 ${
+                    !isInCart || isUpdating || priceLoading ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-50"
+                  }`}
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <div className="flex h-7 min-w-[2.25rem] items-center justify-center border-b border-t border-gray-300 px-2">
+                  <span className="text-sm font-medium">{isInCart ? quantity : 1}</span>
+                </div>
+                <button
+                  onClick={isInCart ? handleIncrement : handleAddToCart}
+                  disabled={isUpdating || priceLoading}
+                  className={`flex h-7 w-7 items-center justify-center rounded-r-lg border border-gray-300 ${
+                    isUpdating || priceLoading ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-50"
+                  }`}
+                >
+                  {isUpdating || priceLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              onClick={isInCart ? () => navigate("/cart") : handleAddToCart}
+              disabled={isUpdating || priceLoading || !token || !selectedSize}
+              className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold tracking-tight transition-all ${
+                token && selectedSize
+                  ? "bg-gray-900 text-white"
+                  : "bg-gray-100 text-gray-500"
+              } ${isUpdating || priceLoading ? "opacity-50" : ""}`}
+            >
+              {isUpdating || priceLoading
+                ? "Working..."
+                : isInCart
+                  ? `In Cart (${quantity})`
+                  : token
+                    ? "Add to Cart"
+                    : "Login Required"}
+            </button>
+            <button
+              onClick={handleBuyNow}
+              disabled={isUpdating || priceLoading || !token || !selectedSize}
+              className={`flex-1 rounded-xl border px-4 py-3 text-sm font-semibold tracking-tight transition-all ${
+                token && selectedSize
+                  ? "border-gray-900 bg-white text-gray-900"
+                  : "border-gray-200 bg-gray-100 text-gray-500"
+              } ${isUpdating || priceLoading ? "opacity-50" : ""}`}
+            >
+              Buy Now
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <ProductImageLightbox
+        isOpen={isImageViewerOpen}
+        items={galleryItems}
+        initialIndex={currentGalleryIndex}
+        title={design.title || design.productName || "Design gallery"}
+        onClose={() => setIsImageViewerOpen(false)}
+        onIndexChange={(nextGalleryIndex) => {
+          const nextViewIndex = galleryViewIndexes[nextGalleryIndex];
+          if (typeof nextViewIndex === "number") {
+            setActiveView(nextViewIndex);
+          }
+        }}
+      />
     </div>
   );
 }

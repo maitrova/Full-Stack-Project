@@ -91,6 +91,7 @@ import ProductSearch from '../components/searchproductdetail.jsx';
 import AdminDesignsPage from './AdminDesignsPage.jsx';
 import DesignUploadsManager from '../components/admindesignuploads.jsx';
 import CouponManagement from '../components/admin/CouponManagement.jsx';
+import HeaderBannerSettings from '../components/admin/HeaderBannerSettings.jsx';
 
 const AdminDashboard = () => {
   const dispatch = useDispatch();
@@ -1125,6 +1126,10 @@ const AdminDashboard = () => {
             <ProductPricingManager />
           )}
 
+          {activeSidebarItem === 'settings' && (
+            <HeaderBannerSettings />
+          )}
+
           {/* Search and Filters for Products */}
           {(activeSidebarItem === 'allProducts' || activeSidebarItem === 'newArrival' || activeSidebarItem === 'bestSeller') && !isEditing && viewMode === 'products' && (
             <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
@@ -1697,7 +1702,8 @@ const AdminDashboard = () => {
      activeSidebarItem !== 'adminDesigns' &&
      activeSidebarItem !== 'adminUploads' &&
      activeSidebarItem !== 'coupons' &&
-     activeSidebarItem !== 'prices' ? (            /* View Mode for Products (excluding dropproducts, orders, homepage, search, and adminDesigns) */
+     activeSidebarItem !== 'prices' &&
+     activeSidebarItem !== 'settings' ? (            /* View Mode for Products (excluding dropproducts, orders, homepage, search, and adminDesigns) */
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
               {productsLoading ? (
                 <div className="flex justify-center items-center h-64">

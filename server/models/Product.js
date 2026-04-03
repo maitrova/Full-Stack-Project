@@ -49,6 +49,22 @@ const productViewSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const imagePriceRuleSchema = new mongoose.Schema(
+  {
+    maxSideInches: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+    price: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+  },
+  { _id: false }
+);
+
 /* ---------- Product Schema ---------- */
 const productSchema = new mongoose.Schema(
   {
@@ -113,6 +129,13 @@ const productSchema = new mongoose.Schema(
       fixedSizeInches: { type: Number, default: 4 },
       pricePerSqInch: { type: Number, default: 6 },
       sleevePrice: { type: Number, default: 30 },
+      imagePriceRules: {
+        type: [imagePriceRuleSchema],
+        default: [
+          { maxSideInches: 4, price: 40 },
+          { maxSideInches: null, price: 100 },
+        ],
+      },
     },
 
     currency: { type: String, default: "INR" },

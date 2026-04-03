@@ -1,46 +1,210 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { logoutUser, selectCurrentToken } from '../redux/slices/Userslice.js';
-import { 
-  selectCartItemCount, 
-  selectCart,
+import {
   getCart,
+  resetCart,
+  selectCart,
+  selectCartItemCount,
   selectCartLoading,
-  resetCart
 } from '../redux/slices/Cartslice.js';
+
+const API_URL = import.meta.env.VITE_API_URL || 'https://maitrova.in/backend/api';
+const DEFAULT_BANNER_MESSAGES = [
+  'Free Shipping Nationwide',
+  'Custom Designs in 48 Hours',
+  'Premium Quality Guaranteed',
+];
+
+const socialLinks = [
+  {
+    key: 'whatsapp',
+    label: 'WhatsApp',
+    href: 'https://wa.me/919390319652',
+    desktopClass: 'border-emerald-100 bg-emerald-50/80 text-emerald-600 hover:border-emerald-200 hover:bg-emerald-100/80 hover:text-emerald-700',
+    mobileIconClass: 'bg-emerald-100 text-emerald-600',
+    icon: (
+      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.67-1.612-.916-2.207-.242-.579-.487-.5-.67-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.76.982.999-3.675-.236-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.897 6.994c-.004 5.45-4.438 9.88-9.888 9.88" />
+      </svg>
+    ),
+  },
+  {
+    key: 'instagram',
+    label: 'Instagram',
+    href: 'https://instagram.com/maitrova',
+    desktopClass: 'border-fuchsia-100 bg-fuchsia-50/80 text-fuchsia-600 hover:border-fuchsia-200 hover:bg-fuchsia-100/80 hover:text-fuchsia-700',
+    mobileIconClass: 'bg-fuchsia-100 text-fuchsia-600',
+    icon: (
+      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0 3.675A6.163 6.163 0 1012 18a6.163 6.163 0 000-12.325zm0 10.162A4 4 0 1112 8a4 4 0 010 8zm6.406-11.845a1.44 1.44 0 101.441 1.44 1.441 1.441 0 00-1.441-1.44z" />
+      </svg>
+    ),
+  },
+  {
+    key: 'facebook',
+    label: 'Facebook',
+    href: 'https://facebook.com/maitrova',
+    desktopClass: 'border-sky-100 bg-sky-50/80 text-sky-600 hover:border-sky-200 hover:bg-sky-100/80 hover:text-sky-700',
+    mobileIconClass: 'bg-sky-100 text-sky-600',
+    icon: (
+      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M24 12.073C24 5.446 18.627.073 12 .073S0 5.446 0 12.073c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+      </svg>
+    ),
+  },
+  {
+    key: 'x',
+    label: 'X',
+    href: 'https://twitter.com/maitrova',
+    desktopClass: 'border-slate-200 bg-slate-100/90 text-slate-700 hover:border-slate-300 hover:bg-slate-200/80 hover:text-slate-900',
+    mobileIconClass: 'bg-slate-200 text-slate-700',
+    icon: (
+      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M18.901 1.153h3.68l-8.04 9.188L24 22.847h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.829L0 1.154h7.594l5.243 6.932zM17.61 20.644h2.039L6.486 3.24H4.298z" />
+      </svg>
+    ),
+  },
+  {
+    key: 'linkedin',
+    label: 'LinkedIn',
+    href: 'https://linkedin.com/company/maitrova',
+    desktopClass: 'border-blue-100 bg-blue-50/80 text-blue-700 hover:border-blue-200 hover:bg-blue-100/80 hover:text-blue-800',
+    mobileIconClass: 'bg-blue-100 text-blue-700',
+    icon: (
+      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M20.447 20.452H16.89v-5.569c0-1.328-.026-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.347V9h3.414v1.561h.049c.476-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455zM5.337 7.433a2.063 2.063 0 110-4.126 2.063 2.063 0 010 4.126zM7.119 20.452H3.555V9H7.12z" />
+      </svg>
+    ),
+  },
+];
+
+const navItems = [
+  { path: '/allproducts', label: 'Products' },
+  { path: '/customproducts', label: 'Custom Design' },
+];
+
+const userMenuItems = [
+  { path: '/profile', label: 'My Profile' },
+  { path: '/orders', label: 'My Orders' },
+  { path: '/usersaved_designs', label: 'My Designs' },
+];
+
+const formatCurrency = (value) => `Rs. ${Number(value || 0).toFixed(2)}`;
+
+const SocialMediaIcons = ({ mobile = false }) => (
+  <div className={`flex items-center ${mobile ? 'flex-wrap gap-2.5' : 'gap-2'}`}>
+    {socialLinks.map((item) => (
+      <a
+        key={item.key}
+        href={item.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={item.label}
+        aria-label={item.label}
+        className={
+          mobile
+            ? 'inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50'
+            : `inline-flex h-10 w-10 items-center justify-center rounded-full border shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${item.desktopClass}`
+        }
+      >
+        {mobile ? (
+          <>
+            <span className={`inline-flex h-8 w-8 items-center justify-center rounded-full ${item.mobileIconClass}`}>{item.icon}</span>
+            <span>{item.label}</span>
+          </>
+        ) : (
+          item.icon
+        )}
+      </a>
+    ))}
+  </div>
+);
 
 const Header = () => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [hoveredLink, setHoveredLink] = useState(null);
-  
-  // Social media URLs (configure these as needed)
-  const socialMedia = {
-    whatsapp: 'https://wa.me/919390319652',
-    instagram: 'https://instagram.com/maitrova',
-    facebook: 'https://facebook.com/maitrova',
-    twitter: 'https://twitter.com/maitrova',
-  };
+  const [bannerMessages, setBannerMessages] = useState(DEFAULT_BANNER_MESSAGES);
+  const [bannerCouponCode, setBannerCouponCode] = useState('');
 
-  // Redux hooks
+  const location = useLocation();
   const dispatch = useDispatch();
-  const user = useSelector(state => state.user.userInfo);
+  const user = useSelector((state) => state.user.userInfo);
   const token = useSelector(selectCurrentToken);
   const cartItemCount = useSelector(selectCartItemCount);
   const cart = useSelector(selectCart);
   const cartLoading = useSelector(selectCartLoading);
   const isAuthenticated = !!token;
 
-  // Keep cart state in sync with auth state.
   useEffect(() => {
     if (token) {
       dispatch(getCart());
-      return;
+    } else {
+      dispatch(resetCart());
     }
-
-    dispatch(resetCart());
   }, [dispatch, token]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadBanner = async () => {
+      try {
+        const res = await fetch(`${API_URL}/header-banner`);
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.message || 'Failed to load banner');
+        }
+
+        if (!isMounted) return;
+
+        const nextMessages = Array.isArray(data?.messages)
+          ? data.messages.map((message) => String(message || '').trim()).filter(Boolean)
+          : DEFAULT_BANNER_MESSAGES;
+
+        setBannerMessages(nextMessages);
+        setBannerCouponCode(String(data?.couponCode || '').trim());
+      } catch (error) {
+        if (!isMounted) return;
+        setBannerMessages(DEFAULT_BANNER_MESSAGES);
+        setBannerCouponCode('');
+      }
+    };
+
+    loadBanner();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+    setShowDropdown(false);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const cartSubtotal = useMemo(() => cart?.cartSummary?.subtotal || 0, [cart?.cartSummary?.subtotal]);
+  const visibleBannerMessages = useMemo(
+    () => bannerMessages.map((message) => String(message || '').trim()).filter(Boolean),
+    [bannerMessages]
+  );
+  const visibleBannerCoupon = useMemo(() => String(bannerCouponCode || '').trim(), [bannerCouponCode]);
+
+  const isRouteActive = (path) => {
+    if (path === '/') return location.pathname === '/';
+    return location.pathname === path || location.pathname.startsWith(`${path}/`);
+  };
 
   const handleLogout = () => {
     dispatch(resetCart());
@@ -48,222 +212,94 @@ const Header = () => {
     setIsMobileMenuOpen(false);
   };
 
-  // Professional hover effects
-  const hoverEffects = {
-    primary: "transition-all duration-300 hover:scale-105 hover:shadow-md",
-    subtle: "transition-all duration-200 hover:opacity-90",
-    glow: "transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20",
-    lift: "transition-transform duration-300 hover:-translate-y-0.5",
-    slide: "relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:bg-blue-600 after:transition-all after:duration-300 after:w-0 hover:after:w-full"
-  };
-
-  // Navigation items
-  const navItems = [
-    { path: "/allproducts", label: "Products", icon: "📦" },
-    { path: "/customproducts", label: "Custom Design", icon: "🎨" },
-    ...(isAuthenticated ? [
-      // { path: "/usersaved_designs", label: "My Designs", icon: "✏️" }
-    ] : [])
-  ];
-
-  // User menu items
-  const userMenuItems = [
-    { path: "/profile", label: "My Profile", icon: "👤" },
-    { path: "/orders", label: "My Orders", icon: "📋" },
-    { path: "/usersaved_designs", label: "My Designs", icon: "✏️" }
-  ];
-
-  // Social Media Icons Component
-  const SocialMediaIcons = ({ variant = 'desktop', position = 'profile' }) => (
-    <div className={`flex items-center space-x-1 ${position === 'profile' ? '' : variant === 'mobile' ? 'justify-center py-2' : ''}`}>
-      <a 
-        href={socialMedia.whatsapp}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`p-2 rounded-lg bg-gradient-to-r from-green-500 to-green-600 text-white ${hoverEffects.lift} hover:shadow-lg hover:from-green-600 hover:to-green-700 group relative`}
-        title="Chat with us on WhatsApp"
-      >
-        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.67-1.612-.916-2.207-.242-.579-.487-.5-.67-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.76.982.999-3.675-.236-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.897 6.994c-.004 5.45-4.438 9.88-9.888 9.88m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.333.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.333 11.893-11.893 0-3.18-1.24-6.162-3.495-8.411"/>
-        </svg>
-        <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-          WhatsApp
-        </span>
-      </a>
-      
-      <a 
-        href={socialMedia.instagram}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`p-2 rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 text-white ${hoverEffects.lift} hover:shadow-lg hover:from-pink-600 hover:to-purple-700 group relative`}
-        title="Follow us on Instagram"
-      >
-        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-        </svg>
-        <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-          Instagram
-        </span>
-      </a>
-      
-      {/* Optional: Facebook icon - can be added if needed */}
-      {position === 'profile' && (
-        <a 
-          href={socialMedia.facebook}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`p-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 text-white ${hoverEffects.lift} hover:shadow-lg hover:from-blue-700 hover:to-blue-800 hidden lg:block group relative`}
-          title="Like us on Facebook"
-        >
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-          </svg>
-          <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-            Facebook
-          </span>
-        </a>
-      )}
-    </div>
-  );
-
-  // Cart Icon Component
   const CartIcon = () => (
-    <Link 
-      to="/cart" 
-      className={`relative p-3 bg-white rounded-xl border border-gray-200 ${hoverEffects.glow} group`}
+    <Link
+      to="/cart"
+      className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 hover:shadow-md"
       onClick={() => setIsMobileMenuOpen(false)}
     >
-      <svg 
-        xmlns="http://www.w3.org/2000/svg" 
-        className="h-6 w-6 text-gray-700 group-hover:text-blue-600 transition-colors"
-        fill="none" 
-        viewBox="0 0 24 24" 
-        stroke="currentColor"
-      >
-        <path 
-          strokeLinecap="round" 
-          strokeLinejoin="round" 
-          strokeWidth={1.8} 
-          d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" 
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.8}
+          d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
         />
       </svg>
       {cartItemCount > 0 && (
-        <span className={`absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center shadow-lg ${hoverEffects.lift}`}>
+        <span className="absolute -right-1.5 -top-1.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-slate-900 px-1 text-[10px] font-semibold text-white">
           {cartItemCount > 9 ? '9+' : cartItemCount}
         </span>
       )}
-      {/* Animated ring on hover */}
-      <div className="absolute inset-0 rounded-xl ring-2 ring-transparent group-hover:ring-blue-400/30 transition-all duration-500"></div>
     </Link>
   );
 
-  // Cart Dropdown Component
   const CartDropdown = () => (
-    <div className={`absolute right-0 mt-2 w-96 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 overflow-hidden transform transition-all duration-300 ${showDropdown ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
-      {/* Gradient header */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-4">
-        <div className="flex justify-between items-center">
-          <h3 className="font-bold text-white text-lg">Shopping Cart</h3>
-          <Link 
-            to="/cart" 
-            className="text-white/90 hover:text-white text-sm font-medium bg-white/10 px-3 py-1 rounded-lg transition-all duration-200 hover:bg-white/20"
-            onClick={() => setShowDropdown(false)}
-          >
-            View Cart →
+    <div className="absolute right-0 mt-4 w-80 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_34px_80px_-42px_rgba(15,23,42,0.45)]">
+      <div className="border-b border-slate-100 bg-[linear-gradient(135deg,_#f8fafc,_#eef2ff)] px-5 py-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Shopping Cart</p>
+            <h3 className="mt-1 text-sm font-semibold text-slate-900">{cartItemCount ? `${cartItemCount} item${cartItemCount > 1 ? 's' : ''}` : 'No items yet'}</h3>
+          </div>
+          <Link to="/cart" className="text-xs font-semibold text-slate-600 transition hover:text-slate-900" onClick={() => setShowDropdown(false)}>
+            Open cart
           </Link>
         </div>
       </div>
-      
-      <div className="p-4 max-h-96 overflow-y-auto">
+
+      <div className="max-h-96 overflow-y-auto p-4">
         {cartLoading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent mx-auto mb-4"></div>
-            <p className="text-gray-500">Loading your cart...</p>
-          </div>
-        ) : cart?.items && cart.items.length > 0 ? (
-          <>
-            <div className="space-y-3">
-              {cart.items.slice(0, 3).map((item) => (
-                <div key={item._id} className="flex items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200 group">
-                  <div className="relative w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg overflow-hidden flex items-center justify-center shadow-sm">
-                    {item.image ? (
-                      <img 
-                        src={item.image} 
-                        alt={item.productName} 
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                      />
-                    ) : (
-                      <span className="text-gray-400 text-sm">📦</span>
-                    )}
-                  </div>
-                  <div className="ml-4 flex-1 min-w-0">
-                    <h4 className="text-sm font-semibold text-gray-800 truncate group-hover:text-blue-600 transition-colors">
-                      {item.productName}
-                    </h4>
-                    <div className="flex items-center justify-between mt-1">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">Qty: {item.qty}</span>
-                        <span className="text-xs text-gray-500">×</span>
-                        <span className="text-xs font-medium text-gray-700">₹{item.unitPrice?.toFixed(2)}</span>
-                      </div>
-                      <p className="text-sm font-bold text-gray-900">
-                        ₹{((item.unitPrice || 0) * (item.qty || 0)).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
+          <div className="py-8 text-center text-sm text-slate-500">Loading cart...</div>
+        ) : cart?.items?.length ? (
+          <div className="space-y-3">
+            {cart.items.slice(0, 3).map((item) => (
+              <div key={item._id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-3">
+                <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white">
+                  {item.image || item.previewImage ? (
+                    <img
+                      src={item.image || item.previewImage}
+                      alt={item.productName || item.title || 'Cart item'}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-xs text-slate-400">Item</span>
+                  )}
                 </div>
-              ))}
-              
-              {cart.items.length > 3 && (
-                <div className="text-center py-2">
-                  <div className="inline-flex items-center px-4 py-2 bg-blue-50 rounded-full text-blue-600 text-sm font-medium">
-                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clipRule="evenodd" />
-                    </svg>
-                    +{cart.items.length - 3} more items
-                  </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-slate-800">{item.productName || item.title || 'Product'}</p>
+                  <p className="mt-1 text-xs text-slate-500">Qty {item.qty} | {formatCurrency(item.unitPrice)}</p>
                 </div>
-              )}
-            </div>
-            
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-sm text-gray-600">Subtotal:</span>
-                <span className="text-lg font-bold text-gray-900">
-                  ₹{cart.cartSummary?.subtotal?.toFixed(2) || '0.00'}
-                </span>
+                <div className="text-sm font-semibold text-slate-900">
+                  {formatCurrency((item.unitPrice || 0) * (item.qty || 0))}
+                </div>
               </div>
-              <Link 
+            ))}
+
+            {cart.items.length > 3 && (
+              <p className="text-center text-xs font-medium text-slate-500">+{cart.items.length - 3} more items</p>
+            )}
+
+            <div className="border-t border-slate-200 pt-4">
+              <div className="mb-3 flex items-center justify-between text-sm">
+                <span className="text-slate-500">Subtotal</span>
+                <span className="font-semibold text-slate-900">{formatCurrency(cartSubtotal)}</span>
+              </div>
+              <Link
                 to="/checkout"
-                className="block w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-center py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-[1.02] shadow-lg hover:shadow-xl"
+                className="block rounded-2xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-slate-800"
                 onClick={() => setShowDropdown(false)}
               >
                 Proceed to Checkout
               </Link>
             </div>
-          </>
+          </div>
         ) : (
-          <div className="text-center py-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full mb-4">
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                className="h-10 w-10 text-gray-400"
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-              >
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={1} 
-                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" 
-                />
-              </svg>
-            </div>
-            <p className="text-gray-600 mb-6">Your cart is empty</p>
-            <Link 
+          <div className="py-8 text-center">
+            <p className="mb-4 text-sm text-slate-500">Your cart is empty</p>
+            <Link
               to="/allproducts"
-              className="inline-block bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
+              className="inline-flex rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
               onClick={() => setShowDropdown(false)}
             >
               Start Shopping
@@ -274,309 +310,258 @@ const Header = () => {
     </div>
   );
 
-  // User Profile Component (with social media integrated)
   const UserProfile = () => (
-    <div className="flex items-center space-x-3">
-      {/* Social media icons on left (for authenticated users) */}
-      {isAuthenticated && (
-        <div className="hidden lg:flex items-center space-x-2 mr-2">
-          <SocialMediaIcons position="profile" />
-          <div className="h-6 w-px bg-gray-300"></div>
+    <Link
+      to="/profile"
+      className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-2 py-2 pr-4 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
+    >
+      <div className="relative">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[linear-gradient(135deg,_#0f172a,_#334155)] text-sm font-semibold text-white">
+          {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
         </div>
-      )}
-      
-      {/* User profile card */}
-      <Link to="/profile">
-      <div className="flex items-center space-x-3 p-2 pr-4 bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-200 group hover:border-blue-300 transition-all duration-300">
-        <div className="relative">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold shadow-md group-hover:scale-110 transition-transform duration-300">
-            {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
-          </div>
-          <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
-        </div>
-        <div className="hidden lg:block">
-          <div className="text-sm font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
-            {user?.name?.split(' ')[0] || 'User'}
-          </div>
-          
-        </div>
+        <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500" />
       </div>
-      </Link>
-    </div>
-  );
-
-  // Simplified top banner without social media
-  const TopBanner = () => (
-    <div className="border-b border-slate-200 bg-slate-50 py-2 px-4">
-      <div className="container mx-auto">
-        <div className="text-center text-sm">
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-            <span className="flex items-center whitespace-nowrap font-medium text-slate-700">
-              <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-              </svg>
-              Free Shipping Nationwide
-            </span>
-            <span className="text-gray-400 hidden sm:inline">•</span>
-            <span className="whitespace-nowrap text-slate-600">Custom Designs in 48 Hours</span>
-            <span className="text-gray-400 hidden lg:inline">•</span>
-            <span className="hidden whitespace-nowrap text-slate-600 lg:inline">Premium Quality Guaranteed</span>
-          </div>
-        </div>
+      <div className="hidden lg:block">
+        <p className="text-sm font-semibold text-slate-800">{user?.name?.split(' ')[0] || 'User'}</p>
       </div>
-    </div>
+    </Link>
   );
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur-md shadow-sm">
-      {/* Top banner */}
-      <TopBanner />
-      
-      {/* Main header */}
-      <div className="container mx-auto px-4 py-3">
-        <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-[0_16px_40px_-28px_rgba(15,23,42,0.28)] md:px-5">
-          {/* Left side - Logo & Mobile Menu */}
-          <div className="flex items-center space-x-6">
-            {/* Mobile Menu Button */}
-            <button
-              className={`md:hidden p-3 rounded-xl border border-slate-200 bg-slate-50 ${hoverEffects.glow}`}
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            >
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                className="h-5 w-5 text-slate-700"
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-              >
-                {isMobileMenuOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" />
+    <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-[rgba(248,250,252,0.88)] shadow-[0_10px_35px_-24px_rgba(15,23,42,0.35)] backdrop-blur-xl">
+      {(visibleBannerMessages.length > 0 || visibleBannerCoupon) && (
+        <div className="border-b border-slate-200/80 bg-[linear-gradient(90deg,_#eff6ff,_#f8fafc,_#fff7ed)] px-4 py-2">
+          <div className="container mx-auto flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-center text-[12px] font-medium text-slate-600">
+            {visibleBannerMessages.map((message, index) => (
+              <React.Fragment key={`header-banner-${index}`}>
+                <span className="rounded-full border border-sky-100 bg-white/90 px-3 py-1 text-sky-700 shadow-sm">
+                  {message}
+                </span>
+                {index < visibleBannerMessages.length - 1 && (
+                  <span className="hidden text-slate-300 sm:inline">|</span>
                 )}
-              </svg>
-            </button>
-            
-            {/* Logo - Updated with image from public folder */}
-            <Link to="/" className={`relative ${hoverEffects.lift}`}>
-              <div className="relative overflow-hidden">
-                <div className="flex h-12 w-40 items-center justify-center rounded-xl bg-white shadow-lg transition-all duration-500 hover:shadow-xl">
-                  <img 
-                    src="/logo/logo.jpeg" 
-                    alt="MAITROVA" 
-                    className="h-12 w-auto object-contain rounded-4xl"
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.style.display = 'none';
-                      e.target.parentElement.classList.add('fallback-logo');
-                      // Add fallback text if image fails to load
-                      const fallbackDiv = document.createElement('div');
-                      fallbackDiv.className = 'text-xl font-bold text-gray-800';
-                      fallbackDiv.textContent = 'MAITROVA';
-                      e.target.parentElement.appendChild(fallbackDiv);
+              </React.Fragment>
+            ))}
+            {visibleBannerCoupon ? (
+              <>
+                {visibleBannerMessages.length > 0 && (
+                  <span className="hidden text-slate-300 lg:inline">|</span>
+                )}
+                <span className="rounded-full border border-amber-200 bg-amber-50/90 px-3 py-1 font-semibold uppercase tracking-[0.12em] text-amber-700 shadow-sm">
+                  Coupon: {visibleBannerCoupon}
+                </span>
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      <div className="container mx-auto px-3 py-3 sm:px-4">
+        <div className="relative overflow-visible rounded-[1.75rem] border border-white/70 bg-[linear-gradient(135deg,_rgba(255,255,255,0.96),_rgba(248,250,252,0.94))] px-3 py-3 shadow-[0_26px_60px_-36px_rgba(15,23,42,0.35)] md:px-5">
+          <div className="absolute inset-0 rounded-[1.75rem] bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.08),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(249,115,22,0.08),_transparent_28%)]" />
+          <div className="relative flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 sm:gap-5">
+              <button
+                className="rounded-2xl border border-slate-200 bg-white p-2.5 text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-md md:hidden"
+                onClick={() => setIsMobileMenuOpen((open) => !open)}
+                aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  {isMobileMenuOpen ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.25} d="M6 18L18 6M6 6l12 12" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.25} d="M4 6h16M4 12h16M4 18h16" />
+                  )}
+                </svg>
+              </button>
+
+              <Link to="/" className="group flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-white/80 bg-white shadow-md transition group-hover:-translate-y-0.5 group-hover:shadow-lg">
+                  <img
+                    src="/logo/logo.jpeg"
+                    alt="MAITROVA"
+                    className="h-full w-full object-cover"
+                    onError={(event) => {
+                      event.target.onerror = null;
+                      event.target.style.display = 'none';
+                      const fallbackNode = document.createElement('span');
+                      fallbackNode.className = 'text-sm font-bold text-slate-800';
+                      fallbackNode.textContent = 'M';
+                      event.target.parentElement.appendChild(fallbackNode);
                     }}
                   />
                 </div>
-                <div className="absolute -bottom-1 left-1/2 h-1 w-16 -translate-x-1/2 transform rounded-full bg-[linear-gradient(90deg,_#cbd5e1,_#94a3b8)]"></div>
-              </div>
-            </Link>
-          </div>
-
-          {/* Desktop Navigation Links */}
-          <div className="hidden md:flex items-center space-x-1 flex-1 justify-center">
-            {navItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`relative px-6 py-3 rounded-xl font-medium text-slate-700 ${hoverEffects.slide} hover:text-slate-950 group`}
-                onMouseEnter={() => setHoveredLink(item.path)}
-                onMouseLeave={() => setHoveredLink(null)}
-              >
-                <div className="flex items-center space-x-2">
-                  <span className="text-lg">{item.icon}</span>
-                  <span>{item.label}</span>
-                </div>
-                {hoveredLink === item.path && (
-                  <div className="absolute top-0 left-0 w-full h-full rounded-xl bg-slate-50 -z-10"></div>
-                )}
-              </Link>
-            ))}
-          </div>
-
-          {/* Right side - User actions & Cart */}
-          <div className="flex items-center space-x-3">
-            {/* Desktop User Actions */}
-            <div className="hidden md:flex items-center space-x-3">
-              {isAuthenticated ? (
-                <>
-                  <div className="relative group">
-                    <UserProfile />
+                <div className="hidden sm:block">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Maitrova</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-slate-900">Premium custom wear</p>
+                    <span className="hidden rounded-full border border-orange-100 bg-orange-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-orange-700 lg:inline-flex">
+                      Fresh drops
+                    </span>
                   </div>
+                </div>
+              </Link>
+            </div>
 
-                  <div className="flex items-center space-x-2">
+            <nav className="hidden md:flex">
+              <div className="flex items-center gap-1 rounded-full border border-slate-200/80 bg-white/80 p-1 shadow-sm">
+                {navItems.map((item) => {
+                  const isActive = isRouteActive(item.path);
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                        isActive
+                          ? 'bg-[linear-gradient(135deg,_#2563eb,_#7c3aed)] text-white shadow-sm'
+                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </nav>
+
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="hidden items-center gap-3 xl:flex">
+                <SocialMediaIcons />
+              </div>
+
+              <div className="hidden items-center gap-2 lg:flex">
+                {isAuthenticated ? (
+                  <>
+                    <UserProfile />
                     {userMenuItems.slice(1).map((item) => (
                       <Link
                         key={item.path}
                         to={item.path}
-                        className={`px-4 py-2.5 rounded-xl font-medium text-slate-700 bg-slate-50 border border-slate-200 ${hoverEffects.lift} hover:bg-white hover:border-slate-300 hover:shadow-md group`}
+                        className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
                       >
-                        <div className="flex items-center space-x-2">
-                          <span>{item.icon}</span>
-                          <span className="text-sm">{item.label}</span>
-                        </div>
+                        {item.label}
                       </Link>
                     ))}
                     <button
                       onClick={handleLogout}
-                      className={`px-4 py-2.5 rounded-xl font-medium text-red-600 bg-red-50 border border-red-200 ${hoverEffects.lift} hover:bg-red-100 hover:border-red-300 hover:shadow-md`}
+                      className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-600 transition hover:bg-rose-100"
                     >
-                      <div className="flex items-center space-x-2">
-                        <span>🚪</span>
-                        <span className="text-sm">Logout</span>
-                      </div>
+                      Logout
                     </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* Social Media for non-authenticated users */}
-                  <SocialMediaIcons position="auth" />
-                  <div className="h-6 w-px bg-gray-300"></div>
-                  
-                  <div className="flex items-center space-x-3">
+                  </>
+                ) : (
+                  <>
                     <Link
                       to="/login"
-                      className={`px-5 py-2.5 rounded-lg font-medium text-gray-700 bg-gray-50 border border-gray-200 ${hoverEffects.lift} hover:bg-white hover:border-blue-300 hover:shadow-md`}
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
                     >
                       Sign In
                     </Link>
                     <Link
                       to="/register"
-                      className={`px-5 py-2.5 rounded-lg font-medium text-white bg-gradient-to-r from-blue-500 to-purple-500 ${hoverEffects.lift} hover:from-blue-600 hover:to-purple-600 hover:shadow-md`}
+                      className="rounded-2xl bg-[linear-gradient(135deg,_#0f172a,_#1e293b)] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:opacity-95 hover:shadow-md"
                     >
                       Get Started
                     </Link>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Mobile Social Media Icons (for non-authenticated users) */}
-            {!isAuthenticated && (
-              <div className="md:hidden flex items-center space-x-2">
-                <SocialMediaIcons variant="mobile" />
+                  </>
+                )}
               </div>
-            )}
 
-            {/* Cart Button with Dropdown */}
-            <div className="relative">
-              <div 
-                className="flex items-center"
+              <div
+                className="relative"
                 onMouseEnter={() => window.innerWidth > 768 && setShowDropdown(true)}
                 onMouseLeave={() => window.innerWidth > 768 && setShowDropdown(false)}
               >
-                <CartIcon />
-                <div className="hidden md:block ml-2">
-                  <div className="text-xs text-gray-500 font-medium">TOTAL</div>
-                  <div className="text-sm font-bold text-gray-900">
-                    {cartItemCount > 0 ? (
-                      <>₹{cart?.cartSummary?.subtotal?.toFixed(2) || '0.00'}</>
-                    ) : (
-                      '₹0.00'
-                    )}
+                <div className="flex items-center gap-2 rounded-2xl border border-sky-100 bg-[linear-gradient(135deg,_rgba(255,255,255,0.96),_rgba(239,246,255,0.9))] px-2 py-2 shadow-sm md:pl-2 md:pr-3">
+                  <CartIcon />
+                  <div className="hidden md:block">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-500">Cart Total</div>
+                    <div className="text-sm font-semibold text-slate-900">{formatCurrency(cartSubtotal)}</div>
                   </div>
                 </div>
+                {showDropdown && window.innerWidth > 768 && <CartDropdown />}
               </div>
-              
-              {/* Cart Dropdown - desktop only */}
-              {showDropdown && window.innerWidth > 768 && <CartDropdown />}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden bg-white/95 backdrop-blur-md border-t border-gray-200 absolute top-full left-0 right-0 shadow-xl z-40 animate-slideDown">
-          <div className="px-4 py-4 space-y-2">
+        <div className="absolute inset-x-0 top-full z-40 px-3 pt-2 md:hidden">
+          <div className="mx-auto max-w-sm overflow-hidden rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(248,250,252,0.96))] p-3 shadow-[0_28px_70px_-38px_rgba(15,23,42,0.45)] backdrop-blur-xl">
             {isAuthenticated && (
-              <>
-                <div className="flex items-center space-x-3 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-md">
-                    {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-gray-800 truncate">
-                      {user?.name || 'User'}
-                    </div>
-                    <div className="text-sm text-gray-500 truncate">
-                      {user?.email || ''}
-                    </div>
-                  </div>
+              <div className="mb-3 flex items-center gap-3 rounded-2xl border border-slate-100 bg-white/80 p-3 shadow-sm">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,_#0f172a,_#334155)] text-sm font-semibold text-white">
+                  {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
                 </div>
-                
-                <div className="grid grid-cols-2 gap-2 p-2">
-                  {userMenuItems.map((item) => (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      className={`flex flex-col items-center justify-center p-3 bg-gray-50 rounded-xl border border-gray-200 ${hoverEffects.lift} hover:bg-white hover:border-blue-300`}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      <span className="text-2xl mb-1">{item.icon}</span>
-                      <span className="text-xs font-medium text-gray-700 text-center">{item.label}</span>
-                    </Link>
-                  ))}
-                  <button
-                    onClick={handleLogout}
-                    className={`flex flex-col items-center justify-center p-3 bg-red-50 rounded-xl border border-red-200 ${hoverEffects.lift} hover:bg-red-100 hover:border-red-300`}
-                  >
-                    <span className="text-2xl mb-1">🚪</span>
-                    <span className="text-xs font-medium text-red-600 text-center">Logout</span>
-                  </button>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-slate-800">{user?.name || 'User'}</p>
+                  <p className="truncate text-xs text-slate-500">{user?.email || ''}</p>
                 </div>
-              </>
+              </div>
             )}
-            
-            <div className="pt-2 border-t border-gray-200">
-              <div className="grid grid-cols-2 gap-2">
-                {navItems.map((item) => (
+
+            <div className="space-y-2">
+              {navItems.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-medium transition ${
+                    isRouteActive(item.path)
+                      ? 'border-slate-900 bg-slate-900 text-white'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                  }`}
+                >
+                  <span>{item.label}</span>
+                  <span className={isRouteActive(item.path) ? 'text-white/70' : 'text-slate-400'}>&rarr;</span>
+                </Link>
+              ))}
+
+              {isAuthenticated &&
+                userMenuItems.map((item) => (
                   <Link
                     key={item.path}
                     to={item.path}
-                    className={`flex items-center justify-center p-3 bg-gray-50 rounded-xl border border-gray-200 ${hoverEffects.lift} hover:bg-white hover:border-blue-300`}
-                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-medium transition ${
+                      isRouteActive(item.path)
+                        ? 'border-slate-900 bg-slate-900 text-white'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                    }`}
                   >
-                    <span className="text-lg mr-2">{item.icon}</span>
-                    <span className="text-sm font-medium text-gray-700">{item.label}</span>
+                    <span>{item.label}</span>
+                    <span className={isRouteActive(item.path) ? 'text-white/70' : 'text-slate-400'}>&rarr;</span>
                   </Link>
                 ))}
-              </div>
-              
-              {/* Social Media in mobile menu */}
-              <div className="mt-4 flex justify-center">
-                <SocialMediaIcons variant="mobile" position="mobile-menu" />
-              </div>
-              
-              {!isAuthenticated && (
-                <div className="grid grid-cols-2 gap-2 mt-4">
-                  <Link
-                    to="/login"
-                    className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-center font-medium text-gray-700 hover:bg-white hover:border-blue-300 transition-all duration-200"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Sign In
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="p-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl border border-transparent text-center font-medium text-white hover:from-blue-600 hover:to-purple-600 transition-all duration-200"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Sign Up
-                  </Link>
-                </div>
-              )}
             </div>
+
+            <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50/90 p-4">
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Connect With Us</p>
+              <SocialMediaIcons mobile />
+            </div>
+
+            {isAuthenticated ? (
+              <button
+                onClick={handleLogout}
+                className="mt-4 w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-600 transition hover:bg-rose-100"
+              >
+                Logout
+              </button>
+            ) : (
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <Link
+                  to="/login"
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  to="/register"
+                  className="rounded-2xl bg-[linear-gradient(135deg,_#0f172a,_#1e293b)] px-4 py-3 text-center text-sm font-medium text-white transition hover:opacity-95"
+                >
+                  Get Started
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       )}

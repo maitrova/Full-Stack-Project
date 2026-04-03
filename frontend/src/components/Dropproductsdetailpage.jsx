@@ -37,6 +37,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { buildImageUrl, getResponsiveImageProps } from "../utils/responsiveImage.js";
+import ProductImageLightbox from "./ProductImageLightbox.jsx";
 
 const DropProductDetailsPage = () => {
   const { id } = useParams();
@@ -58,10 +59,24 @@ const DropProductDetailsPage = () => {
   const [imageLoading, setImageLoading] = useState(true);
   const [loadedImages, setLoadedImages] = useState({});
   const [showCartSuccess, setShowCartSuccess] = useState(false);
+  const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
 
   const mainImageRef = useRef(null);
   const thumbnailContainerRef = useRef(null);
   const assetUrl = (path) => buildImageUrl(path);
+  const galleryItems = (product?.images || []).map((image, index) => {
+    const imageProps = getResponsiveImageProps(image, {
+      sizes: "(max-width: 768px) 100vw, 1200px",
+      loading: index === 0 ? "eager" : "lazy",
+    });
+
+    return {
+      src: imageProps.src || assetUrl(image),
+      thumbSrc: assetUrl(image),
+      alt: `${product?.name || "Product"} - ${index + 1}`,
+      label: `Image ${index + 1}`,
+    };
+  });
 
   useEffect(() => {
     if (id) dispatch(getDropproductById(id));
@@ -431,6 +446,7 @@ const DropProductDetailsPage = () => {
                       className={`w-full h-full object-contain p-4 transition-transform duration-700 ${
                         imageLoading ? "opacity-0" : "opacity-100"
                       }`}
+                      onClick={() => setIsImageViewerOpen(true)}
                       style={
                         imageProps.placeholder
                           ? {
@@ -459,6 +475,14 @@ const DropProductDetailsPage = () => {
                   </div>
                   );
                 })}
+
+                {!!product.images?.length && (
+                  <div className="pointer-events-none absolute inset-x-0 bottom-6 flex justify-center">
+                    <span className="rounded-full bg-black/65 px-4 py-2 text-xs font-semibold tracking-tight text-white shadow-lg backdrop-blur-sm">
+                      Tap image for full screen
+                    </span>
+                  </div>
+                )}
 
                 {/* Nav overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
@@ -790,6 +814,15 @@ const DropProductDetailsPage = () => {
           </div>
         </div>
       </div>
+
+      <ProductImageLightbox
+        isOpen={isImageViewerOpen}
+        items={galleryItems}
+        initialIndex={selectedImageIndex}
+        title={product?.name || "Product gallery"}
+        onClose={() => setIsImageViewerOpen(false)}
+        onIndexChange={setSelectedImageIndex}
+      />
     </div>
   );
 };

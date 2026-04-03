@@ -89,6 +89,74 @@ const sanitizeViews = (views = []) => {
     .filter((view) => view.code && view.label);
 };
 
+const DEFAULT_IMAGE_PRICE_RULES = [
+  { maxSideInches: 4, price: 40 },
+  { maxSideInches: null, price: 100 },
+];
+
+const sanitizeImagePriceRules = (rules = []) => {
+  const source = Array.isArray(rules) ? rules : [];
+  const normalized = source
+    .map((entry) => {
+      const rawMax = entry?.maxSideInches;
+      const hasFiniteMax =
+        rawMax !== null &&
+        rawMax !== undefined &&
+        String(rawMax).trim() !== "";
+      const maxSideInches = hasFiniteMax ? Number(rawMax) : null;
+      const price = Number(entry?.price);
+
+      if (hasFiniteMax && (!Number.isFinite(maxSideInches) || maxSideInches < 0)) {
+        throw new Error("Invalid image price rule max inches");
+      }
+
+      if (!Number.isFinite(price) || price < 0) {
+        throw new Error("Invalid image price rule price");
+      }
+
+      return {
+        maxSideInches,
+        price,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (a.maxSideInches === null) return 1;
+      if (b.maxSideInches === null) return -1;
+      return a.maxSideInches - b.maxSideInches;
+    });
+
+  return normalized.length > 0 ? normalized : DEFAULT_IMAGE_PRICE_RULES;
+};
+
+const sanitizeNormalPricing = (normalPricing = {}, current = {}) => {
+  if (!normalPricing || typeof normalPricing !== "object") {
+    return current;
+  }
+
+  const next = {
+    ...current,
+  };
+
+  if (normalPricing.fixedSizeInches !== undefined) {
+    next.fixedSizeInches = Number(normalPricing.fixedSizeInches || 0);
+  }
+
+  if (normalPricing.pricePerSqInch !== undefined) {
+    next.pricePerSqInch = Number(normalPricing.pricePerSqInch || 0);
+  }
+
+  if (normalPricing.sleevePrice !== undefined) {
+    next.sleevePrice = Number(normalPricing.sleevePrice || 0);
+  }
+
+  if (normalPricing.imagePriceRules !== undefined) {
+    next.imagePriceRules = sanitizeImagePriceRules(normalPricing.imagePriceRules);
+  }
+
+  return next;
+};
+
 // Controller to get all products (for listing page)
 export const getAllProducts = async (req, res) => {
   try {
@@ -290,10 +358,7 @@ export const updateProductAdmin = async (req, res) => {
     }
 
     if (normalPricing && typeof normalPricing === "object") {
-      product.normalPricing = {
-        ...product.normalPricing,
-        ...normalPricing,
-      };
+      product.normalPricing = sanitizeNormalPricing(normalPricing, product.normalPricing);
     }
 
     const updatedProduct = await product.save();

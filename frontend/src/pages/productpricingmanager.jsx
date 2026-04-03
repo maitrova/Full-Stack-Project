@@ -14,9 +14,14 @@ const DEFAULT_COLORS = [
   { value: "#FF6B6B", label: "Coral" },
   { value: "#4ECDC4", label: "Mint" },
 ];
+const DEFAULT_IMAGE_PRICE_RULES = [
+  { maxSideInches: 4, price: 40 },
+  { maxSideInches: "", price: 100 },
+];
 
 const createEmptyColor = () => ({ label: "", value: "#FFFFFF" });
 const createEmptySizeRow = () => ({ size: "M", price: 0, stock: 0 });
+const createEmptyImagePriceRule = () => ({ maxSideInches: "", price: 0 });
 
 const normalizeColors = (colors = []) =>
   Array.isArray(colors) && colors.length > 0
@@ -34,6 +39,17 @@ const normalizeSizePricing = (sizePricing = []) =>
         stock: Number(entry?.stock || 0),
       }))
     : [createEmptySizeRow()];
+
+const normalizeImagePriceRules = (rules = []) =>
+  Array.isArray(rules) && rules.length > 0
+    ? rules.map((entry) => ({
+        maxSideInches:
+          entry?.maxSideInches === null || entry?.maxSideInches === undefined
+            ? ""
+            : String(entry.maxSideInches),
+        price: Number(entry?.price || 0),
+      }))
+    : DEFAULT_IMAGE_PRICE_RULES;
 
 const mapProductToForm = (product) => ({
   _id: product?._id || "",
@@ -58,6 +74,7 @@ const mapProductToForm = (product) => ({
     fixedSizeInches: Number(product?.normalPricing?.fixedSizeInches || 4),
     pricePerSqInch: Number(product?.normalPricing?.pricePerSqInch || 6),
     sleevePrice: Number(product?.normalPricing?.sleevePrice || 30),
+    imagePriceRules: normalizeImagePriceRules(product?.normalPricing?.imagePriceRules),
   },
   views: Array.isArray(product?.views) ? product.views : [],
 });
@@ -91,6 +108,13 @@ const buildPayload = (form) => ({
     fixedSizeInches: Number(form.normalPricing.fixedSizeInches || 0),
     pricePerSqInch: Number(form.normalPricing.pricePerSqInch || 0),
     sleevePrice: Number(form.normalPricing.sleevePrice || 0),
+    imagePriceRules: form.normalPricing.imagePriceRules.map((entry) => ({
+      maxSideInches:
+        entry.maxSideInches === "" || entry.maxSideInches === null || entry.maxSideInches === undefined
+          ? null
+          : Number(entry.maxSideInches),
+      price: Number(entry.price || 0),
+    })),
   },
 });
 
@@ -214,6 +238,18 @@ export default function ProductPricingManager() {
     }));
   };
 
+  const updateImagePriceRule = (index, field, value) => {
+    setForm((prev) => ({
+      ...prev,
+      normalPricing: {
+        ...prev.normalPricing,
+        imagePriceRules: prev.normalPricing.imagePriceRules.map((entry, entryIndex) =>
+          entryIndex === index ? { ...entry, [field]: value } : entry
+        ),
+      },
+    }));
+  };
+
   const addColorRow = () => {
     setForm((prev) => ({
       ...prev,
@@ -235,10 +271,30 @@ export default function ProductPricingManager() {
     }));
   };
 
+  const addImagePriceRule = () => {
+    setForm((prev) => ({
+      ...prev,
+      normalPricing: {
+        ...prev.normalPricing,
+        imagePriceRules: [...prev.normalPricing.imagePriceRules, createEmptyImagePriceRule()],
+      },
+    }));
+  };
+
   const removeSizeRow = (index) => {
     setForm((prev) => ({
       ...prev,
       sizePricing: prev.sizePricing.filter((_, entryIndex) => entryIndex !== index),
+    }));
+  };
+
+  const removeImagePriceRule = (index) => {
+    setForm((prev) => ({
+      ...prev,
+      normalPricing: {
+        ...prev.normalPricing,
+        imagePriceRules: prev.normalPricing.imagePriceRules.filter((_, entryIndex) => entryIndex !== index),
+      },
     }));
   };
 
@@ -592,7 +648,16 @@ export default function ProductPricingManager() {
                 </div>
 
                 <div className="rounded-2xl border border-slate-200 p-4">
-                  <h3 className="mb-4 text-lg font-semibold text-slate-900">Normal Pricing Rules</h3>
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-slate-900">Normal Pricing Rules</h3>
+                    <button
+                      type="button"
+                      onClick={addImagePriceRule}
+                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Add Image Rule
+                    </button>
+                  </div>
                   <div className="space-y-3">
                     <label className="block">
                       <span className="mb-1 block text-sm font-medium text-slate-700">Fixed Size Inches</span>
@@ -633,6 +698,55 @@ export default function ProductPricingManager() {
                         className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sky-500"
                       />
                     </label>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="mb-2">
+                        <p className="text-sm font-medium text-slate-700">Image Price Slabs</p>
+                        <p className="text-xs text-slate-500">
+                          Set charges by maximum image side in inches. Leave max inches empty for the final catch-all rule.
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        {form.normalPricing.imagePriceRules.map((rule, index) => (
+                          <div
+                            key={`${rule.maxSideInches}-${index}`}
+                            className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_48px]"
+                          >
+                            <label className="block">
+                              <span className="mb-1 block text-xs font-medium text-slate-600">Max side (inches)</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                value={rule.maxSideInches}
+                                onChange={(e) => updateImagePriceRule(index, "maxSideInches", e.target.value)}
+                                placeholder="Leave empty for final slab"
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sky-500"
+                              />
+                            </label>
+                            <label className="block">
+                              <span className="mb-1 block text-xs font-medium text-slate-600">Charge (Rs.)</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                value={rule.price}
+                                onChange={(e) => updateImagePriceRule(index, "price", e.target.value)}
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sky-500"
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => removeImagePriceRule(index)}
+                              disabled={form.normalPricing.imagePriceRules.length === 1}
+                              className="rounded-lg border border-rose-200 text-sm font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+                            >
+                              x
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

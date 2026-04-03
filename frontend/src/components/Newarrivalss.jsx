@@ -133,7 +133,7 @@ const getItemImages = (item) => {
               <img
                 src={imgObj.url}
                 alt={imgObj.altText}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                className="w-full h-full object-contain p-4 transition-transform duration-200"
                 loading="lazy"
               />
 
@@ -185,28 +185,28 @@ const getItemImages = (item) => {
     return (
       <Link
         to={detailPath}
-        className="group block overflow-hidden rounded-xl border border-gray-200 bg-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
+        className="group block overflow-hidden rounded-lg border border-gray-200 bg-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
       >
         {/* Image Section */}
-        <div className="relative h-64 bg-gray-50 overflow-hidden">
+        <div className="relative h-52 bg-gray-50 overflow-hidden">
           <ImageSlider 
             images={images} 
             alt={label}
             autoScrollInterval={4000}
           />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/35 via-black/10 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/35 via-black/10 to-transparent" />
 
-          <div className="absolute right-3 top-3">
+          <div className="absolute right-2 top-2">
             {pricing.hasOffer && (
-              <span className="rounded bg-red-600 px-2 py-1 text-[10px] font-semibold tracking-wide text-white shadow-sm">
+              <span className="rounded bg-red-600 px-1.5 py-1 text-[9px] font-semibold tracking-wide text-white shadow-sm">
                 {pricing.discountPercent}% OFF
               </span>
             )}
           </div>
 
-          <div className="absolute inset-x-0 bottom-3 flex justify-center px-3">
-            <div className="flex max-w-full items-center gap-2 rounded-md bg-white px-4 py-2 text-gray-900 shadow">
-              <span className="truncate text-sm font-medium text-gray-900">
+          <div className="absolute inset-x-0 bottom-2 flex justify-center px-2">
+            <div className="flex max-w-full items-center gap-2 rounded-md bg-white px-3 py-1.5 text-gray-900 shadow">
+              <span className="truncate text-xs font-medium text-gray-900 sm:text-sm">
                 {label}
               </span>
             </div>
@@ -251,8 +251,8 @@ const getItemImages = (item) => {
 
           <div className="flex overflow-x-auto scrollbar-hide gap-4 pb-4">
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="min-w-[280px] max-w-[280px] flex-shrink-0 bg-white border border-gray-200 rounded-lg overflow-hidden animate-pulse">
-                <div className="h-64 bg-gray-200"></div>
+              <div key={i} className="min-w-[240px] max-w-[240px] flex-shrink-0 bg-white border border-gray-200 rounded-lg overflow-hidden animate-pulse">
+                <div className="h-52 bg-gray-200"></div>
               </div>
             ))}
           </div>
@@ -359,7 +359,7 @@ const getItemImages = (item) => {
                 className="
                   flex-shrink-0
                   w-[calc(50%-0.375rem)]   /* mobile: 2 items */
-                  sm:min-w-[280px] sm:max-w-[280px]
+                  sm:min-w-[240px] sm:max-w-[240px]
                 "
               >
                 <ProductCard item={item} />

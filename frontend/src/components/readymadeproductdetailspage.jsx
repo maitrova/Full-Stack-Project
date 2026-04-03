@@ -16,6 +16,7 @@ import {
 } from '../redux/slices/Cartslice.js';
 import { selectCurrentToken } from '../redux/slices/Userslice.js';
 import { buildImageUrl, getRawImagePath, getResponsiveImageProps } from "../utils/responsiveImage.js";
+import ProductImageLightbox from "./ProductImageLightbox.jsx";
 
 // Lucide React icons
 import { 
@@ -78,6 +79,7 @@ export default function ProductDetailPage() {
   const [showLoginPrompt, setShowLoginPrompt] = useState(false); // New state for login prompt
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [relatedLoading, setRelatedLoading] = useState(false);
+  const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
 
   // Redux state
   const token = useSelector(selectCurrentToken);
@@ -667,6 +669,26 @@ export default function ProductDetailPage() {
         }]
       : []),
   ];
+  const imageMediaIndexes = media.reduce((acc, item, index) => {
+    if (item?.type === "image") {
+      acc.push(index);
+    }
+    return acc;
+  }, []);
+  const galleryItems = imageMediaIndexes.map((mediaIndex, index) => {
+    const item = media[mediaIndex];
+    const imageProps = getResponsiveImageProps(item?.image, {
+      sizes: "(max-width: 768px) 100vw, 1200px",
+      loading: index === 0 ? "eager" : "lazy",
+    });
+
+    return {
+      src: imageProps.src || buildImageUrl(item?.image),
+      thumbSrc: buildImageUrl(item?.image),
+      alt: item?.alt || `${displayData?.title || "Product"} - ${index + 1}`,
+      label: `Image ${index + 1}`,
+    };
+  });
   
   const sizeChartImageProps = getResponsiveImageProps(itemData?.sizeChart, {
     sizes: "100vw",
@@ -725,6 +747,7 @@ export default function ProductDetailPage() {
   }
 
   const currentMedia = media[selectedImageIndex];
+  const currentGalleryIndex = Math.max(0, imageMediaIndexes.indexOf(selectedImageIndex));
 
   const isVideo = currentMedia?.type === "video";
   const currentMediaImageProps = !isVideo
@@ -1079,7 +1102,8 @@ export default function ProductDetailPage() {
                         srcSet={currentMediaImageProps?.srcSet}
                         sizes={currentMediaImageProps?.sizes}
                         alt={imageAlt}
-                        className="w-full h-full object-contain"
+                        className="w-full h-full cursor-zoom-in object-contain"
+                        onClick={() => setIsImageViewerOpen(true)}
                         onError={(e) => {
                           e.target.style.display = 'none';
                           e.target.parentElement.innerHTML = `
@@ -1101,6 +1125,14 @@ export default function ProductDetailPage() {
                         <ImageIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                         <p className="text-gray-400 font-medium">No preview available</p>
                       </div>
+                    </div>
+                  )}
+
+                  {!isVideo && mediaUrl && (
+                    <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
+                      <span className="rounded-full bg-black/65 px-4 py-2 text-xs font-semibold tracking-tight text-white shadow-lg backdrop-blur-sm">
+                        Tap image for full screen
+                      </span>
                     </div>
                   )}
 
@@ -1790,6 +1822,20 @@ export default function ProductDetailPage() {
         </section>
       )}
       <Footer/>
+
+      <ProductImageLightbox
+        isOpen={isImageViewerOpen}
+        items={galleryItems}
+        initialIndex={currentGalleryIndex}
+        title={displayData?.title || "Product gallery"}
+        onClose={() => setIsImageViewerOpen(false)}
+        onIndexChange={(nextGalleryIndex) => {
+          const nextMediaIndex = imageMediaIndexes[nextGalleryIndex];
+          if (typeof nextMediaIndex === "number") {
+            setSelectedImageIndex(nextMediaIndex);
+          }
+        }}
+      />
     </div>
   );
 }

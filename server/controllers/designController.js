@@ -36,6 +36,52 @@ const normalizeZone = (z, fallbackZone) => {
 };
 
 const PRINT_DPI = 300; // 300 DPI for print quality
+const DEFAULT_IMAGE_PRICE_RULES = [
+  { maxSideInches: 4, price: 40 },
+  { maxSideInches: null, price: 100 },
+];
+
+const normalizeImagePriceRules = (rules = DEFAULT_IMAGE_PRICE_RULES) => {
+  const source = Array.isArray(rules) && rules.length > 0 ? rules : DEFAULT_IMAGE_PRICE_RULES;
+  return source
+    .map((entry) => {
+      const rawMax = entry?.maxSideInches;
+      const hasFiniteMax =
+        rawMax !== null &&
+        rawMax !== undefined &&
+        String(rawMax).trim() !== "";
+      const maxSideInches = hasFiniteMax ? Number(rawMax) : null;
+      const price = Number(entry?.price || 0);
+
+      if (hasFiniteMax && (!Number.isFinite(maxSideInches) || maxSideInches < 0)) {
+        return null;
+      }
+
+      if (!Number.isFinite(price) || price < 0) {
+        return null;
+      }
+
+      return { maxSideInches, price };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (a.maxSideInches === null) return 1;
+      if (b.maxSideInches === null) return -1;
+      return a.maxSideInches - b.maxSideInches;
+    });
+};
+
+const resolveImagePriceRule = (widthInches, heightInches, rules = DEFAULT_IMAGE_PRICE_RULES) => {
+  const largestSide = Math.max(Number(widthInches || 0), Number(heightInches || 0));
+  if (!largestSide) return null;
+
+  const normalizedRules = normalizeImagePriceRules(rules);
+  return (
+    normalizedRules.find(
+      (rule) => rule.maxSideInches === null || largestSide <= rule.maxSideInches
+    ) || normalizedRules[normalizedRules.length - 1] || null
+  );
+};
 const MINIMUM_DESIGN_CHARGE = 0; // Minimum ₹30 for any design up to 4x4 inches
 const getSizeBasePrice = (product, selectedSize) => {
   const list = product?.sizePricing || [];
@@ -84,19 +130,8 @@ const calculateDesignPrice = (
   };
 
   // ✅ FIXED IMAGE PRICING CONSTANTS
-  const SMALL_MAX_IN = 4;
-  const SMALL_PRICE = 40;
-  const LARGE_PRICE = 100;
+  const imagePriceRules = normalizeImagePriceRules(product?.normalPricing?.imagePriceRules);
   const SLEEVE_PRICE = product.normalPricing?.sleevePrice || 30;
-
-  const getFixedImagePrice = (wIn, hIn) => {
-    const w = Number(wIn || 0);
-    const h = Number(hIn || 0);
-    if (!w || !h) return 0;
-    return w <= SMALL_MAX_IN && h <= SMALL_MAX_IN
-      ? SMALL_PRICE
-      : LARGE_PRICE;
-  };
 
   /* =========================
      IMAGE / DESIGN LAYERS
@@ -133,9 +168,10 @@ const calculateDesignPrice = (
       layer.currentPrintHeightInches ??
       0;
 
+    const matchedRule = resolveImagePriceRule(widthIn, heightIn, imagePriceRules);
     const layerPrice =
       Number(layer.layerPrice) ||
-      getFixedImagePrice(widthIn, heightIn);
+      Number(matchedRule?.price || 0);
 
     totalPrice += layerPrice;
 
@@ -146,11 +182,13 @@ const calculateDesignPrice = (
       widthInches: Number(widthIn).toFixed(2),
       heightInches: Number(heightIn).toFixed(2),
       price: layerPrice,
-      minimumChargeApplied: layerPrice === SMALL_PRICE,
+      minimumChargeApplied:
+        matchedRule?.maxSideInches !== null &&
+        Math.max(Number(widthIn || 0), Number(heightIn || 0)) <= Number(matchedRule?.maxSideInches || 0),
       pricingRule:
-        layerPrice === SMALL_PRICE
-          ? "≤ 4×4 fixed price"
-          : "> 4×4 fixed price",
+        matchedRule?.maxSideInches === null
+          ? "Catch-all image rule"
+          : `Up to ${matchedRule.maxSideInches}" max side`, 
     });
   });
 
@@ -945,3 +983,4 @@ export const deleteDesign = async (req, res) => {
     return res.status(500).json({ error: "Failed to delete design" });
   }
 };
+
