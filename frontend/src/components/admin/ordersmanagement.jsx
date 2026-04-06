@@ -46,7 +46,9 @@ const AdminOrders = () => {
   const [filters, setFilters] = useState({
     paymentStatus: '',
     orderStatus: '',
-    userId: ''
+    userId: '',
+    dateFrom: '',
+    dateTo: ''
   });
   const [selectedOrders, setSelectedOrders] = useState([]);
   const [showBulkUpdateModal, setShowBulkUpdateModal] = useState(false);
@@ -132,7 +134,9 @@ const AdminOrders = () => {
     setFilters({
       paymentStatus: '',
       orderStatus: '',
-      userId: ''
+      userId: '',
+      dateFrom: '',
+      dateTo: ''
     });
     dispatch(adminFetchOrders({}));
   };
@@ -688,7 +692,7 @@ const AdminOrders = () => {
             </button>
           </div>
           <form onSubmit={handleApplyFilters} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
               <div>
                 <label htmlFor="paymentStatus" className="block text-sm font-medium text-gray-700">
                   Payment Status
@@ -738,6 +742,36 @@ const AdminOrders = () => {
                   value={filters.userId}
                   onChange={handleFilterChange}
                   placeholder="Enter user ID"
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="dateFrom" className="block text-sm font-medium text-gray-700">
+                  From Date
+                </label>
+                <input
+                  type="date"
+                  id="dateFrom"
+                  name="dateFrom"
+                  value={filters.dateFrom}
+                  onChange={handleFilterChange}
+                  max={filters.dateTo || undefined}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="dateTo" className="block text-sm font-medium text-gray-700">
+                  To Date
+                </label>
+                <input
+                  type="date"
+                  id="dateTo"
+                  name="dateTo"
+                  value={filters.dateTo}
+                  onChange={handleFilterChange}
+                  min={filters.dateFrom || undefined}
                   className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 />
               </div>

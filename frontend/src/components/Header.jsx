@@ -54,30 +54,6 @@ const socialLinks = [
       </svg>
     ),
   },
-  {
-    key: 'x',
-    label: 'X',
-    href: 'https://twitter.com/maitrova',
-    desktopClass: 'border-slate-200 bg-slate-100/90 text-slate-700 hover:border-slate-300 hover:bg-slate-200/80 hover:text-slate-900',
-    mobileIconClass: 'bg-slate-200 text-slate-700',
-    icon: (
-      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-        <path d="M18.901 1.153h3.68l-8.04 9.188L24 22.847h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.829L0 1.154h7.594l5.243 6.932zM17.61 20.644h2.039L6.486 3.24H4.298z" />
-      </svg>
-    ),
-  },
-  {
-    key: 'linkedin',
-    label: 'LinkedIn',
-    href: 'https://linkedin.com/company/maitrova',
-    desktopClass: 'border-blue-100 bg-blue-50/80 text-blue-700 hover:border-blue-200 hover:bg-blue-100/80 hover:text-blue-800',
-    mobileIconClass: 'bg-blue-100 text-blue-700',
-    icon: (
-      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-        <path d="M20.447 20.452H16.89v-5.569c0-1.328-.026-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.347V9h3.414v1.561h.049c.476-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455zM5.337 7.433a2.063 2.063 0 110-4.126 2.063 2.063 0 010 4.126zM7.119 20.452H3.555V9H7.12z" />
-      </svg>
-    ),
-  },
 ];
 
 const navItems = [
@@ -200,6 +176,27 @@ const Header = () => {
     [bannerMessages]
   );
   const visibleBannerCoupon = useMemo(() => String(bannerCouponCode || '').trim(), [bannerCouponCode]);
+  const bannerItems = useMemo(() => {
+    const items = visibleBannerMessages.map((message, index) => ({
+      key: `message-${index}`,
+      type: 'message',
+      label: message,
+    }));
+
+    if (visibleBannerCoupon) {
+      items.push({
+        key: 'coupon',
+        type: 'coupon',
+        label: `Coupon: ${visibleBannerCoupon}`,
+      });
+    }
+
+    return items;
+  }, [visibleBannerMessages, visibleBannerCoupon]);
+  const marqueeBannerItems = useMemo(
+    () => [...bannerItems, ...bannerItems],
+    [bannerItems]
+  );
 
   const isRouteActive = (path) => {
     if (path === '/') return location.pathname === '/';
@@ -329,29 +326,31 @@ const Header = () => {
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-[rgba(248,250,252,0.88)] shadow-[0_10px_35px_-24px_rgba(15,23,42,0.35)] backdrop-blur-xl">
-      {(visibleBannerMessages.length > 0 || visibleBannerCoupon) && (
-        <div className="border-b border-slate-200/80 bg-[linear-gradient(90deg,_#eff6ff,_#f8fafc,_#fff7ed)] px-4 py-2">
-          <div className="container mx-auto flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-center text-[12px] font-medium text-slate-600">
-            {visibleBannerMessages.map((message, index) => (
-              <React.Fragment key={`header-banner-${index}`}>
-                <span className="rounded-full border border-sky-100 bg-white/90 px-3 py-1 text-sky-700 shadow-sm">
-                  {message}
+      {bannerItems.length > 0 && (
+        <div className="overflow-hidden border-b border-slate-200/80 bg-[linear-gradient(90deg,_#eff6ff,_#f8fafc,_#fff7ed)] py-2">
+          <style>{`
+            @keyframes headerBannerMarquee {
+              0% { transform: translate3d(0, 0, 0); }
+              100% { transform: translate3d(-50%, 0, 0); }
+            }
+          `}</style>
+          <div className="relative">
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-slate-50 via-slate-50/90 to-transparent" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-orange-50 via-orange-50/80 to-transparent" />
+            <div className="flex w-max min-w-full items-center gap-3 whitespace-nowrap px-4 text-[12px] font-medium text-slate-600 motion-reduce:animate-none [animation:headerBannerMarquee_24s_linear_infinite]">
+              {marqueeBannerItems.map((item, index) => (
+                <span
+                  key={`${item.key}-${index}`}
+                  className={
+                    item.type === 'coupon'
+                      ? 'rounded-full border border-amber-200 bg-amber-50/90 px-3 py-1 font-semibold uppercase tracking-[0.12em] text-amber-700 shadow-sm'
+                      : 'rounded-full border border-sky-100 bg-white/90 px-3 py-1 text-sky-700 shadow-sm'
+                  }
+                >
+                  {item.label}
                 </span>
-                {index < visibleBannerMessages.length - 1 && (
-                  <span className="hidden text-slate-300 sm:inline">|</span>
-                )}
-              </React.Fragment>
-            ))}
-            {visibleBannerCoupon ? (
-              <>
-                {visibleBannerMessages.length > 0 && (
-                  <span className="hidden text-slate-300 lg:inline">|</span>
-                )}
-                <span className="rounded-full border border-amber-200 bg-amber-50/90 px-3 py-1 font-semibold uppercase tracking-[0.12em] text-amber-700 shadow-sm">
-                  Coupon: {visibleBannerCoupon}
-                </span>
-              </>
-            ) : null}
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -488,7 +487,8 @@ const Header = () => {
 
       {isMobileMenuOpen && (
         <div className="absolute inset-x-0 top-full z-40 px-3 pt-2 md:hidden">
-          <div className="mx-auto max-w-sm overflow-hidden rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(248,250,252,0.96))] p-3 shadow-[0_28px_70px_-38px_rgba(15,23,42,0.45)] backdrop-blur-xl">
+          <div className="mx-auto max-w-sm overflow-hidden rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(248,250,252,0.96))] shadow-[0_28px_70px_-38px_rgba(15,23,42,0.45)] backdrop-blur-xl">
+            <div className="max-h-[min(70vh,32rem)] overflow-y-auto p-3">
             {isAuthenticated && (
               <div className="mb-3 flex items-center gap-3 rounded-2xl border border-slate-100 bg-white/80 p-3 shadow-sm">
                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,_#0f172a,_#334155)] text-sm font-semibold text-white">
@@ -562,6 +562,7 @@ const Header = () => {
                 </Link>
               </div>
             )}
+            </div>
           </div>
         </div>
       )}

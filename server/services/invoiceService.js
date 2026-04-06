@@ -9,6 +9,19 @@ const serverRoot = path.resolve(__dirname, "..");
 const templatePath = path.join(serverRoot, "templates", "invoice.html");
 const invoicesDir = path.join(serverRoot, "outputs", "invoices");
 
+const getPuppeteerLaunchOptions = () => {
+  const launchOptions = {
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  };
+
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+
+  return launchOptions;
+};
+
 const generateInvoiceNumber = () => {
   return `MT-${Date.now()}`;
 };
@@ -118,10 +131,7 @@ export const generateInvoicePDF = async (order) => {
   // 🔹 Launch Puppeteer
   let browser;
   try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
+    browser = await puppeteer.launch(getPuppeteerLaunchOptions());
 
     const page = await browser.newPage();
 

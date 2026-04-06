@@ -38,7 +38,6 @@ import AdminOrders from "./components/admin/ordersmanagement.jsx";
 import ProductSearch from "./components/searchproductdetail.jsx";
 import AdminOrderSearch from "./components/admin/adminsearchpage.jsx";
 import PublishDesignModal from "./components/PublishDesignModal.jsx";
-import CompanyDocumentManager from "./components/admin/CompanyDocumentManager.jsx";
 import Shipping from "./companypdfs/Shipping.jsx";
 import AdminRoute from "./components/AdminRoute.jsx";
 // You'll need to create this
@@ -130,15 +129,6 @@ function App() {
             </AdminRoute>
           </MainLayout>
         } />
-
-         <Route path="/adminpage/company-documents" element={
-          <MainLayout>
-           
-              <CompanyDocumentManager />
-            
-          </MainLayout>
-        } />
-
 
         <Route path="/publish-design" element={
           <MainLayout>

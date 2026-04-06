@@ -30,7 +30,8 @@ import {
   Tag,
   ShoppingBag,
   Home,
-  Search
+  Search,
+  FileText
 } from 'lucide-react';
 
 // Import Redux actions
@@ -92,6 +93,8 @@ import AdminDesignsPage from './AdminDesignsPage.jsx';
 import DesignUploadsManager from '../components/admindesignuploads.jsx';
 import CouponManagement from '../components/admin/CouponManagement.jsx';
 import HeaderBannerSettings from '../components/admin/HeaderBannerSettings.jsx';
+import UserManagement from '../components/admin/UserManagement.jsx';
+import CompanyDocumentManager from '../components/admin/CompanyDocumentManager.jsx';
 
 const AdminDashboard = () => {
   const dispatch = useDispatch();
@@ -189,7 +192,9 @@ const AdminDashboard = () => {
         activeTab !== 'homepage' &&
         activeTab !== 'search' &&
         activeTab !== 'adminDesigns' &&
-        activeTab !== 'coupons') {
+        activeTab !== 'coupons' &&
+        activeTab !== 'users' &&
+        activeTab !== 'companyPolicies') {
       loadProducts();
     }
   }, [currentFilter, pagination.page, currentCategory, currentSubCategory, activeTab]);
@@ -287,6 +292,10 @@ const AdminDashboard = () => {
     setViewMode('search');
   } else if (tab === 'coupons') {
     setViewMode('coupons');
+  } else if (tab === 'users') {
+    setViewMode('users');
+  } else if (tab === 'companyPolicies') {
+    setViewMode('companyPolicies');
   } else {
     setViewMode('products');
     loadProducts();
@@ -607,6 +616,7 @@ const AdminDashboard = () => {
     { id: 'homepage', label: 'Homepage', icon: <Home className="w-5 h-5" /> },
     { id: 'search', label: 'Product Search', icon: <Search className="w-5 h-5" /> },
     { id: 'adminUploads', label: 'Admin Uploads', icon: <Upload className="w-5 h-5" /> },
+    { id: 'companyPolicies', label: 'Company Policies', icon: <FileText className="w-5 h-5" /> },
     { id: 'coupons', label: 'Coupon Management', icon: <DollarSign className="w-5 h-5" /> },
     { id: 'newArrival', label: 'New Arrivals', icon: <TrendingUp className="w-5 h-5" /> },
     { id: 'bestSeller', label: 'Best Sellers', icon: <BarChart3 className="w-5 h-5" /> },
@@ -986,6 +996,7 @@ const AdminDashboard = () => {
                 {activeSidebarItem === 'analytics' && 'Analytics'}
                 {activeSidebarItem === 'settings' && 'Settings'}
                 {activeSidebarItem === 'adminUploads' && 'Admin Uploads'}
+                {activeSidebarItem === 'companyPolicies' && 'Company Policies'}
                 {activeSidebarItem === 'coupons' && 'Coupon Management'}
               </h1>
               <p className="text-gray-600 mt-2">
@@ -1004,6 +1015,7 @@ const AdminDashboard = () => {
                 {activeSidebarItem === 'analytics' && 'View sales and performance analytics'}
                 {activeSidebarItem === 'settings' && 'Configure store settings'}
                 {activeSidebarItem === 'adminUploads' && 'Upload and manage admin files'}
+                {activeSidebarItem === 'companyPolicies' && 'Create and manage public-facing company policy pages'}
                 {activeSidebarItem === 'coupons' && 'Create, edit, pause, and delete coupon rules'}
               </p>
             </div>
@@ -1118,12 +1130,20 @@ const AdminDashboard = () => {
             <DesignUploadsManager />
           )}
 
+          {activeSidebarItem === 'companyPolicies' && (
+            <CompanyDocumentManager />
+          )}
+
           {activeSidebarItem === 'coupons' && (
             <CouponManagement />
           )}
 
           {activeSidebarItem === 'prices' && (
             <ProductPricingManager />
+          )}
+
+          {activeSidebarItem === 'users' && (
+            <UserManagement />
           )}
 
           {activeSidebarItem === 'settings' && (
@@ -1701,8 +1721,10 @@ const AdminDashboard = () => {
      activeSidebarItem !== 'search' && 
      activeSidebarItem !== 'adminDesigns' &&
      activeSidebarItem !== 'adminUploads' &&
+     activeSidebarItem !== 'companyPolicies' &&
      activeSidebarItem !== 'coupons' &&
      activeSidebarItem !== 'prices' &&
+     activeSidebarItem !== 'users' &&
      activeSidebarItem !== 'settings' ? (            /* View Mode for Products (excluding dropproducts, orders, homepage, search, and adminDesigns) */
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
               {productsLoading ? (

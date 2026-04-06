@@ -66,7 +66,7 @@ export const getMyPaidOrderById = async (req, res) => {
 
 /**
  * ADMIN: Get all orders (optional filters)
- * GET /api/admin/orders?paymentStatus=PAID&orderStatus=SHIPPED&userId=...
+ * GET /api/admin/orders?paymentStatus=PAID&orderStatus=SHIPPED&userId=...&dateFrom=2026-04-01&dateTo=2026-04-06
  */
 
 
@@ -80,12 +80,32 @@ const DESIGN_SELECT =
 
 export const adminGetAllOrders = async (req, res) => {
   try {
-    const { paymentStatus, orderStatus, userId } = req.query;
+    const { paymentStatus, orderStatus, userId, dateFrom, dateTo } = req.query;
 
     const query = {};
     if (paymentStatus) query.status = paymentStatus;
     if (orderStatus) query.orderStatus = orderStatus;
     if (userId) query.user = userId;
+    if (dateFrom || dateTo) {
+      query.createdAt = {};
+
+      if (dateFrom) {
+        const fromDate = new Date(dateFrom);
+        if (Number.isNaN(fromDate.getTime())) {
+          return res.status(400).json({ message: "Invalid dateFrom" });
+        }
+        query.createdAt.$gte = fromDate;
+      }
+
+      if (dateTo) {
+        const toDate = new Date(dateTo);
+        if (Number.isNaN(toDate.getTime())) {
+          return res.status(400).json({ message: "Invalid dateTo" });
+        }
+        toDate.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = toDate;
+      }
+    }
 
     const orders = await Order.find(query)
       .populate("user", "name email")

@@ -1,10 +1,8 @@
-// store/slices/companyPdfSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-// Async thunks
 export const uploadCompanyPdf = createAsyncThunk(
   'companyPdf/upload',
   async ({ file, name }, { rejectWithValue }) => {
@@ -21,7 +19,23 @@ export const uploadCompanyPdf = createAsyncThunk(
 
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.response?.data || { error: error.message });
+    }
+  }
+);
+
+export const saveCompanyDocument = createAsyncThunk(
+  'companyPdf/saveDocument',
+  async ({ name, content }, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(`${API_URL}/company-pdfs/company-documents`, {
+        name,
+        content,
+      });
+
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || { error: error.message });
     }
   }
 );
@@ -33,7 +47,7 @@ export const fetchCompanyDocuments = createAsyncThunk(
       const response = await axios.get(`${API_URL}/company-pdfs/company-documents`);
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.response?.data || { error: error.message });
     }
   }
 );
@@ -45,12 +59,11 @@ export const fetchCompanyDocumentByName = createAsyncThunk(
       const response = await axios.get(`${API_URL}/company-pdfs/company-documents/${name}`);
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.response?.data || { error: error.message });
     }
   }
 );
 
-// Initial state
 const initialState = {
   documents: [],
   currentDocument: null,
@@ -61,7 +74,6 @@ const initialState = {
   uploadSuccess: null,
 };
 
-// Slice
 const companyPdfSlice = createSlice({
   name: 'companyPdf',
   initialState,
@@ -81,7 +93,6 @@ const companyPdfSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Upload PDF cases
       .addCase(uploadCompanyPdf.pending, (state) => {
         state.uploading = true;
         state.uploadError = null;
@@ -90,14 +101,42 @@ const companyPdfSlice = createSlice({
       .addCase(uploadCompanyPdf.fulfilled, (state, action) => {
         state.uploading = false;
         state.uploadSuccess = action.payload.message;
-        state.documents = [action.payload.document, ...state.documents];
+        state.currentDocument = action.payload.document;
+        state.documents = [
+          action.payload.document,
+          ...state.documents.filter(
+            (doc) =>
+              doc._id !== action.payload.document._id &&
+              doc.name !== action.payload.document.name
+          ),
+        ];
       })
       .addCase(uploadCompanyPdf.rejected, (state, action) => {
         state.uploading = false;
         state.uploadError = action.payload?.error || 'Upload failed';
       })
-
-      // Fetch all documents cases
+      .addCase(saveCompanyDocument.pending, (state) => {
+        state.uploading = true;
+        state.uploadError = null;
+        state.uploadSuccess = null;
+      })
+      .addCase(saveCompanyDocument.fulfilled, (state, action) => {
+        state.uploading = false;
+        state.uploadSuccess = action.payload.message;
+        state.currentDocument = action.payload.document;
+        state.documents = [
+          action.payload.document,
+          ...state.documents.filter(
+            (doc) =>
+              doc._id !== action.payload.document._id &&
+              doc.name !== action.payload.document.name
+          ),
+        ];
+      })
+      .addCase(saveCompanyDocument.rejected, (state, action) => {
+        state.uploading = false;
+        state.uploadError = action.payload?.error || 'Save failed';
+      })
       .addCase(fetchCompanyDocuments.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -110,8 +149,6 @@ const companyPdfSlice = createSlice({
         state.loading = false;
         state.error = action.payload?.error || 'Failed to fetch documents';
       })
-
-      // Fetch document by name cases
       .addCase(fetchCompanyDocumentByName.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -122,12 +159,12 @@ const companyPdfSlice = createSlice({
       })
       .addCase(fetchCompanyDocumentByName.rejected, (state, action) => {
         state.loading = false;
+        state.currentDocument = null;
         state.error = action.payload?.error || 'Failed to fetch document';
       });
   },
 });
 
-// Export actions
 export const {
   clearUploadState,
   clearError,
@@ -135,7 +172,6 @@ export const {
   resetState,
 } = companyPdfSlice.actions;
 
-// Selectors
 export const selectAllDocuments = (state) => state.companyPdf.documents;
 export const selectCurrentDocument = (state) => state.companyPdf.currentDocument;
 export const selectLoading = (state) => state.companyPdf.loading;

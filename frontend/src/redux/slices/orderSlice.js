@@ -66,7 +66,7 @@ export const fetchMyPaidOrderById = createAsyncThunk(
 // ==============================
 
 /**
- * filters = { paymentStatus, orderStatus, userId }
+ * filters = { paymentStatus, orderStatus, userId, dateFrom, dateTo }
  * any can be omitted
  */
 export const adminFetchOrders = createAsyncThunk(
@@ -77,6 +77,8 @@ export const adminFetchOrders = createAsyncThunk(
       if (filters.paymentStatus) params.paymentStatus = filters.paymentStatus;
       if (filters.orderStatus) params.orderStatus = filters.orderStatus;
       if (filters.userId) params.userId = filters.userId;
+      if (filters.dateFrom) params.dateFrom = filters.dateFrom;
+      if (filters.dateTo) params.dateTo = filters.dateTo;
 
       const res = await axios.get(`${API_URL}/admin/orders`, {
         params,

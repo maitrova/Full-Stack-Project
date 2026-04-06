@@ -2,6 +2,7 @@ import express from "express";
 import {
   uploadCompanyPdfMiddleware,
   uploadCompanyPdf,
+  saveCompanyDocument,
   getCompanyDocuments,
   getCompanyDocumentByName,
 } from "../controllers/companyPdfController.js";
@@ -16,7 +17,7 @@ companypdfs.post("/upload", (req, res, next) => {
   });
 });
 
-
+companypdfs.post("/company-documents", saveCompanyDocument);
 
 companypdfs.get("/company-documents", getCompanyDocuments);
 
