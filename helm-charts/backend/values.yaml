@@ -43,8 +43,8 @@ envSecrets:
   BREVO_ORDER_TEMPLATE_ID_SHIPPED=5
   BREVO_ORDER_TEMPLATE_ID_DELIVERED=6
 
-  ADMIN_NOTIFICATION_EMAIL=nagalahemanth411@gmail.com
-  ADMIN_NOTIFICATION_EMAILS=nagalahemanth411@gmail.com,support@maitrova.com
+  ADMIN_NOTIFICATION_EMAIL=orders@maitrova.in
+  ADMIN_NOTIFICATION_EMAILS=orders@maitrova.in,founder@maitrova.in,support@maitrova.com
   ADMIN_NOTIFICATION_NAME=Maitrova Admin
 # Keys pulled from a pre-existing K8s secret (never committed to git).
 # Apply manually: kubectl apply -f helm-charts/backend/backend-secret.yaml -n <namespace>
