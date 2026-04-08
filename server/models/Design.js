@@ -18,14 +18,28 @@ const textLayerSchema = new mongoose.Schema(
     text: String,
     x: Number,
     y: Number,
+    zone: {
+      type: String,
+      enum: PRINT_ZONES,
+      default: null,
+    },
     fontSize: Number,
     color: String,
     fontFamily: String,
     rotation: Number,
+    scale: Number,
+    scaleX: Number,
+    scaleY: Number,
     // New fields for pricing
     widthInches: Number,
     heightInches: Number,
     areaInches: Number,
+    renderedWidthPx: Number,
+    renderedHeightPx: Number,
+    renderedWidthInches: Number,
+    renderedHeightInches: Number,
+    printableAreaWidthInches: Number,
+    printableAreaHeightInches: Number,
   },
   { _id: false }
 );

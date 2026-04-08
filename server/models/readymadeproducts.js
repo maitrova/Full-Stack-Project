@@ -81,6 +81,12 @@ const readymadeProductSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
     bestSeller: { type: Boolean, default: false },
     newArrival: { type: Boolean, default: false },
+    rating: { type: Number, default: 0, min: 0, max: 5 },
+    reviewCount: { type: Number, default: 0, min: 0 },
+    ratingBreakdown: {
+      type: mongoose.Schema.Types.Mixed,
+      default: () => ({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }),
+    },
 
     // ✅ FIXED: images with altText per image
     images: {

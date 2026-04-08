@@ -65,6 +65,10 @@ const couponSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    allowOnSaleProducts: {
+      type: Boolean,
+      default: false,
+    },
     allowedCategories: [
       {
         type: mongoose.Schema.Types.ObjectId,

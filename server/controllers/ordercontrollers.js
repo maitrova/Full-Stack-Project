@@ -1,10 +1,108 @@
 import mongoose from "mongoose";
 import Order from "../models/Order.js";
+import Review from "../models/Review.js";
+import {
+  buildReviewLookupKey,
+  getReviewTargetFromOrderItem,
+} from "../services/reviewService.js";
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 const PAYMENT_STATUSES = ["PENDING_PAYMENT", "PAID", "FAILED"];
 const FULFILLMENT_STATUSES = ["PROCESSING", "READY", "SHIPPED", "DELIVERED"];
+
+const pickExistingReview = (review) => {
+  if (!review) return null;
+
+  return {
+    _id: review._id,
+    rating: Number(review.rating || 0),
+    title: review.title || "",
+    comment: review.comment || "",
+    createdAt: review.createdAt,
+    updatedAt: review.updatedAt,
+  };
+};
+
+const attachReviewMetaToOrders = async (orders, userId) => {
+  if (!Array.isArray(orders) || !orders.length || !userId) {
+    return orders;
+  }
+
+  const readyMadeIds = new Set();
+  const dropProductIds = new Set();
+
+  for (const order of orders) {
+    for (const item of order.items || []) {
+      const target = getReviewTargetFromOrderItem(item);
+      if (!target) continue;
+
+      if (target.kind === "READYMADE") readyMadeIds.add(target.targetId);
+      if (target.kind === "DROPPRODUCT") dropProductIds.add(target.targetId);
+    }
+  }
+
+  const reviewFilter = {
+    user: userId,
+    status: "ACTIVE",
+    $or: [],
+  };
+
+  if (readyMadeIds.size) {
+    reviewFilter.$or.push({
+      kind: "READYMADE",
+      readymadeProduct: { $in: [...readyMadeIds] },
+    });
+  }
+
+  if (dropProductIds.size) {
+    reviewFilter.$or.push({
+      kind: "DROPPRODUCT",
+      dropproduct: { $in: [...dropProductIds] },
+    });
+  }
+
+  const reviews = reviewFilter.$or.length
+    ? await Review.find(reviewFilter).lean()
+    : [];
+
+  const reviewMap = new Map(
+    reviews.map((review) => {
+      const targetId =
+        review.kind === "READYMADE" ? review.readymadeProduct : review.dropproduct;
+      return [buildReviewLookupKey(review.kind, targetId), review];
+    })
+  );
+
+  return orders.map((order) => ({
+    ...order,
+    items: (order.items || []).map((item) => {
+      const target = getReviewTargetFromOrderItem(item);
+
+      if (!target) {
+        return {
+          ...item,
+          reviewMeta: {
+            reviewable: false,
+            existingReview: null,
+          },
+        };
+      }
+
+      return {
+        ...item,
+        reviewMeta: {
+          reviewable: order.orderStatus === "DELIVERED",
+          kind: target.kind,
+          targetId: target.targetId,
+          existingReview: pickExistingReview(
+            reviewMap.get(buildReviewLookupKey(target.kind, target.targetId))
+          ),
+        },
+      };
+    }),
+  }));
+};
 
 /**
  * USER: Get my PAID orders
@@ -25,7 +123,9 @@ export const getMyPaidOrders = async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    return res.status(200).json({ orders });
+    const ordersWithReviews = await attachReviewMetaToOrders(orders, userId);
+
+    return res.status(200).json({ orders: ordersWithReviews });
   } catch (err) {
     console.error("getMyPaidOrders error:", err);
     return res.status(500).json({ message: "Server error" });
@@ -57,7 +157,9 @@ export const getMyPaidOrderById = async (req, res) => {
 
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    return res.status(200).json({ order });
+    const [orderWithReviews] = await attachReviewMetaToOrders([order], userId);
+
+    return res.status(200).json({ order: orderWithReviews });
   } catch (err) {
     console.error("getMyPaidOrderById error:", err);
     return res.status(500).json({ message: "Server error" });

@@ -18,10 +18,15 @@ const DEFAULT_IMAGE_PRICE_RULES = [
   { maxSideInches: 4, price: 40 },
   { maxSideInches: "", price: 100 },
 ];
+const DEFAULT_TEXT_PRICE_RULES = [
+  { maxSideInches: 4, price: 40 },
+  { maxSideInches: "", price: 100 },
+];
 
 const createEmptyColor = () => ({ label: "", value: "#FFFFFF" });
 const createEmptySizeRow = () => ({ size: "M", price: 0, stock: 0 });
 const createEmptyImagePriceRule = () => ({ maxSideInches: "", price: 0 });
+const createEmptyTextPriceRule = () => ({ maxSideInches: "", price: 0 });
 
 const normalizeColors = (colors = []) =>
   Array.isArray(colors) && colors.length > 0
@@ -51,6 +56,30 @@ const normalizeImagePriceRules = (rules = []) =>
       }))
     : DEFAULT_IMAGE_PRICE_RULES;
 
+const formatImageSlabSize = (value) => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue <= 0) return "";
+  return `${numericValue} x ${numericValue} inches`;
+};
+
+const describeImagePriceRule = (rules = [], index = 0) => {
+  const rule = rules[index];
+  const currentSize = formatImageSlabSize(rule?.maxSideInches);
+
+  if (currentSize) {
+    return `This rule applies to each uploaded image up to ${currentSize}.`;
+  }
+
+  const previousRule = rules[index - 1];
+  const previousSize = formatImageSlabSize(previousRule?.maxSideInches);
+
+  if (previousSize) {
+    return `This final rule applies to each uploaded image larger than ${previousSize}.`;
+  }
+
+  return "This rule applies to each uploaded image that does not match an earlier slab.";
+};
+
 const mapProductToForm = (product) => ({
   _id: product?._id || "",
   name: product?.name || "",
@@ -75,6 +104,9 @@ const mapProductToForm = (product) => ({
     pricePerSqInch: Number(product?.normalPricing?.pricePerSqInch || 6),
     sleevePrice: Number(product?.normalPricing?.sleevePrice || 30),
     imagePriceRules: normalizeImagePriceRules(product?.normalPricing?.imagePriceRules),
+    textPriceRules: normalizeImagePriceRules(
+      product?.normalPricing?.textPriceRules || product?.normalPricing?.imagePriceRules || DEFAULT_TEXT_PRICE_RULES
+    ),
   },
   views: Array.isArray(product?.views) ? product.views : [],
 });
@@ -109,6 +141,13 @@ const buildPayload = (form) => ({
     pricePerSqInch: Number(form.normalPricing.pricePerSqInch || 0),
     sleevePrice: Number(form.normalPricing.sleevePrice || 0),
     imagePriceRules: form.normalPricing.imagePriceRules.map((entry) => ({
+      maxSideInches:
+        entry.maxSideInches === "" || entry.maxSideInches === null || entry.maxSideInches === undefined
+          ? null
+          : Number(entry.maxSideInches),
+      price: Number(entry.price || 0),
+    })),
+    textPriceRules: form.normalPricing.textPriceRules.map((entry) => ({
       maxSideInches:
         entry.maxSideInches === "" || entry.maxSideInches === null || entry.maxSideInches === undefined
           ? null
@@ -250,6 +289,18 @@ export default function ProductPricingManager() {
     }));
   };
 
+  const updateTextPriceRule = (index, field, value) => {
+    setForm((prev) => ({
+      ...prev,
+      normalPricing: {
+        ...prev.normalPricing,
+        textPriceRules: prev.normalPricing.textPriceRules.map((entry, entryIndex) =>
+          entryIndex === index ? { ...entry, [field]: value } : entry
+        ),
+      },
+    }));
+  };
+
   const addColorRow = () => {
     setForm((prev) => ({
       ...prev,
@@ -281,6 +332,16 @@ export default function ProductPricingManager() {
     }));
   };
 
+  const addTextPriceRule = () => {
+    setForm((prev) => ({
+      ...prev,
+      normalPricing: {
+        ...prev.normalPricing,
+        textPriceRules: [...prev.normalPricing.textPriceRules, createEmptyTextPriceRule()],
+      },
+    }));
+  };
+
   const removeSizeRow = (index) => {
     setForm((prev) => ({
       ...prev,
@@ -294,6 +355,16 @@ export default function ProductPricingManager() {
       normalPricing: {
         ...prev.normalPricing,
         imagePriceRules: prev.normalPricing.imagePriceRules.filter((_, entryIndex) => entryIndex !== index),
+      },
+    }));
+  };
+
+  const removeTextPriceRule = (index) => {
+    setForm((prev) => ({
+      ...prev,
+      normalPricing: {
+        ...prev.normalPricing,
+        textPriceRules: prev.normalPricing.textPriceRules.filter((_, entryIndex) => entryIndex !== index),
       },
     }));
   };
@@ -348,7 +419,7 @@ export default function ProductPricingManager() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Customization Product Manager</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Manage product colors, sizes, prices, stock, and customization pricing for seeded products.
+          Manage product colors, sizes, stock, and slab-based image and text customization charges for seeded products.
         </p>
       </div>
 
@@ -649,7 +720,7 @@ export default function ProductPricingManager() {
 
                 <div className="rounded-2xl border border-slate-200 p-4">
                   <div className="mb-4 flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-slate-900">Normal Pricing Rules</h3>
+                    <h3 className="text-lg font-semibold text-slate-900">Per-Image Pricing Rules</h3>
                     <button
                       type="button"
                       onClick={addImagePriceRule}
@@ -659,32 +730,21 @@ export default function ProductPricingManager() {
                     </button>
                   </div>
                   <div className="space-y-3">
-                    <label className="block">
-                      <span className="mb-1 block text-sm font-medium text-slate-700">Fixed Size Inches</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value={form.normalPricing.fixedSizeInches}
-                        onChange={(e) =>
-                          updateNestedField("normalPricing", "fixedSizeInches", e.target.value)
-                        }
-                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sky-500"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="mb-1 block text-sm font-medium text-slate-700">Price Per Sq. Inch</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value={form.normalPricing.pricePerSqInch}
-                        onChange={(e) =>
-                          updateNestedField("normalPricing", "pricePerSqInch", e.target.value)
-                        }
-                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sky-500"
-                      />
-                    </label>
+                    <div className="rounded-xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                      Upload charges are applied per image. Example: set `4 -&gt; 40` and a final empty slab `100`
+                      to charge `₹40` for images up to `4 x 4` inches and `₹100` for anything above `4 x 4`.
+                    </div>
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                      <p className="font-semibold">How admins should read this section</p>
+                      <p className="mt-1">
+                        Each uploaded image is charged separately. The system checks the image size in inches, picks the
+                        first matching slab below, and applies that slab price once for that image.
+                      </p>
+                      <p className="mt-2">
+                        Example: if 3 images are uploaded and all 3 fall into the same slab, that slab charge is added 3
+                        times.
+                      </p>
+                    </div>
                     <label className="block">
                       <span className="mb-1 block text-sm font-medium text-slate-700">Sleeve Price</span>
                       <input
@@ -702,7 +762,8 @@ export default function ProductPricingManager() {
                       <div className="mb-2">
                         <p className="text-sm font-medium text-slate-700">Image Price Slabs</p>
                         <p className="text-xs text-slate-500">
-                          Set charges by maximum image side in inches. Leave max inches empty for the final catch-all rule.
+                          Add slabs from smaller image sizes to larger image sizes. Leave the size empty only in the last
+                          slab, so it works as the final rule for anything above the previous slab.
                         </p>
                       </div>
 
@@ -713,19 +774,26 @@ export default function ProductPricingManager() {
                             className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_48px]"
                           >
                             <label className="block">
-                              <span className="mb-1 block text-xs font-medium text-slate-600">Max side (inches)</span>
+                              <span className="mb-1 block text-xs font-medium text-slate-600">
+                                {rule.maxSideInches === "" ? "Final rule: above previous slab" : `Rule ${index + 1}: up to this image size`}
+                              </span>
                               <input
                                 type="number"
                                 min="0"
                                 step="0.1"
                                 value={rule.maxSideInches}
                                 onChange={(e) => updateImagePriceRule(index, "maxSideInches", e.target.value)}
-                                placeholder="Leave empty for final slab"
+                                placeholder="Example: 4, leave empty only for final rule"
                                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sky-500"
                               />
+                              <span className="mt-1 block text-[11px] text-slate-500">
+                                {rule.maxSideInches === ""
+                                  ? "This row is used for any image larger than the slab above."
+                                  : "Example: 4 means this price applies up to 4 x 4 inches."}
+                              </span>
                             </label>
                             <label className="block">
-                              <span className="mb-1 block text-xs font-medium text-slate-600">Charge (Rs.)</span>
+                              <span className="mb-1 block text-xs font-medium text-slate-600">Charge per image (Rs.)</span>
                               <input
                                 type="number"
                                 min="0"
@@ -743,6 +811,102 @@ export default function ProductPricingManager() {
                             >
                               x
                             </button>
+                            <div className="sm:col-span-2">
+                              <p className="text-xs text-slate-500">
+                                {describeImagePriceRule(form.normalPricing.imagePriceRules, index)}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 p-4">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-slate-900">Per-Text Pricing Rules</h3>
+                    <button
+                      type="button"
+                      onClick={addTextPriceRule}
+                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Add Text Rule
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="rounded-xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                      Text charges are also applied per text layer. The same slab logic is used: up to a size limit gets
+                      one price, and the final empty slab covers anything larger.
+                    </div>
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                      <p className="font-semibold">How admins should read this section</p>
+                      <p className="mt-1">
+                        Each text layer is measured by its printed width and height in inches, then the first matching slab
+                        is applied once for that text layer.
+                      </p>
+                      <p className="mt-2">
+                        Example: if a customer adds 2 separate text layers, the matching text charge is added 2 times.
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="mb-2">
+                        <p className="text-sm font-medium text-slate-700">Text Price Slabs</p>
+                        <p className="text-xs text-slate-500">
+                          Add slabs from smaller text sizes to larger text sizes. Leave the size empty only in the last
+                          slab, so it works as the final rule for anything above the previous slab.
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        {form.normalPricing.textPriceRules.map((rule, index) => (
+                          <div
+                            key={`${rule.maxSideInches}-${index}-text`}
+                            className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_48px]"
+                          >
+                            <label className="block">
+                              <span className="mb-1 block text-xs font-medium text-slate-600">
+                                {rule.maxSideInches === "" ? "Final rule: above previous slab" : `Rule ${index + 1}: up to this text size`}
+                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                value={rule.maxSideInches}
+                                onChange={(e) => updateTextPriceRule(index, "maxSideInches", e.target.value)}
+                                placeholder="Example: 4, leave empty only for final rule"
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sky-500"
+                              />
+                              <span className="mt-1 block text-[11px] text-slate-500">
+                                {rule.maxSideInches === ""
+                                  ? "This row is used for any text layer larger than the slab above."
+                                  : "Example: 4 means this price applies up to 4 x 4 inches."}
+                              </span>
+                            </label>
+                            <label className="block">
+                              <span className="mb-1 block text-xs font-medium text-slate-600">Charge per text layer (Rs.)</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                value={rule.price}
+                                onChange={(e) => updateTextPriceRule(index, "price", e.target.value)}
+                                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sky-500"
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => removeTextPriceRule(index)}
+                              disabled={form.normalPricing.textPriceRules.length === 1}
+                              className="rounded-lg border border-rose-200 text-sm font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+                            >
+                              x
+                            </button>
+                            <div className="sm:col-span-2">
+                              <p className="text-xs text-slate-500">
+                                {describeImagePriceRule(form.normalPricing.textPriceRules, index)}
+                              </p>
+                            </div>
                           </div>
                         ))}
                       </div>

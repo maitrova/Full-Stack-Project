@@ -17,6 +17,7 @@ import {
 import { selectCurrentToken } from '../redux/slices/Userslice.js';
 import { buildImageUrl, getRawImagePath, getResponsiveImageProps } from "../utils/responsiveImage.js";
 import ProductImageLightbox from "./ProductImageLightbox.jsx";
+import ProductReviews from "./ProductReviews.jsx";
 
 // Lucide React icons
 import { 
@@ -594,8 +595,9 @@ export default function ProductDetailPage() {
         material: itemData.material,
         weight: itemData.weight,
         dimensions: itemData.dimensions,
-        rating: itemData.rating || 4,
-        reviewCount: itemData.reviewCount || 24,
+        rating: Number(itemData.rating || 0),
+        reviewCount: Number(itemData.reviewCount || 0),
+        ratingBreakdown: itemData.ratingBreakdown || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
         sku: activeVariant?.sku || itemData.sku || 'N/A',
         specifications: itemData.specifications,
         manufacturer: itemData.manufacturer,
@@ -876,7 +878,7 @@ export default function ProductDetailPage() {
                   <Check className="h-5 w-5" />
                 ) : notification.type === 'error' ? (
                   <AlertCircle className="h-5 w-5" />
-                ) : (
+      ) : (
                   <Info className="h-5 w-5" />
                 )}
               </div>
@@ -1821,6 +1823,15 @@ export default function ProductDetailPage() {
           )}
         </section>
       )}
+      {isReadymade && itemData?._id ? (
+        <ProductReviews
+          kind="READYMADE"
+          targetId={itemData._id}
+          initialRating={displayData?.rating}
+          initialReviewCount={displayData?.reviewCount}
+          initialBreakdown={displayData?.ratingBreakdown}
+        />
+      ) : null}
       <Footer/>
 
       <ProductImageLightbox

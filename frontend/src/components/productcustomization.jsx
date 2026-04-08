@@ -38,6 +38,10 @@ const DEFAULT_IMAGE_PRICE_RULES = [
   { maxSideInches: 4, price: 40 },
   { maxSideInches: null, price: 100 },
 ];
+const DEFAULT_TEXT_PRICE_RULES = [
+  { maxSideInches: 4, price: 40 },
+  { maxSideInches: null, price: 100 },
+];
 const SUPPORTED_DESIGN_MIME_TYPES = new Set([
   "image/png",
 ]);
@@ -97,6 +101,32 @@ const getFixedImageLayerPricing = (wIn, hIn, rules = DEFAULT_IMAGE_PRICE_RULES) 
     matchedRule,
     price: Number(matchedRule?.price || 0),
   };
+};
+
+const formatImagePriceRuleLabel = (rule, index, rules = []) => {
+  if (!rule) return "";
+
+  const previousRule = index > 0 ? rules[index - 1] : null;
+  const upperBound =
+    rule.maxSideInches === null || rule.maxSideInches === undefined || rule.maxSideInches === ""
+      ? null
+      : Number(rule.maxSideInches);
+  const lowerBound =
+    previousRule?.maxSideInches === null || previousRule?.maxSideInches === undefined || previousRule?.maxSideInches === ""
+      ? null
+      : Number(previousRule.maxSideInches);
+
+  if (upperBound === null) {
+    return lowerBound !== null
+      ? `Above ${lowerBound}" × ${lowerBound}"`
+      : "Any image size";
+  }
+
+  if (lowerBound === null) {
+    return `Up to ${upperBound}" × ${upperBound}"`;
+  }
+
+  return `Above ${lowerBound}" × ${lowerBound}" and up to ${upperBound}" × ${upperBound}"`;
 };
 // Tab options
 const TABS = {
@@ -522,6 +552,20 @@ const getInitialZoneKey = (viewCode, preferredZone = null) => {
   return "front-full";
 };
 
+const normalizeEditorZone = (zone, fallback = "front-full") => {
+  const normalized = String(zone || "").trim().toLowerCase();
+  if (!normalized) return fallback;
+  if (
+    normalized === "front-pocket" ||
+    normalized === "front_pocket" ||
+    normalized === "pocket-front" ||
+    normalized === "pocket"
+  ) {
+    return "pocket";
+  }
+  return normalized;
+};
+
 const createDesignLayer = (
   id,
   imageUrl,
@@ -626,6 +670,9 @@ const getSizeBasePrice = (prod, size) => {
   };
   const BASE_PRICE = getSizeBasePrice(product, selectedSize);
   const productImagePriceRules = normalizeImagePriceRules(product?.normalPricing?.imagePriceRules);
+  const productTextPriceRules = normalizeImagePriceRules(
+    product?.normalPricing?.textPriceRules || product?.normalPricing?.imagePriceRules || DEFAULT_TEXT_PRICE_RULES
+  );
 
   const [savedDesignId, setSavedDesignId] = useState(null);
   const [lastSavedPreview, setLastSavedPreview] = useState(null);
@@ -897,6 +944,7 @@ const restoreDesignLayerFromSaved = (d, pricingRules = DEFAULT_IMAGE_PRICE_RULES
   // 3) rebuild base layer (no derived fields trusted yet)
   const baseLayer = {
     ...d,
+    zone: normalizeEditorZone(d.zone, getInitialZoneKey(d.viewCode)),
     priceRules: d.priceRules || normalizeImagePriceRules(pricingRules),
     scale,
     scaleX,
@@ -952,8 +1000,16 @@ const restoreDesignLayerFromSaved = (d, pricingRules = DEFAULT_IMAGE_PRICE_RULES
 
         if (viewState.textLayers) {
           viewState.textLayers.forEach(textLayer => {
+            let zone = textLayer.zone;
+            if (!zone) {
+              if (viewCode === "back") zone = "back-full";
+              else if (supportsPocketZone && viewCode === "front") zone = "front-full";
+              else zone = "front-full";
+            }
+
             allTextLayers.push({
               ...textLayer,
+              zone,
               viewCode
             });
           });
@@ -1020,41 +1076,39 @@ const restoreDesignLayerFromSaved = (d, pricingRules = DEFAULT_IMAGE_PRICE_RULES
     zone,
     viewCode: layer.viewCode,
     size: `${widthIn.toFixed(2)}" × ${heightIn.toFixed(2)}"`,
-    note:
-      matchedRule?.maxSideInches === null
-        ? "Catch-all image price rule"
-        : `Up to ${matchedRule?.maxSideInches}" max side`,
+    note: formatImagePriceRuleLabel(
+      matchedRule,
+      (layer.priceRules || productImagePriceRules).findIndex(
+        (rule) => Number(rule?.maxSideInches) === Number(matchedRule?.maxSideInches)
+      ),
+      layer.priceRules || productImagePriceRules
+    ),
   });
 });
 
 
 
     textLayers.forEach((textLayer) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
       ctx.font = `${textLayer.fontSize}px ${textLayer.fontFamily}`;
       
       const textMetrics = ctx.measureText(textLayer.text);
-      const textWidthPx = textMetrics.width;
-      const textHeightPx = textLayer.fontSize * 1.2;
-      
-      const widthInches = textWidthPx / PRINT_DPI;
-      const heightInches = textHeightPx / PRINT_DPI;
+      const fallbackTextWidthPx = textMetrics.width;
+      const fallbackTextHeightPx = textLayer.fontSize * 1.2;
+
+      const widthInches =
+        Number(textLayer.renderedWidthInches || textLayer.widthInches || 0) || (fallbackTextWidthPx / PRINT_DPI);
+      const heightInches =
+        Number(textLayer.renderedHeightInches || textLayer.heightInches || 0) || (fallbackTextHeightPx / PRINT_DPI);
       const areaInches = widthInches * heightInches;
-      
-      const fixedArea = FIXED_SIZE_INCHES * FIXED_SIZE_INCHES;
-      const additionalArea = Math.max(0, areaInches - fixedArea);
-      let textPrice = additionalArea * PRICE_PER_SQ_INCH;
-      
-      if (areaInches > 0 && textPrice < MINIMUM_DESIGN_CHARGE && areaInches <= fixedArea) {
-        textPrice = MINIMUM_DESIGN_CHARGE;
-        breakdown.minimumCharges += MINIMUM_DESIGN_CHARGE; // add zero value here
-      }
-      
-      if (additionalArea > 0) {
-        breakdown.additionalArea += additionalArea;
-      }
-      
+
+      const { price: textPrice, matchedRule } = getFixedImageLayerPricing(
+        widthInches,
+        heightInches,
+        textLayer.priceRules || productTextPriceRules
+      );
+
       if (textPrice > 0) {
         totalPrice += textPrice;
         breakdown.text.count += 1;
@@ -1064,12 +1118,19 @@ const restoreDesignLayerFromSaved = (d, pricingRules = DEFAULT_IMAGE_PRICE_RULES
           id: textLayer.id,
           text: textLayer.text?.substring(0, 15) + (textLayer.text?.length > 15 ? "..." : ""),
           fontSize: textLayer.fontSize,
-          displaySize: `${(textWidthPx / DISPLAY_DPI).toFixed(2)}" × ${(textHeightPx / DISPLAY_DPI).toFixed(2)}"`,
+          displaySize: `${((textLayer.renderedWidthPx || fallbackTextWidthPx) / DISPLAY_DPI).toFixed(2)}" × ${((textLayer.renderedHeightPx || fallbackTextHeightPx) / DISPLAY_DPI).toFixed(2)}"`,
           printSize: `${widthInches.toFixed(3)}" × ${heightInches.toFixed(3)}"`,
           areaInches: areaInches.toFixed(3),
-          additionalArea: additionalArea.toFixed(3),
           price: textPrice,
           viewCode: textLayer.viewCode,
+          zone: textLayer.zone,
+          note: formatImagePriceRuleLabel(
+            matchedRule,
+            (textLayer.priceRules || productTextPriceRules).findIndex(
+              (rule) => Number(rule?.maxSideInches) === Number(matchedRule?.maxSideInches)
+            ),
+            textLayer.priceRules || productTextPriceRules
+          ),
         });
       }
     });
@@ -1229,6 +1290,7 @@ setPriceBreakdown((prev) => ({
           loadedViewStates[view.code] = {
             textLayers: view.textLayers?.map(t => ({
               ...t,
+              zone: normalizeEditorZone(t.zone, getInitialZoneKey(view.code)),
               id: t.id || `text-${Date.now()}-${Math.random().toString(36).slice(2)}`
             })) || [],
             activeTextId: view.textLayers?.[0]?.id || null,
@@ -1400,7 +1462,8 @@ setPriceBreakdown((prev) => ({
   const cropBoxRect = getCropBoxRect(cropDraftValue);
   const selectedOrLatestDesign = activeDesign || designLayers[designLayers.length - 1] || null;
   const availableZonesForView = getZoneOptionsForView(viewCode, { supportsPocketZone });
-  const activeDesignZone = activeDesign?.zone || availableZonesForView[0] || "front-full";
+  const activeDesignZone = normalizeEditorZone(activeDesign?.zone, availableZonesForView[0] || "front-full");
+  const activeTextZone = normalizeEditorZone(activeTextLayer?.zone, availableZonesForView[0] || "front-full");
 
   useEffect(() => {
     if (!activeDesignId) {
@@ -1460,6 +1523,24 @@ setPriceBreakdown((prev) => ({
           : layer
       ),
       activeDesignId: activeDesign.id,
+    });
+  };
+
+  const moveActiveTextToZone = (zoneKey) => {
+    if (!activeTextLayer || !zoneKey) return;
+
+    updateCurrentViewState({
+      textLayers: textLayers.map((layer) =>
+        layer.id === activeTextLayer.id
+          ? {
+              ...layer,
+              zone: zoneKey,
+              x: null,
+              y: null,
+            }
+          : layer
+      ),
+      activeTextId: activeTextLayer.id,
     });
   };
 
@@ -2183,8 +2264,50 @@ const startCropPreviewPan = (event, mode = "move") => {
         const vs = processedViewStates[v.code] ? { ...baseViewState, ...processedViewStates[v.code] } : baseViewState;
 
         const textLayersPayload = (vs.textLayers || []).map(
-          ({ id, text, x, y, fontSize, color, fontFamily, rotation }) => ({
-            id, text, x, y, fontSize, color, fontFamily, rotation,
+          ({
+            id,
+            text,
+            x,
+            y,
+            zone,
+            fontSize,
+            color,
+            fontFamily,
+            rotation,
+            scale,
+            scaleX,
+            scaleY,
+            widthInches,
+            heightInches,
+            areaInches,
+            renderedWidthPx,
+            renderedHeightPx,
+            renderedWidthInches,
+            renderedHeightInches,
+            printableAreaWidthInches,
+            printableAreaHeightInches,
+          }) => ({
+            id,
+            text,
+            x,
+            y,
+            zone: zone === "pocket" ? "front-pocket" : (zone || null),
+            fontSize,
+            color,
+            fontFamily,
+            rotation,
+            scale,
+            scaleX,
+            scaleY,
+            widthInches,
+            heightInches,
+            areaInches,
+            renderedWidthPx,
+            renderedHeightPx,
+            renderedWidthInches,
+            renderedHeightInches,
+            printableAreaWidthInches,
+            printableAreaHeightInches,
           })
         );
 
@@ -2454,6 +2577,7 @@ const startCropPreviewPan = (event, mode = "move") => {
       restoredViewStates[view.code] = {
         textLayers: view.textLayers?.map(t => ({
           ...t,
+          zone: normalizeEditorZone(t.zone, getInitialZoneKey(view.code)),
           id: t.id || `text-${Date.now()}-${Math.random().toString(36).slice(2)}`
         })) || [],
         activeTextId: view.textLayers?.[0]?.id || null,
@@ -3209,6 +3333,34 @@ const startCropPreviewPan = (event, mode = "move") => {
                       </div>
                     </div>
 
+                    {availableZonesForView.length > 1 && (
+                      <div>
+                        <label className="mb-2 block text-xs font-medium text-slate-500">Text Position Area</label>
+                        <div className="flex flex-wrap gap-2">
+                          {availableZonesForView.map((zoneKey) => {
+                            const isCurrentZone = activeTextZone === zoneKey;
+                            return (
+                              <button
+                                key={`text-zone-${zoneKey}`}
+                                type="button"
+                                onClick={() => moveActiveTextToZone(zoneKey)}
+                                disabled={isCurrentZone}
+                                className={`rounded border px-3 py-1.5 text-xs font-medium ${
+                                  isCurrentZone
+                                    ? "cursor-default border-sky-200 bg-sky-50 text-sky-700"
+                                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                                }`}
+                              >
+                                {isCurrentZone
+                                  ? `In ${ZONE_LABELS[zoneKey] || zoneKey}`
+                                  : `Move to ${ZONE_LABELS[zoneKey] || zoneKey}`}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="text-xs text-slate-600 space-y-1">
                       <p>• Drag the text on the shirt to reposition</p>
                       <p>• Use the corner handle to resize</p>
@@ -3829,7 +3981,9 @@ const startCropPreviewPan = (event, mode = "move") => {
                     selectedView={viewCode}
                     zoneOptions={availableZonesForView}
                     activeDesignZone={activeDesignZone}
+                    activeTextZone={activeTextZone}
                     onMoveActiveDesignToZone={moveActiveDesignToZone}
+                    onMoveActiveTextToZone={moveActiveTextToZone}
                   />
                 ) : (
                   <div className="text-sm text-slate-500 text-center">{product?.name ? `No view configuration found for ${product.name}` : "Product not loaded"}</div>
@@ -3910,6 +4064,7 @@ const startCropPreviewPan = (event, mode = "move") => {
                         <div className="text-slate-500 mt-1">Size: {item.displaySize}</div>
                         <div className="text-slate-500">Print: {item.printSize}</div>
                         <div className="text-amber-600 text-[9px] mt-1">{item.note}</div>
+                        <div className="text-amber-600 text-[9px] mt-1">{item.note}</div>
                       </div>
                     ))}
                   </div>
@@ -3938,24 +4093,24 @@ const startCropPreviewPan = (event, mode = "move") => {
                 </div>
               )}
               
-              {/* Minimum Charges */}
+              {/* Text Minimum Charges */}
               {priceBreakdown.minimumCharges > 0 && (
                 <div className="pb-3 border-b border-slate-100">
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs font-medium text-amber-700">Minimum Charges</span>
+                    <span className="text-xs font-medium text-amber-700">Text Minimum Charges</span>
                     <span className="text-sm font-semibold text-amber-700">+₹{priceBreakdown.minimumCharges.toFixed(2)}</span>
                   </div>
                   <div className="text-[10px] text-amber-600">
-                    Applied to designs/text smaller than {FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}"
+                    Applied to text layers smaller than {FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}"
                   </div>
                 </div>
               )}
               
-              {/* Additional Area */}
+              {/* Text Additional Area */}
               {priceBreakdown.additionalArea > 0 && (
                 <div className="pb-3 border-b border-slate-100">
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs font-medium text-green-700">Additional Area</span>
+                    <span className="text-xs font-medium text-green-700">Text Additional Area</span>
                     <span className="text-sm font-semibold text-green-700">+₹{(priceBreakdown.additionalArea * PRICE_PER_SQ_INCH).toFixed(2)}</span>
                   </div>
                   <div className="text-[10px] text-green-600">
@@ -3980,9 +4135,14 @@ const startCropPreviewPan = (event, mode = "move") => {
           <div className={`${showMobilePriceDetails ? "block" : "hidden"} mt-6 pt-4 border-t border-slate-200 lg:block`}>
             <div className="text-xs text-slate-600 space-y-1">
               <p className="font-medium mb-1">Pricing Information:</p>
-              <p>• Base includes {FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}" design area</p>
-              <p>• Minimum charge: ₹{MINIMUM_DESIGN_CHARGE} (≤{FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}")</p>
-              <p>• Additional: ₹{PRICE_PER_SQ_INCH} per sq.inch beyond {FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}"</p>
+              <p>• Base price depends on the size you select for the product.</p>
+              <p>• Every uploaded image is charged separately based on its printed size.</p>
+              {productImagePriceRules.map((rule, index) => (
+                <p key={`${rule.maxSideInches ?? "catch-all"}-${index}`}>
+                  • {formatImagePriceRuleLabel(rule, index, productImagePriceRules)}: ₹{Number(rule.price || 0)}
+                </p>
+              ))}
+              <p>• If you upload multiple images, the charge is applied per image.</p>
               <p>• Display: 72 DPI (screen preview)</p>
               <p>• Print: 300 DPI (production)</p>
             </div>
@@ -4013,3 +4173,6 @@ const startCropPreviewPan = (event, mode = "move") => {
     </div>
   );
 }
+
+
+

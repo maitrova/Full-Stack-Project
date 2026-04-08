@@ -30,6 +30,7 @@ const buildCouponPayload = (body, { partial = false } = {}) => {
     totalUsageLimit: body.totalUsageLimit,
     perUserUsageLimit: body.perUserUsageLimit,
     newCustomersOnly: body.newCustomersOnly,
+    allowOnSaleProducts: body.allowOnSaleProducts,
     allowedCategories:
       body.allowedCategories !== undefined
         ? parseObjectIdArray(body.allowedCategories || [])
@@ -77,6 +78,7 @@ const couponAdminProjection = {
   perUserUsageLimit: 1,
   maximumDiscountAmount: 1,
   newCustomersOnly: 1,
+  allowOnSaleProducts: 1,
   allowedCategories: 1,
   allowedSubCategories: 1,
   excludedProducts: 1,
@@ -98,6 +100,7 @@ const couponPublicProjection = {
   minimumCartAmount: 1,
   maximumDiscountAmount: 1,
   newCustomersOnly: 1,
+  allowOnSaleProducts: 1,
   firstOrderOnly: 1,
   autoApply: 1,
   campaignTag: 1,

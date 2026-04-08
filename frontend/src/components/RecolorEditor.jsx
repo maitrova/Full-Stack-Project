@@ -1505,6 +1505,8 @@ const RecolorEditor = forwardRef(function RecolorEditor(
     zoneOptions = [],
     activeDesignZone = null,
     onMoveActiveDesignToZone = null,
+    activeTextZone = null,
+    onMoveActiveTextToZone = null,
     
     // OPTIONAL: you can pass your tested front boundaries here if you want to force them
     // Example: { "front-full": {minX, minY, maxX, maxY} }
@@ -2139,6 +2141,30 @@ return () => {
                   {isCurrentZone
                     ? `In ${ZONE_LABELS[zoneKey] || zoneKey}`
                     : `Move to ${ZONE_LABELS[zoneKey] || zoneKey}`}
+                </button>
+              );
+            })}
+          </>
+        )}
+        {!activeDesignId && activeTextId && zoneOptions.length > 1 && onMoveActiveTextToZone && (
+          <>
+            {zoneOptions.map((zoneKey) => {
+              const isCurrentZone = activeTextZone === zoneKey;
+              return (
+                <button
+                  key={`text-zone-${zoneKey}`}
+                  type="button"
+                  onClick={() => onMoveActiveTextToZone(zoneKey)}
+                  disabled={isCurrentZone}
+                  className={`rounded border px-3 py-1.5 text-xs shadow-sm transition ${
+                    isCurrentZone
+                      ? "cursor-default border-sky-200 bg-sky-50 text-sky-700"
+                      : "border-slate-300 bg-white hover:bg-slate-50"
+                  }`}
+                >
+                  {isCurrentZone
+                    ? `Text in ${ZONE_LABELS[zoneKey] || zoneKey}`
+                    : `Move text to ${ZONE_LABELS[zoneKey] || zoneKey}`}
                 </button>
               );
             })}

@@ -40,6 +40,10 @@ const DEFAULT_IMAGE_PRICE_RULES = [
   { maxSideInches: 4, price: 40 },
   { maxSideInches: null, price: 100 },
 ];
+const DEFAULT_TEXT_PRICE_RULES = [
+  { maxSideInches: 4, price: 40 },
+  { maxSideInches: null, price: 100 },
+];
 
 const normalizeImagePriceRules = (rules = DEFAULT_IMAGE_PRICE_RULES) => {
   const source = Array.isArray(rules) && rules.length > 0 ? rules : DEFAULT_IMAGE_PRICE_RULES;
@@ -108,6 +112,33 @@ const calculateTextAreaInches = (fontSize, text = "") => {
   return widthInches * heightInches;
 };
 
+const getTextLayerMeasurements = (textLayer = {}) => {
+  const widthInches = Number(textLayer.renderedWidthInches ?? textLayer.widthInches ?? 0) || 0;
+  const heightInches = Number(textLayer.renderedHeightInches ?? textLayer.heightInches ?? 0) || 0;
+
+  if (widthInches > 0 && heightInches > 0) {
+    return {
+      widthInches,
+      heightInches,
+      areaInches: widthInches * heightInches,
+    };
+  }
+
+  const areaInches =
+    Number(textLayer.areaInches ?? calculateTextAreaInches(textLayer.fontSize, textLayer.text)) || 0;
+
+  if (!areaInches) {
+    return { widthInches: 0, heightInches: 0, areaInches: 0 };
+  }
+
+  const fallbackSide = Math.sqrt(areaInches);
+  return {
+    widthInches: fallbackSide,
+    heightInches: fallbackSide,
+    areaInches,
+  };
+};
+
 // Calculate price based on product's pricing mode
 const calculateDesignPrice = (
   designLayers,
@@ -131,6 +162,9 @@ const calculateDesignPrice = (
 
   // ✅ FIXED IMAGE PRICING CONSTANTS
   const imagePriceRules = normalizeImagePriceRules(product?.normalPricing?.imagePriceRules);
+  const textPriceRules = normalizeImagePriceRules(
+    product?.normalPricing?.textPriceRules || product?.normalPricing?.imagePriceRules || DEFAULT_TEXT_PRICE_RULES
+  );
   const SLEEVE_PRICE = product.normalPricing?.sleevePrice || 30;
 
   /* =========================
@@ -196,25 +230,29 @@ const calculateDesignPrice = (
      TEXT LAYERS (UNCHANGED)
      ========================= */
   textLayers.forEach((textLayer) => {
-    const areaInches =
-      textLayer.areaInches ??
-      calculateTextAreaInches(textLayer.fontSize, textLayer.text);
+    const zone = normalizeZone(textLayer.zone, "front-full");
+    const { widthInches, heightInches, areaInches } = getTextLayerMeasurements(textLayer);
 
-    if (!areaInches) return;
+    if (!widthInches || !heightInches || !areaInches) return;
 
-    const textPrice = MINIMUM_DESIGN_CHARGE;
+    const matchedRule = resolveImagePriceRule(widthInches, heightInches, textPriceRules);
+    const textPrice = Number(textLayer.layerPrice) || Number(matchedRule?.price || 0);
     totalPrice += textPrice;
 
     breakdown.textLayers.push({
       id: textLayer.id,
       text: textLayer.text,
+      zone,
       fontSize: textLayer.fontSize,
+      widthInches: Number(widthInches).toFixed(2),
+      heightInches: Number(heightInches).toFixed(2),
       areaInches: Number(areaInches).toFixed(2),
       price: textPrice,
-      pricingRule: "Text minimum charge",
+      pricingRule:
+        matchedRule?.maxSideInches === null
+          ? "Catch-all text rule"
+          : `Up to ${matchedRule.maxSideInches}" max side`,
     });
-
-    breakdown.minimumDesignCharges += MINIMUM_DESIGN_CHARGE;
   });
 
   breakdown.totalPrice = totalPrice;
@@ -312,17 +350,7 @@ export const saveDesign = async (req, res) => {
 
     const basePriceBySize = getSizeBasePrice(product, selectedSize);
 
-    // ✅ FIXED IMAGE PRICING (only for IMAGE layers)
-    const SMALL_MAX_IN = 4;   // 4x4 threshold
-    const SMALL_PRICE = 40;
-    const LARGE_PRICE = 100;
-
-    const getFixedImagePrice = (wIn, hIn) => {
-      const w = Number(wIn || 0);
-      const h = Number(hIn || 0);
-      if (!w || !h) return 0;
-      return (w <= SMALL_MAX_IN && h <= SMALL_MAX_IN) ? SMALL_PRICE : LARGE_PRICE;
-    };
+    const imagePriceRules = normalizeImagePriceRules(product?.normalPricing?.imagePriceRules);
 
     let totalDesignLayers = [];
     let totalTextLayers = [];
@@ -389,9 +417,14 @@ export const saveDesign = async (req, res) => {
         heightInches = Number(heightInches || 0);
         areaInches = Number(areaInches || (widthInches * heightInches) || 0);
 
-        // ✅ fixed price based on canvas inches
-        const layerPrice = getFixedImagePrice(widthInches, heightInches);
-        const minimumChargeApplied = layerPrice === SMALL_PRICE;
+        // ✅ fixed price based on admin-managed image slab pricing
+        const matchedRule = resolveImagePriceRule(widthInches, heightInches, imagePriceRules);
+        const layerPrice = Number(matchedRule?.price || 0);
+        const minimumChargeApplied = Boolean(
+          matchedRule?.maxSideInches !== null &&
+            widthInches <= Number(matchedRule?.maxSideInches || 0) &&
+            heightInches <= Number(matchedRule?.maxSideInches || 0)
+        );
 
         const processedLayer = {
           ...layer,
@@ -414,6 +447,7 @@ export const saveDesign = async (req, res) => {
           // ✅ persist fixed layer pricing
           layerPrice,
           minimumChargeApplied,
+          priceRules: imagePriceRules,
         };
 
         totalDesignLayers.push(processedLayer);
@@ -423,12 +457,13 @@ export const saveDesign = async (req, res) => {
       });
 
       const textLayers = (view.textLayers || []).map((textLayer) => {
-        const areaInches = calculateTextAreaInches(textLayer.fontSize, textLayer.text);
+        const { widthInches, heightInches, areaInches } = getTextLayerMeasurements(textLayer);
 
         const processedTextLayer = {
           ...textLayer,
-          widthInches: null,
-          heightInches: null,
+          zone: normalizeZone(textLayer.zone, defaultZone),
+          widthInches,
+          heightInches,
           areaInches,
         };
 
@@ -625,12 +660,13 @@ export const updateDesign = async (req, res) => {
       });
 
       const updatedTextLayers = (view.textLayers || []).map((textLayer) => {
-        const areaInches = calculateTextAreaInches(textLayer.fontSize, textLayer.text);
+        const { widthInches, heightInches, areaInches } = getTextLayerMeasurements(textLayer);
 
         const processedTextLayer = {
           ...textLayer,
-          widthInches: null,
-          heightInches: null,
+          zone: normalizeZone(textLayer.zone, defaultZone),
+          widthInches,
+          heightInches,
           areaInches,
         };
 

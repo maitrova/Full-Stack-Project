@@ -29,8 +29,8 @@ envVars:
   BREVO_ORDER_TEMPLATE_ID_READY: 36
   BREVO_ORDER_TEMPLATE_ID_SHIPPED: 5
   BREVO_ORDER_TEMPLATE_ID_DELIVERED: 6
-  ADMIN_NOTIFICATION_EMAIL: nagalahemanth411@gmail.com
-  ADMIN_NOTIFICATION_EMAILS: nagalahemanth411@gmail.com,support@maitrova.com
+  ADMIN_NOTIFICATION_EMAIL:  orders@maitrova.in
+  ADMIN_NOTIFICATION_EMAILS:  orders@maitrova.in,founder@maitrova.in,nagalahemanth411@gmail.com
   ADMIN_NOTIFICATION_NAME: Maitrova Admin
 
 # Secret Environment Variables (non-sensitive enough for Helm, stored in cluster secret)

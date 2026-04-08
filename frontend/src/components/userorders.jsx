@@ -18,6 +18,8 @@ import {
   selectDownloadingOrderId,
   clearInvoiceError
 } from '../redux/slices/invoiceSlice.js';
+import { selectCurrentToken } from '../redux/slices/Userslice.js';
+import ReviewModal from './ReviewModal.jsx';
 
 const UserOrders = () => {
   const dispatch = useDispatch();
@@ -33,10 +35,17 @@ const UserOrders = () => {
   const invoiceLoading = useSelector(selectInvoiceLoading);
   const invoiceError = useSelector(selectInvoiceError);
   const downloadingOrderId = useSelector(selectDownloadingOrderId);
+  const token = useSelector(selectCurrentToken);
   
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [showInvoiceError, setShowInvoiceError] = useState(false);
+  const [reviewModalState, setReviewModalState] = useState({
+    isOpen: false,
+    orderId: null,
+    item: null,
+    productName: '',
+  });
 
   // Get base URL from environment variables
   const BASE_URL = import.meta.env.VITE_IMAGE_URL || 'http://localhost:5000';
@@ -76,6 +85,32 @@ const UserOrders = () => {
     setShowOrderModal(false);
     setSelectedOrderId(null);
     dispatch(clearMyPaidOrder());
+  };
+
+  const openReviewModal = (orderId, item) => {
+    setReviewModalState({
+      isOpen: true,
+      orderId,
+      item,
+      productName: getItemName(item),
+    });
+  };
+
+  const closeReviewModal = () => {
+    setReviewModalState({
+      isOpen: false,
+      orderId: null,
+      item: null,
+      productName: '',
+    });
+  };
+
+  const handleReviewSubmitted = async () => {
+    await dispatch(fetchMyPaidOrders());
+
+    if (selectedOrderId) {
+      await dispatch(fetchMyPaidOrderById(selectedOrderId));
+    }
   };
 
   const handleDownloadInvoice = (orderId) => {
@@ -355,6 +390,13 @@ const UserOrders = () => {
               {orders.map((order) => {
                 const progress = getOrderStatusProgress(order.orderStatus);
                 const isDownloadingThisInvoice = downloadingOrderId === order._id;
+                const reviewableItems = (order.items || []).filter((item) => item.reviewMeta?.reviewable);
+                const reviewedItemsCount = (order.items || []).filter((item) => item.reviewMeta?.existingReview).length;
+                const reviewTargetItem =
+                  reviewableItems.find((item) => !item.reviewMeta?.existingReview) ||
+                  reviewableItems[0] ||
+                  null;
+                const pendingReviewKinds = (order.items || []).some((item) => item.reviewMeta?.kind);
                 return (
                   <li key={order._id} className="p-6 hover:bg-gray-50">
                     <div className="flex flex-col md:flex-row md:items-center justify-between">
@@ -418,10 +460,11 @@ const UserOrders = () => {
                           <div>
                             <h4 className="text-sm font-medium text-gray-700 mb-2">Order Items ({order.items?.length || 0})</h4>
                             <div className="space-y-3">
-                              {order.items?.slice(0, 2).map((item, index) => {
+                              {order.items?.map((item, index) => {
                                 const productDetails = getProductDetails(item);
                                 return (
-                                  <div key={index} className="flex items-center space-x-3">
+                                  <div key={index} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                                    <div className="flex items-start space-x-3">
                                     <img
                                       src={getItemImage(item)}
                                       alt={getItemName(item)}
@@ -450,15 +493,31 @@ const UserOrders = () => {
                                       {item.size && (
                                         <p className="text-xs text-gray-500">Size: {item.size}</p>
                                       )}
+                                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                                        {item.reviewMeta?.existingReview ? (
+                                          <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                            Reviewed {item.reviewMeta.existingReview.rating}/5
+                                          </span>
+                                        ) : null}
+                                        {item.reviewMeta?.reviewable ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => openReviewModal(order._id, item)}
+                                            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                                          >
+                                            {item.reviewMeta?.existingReview ? 'Edit Review' : 'Write Review'}
+                                          </button>
+                                        ) : item.reviewMeta?.kind ? (
+                                          <span className="text-xs text-gray-500">
+                                            Review available after delivery
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    </div>
                                     </div>
                                   </div>
                                 );
                               })}
-                              {order.items?.length > 2 && (
-                                <p className="text-sm text-gray-500">
-                                  +{order.items.length - 2} more item{order.items.length - 2 !== 1 ? 's' : ''}
-                                </p>
-                              )}
                             </div>
                           </div>
                           
@@ -498,6 +557,23 @@ const UserOrders = () => {
                           </svg>
                           View Details
                         </button>
+                        {reviewTargetItem ? (
+                          <button
+                            type="button"
+                            onClick={() => openReviewModal(order._id, reviewTargetItem)}
+                            className="inline-flex items-center justify-center px-4 py-2 border border-amber-200 text-sm font-semibold rounded-md shadow-sm text-amber-900 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-400"
+                          >
+                            {reviewableItems.length > 1
+                              ? `Review Products (${reviewedItemsCount}/${reviewableItems.length})`
+                              : reviewTargetItem.reviewMeta?.existingReview
+                              ? 'Edit Review'
+                              : 'Write Review'}
+                          </button>
+                        ) : pendingReviewKinds ? (
+                          <div className="rounded-md border border-slate-200 bg-slate-50 px-4 py-2 text-center text-xs font-medium text-slate-600">
+                            Review available after delivery
+                          </div>
+                        ) : null}
                         {order.payment?.razorpayPaymentId && (
                           <button
                             onClick={() => handleDownloadInvoice(order._id)}
@@ -714,6 +790,27 @@ const UserOrders = () => {
                                         {productDetails.description}
                                       </p>
                                     )}
+
+                                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                                      {item.reviewMeta?.existingReview ? (
+                                        <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                          Reviewed {item.reviewMeta.existingReview.rating}/5
+                                        </span>
+                                      ) : null}
+                                      {item.reviewMeta?.reviewable ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => openReviewModal(selectedOrder._id, item)}
+                                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                                        >
+                                          {item.reviewMeta?.existingReview ? 'Edit Review' : 'Write Review'}
+                                        </button>
+                                      ) : selectedOrder.orderStatus !== 'DELIVERED' && item.reviewMeta?.kind ? (
+                                        <span className="text-xs text-gray-500">
+                                          Review available after delivery
+                                        </span>
+                                      ) : null}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -906,6 +1003,16 @@ const UserOrders = () => {
           </div>
         </div>
       )}
+
+      <ReviewModal
+        isOpen={reviewModalState.isOpen}
+        onClose={closeReviewModal}
+        item={reviewModalState.item}
+        orderId={reviewModalState.orderId}
+        token={token}
+        productName={reviewModalState.productName}
+        onSubmitted={handleReviewSubmitted}
+      />
     </div>
   );
 };

@@ -67,14 +67,17 @@ export const buildCartPricingContext = (cart) => {
   for (const item of cart?.items || []) {
     let effectiveUnitPrice = Number(item.unitPrice || 0);
 
-    if (item.kind === "READYMADE" && item.readymadeProduct) {
+    const sourceProduct =
+      item.kind === "READYMADE" ? item.dropproduct || item.readymadeProduct : null;
+
+    if (sourceProduct) {
       const selectedSize = String(item.size || "").trim().toUpperCase();
-      const variant = Array.isArray(item.readymadeProduct.variants)
-        ? item.readymadeProduct.variants.find(
+      const variant = Array.isArray(sourceProduct.variants)
+        ? sourceProduct.variants.find(
             (entry) => String(entry.size).toUpperCase() === selectedSize
           )
         : null;
-      const pricing = getReadymadePricing(item.readymadeProduct, { variant });
+      const pricing = getReadymadePricing(sourceProduct, { variant });
       effectiveUnitPrice = pricing.effectivePrice;
       if (pricing.saleActive) {
         saleItemCount += Number(item.qty || 0);
@@ -150,7 +153,7 @@ export const validateCouponForCart = async ({ couponCode, cart, userId }) => {
 
   const context = buildCartPricingContext(cart);
 
-  if (context.saleItemCount > 0) {
+  if (context.saleItemCount > 0 && !coupon.allowOnSaleProducts) {
     return { valid: false, reason: "Coupons cannot be applied to sale items" };
   }
 
@@ -235,6 +238,7 @@ export const validateCouponForCart = async ({ couponCode, cart, userId }) => {
       maximumDiscountAmount: coupon.maximumDiscountAmount,
       discountApplied: discount,
       campaignTag: coupon.campaignTag || "",
+      allowOnSaleProducts: Boolean(coupon.allowOnSaleProducts),
     },
   };
 };

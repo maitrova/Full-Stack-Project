@@ -125,6 +125,9 @@ const formatCouponMeta = (coupon) => {
   if (coupon.firstOrderOnly || coupon.newCustomersOnly) {
     parts.push("First order only");
   }
+  if (coupon.allowOnSaleProducts) {
+    parts.push("Works on sale items");
+  }
   if (coupon.autoApply) {
     parts.push("Auto apply");
   }
@@ -524,7 +527,7 @@ export default function CheckoutAddresses() {
               <div className="border-b border-slate-200 bg-[linear-gradient(135deg,_#0f172a,_#1e293b_48%,_#0f766e)] px-6 py-8 text-white">
                 <div className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-300">Final Step</div>
                 <h3 className="mt-2 text-2xl font-semibold tracking-tight">Offers, totals, and payment</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-200">Apply your coupon, review the total, and pay from a secure backend-generated order. Sale items are excluded from coupon stacking.</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-200">Apply your coupon, review the total, and pay from a secure backend-generated order. Sale-item eligibility depends on the selected coupon rule.</p>
               </div>
 
               <div className="space-y-5 px-6 py-6">

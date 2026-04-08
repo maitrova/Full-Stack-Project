@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { buildImageUrl, getResponsiveImageProps } from "../utils/responsiveImage.js";
 import ProductImageLightbox from "./ProductImageLightbox.jsx";
+import ProductReviews from "./ProductReviews.jsx";
 
 const DropProductDetailsPage = () => {
   const { id } = useParams();
@@ -633,6 +634,11 @@ const DropProductDetailsPage = () => {
                 {productMetaLine && (
                   <span className="text-base font-medium text-gray-600">{productMetaLine}</span>
                 )}
+                <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700">
+                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                  <span>{Number(product?.rating || 0).toFixed(1)}</span>
+                  <span className="text-amber-600/80">({Number(product?.reviewCount || 0)})</span>
+                </div>
                 <span
                   className={`font-bold text-lg ${
                     currentStock > 10 ? "text-green-600" : currentStock > 0 ? "text-yellow-600" : "text-red-600"
@@ -814,6 +820,16 @@ const DropProductDetailsPage = () => {
           </div>
         </div>
       </div>
+
+      {product?._id ? (
+        <ProductReviews
+          kind="DROPPRODUCT"
+          targetId={product._id}
+          initialRating={product?.rating}
+          initialReviewCount={product?.reviewCount}
+          initialBreakdown={product?.ratingBreakdown}
+        />
+      ) : null}
 
       <ProductImageLightbox
         isOpen={isImageViewerOpen}

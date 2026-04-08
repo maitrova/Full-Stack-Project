@@ -93,6 +93,10 @@ const DEFAULT_IMAGE_PRICE_RULES = [
   { maxSideInches: 4, price: 40 },
   { maxSideInches: null, price: 100 },
 ];
+const DEFAULT_TEXT_PRICE_RULES = [
+  { maxSideInches: 4, price: 40 },
+  { maxSideInches: null, price: 100 },
+];
 
 const sanitizeImagePriceRules = (rules = []) => {
   const source = Array.isArray(rules) ? rules : [];
@@ -152,6 +156,18 @@ const sanitizeNormalPricing = (normalPricing = {}, current = {}) => {
 
   if (normalPricing.imagePriceRules !== undefined) {
     next.imagePriceRules = sanitizeImagePriceRules(normalPricing.imagePriceRules);
+  }
+
+  if (normalPricing.textPriceRules !== undefined) {
+    next.textPriceRules = sanitizeImagePriceRules(normalPricing.textPriceRules);
+  }
+
+  if (
+    normalPricing.imagePriceRules === undefined &&
+    normalPricing.textPriceRules === undefined &&
+    !Array.isArray(current?.textPriceRules)
+  ) {
+    next.textPriceRules = DEFAULT_TEXT_PRICE_RULES;
   }
 
   return next;

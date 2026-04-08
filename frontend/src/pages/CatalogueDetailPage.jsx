@@ -1020,7 +1020,7 @@ export default function CatalogueDetailPage() {
                       </div>
                       {priceDetails.additionalCharges > 0 && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Size Adjustment:</span>
+                          <span className="text-gray-600">Printing charges:</span>
                           <span className="font-medium">+₹{priceDetails.additionalCharges}</span>
                         </div>
                       )}

@@ -18,6 +18,7 @@ const createInitialForm = () => ({
   perUserUsageLimit: 1,
   maximumDiscountAmount: "",
   newCustomersOnly: false,
+  allowOnSaleProducts: false,
   allowedCategories: [],
   allowedSubCategories: [],
   excludedProducts: [],
@@ -57,6 +58,7 @@ const couponToForm = (coupon) => ({
       ? ""
       : coupon.maximumDiscountAmount,
   newCustomersOnly: Boolean(coupon.newCustomersOnly),
+  allowOnSaleProducts: Boolean(coupon.allowOnSaleProducts),
   allowedCategories: normalizeIdArray(coupon.allowedCategories),
   allowedSubCategories: normalizeIdArray(coupon.allowedSubCategories),
   excludedProducts: normalizeIdArray(coupon.excludedProducts),
@@ -84,6 +86,7 @@ const buildPayload = (form) => ({
   maximumDiscountAmount:
     form.maximumDiscountAmount === "" ? null : Number(form.maximumDiscountAmount),
   newCustomersOnly: Boolean(form.newCustomersOnly),
+  allowOnSaleProducts: Boolean(form.allowOnSaleProducts),
   allowedCategories: form.allowedCategories,
   allowedSubCategories: form.allowedSubCategories,
   excludedProducts: form.excludedProducts,
@@ -487,6 +490,11 @@ export default function CouponManagement() {
             onChange={(e) => updateField("newCustomersOnly", e.target.checked)}
           />
           <CheckboxField
+            label="Apply on sale products"
+            checked={form.allowOnSaleProducts}
+            onChange={(e) => updateField("allowOnSaleProducts", e.target.checked)}
+          />
+          <CheckboxField
             label="Allow stacking"
             checked={form.stackable}
             onChange={(e) => updateField("stackable", e.target.checked)}
@@ -568,6 +576,11 @@ export default function CouponManagement() {
                       {coupon.discountType === "PERCENTAGE"
                         ? `${coupon.discountValue}%`
                         : `Rs. ${coupon.discountValue}`}
+                      {coupon.allowOnSaleProducts ? (
+                        <div className="mt-1 text-xs font-medium text-emerald-700">
+                          Works on sale products
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-3 py-4 text-slate-700">
                       <div>{new Date(coupon.startDate).toLocaleDateString()}</div>

@@ -136,6 +136,13 @@ const productSchema = new mongoose.Schema(
           { maxSideInches: null, price: 100 },
         ],
       },
+      textPriceRules: {
+        type: [imagePriceRuleSchema],
+        default: [
+          { maxSideInches: 4, price: 40 },
+          { maxSideInches: null, price: 100 },
+        ],
+      },
     },
 
     currency: { type: String, default: "INR" },

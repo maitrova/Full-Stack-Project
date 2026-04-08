@@ -117,6 +117,21 @@ const dropproductSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    rating: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5,
+    },
+    reviewCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    ratingBreakdown: {
+      type: mongoose.Schema.Types.Mixed,
+      default: () => ({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }),
+    },
   },
   { timestamps: true }
 );

@@ -31,7 +31,8 @@ import {
   ShoppingBag,
   Home,
   Search,
-  FileText
+  FileText,
+  MessageSquareText
 } from 'lucide-react';
 
 // Import Redux actions
@@ -95,6 +96,7 @@ import CouponManagement from '../components/admin/CouponManagement.jsx';
 import HeaderBannerSettings from '../components/admin/HeaderBannerSettings.jsx';
 import UserManagement from '../components/admin/UserManagement.jsx';
 import CompanyDocumentManager from '../components/admin/CompanyDocumentManager.jsx';
+import ReviewManagement from '../components/admin/ReviewManagement.jsx';
 
 const AdminDashboard = () => {
   const dispatch = useDispatch();
@@ -193,6 +195,7 @@ const AdminDashboard = () => {
         activeTab !== 'search' &&
         activeTab !== 'adminDesigns' &&
         activeTab !== 'coupons' &&
+        activeTab !== 'reviews' &&
         activeTab !== 'users' &&
         activeTab !== 'companyPolicies') {
       loadProducts();
@@ -292,6 +295,8 @@ const AdminDashboard = () => {
     setViewMode('search');
   } else if (tab === 'coupons') {
     setViewMode('coupons');
+  } else if (tab === 'reviews') {
+    setViewMode('reviews');
   } else if (tab === 'users') {
     setViewMode('users');
   } else if (tab === 'companyPolicies') {
@@ -618,6 +623,7 @@ const AdminDashboard = () => {
     { id: 'adminUploads', label: 'Admin Uploads', icon: <Upload className="w-5 h-5" /> },
     { id: 'companyPolicies', label: 'Company Policies', icon: <FileText className="w-5 h-5" /> },
     { id: 'coupons', label: 'Coupon Management', icon: <DollarSign className="w-5 h-5" /> },
+    { id: 'reviews', label: 'Review Management', icon: <MessageSquareText className="w-5 h-5" /> },
     { id: 'newArrival', label: 'New Arrivals', icon: <TrendingUp className="w-5 h-5" /> },
     { id: 'bestSeller', label: 'Best Sellers', icon: <BarChart3 className="w-5 h-5" /> },
     { id: 'prices', label: 'Price Management', icon: <DollarSign className="w-5 h-5" /> },
@@ -998,6 +1004,7 @@ const AdminDashboard = () => {
                 {activeSidebarItem === 'adminUploads' && 'Admin Uploads'}
                 {activeSidebarItem === 'companyPolicies' && 'Company Policies'}
                 {activeSidebarItem === 'coupons' && 'Coupon Management'}
+                {activeSidebarItem === 'reviews' && 'Review Management'}
               </h1>
               <p className="text-gray-600 mt-2">
                 {activeSidebarItem === 'dashboard' && 'Overview of your store performance'}
@@ -1017,6 +1024,7 @@ const AdminDashboard = () => {
                 {activeSidebarItem === 'adminUploads' && 'Upload and manage admin files'}
                 {activeSidebarItem === 'companyPolicies' && 'Create and manage public-facing company policy pages'}
                 {activeSidebarItem === 'coupons' && 'Create, edit, pause, and delete coupon rules'}
+                {activeSidebarItem === 'reviews' && 'Moderate and delete customer reviews'}
               </p>
             </div>
             
@@ -1136,6 +1144,10 @@ const AdminDashboard = () => {
 
           {activeSidebarItem === 'coupons' && (
             <CouponManagement />
+          )}
+
+          {activeSidebarItem === 'reviews' && (
+            <ReviewManagement />
           )}
 
           {activeSidebarItem === 'prices' && (
@@ -1723,6 +1735,7 @@ const AdminDashboard = () => {
      activeSidebarItem !== 'adminUploads' &&
      activeSidebarItem !== 'companyPolicies' &&
      activeSidebarItem !== 'coupons' &&
+     activeSidebarItem !== 'reviews' &&
      activeSidebarItem !== 'prices' &&
      activeSidebarItem !== 'users' &&
      activeSidebarItem !== 'settings' ? (            /* View Mode for Products (excluding dropproducts, orders, homepage, search, and adminDesigns) */

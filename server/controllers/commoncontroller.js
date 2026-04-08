@@ -50,7 +50,7 @@ export const getCommonSavedData = async (req, res) => {
         .populate("subCategory", "name thumbnail")
         .populate("brand", "name") // POPULATE BRAND NAME ONLY
         .select(
-          "_id title description price salePrice saleStartAt saleEndAt currency category subCategory brand stock variants bestSeller newArrival images thumbnail createdAt"
+          "_id title description price salePrice saleStartAt saleEndAt currency category subCategory brand stock variants bestSeller newArrival images thumbnail rating reviewCount createdAt"
         )
         .sort({ createdAt: -1 })
         .lean(),
@@ -128,6 +128,8 @@ export const getCommonSavedData = async (req, res) => {
 
         stock: pricedProduct.stock ?? 0,
         price: pricedProduct.effectivePrice ?? pricedProduct.price ?? 0,
+        rating: Number(pricedProduct.rating || 0),
+        reviewCount: Number(pricedProduct.reviewCount || 0),
         currency: pricedProduct.currency || "INR",
         createdAt: pricedProduct.createdAt,
         raw: pricedProduct,
