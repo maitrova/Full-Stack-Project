@@ -142,20 +142,10 @@ const getItemImages = (item) => {
                     srcSet={imageProps.srcSet}
                     sizes={imageProps.sizes}
                     alt={imgObj.altText}
-                    className="w-full h-full object-contain p-4 transition-transform duration-200"
+                    className="w-full h-full object-contain transition-transform duration-200"
                     loading={imageProps.loading}
                     decoding={imageProps.decoding}
                     fetchPriority={imageProps.fetchPriority}
-                    style={
-                      imageProps.placeholder
-                        ? {
-                            backgroundImage: `url(${imageProps.placeholder})`,
-                            backgroundPosition: "center",
-                            backgroundSize: "contain",
-                            backgroundRepeat: "no-repeat",
-                          }
-                        : undefined
-                    }
                     onError={(e) => {
                       e.target.onerror = null;
                       e.target.src =
@@ -222,7 +212,7 @@ const getItemImages = (item) => {
             alt={label}
             autoScrollInterval={4000}
           />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/35 via-black/10 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-gray-300/80 via-gray-100/30 to-transparent" />
 
           <div className="absolute right-2 top-2">
             {pricing.hasOffer && (
@@ -231,7 +221,6 @@ const getItemImages = (item) => {
               </span>
             )}
           </div>
-
           <div className="absolute inset-x-0 bottom-2 flex justify-center px-2">
             <div className="flex max-w-full items-center gap-2 rounded-md bg-white px-3 py-1.5 text-gray-900 shadow">
               <span className="truncate text-xs font-medium text-gray-900 sm:text-sm">
