@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Order from "../models/Order.js";
 import Review from "../models/Review.js";
+import { sendOrderStatusEmail } from "../services/orderEmailService.js";
 import {
   buildReviewLookupKey,
   getReviewTargetFromOrderItem,
@@ -10,6 +11,43 @@ const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 const PAYMENT_STATUSES = ["PENDING_PAYMENT", "PAID", "FAILED"];
 const FULFILLMENT_STATUSES = ["PROCESSING", "READY", "SHIPPED", "DELIVERED"];
+const ABSOLUTE_URL_RE = /^(?:https?:)?\/\//i;
+const SPECIAL_URL_RE = /^(?:data:|blob:)/i;
+
+const getAssetBaseUrl = (req) =>
+  String(
+    process.env.API_URL ||
+      process.env.BACKEND_URL ||
+      `${req.protocol}://${req.get("host")}`
+  )
+    .trim()
+    .replace(/\/+$/, "");
+
+const resolveOrderAssetUrl = (req, value) => {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) return rawValue;
+
+  if (ABSOLUTE_URL_RE.test(rawValue) || SPECIAL_URL_RE.test(rawValue)) {
+    return rawValue;
+  }
+
+  const normalizedPath = rawValue.replace(/\\/g, "/");
+
+  let publicPath;
+  if (normalizedPath.startsWith("/api/")) {
+    publicPath = normalizedPath;
+  } else if (normalizedPath.startsWith("api/")) {
+    publicPath = `/${normalizedPath}`;
+  } else if (normalizedPath.startsWith("/outputs/")) {
+    publicPath = `/api${normalizedPath}`;
+  } else if (normalizedPath.startsWith("outputs/")) {
+    publicPath = `/api/${normalizedPath}`;
+  } else {
+    publicPath = normalizedPath.startsWith("/") ? normalizedPath : `/${normalizedPath}`;
+  }
+
+  return `${getAssetBaseUrl(req)}${publicPath}`;
+};
 
 const pickExistingReview = (review) => {
   if (!review) return null;
@@ -248,7 +286,7 @@ export const adminGetAllOrders = async (req, res) => {
             ...it,
             design: {
               _id: d._id,
-              previewImage: d.previewImage,
+              previewImage: resolveOrderAssetUrl(req, d.previewImage),
               product: d.product,
               productSlug: d.productSlug,
               productName: d.productName,
@@ -261,11 +299,11 @@ export const adminGetAllOrders = async (req, res) => {
               salePrice: d.salePrice,
               views: (d.views || []).map((v) => ({
                 code: v.code,
-                previewImage: v.previewImage,
+                previewImage: resolveOrderAssetUrl(req, v.previewImage),
                 textLayers: v.textLayers || [],
                 designLayers: (v.designLayers || []).map((dl) => ({
                   id: dl.id,
-                  imageUrl: dl.imageUrl,
+                  imageUrl: resolveOrderAssetUrl(req, dl.imageUrl),
                   hasBgRemoved: dl.hasBgRemoved,
                   x: dl.x,
                   y: dl.y,
@@ -374,7 +412,7 @@ export const adminGetOrderById = async (req, res) => {
             ...it,
             design: {
               _id: d._id,
-              previewImage: d.previewImage,
+              previewImage: resolveOrderAssetUrl(req, d.previewImage),
               product: d.product,
               productSlug: d.productSlug,
               productName: d.productName,
@@ -387,11 +425,11 @@ export const adminGetOrderById = async (req, res) => {
               salePrice: d.salePrice,
               views: (d.views || []).map((v) => ({
                 code: v.code,
-                previewImage: v.previewImage,
+                previewImage: resolveOrderAssetUrl(req, v.previewImage),
                 textLayers: v.textLayers || [],
                 designLayers: (v.designLayers || []).map((dl) => ({
                   id: dl.id,
-                  imageUrl: dl.imageUrl,
+                  imageUrl: resolveOrderAssetUrl(req, dl.imageUrl),
                   hasBgRemoved: dl.hasBgRemoved,
                   x: dl.x,
                   y: dl.y,
@@ -464,10 +502,13 @@ export const adminUpdateOrderStatus = async (req, res) => {
     }
 
     // Optional rule: Only allow fulfillment updates if payment is PAID
-    const order = await Order.findById(orderId);
+    const order = await Order.findById(orderId).populate("user");
     if (!order) return res.status(404).json({ message: "Order not found" });
     if (order.status !== "PAID") {
       return res.status(400).json({ message: "Cannot update fulfillment status for unpaid order" });
+    }
+    if (order.orderStatus === orderStatus) {
+      return res.status(200).json({ message: "Order status unchanged", order });
     }
 
     order.orderStatus = orderStatus;
@@ -477,6 +518,12 @@ export const adminUpdateOrderStatus = async (req, res) => {
     order.statusHistory.push({ status: orderStatus, at: new Date() });
 
     await order.save();
+
+    try {
+      await sendOrderStatusEmail(order, order.user);
+    } catch (emailError) {
+      console.error("adminUpdateOrderStatus email error:", emailError.response?.body || emailError);
+    }
 
     return res.status(200).json({ message: "Order status updated", order });
   } catch (err) {
@@ -504,19 +551,55 @@ export const adminBulkUpdateOrderStatus = async (req, res) => {
     const invalidId = orderIds.find((id) => !isValidObjectId(id));
     if (invalidId) return res.status(400).json({ message: `Invalid orderId: ${invalidId}` });
 
+    const ordersToUpdate = await Order.find({
+      _id: { $in: orderIds },
+      status: "PAID",
+      orderStatus: { $ne: orderStatus },
+    }).populate("user");
+
+    if (!ordersToUpdate.length) {
+      return res.status(200).json({
+        message: "Bulk status updated",
+        matched: 0,
+        modified: 0,
+        emailsTriggered: 0,
+      });
+    }
+
     // Optional: only update PAID orders
     const result = await Order.updateMany(
-      { _id: { $in: orderIds }, status: "PAID" },
+      { _id: { $in: ordersToUpdate.map((order) => order._id) }, status: "PAID" },
       {
         $set: { orderStatus },
         $push: { statusHistory: { status: orderStatus, at: new Date() } },
       }
     );
 
+    const emailResults = await Promise.allSettled(
+      ordersToUpdate.map(async (order) => {
+        order.orderStatus = orderStatus;
+        await sendOrderStatusEmail(order, order.user);
+      })
+    );
+
+    const emailsTriggered = emailResults.filter(
+      (resultItem) => resultItem.status === "fulfilled"
+    ).length;
+
+    emailResults
+      .filter((resultItem) => resultItem.status === "rejected")
+      .forEach((resultItem) => {
+        console.error(
+          "adminBulkUpdateOrderStatus email error:",
+          resultItem.reason?.response?.body || resultItem.reason
+        );
+      });
+
     return res.status(200).json({
       message: "Bulk status updated",
       matched: result.matchedCount ?? result.n,
       modified: result.modifiedCount ?? result.nModified,
+      emailsTriggered,
     });
   } catch (err) {
     console.error("adminBulkUpdateOrderStatus error:", err);

@@ -65,7 +65,18 @@ const AdminOrders = () => {
   const [showExportNotification, setShowExportNotification] = useState(false);
 
   // Get base URL from environment variables
-  const BASE_URL = import.meta.env.VITE_IMAGE_URL || 'http://localhost:5000';
+  const API_BASE_URL = (
+    import.meta.env.VITE_IMAGE_URL ||
+    import.meta.env.VITE_API_URL ||
+    'http://localhost:5000'
+  ).replace(/\/+$/, '');
+  const ORIGIN_BASE_URL = API_BASE_URL.replace(/\/api$/i, '');
+  const ABSOLUTE_URL_RE = /^(?:https?:)?\/\//i;
+  const SPECIAL_URL_RE = /^(?:data:|blob:)/i;
+  const FALLBACK_THUMBNAIL =
+    "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23f3f4f6'/%3E%3Ctext x='50' y='50' dominant-baseline='middle' text-anchor='middle' font-family='Arial%2Csans-serif' font-size='12' fill='%239ca3af'%3ENo Image%3C/text%3E%3C/svg%3E";
+  const FALLBACK_PREVIEW =
+    "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Crect width='400' height='400' fill='%23f3f4f6'/%3E%3Ctext x='200' y='200' dominant-baseline='middle' text-anchor='middle' font-family='Arial%2Csans-serif' font-size='24' fill='%239ca3af'%3ENo Preview%3C/text%3E%3C/svg%3E";
 
   useEffect(() => {
     dispatch(adminFetchOrders(filters));
@@ -332,46 +343,79 @@ const AdminOrders = () => {
 };
 
 
+  const resolveImageUrl = (path, fallback = FALLBACK_THUMBNAIL) => {
+    if (!path) return fallback;
+
+    const rawPath = String(path).trim();
+    if (!rawPath) return fallback;
+    if (ABSOLUTE_URL_RE.test(rawPath) || SPECIAL_URL_RE.test(rawPath)) {
+      return rawPath;
+    }
+
+    const normalizedPath = rawPath.replace(/\\/g, '/');
+
+    if (normalizedPath.startsWith('/api/')) {
+      return `${ORIGIN_BASE_URL}${normalizedPath}`;
+    }
+    if (normalizedPath.startsWith('api/')) {
+      return `${ORIGIN_BASE_URL}/${normalizedPath}`;
+    }
+    if (normalizedPath.startsWith('/outputs/')) {
+      return `${ORIGIN_BASE_URL}/api${normalizedPath}`;
+    }
+    if (normalizedPath.startsWith('outputs/')) {
+      return `${ORIGIN_BASE_URL}/api/${normalizedPath}`;
+    }
+
+    return `${API_BASE_URL}${normalizedPath.startsWith('/') ? '' : '/'}${normalizedPath}`;
+  };
+
+  const handleImageError = (event, fallback = FALLBACK_THUMBNAIL) => {
+    if (!event?.target) return;
+    event.target.onerror = null;
+    event.target.src = fallback;
+  };
+
   const getItemImage = (item) => {
     if (item.previewImage) {
-      if (item.previewImage.startsWith('data:')) {
-        return item.previewImage;
-      }
-      return `${BASE_URL}/${item.previewImage}`;
+      return resolveImageUrl(item.previewImage);
     }
-    
+
     if (item.kind === "READYMADE" && item.readymadeProduct) {
       if (item.readymadeProduct.thumbnail) {
-        return `${BASE_URL}/${item.readymadeProduct.thumbnail}`;
+        return resolveImageUrl(item.readymadeProduct.thumbnail);
       }
       if (item.readymadeProduct.images && item.readymadeProduct.images.length > 0) {
-        return `${BASE_URL}/${item.readymadeProduct.images[0]}`;
+        return resolveImageUrl(item.readymadeProduct.images[0]);
       }
     } else if (item.kind === "DESIGN" && item.design) {
-      if (item.design.previewImage && item.design.previewImage.startsWith('data:')) {
-        return item.design.previewImage;
+      if (item.design.previewImage) {
+        return resolveImageUrl(item.design.previewImage);
       }
       if (item.design.views && item.design.views.length > 0) {
-        const view = item.design.views[0];
-        if (view.previewImage && view.previewImage.startsWith('data:')) {
-          return view.previewImage;
-        }
+        return resolveImageUrl(item.design.views[0]?.previewImage);
       }
     }
-    
-    return 'https://via.placeholder.com/100x100?text=No+Image';
+
+    return FALLBACK_THUMBNAIL;
   };
 
-  const getViewImage = (view) => {
-    if (view.previewImage && view.previewImage.startsWith('data:')) {
-      return view.previewImage;
-    }
-    return 'https://via.placeholder.com/400x400?text=No+Preview';
-  };
+  const getViewImage = (view) => resolveImageUrl(view?.previewImage, FALLBACK_PREVIEW);
 
   const downloadImage = (url, filename) => {
-    fetch(url)
-      .then(response => response.blob())
+    const resolvedUrl = resolveImageUrl(url, '');
+    if (!resolvedUrl) {
+      alert('No image available to download');
+      return;
+    }
+
+    fetch(resolvedUrl)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Image download failed with status ${response.status}`);
+        }
+        return response.blob();
+      })
       .then(blob => {
         const blobUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -1275,7 +1319,7 @@ const AdminOrders = () => {
                                     alt={getItemName(item)}
                                     className="h-20 w-20 object-cover rounded-lg"
                                     onError={(e) => {
-                                      e.target.src = 'https://via.placeholder.com/100x100?text=No+Image';
+                                      handleImageError(e);
                                     }}
                                   />
                                   <div className="flex-1">
@@ -1504,6 +1548,9 @@ const AdminOrders = () => {
                                 src={getViewImage(selectedOrder.items[selectedItemIndex].design.views[selectedViewIndex])}
                                 alt={`${selectedOrder.items[selectedItemIndex].design.views[selectedViewIndex].code} view`}
                                 className="max-w-full h-auto max-h-96 object-contain rounded-lg border border-gray-300"
+                                onError={(e) => {
+                                  handleImageError(e, FALLBACK_PREVIEW);
+                                }}
                               />
                             </div>
 
@@ -1516,11 +1563,11 @@ const AdminOrders = () => {
                                     <div key={idx} className="border border-gray-200 rounded-lg p-3">
                                       <div className="flex items-start space-x-3">
                                         <img
-                                          src={layer.imageUrl}
+                                          src={resolveImageUrl(layer.imageUrl)}
                                           alt={`Design layer ${idx + 1}`}
                                           className="h-16 w-16 object-cover rounded"
                                           onError={(e) => {
-                                            e.target.src = 'https://via.placeholder.com/100x100?text=No+Image';
+                                            handleImageError(e);
                                           }}
                                         />
                                         <div className="flex-1">

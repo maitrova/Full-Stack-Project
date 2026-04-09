@@ -316,6 +316,25 @@ export const sendOrderStatusEmail = async (order, user) => {
     `BREVO_ORDER_TEMPLATE_ID_${emailOrder.orderStatus}`,
     "BREVO_ORDER_TEMPLATE_ID"
   );
+  const templateParams = buildOrderTemplateParams(
+    emailOrder,
+    emailUser,
+    itemsHtml,
+    orderDate
+  );
+
+  console.info("[email/order-status] Item image URLs", {
+    orderId: String(emailOrder._id || ""),
+    orderStatus: emailOrder.orderStatus || "",
+    assetBaseUrl: getEmailAssetBaseUrl(),
+    items: (emailOrder.items || []).map((item, index) => ({
+      index: index + 1,
+      name: getItemName(item, index),
+      rawPreviewImage: item.previewImage || "",
+      resolvedPreviewImage: resolveEmailImageUrl(item.previewImage),
+      templatePreviewImage: templateParams[`preview_image_${index + 1}`] || "",
+    })),
+  });
 
   const htmlContent = `
   <div style="font-family:Arial,sans-serif;background:#f5f5f5;padding:20px;">
@@ -371,7 +390,7 @@ export const sendOrderStatusEmail = async (order, user) => {
       subject,
       htmlContent,
       templateId,
-      params: buildOrderTemplateParams(emailOrder, emailUser, itemsHtml, orderDate),
+      params: templateParams,
     });
 
     console.log("Order email sent successfully");

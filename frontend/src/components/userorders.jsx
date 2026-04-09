@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import {
   fetchMyPaidOrders,
   fetchMyPaidOrderById,
@@ -23,6 +24,7 @@ import ReviewModal from './ReviewModal.jsx';
 
 const UserOrders = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   
   // Order selectors
   const orders = useSelector(selectMyPaidOrders);
@@ -47,8 +49,16 @@ const UserOrders = () => {
     productName: '',
   });
 
-  // Get base URL from environment variables
-  const BASE_URL = import.meta.env.VITE_IMAGE_URL || 'http://localhost:5000';
+  const API_BASE_URL = (
+    import.meta.env.VITE_IMAGE_URL ||
+    import.meta.env.VITE_API_URL ||
+    'http://localhost:5000'
+  ).replace(/\/+$/, '');
+  const ORIGIN_BASE_URL = API_BASE_URL.replace(/\/api$/i, '');
+  const ABSOLUTE_URL_RE = /^(?:https?:)?\/\//i;
+  const SPECIAL_URL_RE = /^(?:data:|blob:)/i;
+  const FALLBACK_THUMBNAIL =
+    "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23f3f4f6'/%3E%3Ctext x='50' y='50' dominant-baseline='middle' text-anchor='middle' font-family='Arial%2Csans-serif' font-size='12' fill='%239ca3af'%3ENo Image%3C/text%3E%3C/svg%3E";
 
   useEffect(() => {
     dispatch(fetchMyPaidOrders());
@@ -225,52 +235,81 @@ const UserOrders = () => {
     };
   };
 
-  const getItemImage = (item) => {
-    // Check previewImage first (from order item)
-    if (item.previewImage) {
-      return `${BASE_URL}/${item.previewImage}`;
+  const resolveImageUrl = (path, fallback = FALLBACK_THUMBNAIL) => {
+    if (!path) return fallback;
+
+    const rawPath = String(path).trim();
+    if (!rawPath) return fallback;
+    if (ABSOLUTE_URL_RE.test(rawPath) || SPECIAL_URL_RE.test(rawPath)) {
+      return rawPath;
     }
-    
-    // Check for product images based on kind
+
+    const normalizedPath = rawPath.replace(/\\/g, '/');
+
+    if (normalizedPath.startsWith('/api/')) {
+      return `${ORIGIN_BASE_URL}${normalizedPath}`;
+    }
+    if (normalizedPath.startsWith('api/')) {
+      return `${ORIGIN_BASE_URL}/${normalizedPath}`;
+    }
+    if (normalizedPath.startsWith('/outputs/')) {
+      return `${ORIGIN_BASE_URL}/api${normalizedPath}`;
+    }
+    if (normalizedPath.startsWith('outputs/')) {
+      return `${ORIGIN_BASE_URL}/api/${normalizedPath}`;
+    }
+
+    return `${API_BASE_URL}${normalizedPath.startsWith('/') ? '' : '/'}${normalizedPath}`;
+  };
+
+  const handleImageError = (event) => {
+    if (!event?.target) return;
+    event.target.onerror = null;
+    event.target.src = FALLBACK_THUMBNAIL;
+  };
+
+  const getItemImage = (item) => {
+    if (item.previewImage) {
+      return resolveImageUrl(item.previewImage);
+    }
+
     if (item.kind === "READYMADE" && item.readymadeProduct) {
       if (item.readymadeProduct.thumbnail) {
-        return `${BASE_URL}/${item.readymadeProduct.thumbnail}`;
+        return resolveImageUrl(item.readymadeProduct.thumbnail);
       }
       if (item.readymadeProduct.images && item.readymadeProduct.images.length > 0) {
-        return `${BASE_URL}/${item.readymadeProduct.images[0]}`;
+        return resolveImageUrl(item.readymadeProduct.images[0]);
       }
     } else if (item.kind === "DESIGN" && item.design) {
       if (item.design.previewImage) {
-        return `${BASE_URL}/${item.design.previewImage}`;
+        return resolveImageUrl(item.design.previewImage);
       }
       if (item.design.thumbnail) {
-        return `${BASE_URL}/${item.design.thumbnail}`;
+        return resolveImageUrl(item.design.thumbnail);
+      }
+      if (item.design.views && item.design.views.length > 0) {
+        return resolveImageUrl(item.design.views[0]?.previewImage);
       }
     } else if (item.dropproduct) {
       if (item.dropproduct.thumbnail) {
-        return `${BASE_URL}/${item.dropproduct.thumbnail}`;
+        return resolveImageUrl(item.dropproduct.thumbnail);
       }
       if (item.dropproduct.images && item.dropproduct.images.length > 0) {
-        return `${BASE_URL}/${item.dropproduct.images[0]}`;
+        return resolveImageUrl(item.dropproduct.images[0]);
       }
     } else if (item.product) {
       if (item.product.thumbnail) {
-        return `${BASE_URL}/${item.product.thumbnail}`;
+        return resolveImageUrl(item.product.thumbnail);
       }
       if (item.product.images && item.product.images.length > 0) {
-        return `${BASE_URL}/${item.product.images[0]}`;
+        return resolveImageUrl(item.product.images[0]);
       }
     }
-    
-    // Return a placeholder image if no image found
-    return 'https://via.placeholder.com/100x100?text=No+Image';
+
+    return FALLBACK_THUMBNAIL;
   };
 
-  const getFullImageUrl = (path) => {
-    if (!path) return 'https://via.placeholder.com/100x100?text=No+Image';
-    if (path.startsWith('http')) return path;
-    return `${BASE_URL}/${path}`;
-  };
+  const getFullImageUrl = (path) => resolveImageUrl(path);
 
   const getOrderStatusProgress = (orderStatus) => {
     const statusOrder = ['PROCESSING', 'READY', 'SHIPPED', 'DELIVERED'];
@@ -281,6 +320,46 @@ const UserOrders = () => {
       shipped: currentIndex >= 2,
       delivered: currentIndex >= 3
     };
+  };
+
+  const getItemDetailsPath = (item) => {
+    if (!item) return null;
+
+    if (item.kind === 'READYMADE') {
+      const readymadeId =
+        item.readymadeProduct?._id ||
+        item.readymadeProduct ||
+        item.product?._id ||
+        item.product;
+      return readymadeId ? `/readymade/${readymadeId}` : null;
+    }
+
+    if (item.kind === 'DROPPRODUCT') {
+      const dropProductId = item.dropproduct?._id || item.dropproduct;
+      return dropProductId ? `/dropproducts/${dropProductId}` : null;
+    }
+
+    if (item.kind === 'DESIGN') {
+      const designId = item.design?._id || item.design;
+      if (designId) {
+        return `/catalogue/${designId}`;
+      }
+
+      const productSlug =
+        item.design?.productSlug ||
+        item.product?.slug ||
+        item.design?.product?.slug;
+      return productSlug ? `/products/${productSlug}/customize` : null;
+    }
+
+    return null;
+  };
+
+  const handleOpenItemDetails = (item) => {
+    const detailsPath = getItemDetailsPath(item);
+    if (detailsPath) {
+      navigate(detailsPath);
+    }
   };
 
   if (loading) {
@@ -468,9 +547,10 @@ const UserOrders = () => {
                                     <img
                                       src={getItemImage(item)}
                                       alt={getItemName(item)}
-                                      className="h-12 w-12 object-cover rounded"
+                                      className={`h-12 w-12 object-cover rounded ${getItemDetailsPath(item) ? 'cursor-pointer' : ''}`}
+                                      onClick={() => handleOpenItemDetails(item)}
                                       onError={(e) => {
-                                        e.target.src = 'https://via.placeholder.com/100x100?text=No+Image';
+                                        handleImageError(e);
                                       }}
                                     />
                                     <div className="flex-1 min-w-0">
@@ -707,9 +787,10 @@ const UserOrders = () => {
                                 <img
                                   src={getItemImage(item)}
                                   alt={getItemName(item)}
-                                  className="h-20 w-20 object-cover rounded-lg"
+                                  className={`h-20 w-20 object-cover rounded-lg ${getItemDetailsPath(item) ? 'cursor-pointer' : ''}`}
+                                  onClick={() => handleOpenItemDetails(item)}
                                   onError={(e) => {
-                                    e.target.src = 'https://via.placeholder.com/100x100?text=No+Image';
+                                    handleImageError(e);
                                   }}
                                 />
                                 <div className="flex-1">
