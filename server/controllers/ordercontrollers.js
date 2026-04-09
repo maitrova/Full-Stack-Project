@@ -21,7 +21,8 @@ const getAssetBaseUrl = (req) =>
       `${req.protocol}://${req.get("host")}`
   )
     .trim()
-    .replace(/\/+$/, "");
+    .replace(/\/+$/, "")
+    .replace(/\/api$/i, "");
 
 const resolveOrderAssetUrl = (req, value) => {
   const rawValue = String(value || "").trim();

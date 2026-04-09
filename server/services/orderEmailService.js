@@ -40,7 +40,8 @@ const getEmailAssetBaseUrl = () =>
       "https://maitrova.in"
   )
     .trim()
-    .replace(/\/+$/, "");
+    .replace(/\/+$/, "")
+    .replace(/\/api$/i, "");
 
 const resolveEmailImageUrl = (value) => {
   const rawValue = String(value || "").trim();
