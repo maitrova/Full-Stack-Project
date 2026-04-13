@@ -54,12 +54,14 @@ externalSecret:
 
   
 # Resource Limits
+# Memory: Node.js (~250MB) + onnxruntime model (~300MB) + inference peak (~800MB) = ~1.4GB peak
+# CPU request raised to 1 core so onnxruntime inference is not throttled on busy nodes
 resources:
   limits:
     cpu: "2"
     memory: 3Gi
   requests:
-    cpu: "500m"
+    cpu: "1"
     memory: 1.5Gi
 
 # Health Checks
