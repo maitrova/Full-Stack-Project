@@ -2025,18 +2025,34 @@ const nudgeDesignScaleAxis = (axis, delta) => {
 const handleActiveDesignCropChange = (patch) => {
   if (!activeDesign) return;
 
-  const updated = designLayers.map((designLayer) => {
-    if (designLayer.id !== activeDesign.id) return designLayer;
-    return updateDesignLayerDimensions({
-      ...designLayer,
-      crop: normalizeImageCrop({
-        ...(designLayer.crop || {}),
-        ...patch,
-      }),
+  // Use the design ID and viewCode as stable captures (primitives, not objects)
+  // so the functional setState below always reads the *latest* designLayers
+  // from state rather than from a potentially stale closure.
+  const designId = activeDesign.id;
+  const targetViewCode = viewCode;
+
+  setViewStates((prev) => {
+    const existing = prev[targetViewCode];
+    const current = existing ? { ...baseViewState, ...existing } : baseViewState;
+    const updated = (current.designLayers || []).map((designLayer) => {
+      if (designLayer.id !== designId) return designLayer;
+      return updateDesignLayerDimensions({
+        ...designLayer,
+        crop: normalizeImageCrop({
+          ...(designLayer.crop || {}),
+          ...patch,
+        }),
+      });
     });
+    return {
+      ...prev,
+      [targetViewCode]: {
+        ...current,
+        designLayers: updated,
+      },
+    };
   });
 
-  updateCurrentViewState({ designLayers: updated });
   calculatePrice();
 };
 
@@ -2052,11 +2068,15 @@ const closeCropModal = () => {
   setCropDraft(normalizeImageCrop(activeDesign?.crop));
 };
 
-const applyCropDraft = async () => {
+const applyCropDraft = () => {
   if (!activeDesign) return;
   stopCropPreviewPan();
-  const trimmedCrop = await trimCropDraftToVisiblePixels(activeDesign, cropDraftValue);
-  handleActiveDesignCropChange(trimmedCrop);
+  // Apply the user's exact visual selection directly — no async trim.
+  // trimCropDraftToVisiblePixels silently moves the crop window to the
+  // tight bounding box of non-transparent pixels, making the result differ
+  // from what the user drew in the modal. Skipping it keeps the result
+  // 1-to-1 with the visual selection.
+  handleActiveDesignCropChange(cropDraftValue);
   setIsCropModalOpen(false);
 };
 
