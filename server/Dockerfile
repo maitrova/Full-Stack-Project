@@ -67,6 +67,15 @@ RUN pip3 install --no-cache-dir --break-system-packages \
 # Copy application code
 COPY . .
 
+# Pre-download the rembg u2net model (~170MB) so the first request doesn't pay the download cost
+RUN python3 -c "\
+from rembg import remove; \
+from PIL import Image; \
+import io; \
+img = Image.new('RGB', (10, 10), color=(128, 128, 128)); \
+remove(img); \
+print('rembg model pre-loaded successfully')" || true
+
 # Create required directories
 RUN mkdir -p /app/outputs/designs
 RUN mkdir -p /app/outputs/dropimages

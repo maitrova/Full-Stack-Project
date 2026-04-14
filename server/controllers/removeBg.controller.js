@@ -76,7 +76,21 @@ export const removeBgController = async (req, res) => {
     let stderr = "";
     let didRespond = false;
 
+    // Kill the process after 60 seconds to prevent indefinite hangs
+    const timeout = setTimeout(() => {
+      if (didRespond) return;
+      didRespond = true;
+      python.kill("SIGKILL");
+      cleanupFile(inputPath);
+      cleanupFile(outputPath);
+      return res.status(504).json({
+        error: "Background removal timed out",
+        details: "The process exceeded the 60 second limit",
+      });
+    }, 60000);
+
     python.on("error", (spawnErr) => {
+      clearTimeout(timeout);
       if (didRespond) return;
       didRespond = true;
       cleanupFile(inputPath);
@@ -91,6 +105,7 @@ export const removeBgController = async (req, res) => {
     python.stderr.on("data", (d) => (stderr += d.toString()));
 
     python.on("close", (code) => {
+      clearTimeout(timeout);
       if (didRespond) return;
       didRespond = true;
 
