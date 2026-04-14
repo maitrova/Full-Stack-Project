@@ -2,7 +2,7 @@ name: Build and Push Docker Images
 
 on:
   push:
-    branches: [ remove-backgroud ]
+    branches: [ rem-back2 ]
   workflow_dispatch:
 
 env:
