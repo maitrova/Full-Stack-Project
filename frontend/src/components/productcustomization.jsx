@@ -740,6 +740,10 @@ const getSizeBasePrice = (prod, size) => {
   const removeBgRequestSeqRef = useRef(0);
   const cropPreviewFrameRef = useRef(null);
   const cropDragStateRef = useRef(null);
+  // Stable refs to the exact listener instances so add/remove always match,
+  // even though the functions are recreated on every render.
+  const cropMoveListenerRef = useRef(null);
+  const cropUpListenerRef = useRef(null);
   const supportsPocketZone = String(slug || product?.slug || "")
     .trim()
     .toLowerCase() === "hoodie";
@@ -2071,9 +2075,16 @@ const updateCropDraft = (updater) => {
 
 const stopCropPreviewPan = () => {
   cropDragStateRef.current = null;
-  window.removeEventListener("pointermove", handleCropPreviewPointerMove);
-  window.removeEventListener("pointerup", stopCropPreviewPan);
-  window.removeEventListener("pointercancel", stopCropPreviewPan);
+  // Use the stored refs — these always match what was passed to addEventListener
+  if (cropMoveListenerRef.current) {
+    window.removeEventListener("pointermove", cropMoveListenerRef.current);
+    cropMoveListenerRef.current = null;
+  }
+  if (cropUpListenerRef.current) {
+    window.removeEventListener("pointerup", cropUpListenerRef.current);
+    window.removeEventListener("pointercancel", cropUpListenerRef.current);
+    cropUpListenerRef.current = null;
+  }
 };
 
 function handleCropPreviewPointerMove(event) {
@@ -2124,9 +2135,23 @@ const startCropPreviewPan = (event, mode = "move") => {
     mode,
   };
 
-  window.addEventListener("pointermove", handleCropPreviewPointerMove);
-  window.addEventListener("pointerup", stopCropPreviewPan);
-  window.addEventListener("pointercancel", stopCropPreviewPan);
+  // Remove any lingering listeners from a previous drag before adding new ones
+  if (cropMoveListenerRef.current) {
+    window.removeEventListener("pointermove", cropMoveListenerRef.current);
+  }
+  if (cropUpListenerRef.current) {
+    window.removeEventListener("pointerup", cropUpListenerRef.current);
+    window.removeEventListener("pointercancel", cropUpListenerRef.current);
+  }
+
+  // Capture the current function references so stopCropPreviewPan can remove
+  // the exact same instances later, even after React re-renders.
+  cropMoveListenerRef.current = handleCropPreviewPointerMove;
+  cropUpListenerRef.current = stopCropPreviewPan;
+
+  window.addEventListener("pointermove", cropMoveListenerRef.current);
+  window.addEventListener("pointerup", cropUpListenerRef.current);
+  window.addEventListener("pointercancel", cropUpListenerRef.current);
   event.currentTarget?.setPointerCapture?.(event.pointerId);
 };
 
