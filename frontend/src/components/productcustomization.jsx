@@ -740,10 +740,6 @@ const getSizeBasePrice = (prod, size) => {
   const removeBgRequestSeqRef = useRef(0);
   const cropPreviewFrameRef = useRef(null);
   const cropDragStateRef = useRef(null);
-  // Stable refs to the exact listener instances so add/remove always match,
-  // even though the functions are recreated on every render.
-  const cropMoveListenerRef = useRef(null);
-  const cropUpListenerRef = useRef(null);
   const supportsPocketZone = String(slug || product?.slug || "")
     .trim()
     .toLowerCase() === "hoodie";
@@ -2025,34 +2021,18 @@ const nudgeDesignScaleAxis = (axis, delta) => {
 const handleActiveDesignCropChange = (patch) => {
   if (!activeDesign) return;
 
-  // Use the design ID and viewCode as stable captures (primitives, not objects)
-  // so the functional setState below always reads the *latest* designLayers
-  // from state rather than from a potentially stale closure.
-  const designId = activeDesign.id;
-  const targetViewCode = viewCode;
-
-  setViewStates((prev) => {
-    const existing = prev[targetViewCode];
-    const current = existing ? { ...baseViewState, ...existing } : baseViewState;
-    const updated = (current.designLayers || []).map((designLayer) => {
-      if (designLayer.id !== designId) return designLayer;
-      return updateDesignLayerDimensions({
-        ...designLayer,
-        crop: normalizeImageCrop({
-          ...(designLayer.crop || {}),
-          ...patch,
-        }),
-      });
+  const updated = designLayers.map((designLayer) => {
+    if (designLayer.id !== activeDesign.id) return designLayer;
+    return updateDesignLayerDimensions({
+      ...designLayer,
+      crop: normalizeImageCrop({
+        ...(designLayer.crop || {}),
+        ...patch,
+      }),
     });
-    return {
-      ...prev,
-      [targetViewCode]: {
-        ...current,
-        designLayers: updated,
-      },
-    };
   });
 
+  updateCurrentViewState({ designLayers: updated });
   calculatePrice();
 };
 
@@ -2068,15 +2048,11 @@ const closeCropModal = () => {
   setCropDraft(normalizeImageCrop(activeDesign?.crop));
 };
 
-const applyCropDraft = () => {
+const applyCropDraft = async () => {
   if (!activeDesign) return;
   stopCropPreviewPan();
-  // Apply the user's exact visual selection directly — no async trim.
-  // trimCropDraftToVisiblePixels silently moves the crop window to the
-  // tight bounding box of non-transparent pixels, making the result differ
-  // from what the user drew in the modal. Skipping it keeps the result
-  // 1-to-1 with the visual selection.
-  handleActiveDesignCropChange(cropDraftValue);
+  const trimmedCrop = await trimCropDraftToVisiblePixels(activeDesign, cropDraftValue);
+  handleActiveDesignCropChange(trimmedCrop);
   setIsCropModalOpen(false);
 };
 
@@ -2095,16 +2071,9 @@ const updateCropDraft = (updater) => {
 
 const stopCropPreviewPan = () => {
   cropDragStateRef.current = null;
-  // Use the stored refs — these always match what was passed to addEventListener
-  if (cropMoveListenerRef.current) {
-    window.removeEventListener("pointermove", cropMoveListenerRef.current);
-    cropMoveListenerRef.current = null;
-  }
-  if (cropUpListenerRef.current) {
-    window.removeEventListener("pointerup", cropUpListenerRef.current);
-    window.removeEventListener("pointercancel", cropUpListenerRef.current);
-    cropUpListenerRef.current = null;
-  }
+  window.removeEventListener("pointermove", handleCropPreviewPointerMove);
+  window.removeEventListener("pointerup", stopCropPreviewPan);
+  window.removeEventListener("pointercancel", stopCropPreviewPan);
 };
 
 function handleCropPreviewPointerMove(event) {
@@ -2155,23 +2124,9 @@ const startCropPreviewPan = (event, mode = "move") => {
     mode,
   };
 
-  // Remove any lingering listeners from a previous drag before adding new ones
-  if (cropMoveListenerRef.current) {
-    window.removeEventListener("pointermove", cropMoveListenerRef.current);
-  }
-  if (cropUpListenerRef.current) {
-    window.removeEventListener("pointerup", cropUpListenerRef.current);
-    window.removeEventListener("pointercancel", cropUpListenerRef.current);
-  }
-
-  // Capture the current function references so stopCropPreviewPan can remove
-  // the exact same instances later, even after React re-renders.
-  cropMoveListenerRef.current = handleCropPreviewPointerMove;
-  cropUpListenerRef.current = stopCropPreviewPan;
-
-  window.addEventListener("pointermove", cropMoveListenerRef.current);
-  window.addEventListener("pointerup", cropUpListenerRef.current);
-  window.addEventListener("pointercancel", cropUpListenerRef.current);
+  window.addEventListener("pointermove", handleCropPreviewPointerMove);
+  window.addEventListener("pointerup", stopCropPreviewPan);
+  window.addEventListener("pointercancel", stopCropPreviewPan);
   event.currentTarget?.setPointerCapture?.(event.pointerId);
 };
 
