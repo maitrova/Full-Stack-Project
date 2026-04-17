@@ -72,6 +72,7 @@ RUN mkdir -p /app/outputs/designs
 RUN mkdir -p /app/outputs/dropimages
 RUN mkdir -p /app/outputs/adminuploadeddesigns
 RUN mkdir -p /app/outputs/readymade-products
+RUN mkdir -p /app/outputs/returns
 RUN mkdir -p /app/uploads
 RUN mkdir -p /app/scripts
 

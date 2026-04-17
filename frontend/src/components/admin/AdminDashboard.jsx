@@ -34,6 +34,7 @@ import Designs from './Designs.jsx';
 import NewArrivals from './NewArrivals.jsx';
 import BestSellers from './BestSellers.jsx';
 import HomepageAdmin from './HomepageAdmin.jsx'; // Add this
+import ReturnManagement from './ReturnManagement.jsx';
 
 // Import modals
 import ProductFormModal from '../newproductadding.jsx';
@@ -113,6 +114,7 @@ const AdminDashboard = () => {
     { id: 'designs', label: 'Designs', icon: <Palette className="w-5 h-5" /> },
     { id: 'newArrival', label: 'New Arrivals', icon: <TrendingUp className="w-5 h-5" /> },
     { id: 'bestSeller', label: 'Best Sellers', icon: <BarChart3 className="w-5 h-5" /> },
+    { id: 'returns', label: 'Returns', icon: <Package className="w-5 h-5" /> },
     { id: 'prices', label: 'Prices', icon: <DollarSign className="w-5 h-5" /> },
     { id: 'users', label: 'Users', icon: <Users className="w-5 h-5" /> },
     { id: 'analytics', label: 'Analytics', icon: <BarChart3 className="w-5 h-5" /> },
@@ -174,6 +176,8 @@ const AdminDashboard = () => {
             onAddProduct={handleAddProduct}
           />
         );
+      case 'returns':
+        return <ReturnManagement />;
       default:
         return <Dashboard />;
     }
@@ -187,6 +191,7 @@ const AdminDashboard = () => {
       case 'designs': return 'Designs';
       case 'newArrival': return 'New Arrivals';
       case 'bestSeller': return 'Best Sellers';
+      case 'returns': return 'Return Management';
       case 'prices': return 'Price Management';
       case 'users': return 'User Management';
       case 'analytics': return 'Analytics';
@@ -203,6 +208,7 @@ const AdminDashboard = () => {
       case 'designs': return 'Manage user-created designs';
       case 'newArrival': return 'Manage new arrival products';
       case 'bestSeller': return 'Manage best selling products';
+      case 'returns': return 'Review customer return requests and refund details';
       case 'prices': return 'Manage product pricing and discounts';
       case 'users': return 'Manage customers and administrators';
       case 'analytics': return 'View sales and performance analytics';

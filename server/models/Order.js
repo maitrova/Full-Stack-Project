@@ -77,8 +77,47 @@ const orderSchema = new mongoose.Schema(
     default: "PROCESSING",
     index: true,
   },
+    deliveredAt: { type: Date, default: null },
+
+    returnRequest: {
+      status: {
+        type: String,
+        enum: ["NONE", "PROCESSING", "APPROVED", "REJECTED"],
+        default: "NONE",
+      },
+      requestedAt: { type: Date, default: null },
+      decidedAt: { type: Date, default: null },
+      refundPaidAt: { type: Date, default: null },
+      deadlineAt: { type: Date, default: null },
+      reason: { type: String, default: "" },
+      imageUrls: { type: [String], default: [] },
+      adminDecisionNote: { type: String, default: "" },
+      refundStatus: {
+        type: String,
+        enum: ["NOT_PAID", "PAID"],
+        default: "NOT_PAID",
+      },
+      bankDetails: {
+        method: {
+          type: String,
+          enum: ["BANK", "UPI", ""],
+          default: "",
+        },
+        accountHolderName: { type: String, default: "" },
+        accountNumber: { type: String, default: "" },
+        ifscCode: { type: String, default: "" },
+        bankName: { type: String, default: "" },
+        branchName: { type: String, default: "" },
+        upiId: { type: String, default: "" },
+      },
+    },
 
     payment: {
+      method: {
+        type: String,
+        enum: ["", "RAZORPAY", "COD"],
+        default: "",
+      },
       razorpayOrderId: String,
       razorpayPaymentId: String,
       razorpaySignature: String,

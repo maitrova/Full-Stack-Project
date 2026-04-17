@@ -52,7 +52,8 @@ externalSecret:
   keys:
     - BREVO_API_KEY
 
-  
+
+
 # Resource Limits
 resources:
   limits:

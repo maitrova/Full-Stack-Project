@@ -90,95 +90,179 @@ const validateCartInventory = (cart) => {
   }
 };
 
+const getActiveCartWithPricing = async (userId) => {
+  const cart = await Cart.findOne({ user: userId, status: "ACTIVE" })
+    .populate("items.readymadeProduct")
+    .populate("items.dropproduct")
+    .populate("items.product")
+    .populate({
+      path: "items.readymadeProduct",
+      populate: [
+        { path: "category", select: "name" },
+        { path: "subCategory", select: "name category" },
+      ],
+    });
+
+  if (!cart || cart.items.length === 0) {
+    const error = new Error("Cart is empty");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  cart.items = cart.items.map((item) => refreshCartItemPricing(item));
+  validateCartInventory(cart);
+  return cart;
+};
+
+const getCheckoutAddresses = async (userId) => {
+  const [delivery, billing] = await Promise.all([
+    Address.findOne({ user: userId, type: "delivery" }),
+    Address.findOne({ user: userId, type: "billing" }),
+  ]);
+
+  if (!delivery) {
+    const error = new Error("Delivery address not found");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!billing) {
+    const error = new Error("Billing address not found");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return { delivery, billing };
+};
+
+const getCartTotals = async ({ cart, userId, couponCode }) => {
+  const subtotal = cart.items.reduce(
+    (sum, item) => sum + Number(item.unitPrice || 0) * Number(item.qty || 0),
+    0
+  );
+  const shipping = 0;
+  let discount = 0;
+  let couponSnapshot = null;
+
+  if (couponCode) {
+    const couponResult = await validateCouponForCart({ couponCode, cart, userId });
+    if (!couponResult.valid) {
+      const error = new Error(couponResult.reason);
+      error.statusCode = 400;
+      throw error;
+    }
+
+    discount = couponResult.discount;
+    couponSnapshot = couponResult.couponSnapshot;
+  }
+
+  const total = Math.max(0, subtotal + shipping - discount);
+  return { subtotal, shipping, discount, total, couponSnapshot };
+};
+
+const createOrderDocFromCart = async ({
+  userId,
+  cart,
+  delivery,
+  billing,
+  totals,
+  paymentMethod,
+  paymentStatus,
+  orderStatus = "PROCESSING",
+}) => {
+  return Order.create({
+    user: userId,
+    cart: cart._id,
+    items: cart.items.map((item) => ({
+      kind: item.kind,
+      readymadeProduct: getRefId(item.readymadeProduct),
+      design: getRefId(item.design),
+      dropproduct: getRefId(item.dropproduct),
+      product: getRefId(item.product),
+      size: item.size,
+      qty: item.qty,
+      unitPrice: item.unitPrice,
+      basePrice: item.basePrice,
+      currency: item.currency || "INR",
+      previewImage: item.previewImage,
+      signature: item.signature,
+    })),
+    deliveryAddress: delivery._id,
+    billingAddress: billing._id,
+    subtotal: totals.subtotal,
+    shipping: totals.shipping,
+    discount: totals.discount,
+    total: totals.total,
+    currency: "INR",
+    coupon: totals.couponSnapshot,
+    status: paymentStatus,
+    orderStatus,
+    payment: {
+      method: paymentMethod,
+      status: paymentMethod === "COD" ? "COD_PENDING" : "CREATED",
+    },
+  });
+};
+
+const finalizePostOrderFlow = async ({ orderDoc, userId }) => {
+  if (!orderDoc.inventoryAdjustedAt) {
+    await applyInventoryForOrder(orderDoc);
+    orderDoc.inventoryAdjustedAt = new Date();
+    await orderDoc.save();
+  }
+
+  await redeemCouponForOrder({
+    couponSnapshot: orderDoc.coupon,
+    userId,
+    orderId: orderDoc._id,
+  });
+
+  const populatedOrder = await Order.findById(orderDoc._id).populate("user");
+  await Promise.all([
+    sendOrderStatusEmail(populatedOrder, populatedOrder.user),
+    sendAdminOrderNotification(populatedOrder, populatedOrder.user),
+  ]);
+
+  await Cart.findOneAndUpdate(
+    { _id: orderDoc.cart, user: userId, status: "ACTIVE" },
+    { $set: { status: "ORDERED" } },
+    { new: true }
+  );
+
+  return Cart.findOneAndUpdate(
+    { user: userId, status: "ACTIVE" },
+    { $setOnInsert: { user: userId, status: "ACTIVE", items: [] } },
+    { upsert: true, new: true }
+  );
+};
+
 export const createRazorpayOrderFromCart = async (req, res) => {
   try {
     const userId = req.user?.id;
     const { couponCode } = req.body;
 
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
-
-    const cart = await Cart.findOne({ user: userId, status: "ACTIVE" })
-      .populate("items.readymadeProduct")
-      .populate("items.dropproduct")
-      .populate("items.product")
-      .populate({
-        path: "items.readymadeProduct",
-        populate: [
-          { path: "category", select: "name" },
-          { path: "subCategory", select: "name category" },
-        ],
-      });
-
-    if (!cart || cart.items.length === 0) {
-      return res.status(400).json({ message: "Cart is empty" });
-    }
-
-    cart.items = cart.items.map((item) => refreshCartItemPricing(item));
-    validateCartInventory(cart);
-
-    const delivery = await Address.findOne({ user: userId, type: "delivery" });
-    const billing = await Address.findOne({ user: userId, type: "billing" });
-
-    if (!delivery) return res.status(400).json({ message: "Delivery address not found" });
-    if (!billing) return res.status(400).json({ message: "Billing address not found" });
-
-    const subtotal = cart.items.reduce(
-      (sum, item) => sum + Number(item.unitPrice || 0) * Number(item.qty || 0),
-      0
-    );
-    const shipping = 0;
-    let discount = 0;
-    let couponSnapshot = null;
-
-    if (couponCode) {
-      const couponResult = await validateCouponForCart({ couponCode, cart, userId });
-      if (!couponResult.valid) {
-        return res.status(400).json({ message: couponResult.reason });
-      }
-
-      discount = couponResult.discount;
-      couponSnapshot = couponResult.couponSnapshot;
-    }
-
-    const total = Math.max(0, subtotal + shipping - discount);
-
-    const orderDoc = await Order.create({
-      user: userId,
-      cart: cart._id,
-      items: cart.items.map((item) => ({
-        kind: item.kind,
-        readymadeProduct: getRefId(item.readymadeProduct),
-        design: getRefId(item.design),
-        dropproduct: getRefId(item.dropproduct),
-        product: getRefId(item.product),
-        size: item.size,
-        qty: item.qty,
-        unitPrice: item.unitPrice,
-        basePrice: item.basePrice,
-        currency: item.currency || "INR",
-        previewImage: item.previewImage,
-        signature: item.signature,
-      })),
-      deliveryAddress: delivery._id,
-      billingAddress: billing._id,
-      subtotal,
-      shipping,
-      discount,
-      total,
-      currency: "INR",
-      coupon: couponSnapshot,
-      status: "PENDING_PAYMENT",
-      payment: { status: "CREATED" },
+    const cart = await getActiveCartWithPricing(userId);
+    const { delivery, billing } = await getCheckoutAddresses(userId);
+    const totals = await getCartTotals({ cart, userId, couponCode });
+    const orderDoc = await createOrderDocFromCart({
+      userId,
+      cart,
+      delivery,
+      billing,
+      totals,
+      paymentMethod: "RAZORPAY",
+      paymentStatus: "PENDING_PAYMENT",
+      orderStatus: "PROCESSING",
     });
 
     const rpOrder = await razorpay.orders.create({
-      amount: toPaise(total),
+      amount: toPaise(totals.total),
       currency: "INR",
       receipt: `rcpt_${orderDoc._id}`,
       notes: {
         orderId: String(orderDoc._id),
         userId: String(userId),
-        couponCode: couponSnapshot?.code || "",
+        couponCode: totals.couponSnapshot?.code || "",
       },
     });
 
@@ -193,16 +277,58 @@ export const createRazorpayOrderFromCart = async (req, res) => {
       currency: rpOrder.currency,
       razorpayKeyId: process.env.RAZORPAY_KEY_ID,
       pricing: {
-        subtotal,
-        shipping,
-        discount,
-        total,
-        coupon: couponSnapshot,
+        subtotal: totals.subtotal,
+        shipping: totals.shipping,
+        discount: totals.discount,
+        total: totals.total,
+        coupon: totals.couponSnapshot,
       },
     });
   } catch (err) {
     console.error("createRazorpayOrderFromCart error:", err);
-    return res.status(500).json({ message: "Server error" });
+    return res.status(err.statusCode || 500).json({ message: err.message || "Server error" });
+  }
+};
+
+export const createCashOnDeliveryOrderFromCart = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const { couponCode } = req.body;
+
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const cart = await getActiveCartWithPricing(userId);
+    const { delivery, billing } = await getCheckoutAddresses(userId);
+    const totals = await getCartTotals({ cart, userId, couponCode });
+
+    const orderDoc = await createOrderDocFromCart({
+      userId,
+      cart,
+      delivery,
+      billing,
+      totals,
+      paymentMethod: "COD",
+      paymentStatus: "PENDING_PAYMENT",
+      orderStatus: "PROCESSING",
+    });
+
+    const newActiveCart = await finalizePostOrderFlow({ orderDoc, userId });
+
+    return res.status(201).json({
+      message: "Cash on delivery order created",
+      order: orderDoc,
+      cart: newActiveCart,
+      pricing: {
+        subtotal: totals.subtotal,
+        shipping: totals.shipping,
+        discount: totals.discount,
+        total: totals.total,
+        coupon: totals.couponSnapshot,
+      },
+    });
+  } catch (err) {
+    console.error("createCashOnDeliveryOrderFromCart error:", err);
+    return res.status(err.statusCode || 500).json({ message: err.message || "Server error" });
   }
 };
 
@@ -288,17 +414,7 @@ export const verifyRazorpayPayment = async (req, res) => {
       ]);
     }
 
-    await Cart.findOneAndUpdate(
-      { _id: orderDoc.cart, user: userId, status: "ACTIVE" },
-      { $set: { status: "ORDERED" } },
-      { new: true }
-    );
-
-    const newActiveCart = await Cart.findOneAndUpdate(
-      { user: userId, status: "ACTIVE" },
-      { $setOnInsert: { user: userId, status: "ACTIVE", items: [] } },
-      { upsert: true, new: true }
-    );
+    const newActiveCart = await finalizePostOrderFlow({ orderDoc, userId });
 
     return res.status(200).json({
       message: alreadyVerified ? "Payment already verified" : "Payment verified",

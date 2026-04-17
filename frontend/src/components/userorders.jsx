@@ -4,11 +4,19 @@ import { useNavigate } from 'react-router-dom';
 import {
   fetchMyPaidOrders,
   fetchMyPaidOrderById,
+  cancelMyOrder,
+  submitReturnRequest,
   selectMyPaidOrders,
   selectMyPaidOrdersLoading,
   selectMyPaidOrdersError,
   selectMyPaidOrder,
   selectMyPaidOrderLoading,
+  selectCancelMyOrderLoading,
+  selectCancelMyOrderError,
+  selectCancellingOrderId,
+  selectSubmitReturnLoading,
+  selectSubmitReturnError,
+  selectReturnSubmittingOrderId,
   clearOrderErrors,
   clearMyPaidOrder
 } from '../redux/slices/orderSlice.js';
@@ -19,8 +27,35 @@ import {
   selectDownloadingOrderId,
   clearInvoiceError
 } from '../redux/slices/invoiceSlice.js';
+import { INDIAN_BANK_OPTIONS } from '../constants/indianBanks.js';
 import { selectCurrentToken } from '../redux/slices/Userslice.js';
 import ReviewModal from './ReviewModal.jsx';
+
+const BankLogoBadge = ({ option, className = '' }) => (
+  <span className={`inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-[10px] font-bold tracking-wide text-white ${option.color} ${className}`}>
+    {option.shortLabel}
+  </span>
+);
+
+const BANK_OPTIONS = INDIAN_BANK_OPTIONS;
+
+const BankLogoMark = ({ option, className = '' }) => {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  if (!option?.domain || imageFailed) {
+    return <BankLogoBadge option={option} className={className} />;
+  }
+
+  return (
+    <img
+      src={`https://img.logo.dev/${option.domain}?size=64&format=png`}
+      alt={`${option.label} logo`}
+      className={`h-8 w-8 rounded-full bg-white object-contain p-1 ring-1 ring-slate-200 ${className}`}
+      onError={() => setImageFailed(true)}
+      loading="lazy"
+    />
+  );
+};
 
 const UserOrders = () => {
   const dispatch = useDispatch();
@@ -32,6 +67,12 @@ const UserOrders = () => {
   const error = useSelector(selectMyPaidOrdersError);
   const selectedOrder = useSelector(selectMyPaidOrder);
   const selectedOrderLoading = useSelector(selectMyPaidOrderLoading);
+  const cancelOrderLoading = useSelector(selectCancelMyOrderLoading);
+  const cancelOrderError = useSelector(selectCancelMyOrderError);
+  const cancellingOrderId = useSelector(selectCancellingOrderId);
+  const submitReturnLoading = useSelector(selectSubmitReturnLoading);
+  const submitReturnError = useSelector(selectSubmitReturnError);
+  const returnSubmittingOrderId = useSelector(selectReturnSubmittingOrderId);
   
   // Invoice selectors
   const invoiceLoading = useSelector(selectInvoiceLoading);
@@ -42,6 +83,22 @@ const UserOrders = () => {
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [showInvoiceError, setShowInvoiceError] = useState(false);
+  const [cancelSuccessMessage, setCancelSuccessMessage] = useState('');
+  const [returnSuccessMessage, setReturnSuccessMessage] = useState('');
+  const [cancelConfirmOrderId, setCancelConfirmOrderId] = useState(null);
+  const [returnModalOrderId, setReturnModalOrderId] = useState(null);
+  const [showBankDropdown, setShowBankDropdown] = useState(false);
+  const [returnForm, setReturnForm] = useState({
+    reason: '',
+    method: 'UPI',
+    accountHolderName: '',
+    accountNumber: '',
+    ifscCode: '',
+    bankName: '',
+    branchName: '',
+    upiId: '',
+    images: [],
+  });
   const [reviewModalState, setReviewModalState] = useState({
     isOpen: false,
     orderId: null,
@@ -125,6 +182,111 @@ const UserOrders = () => {
 
   const handleDownloadInvoice = (orderId) => {
     dispatch(downloadInvoice(orderId));
+  };
+
+  const canCancelOrder = (order) =>
+    order?.orderStatus === 'PROCESSING' &&
+    (order?.status === 'PAID' || order?.payment?.method === 'COD') &&
+    order?.status !== 'CANCELLED';
+
+  const canReturnOrder = (order) => Boolean(order?.returnEligible);
+
+  const needsReturnSupport = (order) => Boolean(order?.returnRestrictedReason);
+
+  const openCancelConfirm = (orderId) => {
+    setCancelConfirmOrderId(orderId);
+  };
+
+  const closeCancelConfirm = () => {
+    if (cancelOrderLoading) return;
+    setCancelConfirmOrderId(null);
+  };
+
+  const handleCancelOrder = async (orderId) => {
+    const resultAction = await dispatch(cancelMyOrder(orderId));
+
+    if (cancelMyOrder.fulfilled.match(resultAction)) {
+      setCancelSuccessMessage('Order cancelled successfully.');
+      setCancelConfirmOrderId(null);
+      setTimeout(() => setCancelSuccessMessage(''), 4000);
+    }
+  };
+
+  const resetReturnForm = () => {
+    setReturnForm({
+      reason: '',
+      method: 'UPI',
+      accountHolderName: '',
+      accountNumber: '',
+      ifscCode: '',
+      bankName: '',
+      branchName: '',
+      upiId: '',
+      images: [],
+    });
+  };
+
+  const openReturnModal = (orderId) => {
+    setReturnModalOrderId(orderId);
+    resetReturnForm();
+  };
+
+  const closeReturnModal = () => {
+    if (submitReturnLoading) return;
+    setReturnModalOrderId(null);
+    setShowBankDropdown(false);
+    resetReturnForm();
+  };
+
+  const handleReturnInputChange = (event) => {
+    const { name, value } = event.target;
+    setReturnForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleReturnImagesChange = (event) => {
+    const files = Array.from(event.target.files || []).slice(0, 5);
+    setReturnForm((prev) => ({ ...prev, images: files }));
+  };
+
+  const selectedBankOption = BANK_OPTIONS.find((option) => option.value === returnForm.bankName) || null;
+
+  const isReturnFormValid = () => {
+    if (!returnForm.reason.trim() || returnForm.images.length === 0) {
+      return false;
+    }
+
+    if (returnForm.method === 'UPI') {
+      return Boolean(returnForm.upiId.trim());
+    }
+
+    return Boolean(
+      returnForm.accountHolderName.trim() &&
+      returnForm.accountNumber.trim() &&
+      returnForm.ifscCode.trim() &&
+      returnForm.bankName.trim() &&
+      returnForm.branchName.trim()
+    );
+  };
+
+  const handleSubmitReturnRequest = async (orderId) => {
+    const formData = new FormData();
+    formData.append('reason', returnForm.reason);
+    formData.append('method', returnForm.method);
+    formData.append('accountHolderName', returnForm.accountHolderName);
+    formData.append('accountNumber', returnForm.accountNumber);
+    formData.append('ifscCode', returnForm.ifscCode);
+    formData.append('bankName', returnForm.bankName);
+    formData.append('branchName', returnForm.branchName);
+    formData.append('upiId', returnForm.upiId);
+    returnForm.images.forEach((file) => formData.append('images', file));
+
+    const resultAction = await dispatch(submitReturnRequest({ orderId, formData }));
+
+    if (submitReturnRequest.fulfilled.match(resultAction)) {
+      setReturnSuccessMessage('Return request submitted successfully.');
+      closeReturnModal();
+      setTimeout(() => setReturnSuccessMessage(''), 5000);
+    }
   };
 
   const formatDate = (dateString) => {
@@ -322,6 +484,74 @@ const UserOrders = () => {
     };
   };
 
+  const getCancellationNote = (order) => {
+    if (!order || order.status !== 'CANCELLED') return null;
+    return 'This order was cancelled before it reached ready status.';
+  };
+
+  const getReturnStatusInfo = (order) => {
+    const status = order?.returnRequest?.status || 'NONE';
+
+    if (status === 'PROCESSING') {
+      return {
+        tone: 'amber',
+        message: 'Return request is processing and waiting for admin approval.',
+      };
+    }
+
+    if (status === 'APPROVED') {
+      if (order?.returnRequest?.refundStatus === 'PAID') {
+        return {
+          tone: 'emerald',
+          message: order?.returnRequest?.refundPaidAt
+            ? `Refund paid on ${formatDate(order.returnRequest.refundPaidAt)}.`
+            : 'Refund paid successfully.',
+        };
+      }
+
+      return {
+        tone: 'emerald',
+        message: 'Return approved by admin. You will receive the refund within 3-5 business days.',
+      };
+    }
+
+    if (status === 'REJECTED') {
+      return {
+        tone: 'rose',
+        message: order?.returnRequest?.adminDecisionNote || 'Return request was rejected by admin.',
+      };
+    }
+
+    if (order?.returnRestrictedReason) {
+      return {
+        tone: 'amber',
+        message: order.returnRestrictedReason,
+      };
+    }
+
+    if (order?.returnEligible && order?.returnDeadlineAt) {
+      return {
+        tone: 'blue',
+        message: `Return available until ${formatDate(order.returnDeadlineAt)}.`,
+      };
+    }
+
+    return null;
+  };
+
+  const getReturnToneClasses = (tone) => {
+    switch (tone) {
+      case 'emerald':
+        return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+      case 'rose':
+        return 'border-rose-200 bg-rose-50 text-rose-700';
+      case 'amber':
+        return 'border-amber-200 bg-amber-50 text-amber-700';
+      default:
+        return 'border-blue-200 bg-blue-50 text-blue-700';
+    }
+  };
+
   const getItemDetailsPath = (item) => {
     if (!item) return null;
 
@@ -361,6 +591,14 @@ const UserOrders = () => {
       navigate(detailsPath);
     }
   };
+
+  const cancelConfirmOrder =
+    (cancelConfirmOrderId && orders.find((order) => order._id === cancelConfirmOrderId)) ||
+    (selectedOrder?._id === cancelConfirmOrderId ? selectedOrder : null);
+
+  const returnModalOrder =
+    (returnModalOrderId && orders.find((order) => order._id === returnModalOrderId)) ||
+    (selectedOrder?._id === returnModalOrderId ? selectedOrder : null);
 
   if (loading) {
     return (
@@ -442,9 +680,33 @@ const UserOrders = () => {
             <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1zM12 2a1 1 0 01.967.744L14.146 7.2 17.5 9.134a1 1 0 010 1.732l-3.354 1.935-1.18 4.455a1 1 0 01-1.933 0L9.854 12.2 6.5 10.266a1 1 0 010-1.732l3.354-1.935 1.18-4.455A1 1 0 0112 2z" clipRule="evenodd" />
             </svg>
-            Showing only paid orders
+            Showing paid, cash on delivery, and cancelled orders
           </div>
         </div>
+
+        {cancelSuccessMessage ? (
+          <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {cancelSuccessMessage}
+          </div>
+        ) : null}
+
+        {returnSuccessMessage ? (
+          <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {returnSuccessMessage}
+          </div>
+        ) : null}
+
+        {cancelOrderError ? (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {cancelOrderError}
+          </div>
+        ) : null}
+
+        {submitReturnError ? (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {submitReturnError}
+          </div>
+        ) : null}
 
         {/* Orders List */}
         <div className="bg-white shadow overflow-hidden sm:rounded-lg">
@@ -476,6 +738,10 @@ const UserOrders = () => {
                   reviewableItems[0] ||
                   null;
                 const pendingReviewKinds = (order.items || []).some((item) => item.reviewMeta?.kind);
+                const isCancellingThisOrder = cancellingOrderId === order._id && cancelOrderLoading;
+                const isSubmittingReturnThisOrder = returnSubmittingOrderId === order._id && submitReturnLoading;
+                const cancellationNote = getCancellationNote(order);
+                const returnStatusInfo = getReturnStatusInfo(order);
                 return (
                   <li key={order._id} className="p-6 hover:bg-gray-50">
                     <div className="flex flex-col md:flex-row md:items-center justify-between">
@@ -516,6 +782,16 @@ const UserOrders = () => {
                             <span>Shipped</span>
                             <span>Delivered</span>
                           </div>
+                          {cancellationNote ? (
+                            <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
+                              {cancellationNote}
+                            </div>
+                          ) : null}
+                          {returnStatusInfo ? (
+                            <div className={`mt-3 rounded-md border px-3 py-2 text-xs font-medium ${getReturnToneClasses(returnStatusInfo.tone)}`}>
+                              {returnStatusInfo.message}
+                            </div>
+                          ) : null}
                         </div>
                         
                         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -637,6 +913,42 @@ const UserOrders = () => {
                           </svg>
                           View Details
                         </button>
+                        {canCancelOrder(order) ? (
+                          <button
+                            type="button"
+                            onClick={() => openCancelConfirm(order._id)}
+                            disabled={isCancellingThisOrder}
+                            className={`inline-flex items-center justify-center px-4 py-2 border text-sm font-semibold rounded-md shadow-sm ${
+                              isCancellingThisOrder
+                                ? 'cursor-not-allowed border-rose-100 bg-rose-50 text-rose-300'
+                                : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-400'
+                            }`}
+                          >
+                            {isCancellingThisOrder ? 'Cancelling...' : 'Cancel Order'}
+                          </button>
+                        ) : null}
+                        {canReturnOrder(order) ? (
+                          <button
+                            type="button"
+                            onClick={() => openReturnModal(order._id)}
+                            disabled={isSubmittingReturnThisOrder}
+                            className={`inline-flex items-center justify-center px-4 py-2 border text-sm font-semibold rounded-md shadow-sm ${
+                              isSubmittingReturnThisOrder
+                                ? 'cursor-not-allowed border-sky-100 bg-sky-50 text-sky-300'
+                                : 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-400'
+                            }`}
+                          >
+                            {isSubmittingReturnThisOrder ? 'Submitting Return...' : 'Return Order'}
+                          </button>
+                        ) : null}
+                        {needsReturnSupport(order) ? (
+                          <a
+                            href="/contact"
+                            className="inline-flex items-center justify-center px-4 py-2 border border-amber-200 text-sm font-semibold rounded-md shadow-sm text-amber-900 bg-amber-50 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-400"
+                          >
+                            Contact Support Team
+                          </a>
+                        ) : null}
                         {reviewTargetItem ? (
                           <button
                             type="button"
@@ -725,6 +1037,16 @@ const UserOrders = () => {
                 <div className="space-y-8">
                   {/* Order Status */}
                   <div className="bg-gray-50 rounded-lg p-6">
+                    {getCancellationNote(selectedOrder) ? (
+                      <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                        {getCancellationNote(selectedOrder)}
+                      </div>
+                    ) : null}
+                    {getReturnStatusInfo(selectedOrder) ? (
+                      <div className={`mb-4 rounded-lg border px-4 py-3 text-sm font-medium ${getReturnToneClasses(getReturnStatusInfo(selectedOrder).tone)}`}>
+                        {getReturnStatusInfo(selectedOrder).message}
+                      </div>
+                    ) : null}
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <h4 className="text-lg font-medium text-gray-900">Order Status</h4>
@@ -998,6 +1320,12 @@ const UserOrders = () => {
                       <h4 className="text-lg font-medium text-gray-900 mb-4">Payment Details</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
+                          <p className="text-sm text-gray-600">Payment Method</p>
+                          <p className="mt-1 text-sm font-medium text-gray-900">
+                            {selectedOrder.payment?.method === 'COD' ? 'Cash on Delivery' : 'Razorpay'}
+                          </p>
+                        </div>
+                        <div>
                           <p className="text-sm text-gray-600">Payment Status</p>
                           <p className={`mt-1 text-sm font-semibold ${selectedOrder.status === 'PAID' ? 'text-green-600' : 'text-yellow-600'}`}>
                             {selectedOrder.payment.status}
@@ -1047,6 +1375,42 @@ const UserOrders = () => {
                   </p>
                 </div>
                 <div className="flex space-x-3">
+                  {canCancelOrder(selectedOrder) ? (
+                    <button
+                      type="button"
+                      onClick={() => openCancelConfirm(selectedOrder._id)}
+                      disabled={cancelOrderLoading && cancellingOrderId === selectedOrder._id}
+                      className={`inline-flex items-center justify-center px-4 py-2 border rounded-md shadow-sm text-sm font-medium ${
+                        cancelOrderLoading && cancellingOrderId === selectedOrder._id
+                          ? 'cursor-not-allowed border-rose-100 bg-rose-50 text-rose-300'
+                          : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-400'
+                      }`}
+                    >
+                      {cancelOrderLoading && cancellingOrderId === selectedOrder._id ? 'Cancelling...' : 'Cancel Order'}
+                    </button>
+                  ) : null}
+                  {canReturnOrder(selectedOrder) ? (
+                    <button
+                      type="button"
+                      onClick={() => openReturnModal(selectedOrder._id)}
+                      disabled={submitReturnLoading && returnSubmittingOrderId === selectedOrder._id}
+                      className={`inline-flex items-center justify-center px-4 py-2 border rounded-md shadow-sm text-sm font-medium ${
+                        submitReturnLoading && returnSubmittingOrderId === selectedOrder._id
+                          ? 'cursor-not-allowed border-sky-100 bg-sky-50 text-sky-300'
+                          : 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-400'
+                      }`}
+                    >
+                      {submitReturnLoading && returnSubmittingOrderId === selectedOrder._id ? 'Submitting Return...' : 'Return Order'}
+                    </button>
+                  ) : null}
+                  {needsReturnSupport(selectedOrder) ? (
+                    <a
+                      href="/contact"
+                      className="inline-flex items-center justify-center px-4 py-2 border rounded-md shadow-sm text-sm font-medium border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-400"
+                    >
+                      Contact Support Team
+                    </a>
+                  ) : null}
                   {selectedOrder?.payment?.razorpayPaymentId && (
                     <button
                       onClick={() => handleDownloadInvoice(selectedOrder._id)}
@@ -1084,6 +1448,260 @@ const UserOrders = () => {
           </div>
         </div>
       )}
+
+      {cancelConfirmOrder ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-slate-900">Cancel this order?</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              This will cancel order #{cancelConfirmOrder._id.slice(-8).toUpperCase()} immediately.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeCancelConfirm}
+                disabled={cancelOrderLoading}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Keep Order
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCancelOrder(cancelConfirmOrder._id)}
+                disabled={cancelOrderLoading}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
+                  cancelOrderLoading
+                    ? 'cursor-not-allowed bg-rose-300'
+                    : 'bg-rose-600 hover:bg-rose-700'
+                }`}
+              >
+                {cancelOrderLoading ? 'Cancelling...' : 'Confirm Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {returnModalOrder ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl">
+            <div className="border-b border-slate-200 px-6 py-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-semibold text-slate-900">Request Return</h3>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Upload proof images, explain the issue, and provide refund bank or UPI details.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeReturnModal}
+                  disabled={submitReturnLoading}
+                  className="text-slate-400 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-6 px-6 py-6">
+              <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">
+                Return deadline: {formatDate(returnModalOrder.returnDeadlineAt)}
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Reason for return</label>
+                <textarea
+                  name="reason"
+                  value={returnForm.reason}
+                  onChange={handleReturnInputChange}
+                  rows={4}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                  placeholder="Describe the issue with the order"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Upload images</label>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  multiple
+                  onChange={handleReturnImagesChange}
+                  className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
+                />
+                <p className="mt-2 text-xs text-slate-500">Upload up to 5 images.</p>
+                {returnForm.images.length ? (
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
+                    {returnForm.images.map((file) => (
+                      <span key={`${file.name}-${file.size}`} className="rounded-full bg-slate-100 px-3 py-1">
+                        {file.name}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Refund method</label>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setReturnForm((prev) => ({ ...prev, method: 'UPI' }))}
+                    className={`rounded-lg border px-4 py-2 text-sm font-medium ${
+                      returnForm.method === 'UPI'
+                        ? 'border-sky-500 bg-sky-50 text-sky-700'
+                        : 'border-slate-300 bg-white text-slate-700'
+                    }`}
+                  >
+                    UPI
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReturnForm((prev) => ({ ...prev, method: 'BANK' }))}
+                    className={`rounded-lg border px-4 py-2 text-sm font-medium ${
+                      returnForm.method === 'BANK'
+                        ? 'border-sky-500 bg-sky-50 text-sky-700'
+                        : 'border-slate-300 bg-white text-slate-700'
+                    }`}
+                  >
+                    Bank
+                  </button>
+                </div>
+              </div>
+
+              {returnForm.method === 'UPI' ? (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">UPI ID</label>
+                  <input
+                    type="text"
+                    name="upiId"
+                    value={returnForm.upiId}
+                    onChange={handleReturnInputChange}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                    placeholder="example@upi"
+                    required
+                  />
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">Account Holder Name</label>
+                    <input
+                      type="text"
+                      name="accountHolderName"
+                      value={returnForm.accountHolderName}
+                      onChange={handleReturnInputChange}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">Account Number</label>
+                    <input
+                      type="text"
+                      name="accountNumber"
+                      value={returnForm.accountNumber}
+                      onChange={handleReturnInputChange}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">IFSC Code</label>
+                    <input
+                      type="text"
+                      name="ifscCode"
+                      value={returnForm.ifscCode}
+                      onChange={handleReturnInputChange}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">Bank Name</label>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowBankDropdown((prev) => !prev)}
+                        className="flex w-full items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                      >
+                        {selectedBankOption ? (
+                          <span className="flex items-center gap-3">
+                            <BankLogoMark option={selectedBankOption} />
+                            <span>{selectedBankOption.label}</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">Select bank</span>
+                        )}
+                        <svg className="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      {showBankDropdown ? (
+                        <div className="absolute z-10 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+                          {BANK_OPTIONS.map((option) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => {
+                                setReturnForm((prev) => ({ ...prev, bankName: option.value }));
+                                setShowBankDropdown(false);
+                              }}
+                              className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition hover:bg-slate-50 ${
+                                returnForm.bankName === option.value ? 'bg-sky-50 text-sky-700' : 'text-slate-700'
+                              }`}
+                            >
+                              <BankLogoMark option={option} />
+                              <span>{option.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">Branch Name</label>
+                    <input
+                      type="text"
+                      name="branchName"
+                      value={returnForm.branchName}
+                      onChange={handleReturnInputChange}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+              <button
+                type="button"
+                onClick={closeReturnModal}
+                disabled={submitReturnLoading}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSubmitReturnRequest(returnModalOrder._id)}
+                disabled={submitReturnLoading || !isReturnFormValid()}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
+                  submitReturnLoading || !isReturnFormValid()
+                    ? 'cursor-not-allowed bg-sky-300'
+                    : 'bg-sky-600 hover:bg-sky-700'
+                }`}
+              >
+                {submitReturnLoading ? 'Submitting...' : 'Submit Return Request'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <ReviewModal
         isOpen={reviewModalState.isOpen}

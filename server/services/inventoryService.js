@@ -199,3 +199,13 @@ export const applyInventoryForOrder = async (order) => {
 
   return adjustments;
 };
+
+export const rollbackInventoryForOrder = async (order) => {
+  const adjustments = buildInventoryAdjustments(order);
+
+  for (const adjustment of adjustments) {
+    await rollbackInventory(adjustment);
+  }
+
+  return adjustments;
+};

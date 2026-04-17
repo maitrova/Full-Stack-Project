@@ -97,6 +97,7 @@ import HeaderBannerSettings from '../components/admin/HeaderBannerSettings.jsx';
 import UserManagement from '../components/admin/UserManagement.jsx';
 import CompanyDocumentManager from '../components/admin/CompanyDocumentManager.jsx';
 import ReviewManagement from '../components/admin/ReviewManagement.jsx';
+import ReturnManagement from '../components/admin/ReturnManagement.jsx';
 
 const AdminDashboard = () => {
   const dispatch = useDispatch();
@@ -191,6 +192,7 @@ const AdminDashboard = () => {
         activeTab !== 'dashboard' && 
         activeTab !== 'dropproducts' && 
         activeTab !== 'orders' && 
+        activeTab !== 'returns' &&
         activeTab !== 'homepage' &&
         activeTab !== 'search' &&
         activeTab !== 'adminDesigns' &&
@@ -289,6 +291,8 @@ const AdminDashboard = () => {
     setViewMode('dropproducts');
   } else if (tab === 'orders') {
     setViewMode('orders');
+  } else if (tab === 'returns') {
+    setViewMode('returns');
   } else if (tab === 'homepage') {
     setViewMode('homepage');
   } else if (tab === 'search') {
@@ -618,6 +622,7 @@ const AdminDashboard = () => {
     { id: 'adminDesigns', label: 'Admin Designs', icon: <Palette className="w-5 h-5" /> }, // Added admin designs item
     { id: 'dropproducts', label: 'Drop Products', icon: <Tag className="w-5 h-5" /> },
     { id: 'orders', label: 'Orders', icon: <ShoppingBag className="w-5 h-5" /> },
+    { id: 'returns', label: 'Returns', icon: <FileText className="w-5 h-5" /> },
     { id: 'homepage', label: 'Homepage', icon: <Home className="w-5 h-5" /> },
     { id: 'search', label: 'Product Search', icon: <Search className="w-5 h-5" /> },
     { id: 'adminUploads', label: 'Admin Uploads', icon: <Upload className="w-5 h-5" /> },
@@ -993,6 +998,7 @@ const AdminDashboard = () => {
                 {activeSidebarItem === 'adminDesigns' && 'Admin Designs'}
                 {activeSidebarItem === 'dropproducts' && 'Drop Products'}
                 {activeSidebarItem === 'orders' && 'Order Management'}
+                {activeSidebarItem === 'returns' && 'Return Management'}
                 {activeSidebarItem === 'homepage' && 'Homepage Management'}
                 {activeSidebarItem === 'search' && 'Product Search'}
                 {activeSidebarItem === 'newArrival' && 'New Arrivals'}
@@ -1013,6 +1019,7 @@ const AdminDashboard = () => {
                 {activeSidebarItem === 'adminDesigns' && 'Manage admin-created designs'}
                 {activeSidebarItem === 'dropproducts' && 'Manage drop products inventory'}
                 {activeSidebarItem === 'orders' && 'Manage and update customer orders'}
+                {activeSidebarItem === 'returns' && 'Review customer return requests and refund details'}
                 {activeSidebarItem === 'homepage' && 'Manage featured content displayed on the homepage'}
                 {activeSidebarItem === 'search' && 'Search for products by their unique ID'}
                 {activeSidebarItem === 'newArrival' && 'Manage new arrival products'}
@@ -1116,6 +1123,10 @@ const AdminDashboard = () => {
           {/* Orders Component */}
           {activeSidebarItem === 'orders' && (
             <AdminOrders />
+          )}
+
+          {activeSidebarItem === 'returns' && (
+            <ReturnManagement />
           )}
 
           {/* Homepage Component */}
@@ -1729,6 +1740,7 @@ const AdminDashboard = () => {
             </div>
 ) : activeSidebarItem !== 'dropproducts' && 
      activeSidebarItem !== 'orders' && 
+     activeSidebarItem !== 'returns' && 
      activeSidebarItem !== 'homepage' && 
      activeSidebarItem !== 'search' && 
      activeSidebarItem !== 'adminDesigns' &&

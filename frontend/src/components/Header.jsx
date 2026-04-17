@@ -327,7 +327,7 @@ const Header = () => {
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-[rgba(248,250,252,0.88)] shadow-[0_10px_35px_-24px_rgba(15,23,42,0.35)] backdrop-blur-xl">
       {bannerItems.length > 0 && (
-        <div className="overflow-hidden border-b border-slate-200/80 bg-[linear-gradient(90deg,_#eff6ff,_#f8fafc,_#fff7ed)] py-2">
+        <div className="overflow-hidden border-b border-slate-200/80 bg-[linear-gradient(90deg,_#eff6ff,_#f8fafc,_#fff7ed)] py-1.5">
           <style>{`
             @keyframes headerBannerMarquee {
               0% { transform: translate3d(0, 0, 0); }
@@ -355,8 +355,8 @@ const Header = () => {
         </div>
       )}
 
-      <div className="container mx-auto px-3 py-3 sm:px-4">
-        <div className="relative overflow-visible rounded-[1.75rem] border border-white/70 bg-[linear-gradient(135deg,_rgba(255,255,255,0.96),_rgba(248,250,252,0.94))] px-3 py-3 shadow-[0_26px_60px_-36px_rgba(15,23,42,0.35)] md:px-5">
+      <div className="container mx-auto px-2 py-1.5 sm:px-3">
+        <div className="relative overflow-visible rounded-[1.5rem] border border-white/70 bg-[linear-gradient(135deg,_rgba(255,255,255,0.96),_rgba(248,250,252,0.94))] px-2.5 py-2 shadow-[0_26px_60px_-36px_rgba(15,23,42,0.35)] md:px-4">
           <div className="absolute inset-0 rounded-[1.75rem] bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.08),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(249,115,22,0.08),_transparent_28%)]" />
           <div className="relative flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 sm:gap-5">

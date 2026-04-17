@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import Header from "./components/Header.jsx";
 import ProductList from "./pages/ProductList.jsx";
@@ -71,10 +71,32 @@ const ScrollToTop = () => {
   return null;
 };
 
+const GtmRouteTracker = () => {
+  const location = useLocation();
+  const lastTrackedPathRef = useRef("");
+
+  useEffect(() => {
+    const pagePath = `${location.pathname}${location.search}${location.hash}`;
+    if (lastTrackedPathRef.current === pagePath) return;
+
+    lastTrackedPathRef.current = pagePath;
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: "page_view",
+      page_path: pagePath,
+      page_title: document.title,
+      page_location: window.location.href,
+    });
+  }, [location]);
+
+  return null;
+};
+
 function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
+      <GtmRouteTracker />
       <Routes>
         {/* Auth pages without header */}
         <Route path="/login" element={

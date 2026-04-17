@@ -72,6 +72,10 @@ const formatDateTime = (date) =>
   });
 
 const resolvePaymentMethod = (order) => {
+  if (order?.payment?.method === "COD") {
+    return "Cash on Delivery";
+  }
+
   if (order?.payment?.razorpayPaymentId || order?.payment?.razorpayOrderId) {
     return "Razorpay";
   }

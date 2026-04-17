@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    
+    <!-- Logo as favicon -->
+    <link rel="icon" type="image/jpeg" href="/logo/logo.jpeg" />
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>maitrova</title>
+    <script type="module" crossorigin src="/assets/index-DRGq99s2.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-D7aYKz5S.css">
+  </head>
+  <body>
+<!--     
+    Logo visible on page
+    <div style="padding: 10px;">
+      <img src="/logo/logo.png" alt="Maitrova Logo" style="height: 50px;" loading="lazy" />
+    </div> -->
+
+    <div id="root"></div>
+    
+  </body>
+</html>

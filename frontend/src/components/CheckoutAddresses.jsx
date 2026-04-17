@@ -248,6 +248,8 @@ export default function CheckoutAddresses() {
   const [availableCoupons, setAvailableCoupons] = useState([]);
   const [loadingCoupons, setLoadingCoupons] = useState(false);
   const [copiedCouponCode, setCopiedCouponCode] = useState("");
+  const [codLoading, setCodLoading] = useState(false);
+  const [codError, setCodError] = useState("");
 
   const isEditing = useMemo(() => mode.startsWith("edit"), [mode]);
   const normalizedCouponCode = useMemo(() => String(couponCode || "").trim().toUpperCase(), [couponCode]);
@@ -434,6 +436,39 @@ export default function CheckoutAddresses() {
     setPricingPreview({ subtotal: Number(pricing.subtotal || 0), shipping: Number(pricing.shipping || 0), discount: Number(pricing.discount || 0), total: Number(pricing.total || 0), coupon: pricing.coupon || null });
   };
 
+  const handleCashOnDelivery = async () => {
+    if (!token || checkoutDisabled) return;
+
+    setCodLoading(true);
+    setCodError("");
+
+    try {
+      const res = await fetch(`${API_URL}/payment/cod/create-from-cart`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(
+          isCouponApplied ? { couponCode: normalizedCouponCode } : {}
+        ),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.message || "Failed to create cash on delivery order");
+      }
+
+      handleOrderCreated(data);
+      dispatch(getCart());
+      window.location.href = "/orders";
+    } catch (cashOnDeliveryError) {
+      setCodError(cashOnDeliveryError.message || "Failed to place cash on delivery order");
+    } finally {
+      setCodLoading(false);
+    }
+  };
+
   const headerTitle = mode === "edit-delivery" ? "Edit Delivery Address" : mode === "edit-billing" ? "Edit Billing Address" : "Delivery & Billing Address";
 
   return (
@@ -578,16 +613,36 @@ export default function CheckoutAddresses() {
                 <div className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff,_#f8fafc)] p-5 shadow-sm">
                   <div className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Secure payment</div>
                   <h3 className="mt-3 text-xl font-semibold text-slate-900">Complete your order</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">Pay securely using Razorpay after saving your addresses. Applied offers are locked into the server-side order amount.</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">Choose Razorpay for online payment or place the order with cash on delivery after saving your addresses. Applied offers are locked into the server-side order amount.</p>
                   <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                     <div className="flex items-center justify-between text-sm text-slate-600"><span>Order total</span><span className="text-base font-semibold text-slate-900">Rs. {effectiveTotal.toFixed(2)}</span></div>
                     {isCouponApplied ? <div className="mt-3 flex items-center justify-between rounded-2xl bg-emerald-50 px-3 py-2 text-sm"><span className="font-medium text-emerald-700">{normalizedCouponCode}</span><span className="font-semibold text-emerald-700">Saved Rs. {effectiveDiscount.toFixed(2)}</span></div> : null}
                   </div>
-                  <div className="mt-5">
-                    <RazorpayPayNow token={token} couponCode={isCouponApplied ? normalizedCouponCode : ""} onSuccess={({ orderId }) => console.log("Paid order:", orderId)} onOrderCreated={handleOrderCreated} disabled={checkoutDisabled} />
+                  <div className="mt-5 space-y-3">
+                    <div>
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Pay Online</div>
+                      <RazorpayPayNow token={token} couponCode={isCouponApplied ? normalizedCouponCode : ""} onSuccess={({ orderId }) => console.log("Paid order:", orderId)} onOrderCreated={handleOrderCreated} disabled={checkoutDisabled || codLoading} />
+                    </div>
+                    <div>
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Cash On Delivery</div>
+                      <button
+                        type="button"
+                        onClick={handleCashOnDelivery}
+                        disabled={checkoutDisabled || codLoading}
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:opacity-60"
+                      >
+                        {codLoading ? "Placing COD Order..." : "Place Cash On Delivery Order"}
+                      </button>
+                    </div>
                   </div>
+                  {codError ? (
+                    <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-800">
+                      {codError}
+                    </div>
+                  ) : null}
                   <div className="mt-5 space-y-3 text-xs text-slate-500">
                     <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500" />Razorpay-secured checkout</div>
+                    <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-slate-500" />Cash on delivery order creation available</div>
                     <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500" />Coupon logic never runs on the client</div>
                     <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500" />Payment total is locked from the backend</div>
                   </div>
