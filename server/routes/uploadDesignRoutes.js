@@ -4,10 +4,6 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import {
-  optimizeUploadedImage,
-  normalizeStoredPath,
-} from "../utils/imageOptimization.js";
 
 const designsrouters = express.Router();
 
@@ -56,22 +52,17 @@ designsrouters.post("/upload-design", upload.single("designImage"), async (req, 
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    const optimized = await optimizeUploadedImage(
-      normalizeStoredPath(req.file.path),
-      {
-        outputDir: "outputs/designs",
-        baseName: path.basename(req.file.filename, path.extname(req.file.filename)),
-        cleanupSource: true,
-      }
-    );
-
-    const relativeUrl = `/${String(optimized.url || "").replace(/^\/+/, "")}`;
+    // Keep the original file exactly as uploaded — full resolution, original format,
+    // original size. Do NOT run optimizeUploadedImage here because:
+    //   1. It converts to WebP at 300/600px — destroys print quality (needs 300 DPI)
+    //   2. It deletes the source (cleanupSource: true) — original is lost forever
+    //   3. Remove-background and crop both need the full-res original to work correctly
+    const relativeUrl = `/outputs/designs/${req.file.filename}`;
 
     return res.status(200).json({
       message: "Design image uploaded successfully",
       imageUrl: relativeUrl,
-      filename: path.basename(relativeUrl),
-      variants: optimized.variants,
+      filename: req.file.filename,
     });
   } catch (error) {
     console.error("Upload design error:", error);

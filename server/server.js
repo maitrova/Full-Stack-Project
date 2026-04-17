@@ -3,6 +3,8 @@ import "dotenv/config";
 import express from 'express';
 import cors from "cors";
 import connectDB from './config/db.js';
+import { spawn as spawnProcess } from 'child_process';
+import fs from 'fs';
 
 import path from "path";
 import { fileURLToPath } from "url";
@@ -155,7 +157,43 @@ app.use((req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+
+  // Warm up the rembg Python process in the background so the model is loaded
+  // into OS cache before the first real user request arrives.
+  const scriptPath = path.join(__dirname, "scripts", "remove_bg_cli.py");
+  const warmupInput = path.join(__dirname, "scripts", "warmup_pixel.png");
+  const warmupOutput = path.join(__dirname, "scripts", "warmup_pixel_out.png");
+
+  // Write a tiny 1x1 white PNG if it doesn't exist
+  if (!fs.existsSync(warmupInput)) {
+    // Minimal valid 1x1 white PNG (67 bytes)
+    const pixel = Buffer.from(
+      "89504e470d0a1a0a0000000d494844520000000100000001080200000090" +
+      "77533800000000c49444154789c6260f8cf000000000200016af5d6100000" +
+      "00049454e44ae426082",
+      "hex"
+    );
+    fs.writeFileSync(warmupInput, pixel);
+  }
+
+  const pythonCmd = process.env.PYTHON_EXECUTABLE?.trim() ||
+    (process.platform === "win32" ? "python" : "python3");
+
+  const proc = spawnProcess(pythonCmd, [scriptPath, warmupInput, warmupOutput]);
+  proc.on("close", (code) => {
+    if (code === 0) {
+      console.log("rembg warm-up complete — model is ready");
+      try { fs.unlinkSync(warmupOutput); } catch {}
+    } else {
+      console.warn("rembg warm-up failed (non-critical) — model will load on first request");
+    }
+  });
+  proc.on("error", () => {
+    console.warn("rembg warm-up process error (non-critical)");
+  });
+});
 
 
 // app.use("/api/outputs", express.static(path.join(__dirname, "outputs")));
