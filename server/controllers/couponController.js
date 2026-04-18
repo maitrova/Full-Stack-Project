@@ -39,6 +39,10 @@ const buildCouponPayload = (body, { partial = false } = {}) => {
       body.allowedSubCategories !== undefined
         ? parseObjectIdArray(body.allowedSubCategories || [])
         : undefined,
+    allowedProducts:
+      body.allowedProducts !== undefined
+        ? parseObjectIdArray(body.allowedProducts || [])
+        : undefined,
     excludedProducts:
       body.excludedProducts !== undefined
         ? parseObjectIdArray(body.excludedProducts || [])
@@ -81,6 +85,7 @@ const couponAdminProjection = {
   allowOnSaleProducts: 1,
   allowedCategories: 1,
   allowedSubCategories: 1,
+  allowedProducts: 1,
   excludedProducts: 1,
   stackable: 1,
   autoApply: 1,

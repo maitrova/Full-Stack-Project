@@ -13,6 +13,7 @@ import {
   validateCouponForCart,
 } from "../services/couponService.js";
 import { getReadymadePricing } from "../utils/readymadePricing.js";
+import HeaderBannerSettings from "../models/HeaderBannerSettings.js";
 
 const toPaise = (rupees) => Math.round(Number(rupees) * 100);
 const getRefId = (value) => value?._id || value || null;
@@ -43,8 +44,21 @@ const getItemTitle = (item) =>
   item?.dropproduct?.name ||
   item?.readymadeProduct?.title ||
   item?.readymadeProduct?.name ||
+  item?.product?.name ||
+  item?.product?.title ||
   item?.design?.name ||
   "Item";
+
+const cartHasCustomizationItems = (cart) =>
+  Array.isArray(cart?.items) &&
+  cart.items.some((item) => item?.kind === "DESIGN" || Boolean(item?.product));
+
+const getCodMinimumOrderAmount = async () => {
+  const settings = await HeaderBannerSettings.findOne({ key: "main" }).select(
+    "codMinimumOrderAmount"
+  );
+  return Math.max(0, Number(settings?.codMinimumOrderAmount || 0));
+};
 
 const validateCartInventory = (cart) => {
   for (const item of cart?.items || []) {
@@ -300,6 +314,20 @@ export const createCashOnDeliveryOrderFromCart = async (req, res) => {
     const cart = await getActiveCartWithPricing(userId);
     const { delivery, billing } = await getCheckoutAddresses(userId);
     const totals = await getCartTotals({ cart, userId, couponCode });
+
+    if (cartHasCustomizationItems(cart)) {
+      return res.status(400).json({
+        message: "Cash on delivery is not available for customization products",
+      });
+    }
+
+    const codMinimumOrderAmount = await getCodMinimumOrderAmount();
+    if (totals.total < codMinimumOrderAmount) {
+      return res.status(400).json({
+        message: `Cash on delivery is available only for orders of Rs. ${codMinimumOrderAmount.toFixed(2)} or more`,
+        codMinimumOrderAmount,
+      });
+    }
 
     const orderDoc = await createOrderDocFromCart({
       userId,

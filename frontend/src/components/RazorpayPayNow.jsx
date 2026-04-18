@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { loadRazorpay } from "../utils/loadRazorpay.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/api";
@@ -13,7 +12,6 @@ export default function RazorpayPayNow({
 }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
-  const navigate = useNavigate();
 
   const createOrderFromCart = async () => {
     const res = await fetch(`${API_URL}/payment/razorpay/create-from-cart`, {
@@ -85,8 +83,6 @@ export default function RazorpayPayNow({
               orderId: created.orderId,
               razorpayOrderId: created.razorpayOrderId,
             });
-
-            navigate("/orders");
           } catch (error) {
             setErr(error.message || "Verification failed");
           }

@@ -58,14 +58,12 @@ const getItemSubCategoryIds = (item) => {
 
 export const buildCartPricingContext = (cart) => {
   let subtotal = 0;
-
-  const categoryIdSet = new Set();
-  const subCategoryIdSet = new Set();
-  const productIdSet = new Set();
   let saleItemCount = 0;
+  const items = [];
 
   for (const item of cart?.items || []) {
     let effectiveUnitPrice = Number(item.unitPrice || 0);
+    let saleActive = false;
 
     const sourceProduct =
       item.kind === "READYMADE" ? item.dropproduct || item.readymadeProduct : null;
@@ -79,31 +77,35 @@ export const buildCartPricingContext = (cart) => {
         : null;
       const pricing = getReadymadePricing(sourceProduct, { variant });
       effectiveUnitPrice = pricing.effectivePrice;
-      if (pricing.saleActive) {
+      saleActive = Boolean(pricing.saleActive);
+      if (saleActive) {
         saleItemCount += Number(item.qty || 0);
       }
     }
 
-    subtotal += effectiveUnitPrice * Number(item.qty || 0);
+    const quantity = Number(item.qty || 0);
+    const lineSubtotal = effectiveUnitPrice * quantity;
+    subtotal += lineSubtotal;
 
-    for (const categoryId of getItemCategoryIds(item)) {
-      categoryIdSet.add(categoryId);
-    }
-    for (const subCategoryId of getItemSubCategoryIds(item)) {
-      subCategoryIdSet.add(subCategoryId);
-    }
-    for (const productId of getItemProductIds(item)) {
-      productIdSet.add(productId);
-    }
+    const categoryIds = getItemCategoryIds(item);
+    const subCategoryIds = getItemSubCategoryIds(item);
+    const productIds = getItemProductIds(item);
+
+    items.push({
+      categoryIds,
+      subCategoryIds,
+      productIds,
+      quantity,
+      lineSubtotal,
+      saleActive,
+    });
   }
 
   return {
     subtotal,
-    categoryIdSet,
-    subCategoryIdSet,
-    productIdSet,
     saleItemCount,
     itemCount: cart?.items?.length || 0,
+    items,
   };
 };
 
@@ -152,39 +154,53 @@ export const validateCouponForCart = async ({ couponCode, cart, userId }) => {
   }
 
   const context = buildCartPricingContext(cart);
-
-  if (context.saleItemCount > 0 && !coupon.allowOnSaleProducts) {
-    return { valid: false, reason: "Coupons cannot be applied to sale items" };
-  }
-
-  if (context.subtotal < Number(coupon.minimumCartAmount || 0)) {
-    return {
-      valid: false,
-      reason: `Minimum cart amount is ${coupon.minimumCartAmount}`,
-    };
-  }
-
   const allowedCategoryIds = new Set((coupon.allowedCategories || []).map((id) => String(id)));
   const allowedSubCategoryIds = new Set(
     (coupon.allowedSubCategories || []).map((id) => String(id))
   );
+  const allowedProductIds = new Set((coupon.allowedProducts || []).map((id) => String(id)));
+  const excludedProducts = new Set((coupon.excludedProducts || []).map((id) => String(id)));
 
-  if (allowedCategoryIds.size > 0 || allowedSubCategoryIds.size > 0) {
-    const hasAllowedCategory = [...context.categoryIdSet].some((id) =>
-      allowedCategoryIds.has(id)
-    );
-    const hasAllowedSubCategory = [...context.subCategoryIdSet].some((id) =>
-      allowedSubCategoryIds.has(id)
-    );
-
-    if (!hasAllowedCategory && !hasAllowedSubCategory) {
-      return { valid: false, reason: "Coupon is not applicable to these categories" };
+  let eligibleItems = context.items.filter((item) => {
+    if (!coupon.allowOnSaleProducts && item.saleActive) {
+      return false;
     }
+
+    if (item.productIds.some((id) => excludedProducts.has(id))) {
+      return false;
+    }
+
+    const hasProductRule = allowedProductIds.size > 0;
+    const hasCategoryRule = allowedCategoryIds.size > 0 || allowedSubCategoryIds.size > 0;
+
+    if (!hasProductRule && !hasCategoryRule) {
+      return true;
+    }
+
+    const matchesProduct = item.productIds.some((id) => allowedProductIds.has(id));
+    const matchesCategory = item.categoryIds.some((id) => allowedCategoryIds.has(id));
+    const matchesSubCategory = item.subCategoryIds.some((id) => allowedSubCategoryIds.has(id));
+
+    return matchesProduct || matchesCategory || matchesSubCategory;
+  });
+
+  const eligibleSubtotal = eligibleItems.reduce(
+    (sum, item) => sum + Number(item.lineSubtotal || 0),
+    0
+  );
+
+  if (eligibleItems.length === 0 || eligibleSubtotal <= 0) {
+    if (!coupon.allowOnSaleProducts && context.saleItemCount > 0) {
+      return { valid: false, reason: "Coupon is not applicable to sale items" };
+    }
+    return { valid: false, reason: "Coupon is not applicable to these cart items" };
   }
 
-  const excludedProducts = new Set((coupon.excludedProducts || []).map((id) => String(id)));
-  if ([...context.productIdSet].some((id) => excludedProducts.has(id))) {
-    return { valid: false, reason: "Coupon is not applicable to one or more cart items" };
+  if (eligibleSubtotal < Number(coupon.minimumCartAmount || 0)) {
+    return {
+      valid: false,
+      reason: `Minimum cart amount is ${coupon.minimumCartAmount}`,
+    };
   }
 
   const [usageStats, paidOrderCount] = await Promise.all([
@@ -210,7 +226,7 @@ export const validateCouponForCart = async ({ couponCode, cart, userId }) => {
 
   let discount = 0;
   if (coupon.discountType === "PERCENTAGE") {
-    discount = (context.subtotal * coupon.discountValue) / 100;
+    discount = (eligibleSubtotal * coupon.discountValue) / 100;
     if (coupon.maximumDiscountAmount !== null && coupon.maximumDiscountAmount !== undefined) {
       discount = Math.min(discount, coupon.maximumDiscountAmount);
     }
@@ -218,7 +234,7 @@ export const validateCouponForCart = async ({ couponCode, cart, userId }) => {
     discount = coupon.discountValue;
   }
 
-  discount = Math.min(context.subtotal, Math.max(0, Math.round(discount * 100) / 100));
+  discount = Math.min(eligibleSubtotal, Math.max(0, Math.round(discount * 100) / 100));
 
   if (discount <= 0) {
     return { valid: false, reason: "Coupon does not apply any discount" };
@@ -229,6 +245,7 @@ export const validateCouponForCart = async ({ couponCode, cart, userId }) => {
     coupon,
     discount,
     cartSubtotal: context.subtotal,
+    eligibleSubtotal,
     couponSnapshot: {
       couponId: coupon._id,
       code: coupon.code,
@@ -237,6 +254,7 @@ export const validateCouponForCart = async ({ couponCode, cart, userId }) => {
       discountValue: coupon.discountValue,
       maximumDiscountAmount: coupon.maximumDiscountAmount,
       discountApplied: discount,
+      eligibleSubtotal,
       campaignTag: coupon.campaignTag || "",
       allowOnSaleProducts: Boolean(coupon.allowOnSaleProducts),
     },

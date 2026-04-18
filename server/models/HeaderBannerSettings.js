@@ -21,6 +21,11 @@ const headerBannerSettingsSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+    codMinimumOrderAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   { timestamps: true }
 );

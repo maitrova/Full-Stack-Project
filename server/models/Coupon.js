@@ -81,6 +81,10 @@ const couponSchema = new mongoose.Schema(
         ref: "SubCategory",
       },
     ],
+    allowedProducts: {
+      type: [mongoose.Schema.Types.ObjectId],
+      default: [],
+    },
     excludedProducts: {
       type: [mongoose.Schema.Types.ObjectId],
       default: [],

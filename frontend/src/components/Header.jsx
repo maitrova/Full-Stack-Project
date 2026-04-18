@@ -7,6 +7,7 @@ import {
   resetCart,
   selectCart,
   selectCartItemCount,
+  selectCartSummary,
   selectCartLoading,
 } from '../redux/slices/Cartslice.js';
 
@@ -69,6 +70,30 @@ const userMenuItems = [
 
 const formatCurrency = (value) => `Rs. ${Number(value || 0).toFixed(2)}`;
 
+const getCartItemImage = (item) =>
+  item?.previewImage ||
+  item?.image ||
+  item?.readymadeProduct?.thumbnail ||
+  item?.readymadeProduct?.images?.[0]?.url ||
+  item?.dropproduct?.thumbnail ||
+  item?.dropproduct?.images?.[0] ||
+  item?.product?.thumbnail ||
+  item?.product?.images?.[0]?.url ||
+  null;
+
+const getCartItemTitle = (item) =>
+  item?.productName ||
+  item?.title ||
+  item?.design?.title ||
+  item?.design?.name ||
+  item?.readymadeProduct?.title ||
+  item?.readymadeProduct?.name ||
+  item?.dropproduct?.title ||
+  item?.dropproduct?.name ||
+  item?.product?.title ||
+  item?.product?.name ||
+  'Product';
+
 const SocialMediaIcons = ({ mobile = false }) => (
   <div className={`flex items-center ${mobile ? 'flex-wrap gap-2.5' : 'gap-2'}`}>
     {socialLinks.map((item) => (
@@ -110,6 +135,7 @@ const Header = () => {
   const token = useSelector(selectCurrentToken);
   const cartItemCount = useSelector(selectCartItemCount);
   const cart = useSelector(selectCart);
+  const cartSummary = useSelector(selectCartSummary);
   const cartLoading = useSelector(selectCartLoading);
   const isAuthenticated = !!token;
 
@@ -170,7 +196,7 @@ const Header = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const cartSubtotal = useMemo(() => cart?.cartSummary?.subtotal || 0, [cart?.cartSummary?.subtotal]);
+  const cartSubtotal = useMemo(() => Number(cartSummary?.subtotal || 0), [cartSummary?.subtotal]);
   const visibleBannerMessages = useMemo(
     () => bannerMessages.map((message) => String(message || '').trim()).filter(Boolean),
     [bannerMessages]
@@ -250,13 +276,17 @@ const Header = () => {
           <div className="py-8 text-center text-sm text-slate-500">Loading cart...</div>
         ) : cart?.items?.length ? (
           <div className="space-y-3">
-            {cart.items.slice(0, 3).map((item) => (
+            {cart.items.slice(0, 3).map((item) => {
+              const imageSrc = getCartItemImage(item);
+              const itemTitle = getCartItemTitle(item);
+
+              return (
               <div key={item._id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-3">
                 <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white">
-                  {item.image || item.previewImage ? (
+                  {imageSrc ? (
                     <img
-                      src={item.image || item.previewImage}
-                      alt={item.productName || item.title || 'Cart item'}
+                      src={imageSrc}
+                      alt={itemTitle}
                       className="h-full w-full object-cover"
                     />
                   ) : (
@@ -264,14 +294,14 @@ const Header = () => {
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-slate-800">{item.productName || item.title || 'Product'}</p>
+                  <p className="truncate text-sm font-medium text-slate-800">{itemTitle}</p>
                   <p className="mt-1 text-xs text-slate-500">Qty {item.qty} | {formatCurrency(item.unitPrice)}</p>
                 </div>
                 <div className="text-sm font-semibold text-slate-900">
                   {formatCurrency((item.unitPrice || 0) * (item.qty || 0))}
                 </div>
               </div>
-            ))}
+            )})}
 
             {cart.items.length > 3 && (
               <p className="text-center text-xs font-medium text-slate-500">+{cart.items.length - 3} more items</p>

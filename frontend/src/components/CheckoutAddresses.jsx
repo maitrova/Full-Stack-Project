@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   upsertDeliveryBilling,
@@ -100,6 +101,46 @@ function CouponCelebration({ visible, code, discount }) {
           <p className="mt-1 text-sm text-slate-600">Discount applied: <span className="font-semibold text-emerald-700">Rs. {discount.toFixed(2)}</span></p>
         </div>
       </div>
+    </div>
+  );
+}
+
+function OrderSuccessPopup({ visible, paymentLabel }) {
+  if (!visible) return null;
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-md overflow-hidden rounded-[28px] border border-emerald-200 bg-white shadow-[0_40px_120px_-48px_rgba(15,23,42,0.55)]">
+        <div className="bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_36%),linear-gradient(135deg,_#ecfdf5,_#f8fafc,_#ffffff)] px-6 py-6">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-200">
+            <svg className="h-7 w-7" viewBox="0 0 20 20" fill="currentColor">
+              <path
+                fillRule="evenodd"
+                d="M16.704 5.29a1 1 0 010 1.42l-7.13 7.13a1 1 0 01-1.414 0l-3.164-3.164a1 1 0 111.414-1.415l2.457 2.457 6.423-6.423a1 1 0 011.414 0z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </div>
+          <div className="mt-4 text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+            Order Confirmed
+          </div>
+          <h3 className="mt-2 text-2xl font-semibold text-slate-900">
+            Your order has been placed successfully
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            {paymentLabel} has been recorded. Redirecting you to your orders page in a moment.
+          </p>
+          <div className="mt-5 h-2 overflow-hidden rounded-full bg-emerald-100">
+            <div className="h-full w-full origin-left animate-[successRedirect_3.5s_linear_forwards] rounded-full bg-emerald-500" />
+          </div>
+        </div>
+      </div>
+      <style>{`
+        @keyframes successRedirect {
+          from { transform: scaleX(1); }
+          to { transform: scaleX(0); }
+        }
+      `}</style>
     </div>
   );
 }
@@ -226,6 +267,7 @@ function AvailableCoupons({ coupons, loading, copiedCouponCode, onCopy }) {
 
 export default function CheckoutAddresses() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const token = useSelector(selectCurrentToken);
   const deliverySaved = useSelector(selectDeliveryAddress);
   const billingSaved = useSelector(selectBillingAddress);
@@ -250,6 +292,11 @@ export default function CheckoutAddresses() {
   const [copiedCouponCode, setCopiedCouponCode] = useState("");
   const [codLoading, setCodLoading] = useState(false);
   const [codError, setCodError] = useState("");
+  const [codMinimumOrderAmount, setCodMinimumOrderAmount] = useState(0);
+  const [orderSuccessState, setOrderSuccessState] = useState({
+    visible: false,
+    paymentLabel: "",
+  });
 
   const isEditing = useMemo(() => mode.startsWith("edit"), [mode]);
   const normalizedCouponCode = useMemo(() => String(couponCode || "").trim().toUpperCase(), [couponCode]);
@@ -259,6 +306,17 @@ export default function CheckoutAddresses() {
   const effectiveShipping = Number(pricingPreview?.shipping ?? 0);
   const effectiveDiscount = Number(pricingPreview?.discount ?? couponState.discount ?? 0);
   const effectiveTotal = Number(pricingPreview?.total ?? Math.max(0, effectiveSubtotal + effectiveShipping - effectiveDiscount));
+  const hasCustomizationItems = useMemo(
+    () => cartItems.some((item) => item?.kind === "DESIGN" || Boolean(item?.product)),
+    [cartItems]
+  );
+  const codBelowMinimum = effectiveTotal < Number(codMinimumOrderAmount || 0);
+  const codDisabled = checkoutDisabled || codLoading || hasCustomizationItems || codBelowMinimum;
+  const codHelperMessage = hasCustomizationItems
+    ? "Cash on delivery is not available for customization products."
+    : codBelowMinimum && codMinimumOrderAmount > 0
+      ? `Cash on delivery is available only for orders of Rs. ${Number(codMinimumOrderAmount).toFixed(2)} or more.`
+      : "";
 
   useEffect(() => {
     dispatch(fetchMyAddresses());
@@ -280,6 +338,16 @@ export default function CheckoutAddresses() {
     const timer = window.setTimeout(() => setShowCouponCelebration(false), 2600);
     return () => window.clearTimeout(timer);
   }, [showCouponCelebration]);
+
+  useEffect(() => {
+    if (!orderSuccessState.visible) return undefined;
+
+    const timer = window.setTimeout(() => {
+      navigate("/orders");
+    }, 3500);
+
+    return () => window.clearTimeout(timer);
+  }, [navigate, orderSuccessState.visible]);
 
   useEffect(() => {
     let cancelled = false;
@@ -308,6 +376,33 @@ export default function CheckoutAddresses() {
     };
 
     loadCoupons();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCodSettings = async () => {
+      try {
+        const res = await fetch(`${API_URL}/header-banner`);
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data?.message || "Failed to load store settings");
+        }
+        if (!cancelled) {
+          setCodMinimumOrderAmount(Number(data?.codMinimumOrderAmount || 0));
+        }
+      } catch (settingsError) {
+        if (!cancelled) {
+          setCodMinimumOrderAmount(0);
+        }
+      }
+    };
+
+    loadCodSettings();
 
     return () => {
       cancelled = true;
@@ -436,6 +531,14 @@ export default function CheckoutAddresses() {
     setPricingPreview({ subtotal: Number(pricing.subtotal || 0), shipping: Number(pricing.shipping || 0), discount: Number(pricing.discount || 0), total: Number(pricing.total || 0), coupon: pricing.coupon || null });
   };
 
+  const handleOrderSuccess = (paymentLabel) => {
+    dispatch(getCart());
+    setOrderSuccessState({
+      visible: true,
+      paymentLabel,
+    });
+  };
+
   const handleCashOnDelivery = async () => {
     if (!token || checkoutDisabled) return;
 
@@ -460,8 +563,7 @@ export default function CheckoutAddresses() {
       }
 
       handleOrderCreated(data);
-      dispatch(getCart());
-      window.location.href = "/orders";
+      handleOrderSuccess("Cash on Delivery");
     } catch (cashOnDeliveryError) {
       setCodError(cashOnDeliveryError.message || "Failed to place cash on delivery order");
     } finally {
@@ -473,6 +575,10 @@ export default function CheckoutAddresses() {
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,_#eef6ff_0%,_#f8fafc_24%,_#ffffff_100%)]">
+      <OrderSuccessPopup
+        visible={orderSuccessState.visible}
+        paymentLabel={orderSuccessState.paymentLabel}
+      />
       <div className="mx-auto max-w-7xl px-4 py-6 md:px-8 md:py-10">
         <div className="relative overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_26%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.15),_transparent_24%),linear-gradient(135deg,_#0f172a,_#1e293b_48%,_#0f766e)] px-6 py-8 text-white shadow-[0_36px_90px_-44px_rgba(15,23,42,0.55)] md:px-10 md:py-10">
           <div className="relative grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
@@ -621,18 +727,32 @@ export default function CheckoutAddresses() {
                   <div className="mt-5 space-y-3">
                     <div>
                       <div className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Pay Online</div>
-                      <RazorpayPayNow token={token} couponCode={isCouponApplied ? normalizedCouponCode : ""} onSuccess={({ orderId }) => console.log("Paid order:", orderId)} onOrderCreated={handleOrderCreated} disabled={checkoutDisabled || codLoading} />
+                      <RazorpayPayNow
+                        token={token}
+                        couponCode={isCouponApplied ? normalizedCouponCode : ""}
+                        onSuccess={({ orderId }) => {
+                          console.log("Paid order:", orderId);
+                          handleOrderSuccess("Online payment");
+                        }}
+                        onOrderCreated={handleOrderCreated}
+                        disabled={checkoutDisabled || codLoading || orderSuccessState.visible}
+                      />
                     </div>
                     <div>
                       <div className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Cash On Delivery</div>
                       <button
                         type="button"
                         onClick={handleCashOnDelivery}
-                        disabled={checkoutDisabled || codLoading}
+                        disabled={codDisabled}
                         className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:opacity-60"
                       >
                         {codLoading ? "Placing COD Order..." : "Place Cash On Delivery Order"}
                       </button>
+                      {codHelperMessage ? (
+                        <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                          {codHelperMessage}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                   {codError ? (
@@ -642,7 +762,7 @@ export default function CheckoutAddresses() {
                   ) : null}
                   <div className="mt-5 space-y-3 text-xs text-slate-500">
                     <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500" />Razorpay-secured checkout</div>
-                    <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-slate-500" />Cash on delivery order creation available</div>
+                    <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-slate-500" />Cash on delivery follows product and minimum-order rules</div>
                     <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500" />Coupon logic never runs on the client</div>
                     <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500" />Payment total is locked from the backend</div>
                   </div>

@@ -13,6 +13,7 @@ const normalizeBanner = (banner) => ({
       ? banner.messages.map((message) => String(message || ""))
       : [createEmptyMessage()],
   couponCode: String(banner?.couponCode || ""),
+  codMinimumOrderAmount: Number(banner?.codMinimumOrderAmount || 0),
 });
 
 export default function HeaderBannerSettings() {
@@ -85,6 +86,7 @@ export default function HeaderBannerSettings() {
       const payload = {
         messages: form.messages.map((message) => String(message || "").trim()).filter(Boolean),
         couponCode: String(form.couponCode || "").trim(),
+        codMinimumOrderAmount: Number(form.codMinimumOrderAmount || 0),
       };
 
       const res = await fetch(`${API_URL}/header-banner/admin`, {
@@ -115,14 +117,17 @@ export default function HeaderBannerSettings() {
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600">
-            Header Banner
+            Store Settings
           </p>
           <h2 className="mt-2 text-2xl font-semibold text-slate-900">
-            Manage the banner above the header
+            Header banner and COD settings
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-600">
-            Add multiple banner texts like shipping or promo messages, and keep one coupon code
-            field that appears separately in the top strip.
+            Control the top header banner, promo coupon display, and the minimum order amount
+            required for cash on delivery from one admin page.
+          </p>
+          <p className="mt-2 text-xs font-medium text-slate-500">
+            Admin path: Dashboard &gt; Settings
           </p>
         </div>
 
@@ -133,7 +138,7 @@ export default function HeaderBannerSettings() {
           className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Save className="h-4 w-4" />
-          {saving ? "Saving..." : "Save Banner"}
+          {saving ? "Saving..." : "Save Settings"}
         </button>
       </div>
 
@@ -227,6 +232,33 @@ export default function HeaderBannerSettings() {
               />
             </div>
 
+            <div className="rounded-3xl border border-slate-200 bg-white p-5">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Cash on delivery settings</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Set the minimum order amount allowed for COD. Use 0 to allow COD with no
+                  minimum amount.
+                </p>
+              </div>
+
+              <label className="mt-4 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                COD minimum order amount
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={form.codMinimumOrderAmount}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    codMinimumOrderAmount: event.target.value,
+                  }))
+                }
+                placeholder="0"
+                className="mt-4 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100"
+              />
+            </div>
+
             <div className="rounded-3xl border border-slate-200 bg-[linear-gradient(135deg,_#eff6ff,_#ffffff,_#fff7ed)] p-5">
               <p className="text-sm font-semibold text-slate-900">Preview</p>
               <div className="mt-4 flex flex-wrap gap-2">
@@ -244,6 +276,11 @@ export default function HeaderBannerSettings() {
                 {String(form.couponCode || "").trim() ? (
                   <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-amber-700 shadow-sm">
                     Coupon: {String(form.couponCode || "").trim()}
+                  </span>
+                ) : null}
+                {Number(form.codMinimumOrderAmount || 0) > 0 ? (
+                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+                    COD min: Rs. {Number(form.codMinimumOrderAmount).toFixed(2)}
                   </span>
                 ) : null}
               </div>

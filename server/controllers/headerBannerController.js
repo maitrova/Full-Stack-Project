@@ -28,16 +28,23 @@ const normalizeMessages = (messages = []) => {
 const normalizeBannerPayload = (body = {}, { fallbackToDefaults = false } = {}) => {
   const messages = normalizeMessages(body.messages);
   const couponCode = String(body.couponCode || "").trim();
+  const rawCodMinimumOrderAmount = body.codMinimumOrderAmount;
+  const codMinimumOrderAmount =
+    rawCodMinimumOrderAmount === undefined || rawCodMinimumOrderAmount === null || rawCodMinimumOrderAmount === ""
+      ? 0
+      : Math.max(0, Number(rawCodMinimumOrderAmount) || 0);
 
   return {
     messages: messages.length > 0 ? messages : fallbackToDefaults ? DEFAULT_MESSAGES : [],
     couponCode,
+    codMinimumOrderAmount,
   };
 };
 
 const bannerResponse = (doc) => ({
   messages: Array.isArray(doc?.messages) ? doc.messages : [],
   couponCode: String(doc?.couponCode || ""),
+  codMinimumOrderAmount: Number(doc?.codMinimumOrderAmount || 0),
   updatedAt: doc?.updatedAt || null,
 });
 
@@ -48,6 +55,7 @@ const getOrCreateSettings = async () => {
       key: "main",
       messages: DEFAULT_MESSAGES,
       couponCode: "",
+      codMinimumOrderAmount: 0,
     });
   }
   return settings;
