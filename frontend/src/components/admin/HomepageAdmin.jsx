@@ -1,6 +1,7 @@
 // client/src/components/admin/HomepageAdmin.jsx
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { buildImageUrl } from '../../utils/responsiveImage.js';
 import {
   // New Arrivals specific actions/selectors
   fetchEligibleNewArrivals,
@@ -175,6 +176,7 @@ const HomepageAdmin = () => {
 
   const renderItemCard = (item, isPreview = false) => {
     if (!item) return null;
+    const imageSrc = buildImageUrl(item.previewImage || item.imageUrl || item.image) || '';
 
     return (
       <div
@@ -205,9 +207,9 @@ const HomepageAdmin = () => {
 
         {/* Image */}
         <div className="aspect-square bg-gray-100 overflow-hidden">
-          {item.previewImage || item.imageUrl ? (
+          {imageSrc ? (
             <img
-              src={item.previewImage || item.imageUrl}
+              src={imageSrc}
               alt={item.title || item.name}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               onError={(e) => {
