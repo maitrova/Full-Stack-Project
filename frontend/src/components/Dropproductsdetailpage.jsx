@@ -65,7 +65,14 @@ const DropProductDetailsPage = () => {
   const mainImageRef = useRef(null);
   const thumbnailContainerRef = useRef(null);
   const assetUrl = (path) => buildImageUrl(path);
-  const galleryItems = (product?.images || []).map((image, index) => {
+  const normalizedGalleryImages = useMemo(() => {
+    const images = Array.isArray(product?.images) ? product.images.filter(Boolean) : [];
+    if (images.length > 0) return images;
+    if (product?.thumbnail) return [product.thumbnail];
+    return [];
+  }, [product?.images, product?.thumbnail]);
+
+  const galleryItems = normalizedGalleryImages.map((image, index) => {
     const imageProps = getResponsiveImageProps(image, {
       sizes: "(max-width: 768px) 100vw, 1200px",
       loading: index === 0 ? "eager" : "lazy",
@@ -160,13 +167,24 @@ const DropProductDetailsPage = () => {
     setImageLoading(true);
   }, [product?._id]);
 
+  useEffect(() => {
+    if (!normalizedGalleryImages.length) {
+      setSelectedImageIndex(0);
+      return;
+    }
+
+    if (selectedImageIndex >= normalizedGalleryImages.length) {
+      setSelectedImageIndex(0);
+    }
+  }, [normalizedGalleryImages, selectedImageIndex]);
+
   // Auto-rotate images
   useEffect(() => {
-    if (!product?.images || product.images.length <= 1) return;
+    if (normalizedGalleryImages.length <= 1) return;
     const interval = setInterval(() => nextImage(), 5000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product?.images, selectedImageIndex]);
+  }, [normalizedGalleryImages, selectedImageIndex]);
 
   const scrollToImage = (index) => {
     setSelectedImageIndex(index);
@@ -175,7 +193,7 @@ const DropProductDetailsPage = () => {
     if (thumbnailContainerRef.current) {
       const thumbnailWidth = 80; // width + gap
       const containerWidth = thumbnailContainerRef.current.clientWidth;
-      const thumbnailsCount = product?.images?.length || 0;
+      const thumbnailsCount = normalizedGalleryImages.length;
       const maxScroll = thumbnailsCount * thumbnailWidth - containerWidth;
       const scrollPosition = index * thumbnailWidth - containerWidth / 2 + thumbnailWidth / 2;
 
@@ -187,13 +205,14 @@ const DropProductDetailsPage = () => {
   };
 
   const nextImage = () => {
-    const nextIndex = (selectedImageIndex + 1) % (product?.images?.length || 1);
+    const nextIndex = (selectedImageIndex + 1) % (normalizedGalleryImages.length || 1);
     scrollToImage(nextIndex);
   };
 
   const prevImage = () => {
     const prevIndex =
-      (selectedImageIndex - 1 + (product?.images?.length || 1)) % (product?.images?.length || 1);
+      (selectedImageIndex - 1 + (normalizedGalleryImages.length || 1)) %
+      (normalizedGalleryImages.length || 1);
     scrollToImage(prevIndex);
   };
 
@@ -423,7 +442,7 @@ const DropProductDetailsPage = () => {
             {/* Main Image */}
             <div className="relative rounded-3xl shadow-xl overflow-hidden group bg-gradient-to-br from-slate-100 via-white to-slate-100">
               <div className="relative h-[500px] md:h-[600px] overflow-hidden">
-                {product.images?.map((image, index) => {
+                {normalizedGalleryImages.map((image, index) => {
                   const imageProps = getResponsiveImageProps(image, {
                     sizes: "(max-width: 1024px) 100vw, 50vw",
                     loading: index === 0 ? "eager" : "lazy",
@@ -477,7 +496,7 @@ const DropProductDetailsPage = () => {
                   );
                 })}
 
-                {!!product.images?.length && (
+                {!!normalizedGalleryImages.length && (
                   <div className="pointer-events-none absolute inset-x-0 bottom-6 flex justify-center">
                     <span className="rounded-full bg-black/65 px-4 py-2 text-xs font-semibold tracking-tight text-white shadow-lg backdrop-blur-sm">
                       Tap image for full screen
@@ -505,7 +524,7 @@ const DropProductDetailsPage = () => {
 
                 {/* Counter */}
                 <div className="absolute bottom-6 right-6 px-3 py-1 bg-black/60 backdrop-blur-sm text-white text-sm rounded-full">
-                  {selectedImageIndex + 1} / {product.images?.length}
+                  {selectedImageIndex + 1} / {normalizedGalleryImages.length}
                 </div>
 
                 {/* Discount */}
@@ -524,7 +543,7 @@ const DropProductDetailsPage = () => {
                 className="flex space-x-3 overflow-x-auto pb-4 scrollbar-hide"
                 style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
               >
-                {product.images?.map((image, index) => {
+                {normalizedGalleryImages.map((image, index) => {
                   const thumbProps = getResponsiveImageProps(image, {
                     sizes: "80px",
                   });
@@ -554,7 +573,7 @@ const DropProductDetailsPage = () => {
                 })}
               </div>
 
-              {product.images?.length > 5 && (
+              {normalizedGalleryImages.length > 5 && (
                 <>
                   <button
                     onClick={() => thumbnailContainerRef.current?.scrollBy({ left: -100, behavior: "smooth" })}

@@ -34,6 +34,11 @@ const productColorSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    stock: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
   },
   { _id: false }
 );

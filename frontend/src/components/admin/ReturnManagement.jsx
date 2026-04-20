@@ -305,7 +305,7 @@ const ReturnManagement = () => {
                         {returnRequest.status === 'APPROVED' ? (
                           <>
                             <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                              Return approved. Update refund payout status after you transfer the money.
+                              Return approved. Please keep the shipment ready for pickup. Refund will be initiated after warehouse inspection (3-5 business days).
                             </div>
                             <div className="flex gap-3">
                               <button

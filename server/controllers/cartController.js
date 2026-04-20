@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 // import { Cart } from "../models/Cart.js";
 import ReadymadeProduct from "../models/readymadeproducts.js"; // default export in your schema
 import { Design } from "../models/Design.js";
+import { Product } from "../models/Product.js";
 import { Cart } from "../models/Cart.js";
 
 import Dropproduct from "../models/dropproduct.model.js"; // ✅ NEW
@@ -89,6 +90,27 @@ const sanitizePreviewImage = (value) => {
   }
 
   return trimmed;
+};
+
+const getCustomizationColorStock = (product, colorValue) => {
+  if (!product || !colorValue) return null;
+
+  const colors = Array.isArray(product.colors) ? product.colors : [];
+  const matchedColor = colors.find(
+    (entry) =>
+      String(entry?.value || "").trim().toLowerCase() ===
+      String(colorValue || "").trim().toLowerCase()
+  );
+
+  if (!matchedColor) return null;
+
+  const rawStock = matchedColor.stock;
+  if (rawStock === null || rawStock === undefined || String(rawStock).trim() === "") {
+    return null;
+  }
+
+  const numericStock = Number(rawStock);
+  return Number.isFinite(numericStock) ? numericStock : null;
 };
 
 const buildCartItemSignature = (item = {}) => {
@@ -398,6 +420,16 @@ export const addToCart = async (req, res) => {
       const design = await Design.findById(effectiveDesignId).lean();
       if (!design) return res.status(404).json({ message: "Design not found" });
 
+      const customizationProduct = design.product
+        ? await Product.findById(design.product).lean()
+        : null;
+      const colorStock = getCustomizationColorStock(customizationProduct, design.productColor);
+      if (colorStock !== null && colorStock < parsedQty) {
+        return res.status(400).json({
+          message: `Not enough stock for color ${design.productColorName || design.productColor}`,
+        });
+      }
+
       const fallbackUnitPrice = computeDesignUnitPrice(design);
       const finalDesignUnitPrice =
         requestedUnitPrice > 0 ? requestedUnitPrice : fallbackUnitPrice;
@@ -654,6 +686,16 @@ export const updateCartItemQty = async (req, res) => {
     if (item.kind === "DESIGN") {
       const d = await Design.findById(item.design).lean();
       if (!d) return res.status(404).json({ message: "Design not found" });
+
+      const customizationProduct = d.product
+        ? await Product.findById(d.product).lean()
+        : null;
+      const colorStock = getCustomizationColorStock(customizationProduct, d.productColor);
+      if (colorStock !== null && colorStock < parsedQty) {
+        return res.status(400).json({
+          message: `Not enough stock for color ${d.productColorName || d.productColor}`,
+        });
+      }
 
       const isOwner = d.user?.toString() === userId.toString();
       const isPublic = d.isPublished === true;

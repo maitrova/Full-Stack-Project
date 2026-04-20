@@ -315,10 +315,14 @@ const UserOrders = () => {
       PAID: 'bg-green-100 text-green-800 border border-green-200',
       PENDING_PAYMENT: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
       FAILED: 'bg-red-100 text-red-800 border border-red-200',
-      CANCELLED: 'bg-gray-100 text-gray-800 border border-gray-200'
+      CANCELLED: 'bg-gray-100 text-gray-800 border border-gray-200',
+      COD: 'bg-sky-100 text-sky-800 border border-sky-200'
     };
     return colors[status] || 'bg-gray-100 text-gray-800 border border-gray-200';
   };
+
+  const getDisplayPaymentStatus = (order) =>
+    order?.payment?.method === 'COD' ? 'COD' : (order?.status || 'PENDING_PAYMENT');
 
   const calculateTotal = (order) => {
     if (!order?.items) return '0.00';
@@ -511,7 +515,7 @@ const UserOrders = () => {
 
       return {
         tone: 'emerald',
-        message: 'Return approved by admin. You will receive the refund within 3-5 business days.',
+        message: 'Return approved. Please keep the shipment ready for pickup. Refund will be initiated after warehouse inspection (3-5 business days).',
       };
     }
 
@@ -754,14 +758,6 @@ const UserOrders = () => {
                             <p className="mt-1 text-sm text-gray-500">
                               Placed on {formatDate(order.createdAt)}
                             </p>
-                          </div>
-                          <div className="flex flex-col items-end space-y-2">
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.orderStatus)}`}>
-                              {order.orderStatus}
-                            </span>
-                            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getPaymentStatusColor(order.status)}`}>
-                              {order.status.replace('_', ' ')}
-                            </span>
                           </div>
                         </div>
                         
@@ -1054,8 +1050,8 @@ const UserOrders = () => {
                           <span className={`px-4 py-2 rounded-full text-sm font-semibold ${getStatusColor(selectedOrder.orderStatus)}`}>
                             {selectedOrder.orderStatus}
                           </span>
-                          <span className={`px-4 py-2 rounded-full text-sm font-semibold ${getPaymentStatusColor(selectedOrder.status)}`}>
-                            {selectedOrder.status.replace('_', ' ')}
+                          <span className={`px-4 py-2 rounded-full text-sm font-semibold ${getPaymentStatusColor(getDisplayPaymentStatus(selectedOrder))}`}>
+                            {getDisplayPaymentStatus(selectedOrder).replace('_', ' ')}
                           </span>
                         </div>
                       </div>

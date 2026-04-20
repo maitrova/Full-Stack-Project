@@ -31,11 +31,20 @@ const sanitizeColors = (colors = []) => {
       if (!entry) return null;
       const value = sanitizeColorValue(entry.value);
       const label = String(entry.label || "").trim();
+      const rawStock = entry.stock;
+      const hasStockValue =
+        rawStock !== null &&
+        rawStock !== undefined &&
+        String(rawStock).trim() !== "";
+      const stock = hasStockValue ? Number(rawStock) : null;
       if (!value || !label) return null;
+      if (hasStockValue && (!Number.isFinite(stock) || stock < 0)) {
+        throw new Error(`Invalid stock for color ${label || value}`);
+      }
       const key = `${value}:${label.toLowerCase()}`;
       if (seen.has(key)) return null;
       seen.add(key);
-      return { value, label };
+      return { value, label, stock };
     })
     .filter(Boolean);
 

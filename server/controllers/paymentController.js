@@ -60,8 +60,49 @@ const getCodMinimumOrderAmount = async () => {
   return Math.max(0, Number(settings?.codMinimumOrderAmount || 0));
 };
 
+const getCustomizationColorStock = (product, colorValue) => {
+  if (!product || !colorValue) return null;
+
+  const colors = Array.isArray(product.colors) ? product.colors : [];
+  const matchedColor = colors.find(
+    (entry) =>
+      String(entry?.value || "").trim().toLowerCase() ===
+      String(colorValue || "").trim().toLowerCase()
+  );
+
+  if (!matchedColor) return null;
+
+  const rawStock = matchedColor.stock;
+  if (rawStock === null || rawStock === undefined || String(rawStock).trim() === "") {
+    return null;
+  }
+
+  const numericStock = Number(rawStock);
+  return Number.isFinite(numericStock) ? numericStock : null;
+};
+
 const validateCartInventory = (cart) => {
   for (const item of cart?.items || []) {
+    if (item?.kind === "DESIGN") {
+      const qty = Number(item.qty || 0);
+      const colorStock = getCustomizationColorStock(
+        item.product,
+        item.design?.productColor
+      );
+
+      if (colorStock !== null && colorStock < qty) {
+        const error = new Error(
+          `${getItemTitle(item)} is out of stock for color ${
+            item.design?.productColorName || item.design?.productColor
+          }`
+        );
+        error.statusCode = 409;
+        throw error;
+      }
+
+      continue;
+    }
+
     if (item?.kind !== "READYMADE") continue;
 
     const sourceProduct = item.dropproduct || item.readymadeProduct;
@@ -108,6 +149,7 @@ const getActiveCartWithPricing = async (userId) => {
   const cart = await Cart.findOne({ user: userId, status: "ACTIVE" })
     .populate("items.readymadeProduct")
     .populate("items.dropproduct")
+    .populate("items.design")
     .populate("items.product")
     .populate({
       path: "items.readymadeProduct",

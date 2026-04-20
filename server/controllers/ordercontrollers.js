@@ -1,7 +1,13 @@
 import mongoose from "mongoose";
 import Order from "../models/Order.js";
 import Review from "../models/Review.js";
-import { sendOrderStatusEmail } from "../services/orderEmailService.js";
+import {
+  sendOrderCancelledEmail,
+  sendOrderStatusEmail,
+  sendReturnDecisionEmail,
+  sendReturnRefundPaidEmail,
+  sendReturnRequestSubmittedEmail,
+} from "../services/orderEmailService.js";
 import { rollbackInventoryForOrder } from "../services/inventoryService.js";
 import {
   buildReviewLookupKey,
@@ -89,6 +95,8 @@ const getReturnDeadline = (order) => {
 };
 
 const toTrimmedString = (value) => String(value || "").trim();
+const isPaidOrCodOrder = (order) =>
+  order?.status === "PAID" || order?.payment?.method === "COD";
 
 const normalizeBankDetails = (bankDetails = {}) => ({
   method: toTrimmedString(bankDetails.method).toUpperCase(),
@@ -254,7 +262,7 @@ const attachReturnMetaToOrders = (req, orders) => {
       getReturnDeadline(order);
     const returnStatus = order.returnRequest?.status || "NONE";
     const returnEligible =
-      order.status === "PAID" &&
+      isPaidOrCodOrder(order) &&
       order.orderStatus === "DELIVERED" &&
       !hasCustomDesignItem &&
       returnStatus === "NONE" &&
@@ -402,7 +410,7 @@ export const cancelMyOrder = async (req, res) => {
     await order.save();
 
     try {
-      await sendOrderStatusEmail(order, order.user);
+      await sendOrderCancelledEmail(order, order.user);
     } catch (emailError) {
       console.error("cancelMyOrder email error:", emailError.response?.body || emailError);
     }
@@ -446,8 +454,10 @@ export const submitReturnRequest = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    if (order.status !== "PAID" || order.orderStatus !== "DELIVERED") {
-      return res.status(400).json({ message: "Only delivered paid orders can be returned" });
+    if (!isPaidOrCodOrder(order) || order.orderStatus !== "DELIVERED") {
+      return res.status(400).json({
+        message: "Only delivered paid or cash on delivery orders can be returned",
+      });
     }
 
     if (Array.isArray(order.items) && order.items.some((item) => item?.kind === "DESIGN")) {
@@ -502,6 +512,12 @@ export const submitReturnRequest = async (req, res) => {
 
     await order.save();
 
+    try {
+      await sendReturnRequestSubmittedEmail(order, req.user);
+    } catch (emailError) {
+      console.error("submitReturnRequest email error:", emailError.response?.body || emailError);
+    }
+
     const [orderWithReviews] = await attachReviewMetaToOrders([order.toObject()], userId);
     const [orderWithReturnMeta] = attachReturnMetaToOrders(req, [orderWithReviews]);
 
@@ -536,7 +552,14 @@ export const adminGetAllOrders = async (req, res) => {
     const { paymentStatus, orderStatus, userId, dateFrom, dateTo } = req.query;
 
     const query = {};
-    if (paymentStatus) query.status = paymentStatus;
+    if (paymentStatus === "COD") {
+      query["payment.method"] = "COD";
+    } else if (paymentStatus === "PENDING_PAYMENT") {
+      query.status = paymentStatus;
+      query["payment.method"] = { $ne: "COD" };
+    } else if (paymentStatus) {
+      query.status = paymentStatus;
+    }
     if (orderStatus) query.orderStatus = orderStatus;
     if (userId) query.user = userId;
     if (dateFrom || dateTo) {
@@ -1046,6 +1069,12 @@ export const adminUpdateReturnRequest = async (req, res) => {
 
     await order.save();
 
+    try {
+      await sendReturnDecisionEmail(order, order.user);
+    } catch (emailError) {
+      console.error("adminUpdateReturnRequest email error:", emailError.response?.body || emailError);
+    }
+
     const shaped = {
       ...order.toObject(),
       returnRequest: shapeReturnRequest(req, {
@@ -1111,6 +1140,17 @@ export const adminUpdateReturnRefundStatus = async (req, res) => {
     order.returnRequest.refundStatus = nextRefundStatus;
     order.returnRequest.refundPaidAt = nextRefundStatus === "PAID" ? new Date() : null;
     await order.save();
+
+    if (nextRefundStatus === "PAID") {
+      try {
+        await sendReturnRefundPaidEmail(order, order.user);
+      } catch (emailError) {
+        console.error(
+          "adminUpdateReturnRefundStatus email error:",
+          emailError.response?.body || emailError
+        );
+      }
+    }
 
     const shaped = {
       ...order.toObject(),

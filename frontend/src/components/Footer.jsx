@@ -79,20 +79,6 @@ const Footer = () => {
               </React.Fragment>
             ))}
           </ul>
-
-          {/* Mobile view - simplified version */}
-          <ul className="sm:hidden flex flex-wrap justify-center gap-x-4 gap-y-2 mt-4 text-xs">
-            {legalLinks.map((link) => (
-              <li key={link.label}>
-                <a
-                  href={link.href}
-                  className="text-gray-400 hover:text-gray-600 transition-colors duration-200 tracking-wide"
-                >
-                  {link.label}
-                </a>
-              </li>
-            ))}
-          </ul>
         </nav>
       </div>
     </footer>

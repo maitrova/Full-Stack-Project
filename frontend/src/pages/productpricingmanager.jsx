@@ -9,10 +9,10 @@ import {
 const API_BASE = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
 const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"];
 const DEFAULT_COLORS = [
-  { value: "#FFFFFF", label: "White" },
-  { value: "#000000", label: "Black" },
-  { value: "#FF6B6B", label: "Coral" },
-  { value: "#4ECDC4", label: "Mint" },
+  { value: "#FFFFFF", label: "White", stock: "" },
+  { value: "#000000", label: "Black", stock: "" },
+  { value: "#FF6B6B", label: "Coral", stock: "" },
+  { value: "#4ECDC4", label: "Mint", stock: "" },
 ];
 const DEFAULT_IMAGE_PRICE_RULES = [
   { maxSideInches: 4, price: 40 },
@@ -23,7 +23,7 @@ const DEFAULT_TEXT_PRICE_RULES = [
   { maxSideInches: "", price: 100 },
 ];
 
-const createEmptyColor = () => ({ label: "", value: "#FFFFFF" });
+const createEmptyColor = () => ({ label: "", value: "#FFFFFF", stock: "" });
 const createEmptySizeRow = () => ({ size: "M", price: 0, stock: 0 });
 const createEmptyImagePriceRule = () => ({ maxSideInches: "", price: 0 });
 const createEmptyTextPriceRule = () => ({ maxSideInches: "", price: 0 });
@@ -33,6 +33,10 @@ const normalizeColors = (colors = []) =>
     ? colors.map((entry) => ({
         label: entry?.label || "",
         value: entry?.value || "#FFFFFF",
+        stock:
+          entry?.stock === null || entry?.stock === undefined || entry?.stock === ""
+            ? ""
+            : Number(entry.stock || 0),
       }))
     : DEFAULT_COLORS;
 
@@ -123,6 +127,10 @@ const buildPayload = (form) => ({
     .map((entry) => ({
       label: String(entry.label || "").trim(),
       value: String(entry.value || "").trim().toUpperCase(),
+      stock:
+        entry.stock === "" || entry.stock === null || entry.stock === undefined
+          ? null
+          : Number(entry.stock || 0),
     }))
     .filter((entry) => entry.label && entry.value),
   sizePricing: form.sizePricing.map((entry) => ({
@@ -580,7 +588,7 @@ export default function ProductPricingManager() {
                   {form.colors.map((color, index) => (
                     <div
                       key={`${color.value}-${index}`}
-                      className="grid gap-3 rounded-xl border border-slate-200 p-3 sm:grid-cols-[minmax(0,1fr)_160px_48px]"
+                      className="grid gap-3 rounded-xl border border-slate-200 p-3 sm:grid-cols-[minmax(0,1fr)_160px_160px_48px]"
                     >
                       <input
                         type="text"
@@ -594,6 +602,14 @@ export default function ProductPricingManager() {
                         value={color.value}
                         onChange={(e) => updateColor(index, "value", e.target.value)}
                         className="h-10 w-full rounded-lg border border-slate-300 bg-white px-2 py-1"
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        value={color.stock}
+                        onChange={(e) => updateColor(index, "stock", e.target.value)}
+                        placeholder="Color stock"
+                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sky-500"
                       />
                       <button
                         type="button"

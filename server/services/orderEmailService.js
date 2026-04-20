@@ -31,6 +31,8 @@ const ORDER_EMAIL_POPULATE = [
 const formatAmount = (value) => Number(value || 0).toFixed(2);
 const formatCurrencyAmount = (value, currency = "INR") =>
   `${currency === "INR" ? "Rs." : `${currency} `}${formatAmount(value)}`;
+const formatMoneyLabel = (value, currency = "INR") =>
+  `${currency === "INR" ? "Rs." : currency} ${formatAmount(value)}`;
 
 const getEmailAssetBaseUrl = () =>
   String(
@@ -70,6 +72,18 @@ const formatDateTime = (date) =>
     hour: "2-digit",
     minute: "2-digit",
   });
+
+const safeFormatDate = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : formatDate(date);
+};
+
+const safeFormatDateTime = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : formatDateTime(date);
+};
 
 const resolvePaymentMethod = (order) => {
   if (order?.payment?.method === "COD") {
@@ -192,6 +206,103 @@ const buildItemsHtml = (items = []) =>
     `;
     })
     .join("");
+
+const maskAccountNumber = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (raw.length <= 4) return raw;
+  return `${"*".repeat(Math.max(raw.length - 4, 0))}${raw.slice(-4)}`;
+};
+
+const buildCustomerTemplateBaseParams = (order, user, itemsHtml, orderDate) => {
+  const normalizedItems = (order.items || []).map((item, index) => ({
+    index: index + 1,
+    name: getItemName(item, index),
+    item_name: getItemName(item, index),
+    previewImage: resolveEmailImageUrl(item.previewImage),
+    preview_image: resolveEmailImageUrl(item.previewImage),
+    size: item.size || "",
+    quantity: Number(item.qty || 0),
+    qty: Number(item.qty || 0),
+    unitPrice: formatAmount(item.unitPrice),
+    unit_price: formatAmount(item.unitPrice),
+    currency: item.currency || order.currency || "INR",
+  }));
+
+  const deliveryAddress = buildAddressText(order.deliveryAddress);
+  const billingAddress = buildAddressText(order.billingAddress);
+  const returnRequest = order.returnRequest || {};
+  const bankDetails = returnRequest.bankDetails || {};
+  const paymentMethod = resolvePaymentMethod(order);
+
+  const params = {
+    customerName: user?.name || "",
+    customer_name: user?.name || "",
+    customerEmail: user?.email || "",
+    customer_email: user?.email || "",
+    customerPhone:
+      order.deliveryAddress?.mobileNumber ||
+      order.billingAddress?.mobileNumber ||
+      user?.phone ||
+      "",
+    customer_phone:
+      order.deliveryAddress?.mobileNumber ||
+      order.billingAddress?.mobileNumber ||
+      user?.phone ||
+      "",
+    orderId: String(order._id || ""),
+    order_id: String(order._id || ""),
+    orderStatus: order.orderStatus || "",
+    order_status: order.orderStatus || "",
+    paymentStatus: order.payment?.status || order.status || "",
+    payment_status: order.payment?.status || order.status || "",
+    paymentMethod: paymentMethod,
+    payment_method: paymentMethod,
+    orderDate: orderDate || "",
+    order_date: orderDate || "",
+    subtotal: formatAmount(order.subtotal),
+    subtotal_amount: formatAmount(order.subtotal),
+    shipping: formatAmount(order.shipping),
+    shipping_amount: formatAmount(order.shipping),
+    discount: formatAmount(order.discount),
+    discount_amount: formatAmount(order.discount),
+    total: formatAmount(order.total),
+    total_amount: formatAmount(order.total),
+    total_refund_amount: formatAmount(order.total),
+    currency: order.currency || "INR",
+    delivery_address: deliveryAddress,
+    billing_address: billingAddress || deliveryAddress,
+    items: normalizedItems,
+    itemsHtml,
+    items_html: itemsHtml,
+    return_status: returnRequest.status || "NONE",
+    return_requested_at: safeFormatDateTime(returnRequest.requestedAt),
+    return_decided_at: safeFormatDateTime(returnRequest.decidedAt),
+    return_deadline_at: safeFormatDateTime(returnRequest.deadlineAt),
+    return_reason: returnRequest.reason || "",
+    admin_decision_note: returnRequest.adminDecisionNote || "",
+    refund_status: returnRequest.refundStatus || "NOT_PAID",
+    refund_paid_at: safeFormatDateTime(returnRequest.refundPaidAt),
+    refund_method: bankDetails.method || "",
+    refund_account_holder_name: bankDetails.accountHolderName || "",
+    refund_account_number_masked: maskAccountNumber(bankDetails.accountNumber),
+    refund_ifsc_code: bankDetails.ifscCode || "",
+    refund_bank_name: bankDetails.bankName || "",
+    refund_branch_name: bankDetails.branchName || "",
+    refund_upi_id: bankDetails.upiId || "",
+    transaction_id: order.payment?.razorpayPaymentId || order.payment?.razorpayOrderId || "",
+  };
+
+  normalizedItems.forEach((item) => {
+    params[`product_name_${item.index}`] = item.name;
+    params[`size_${item.index}`] = item.size;
+    params[`qty_${item.index}`] = item.quantity;
+    params[`price_${item.index}`] = item.unitPrice;
+    params[`preview_image_${item.index}`] = item.previewImage;
+  });
+
+  return params;
+};
 
 const buildOrderTemplateParams = (order, user, itemsHtml, orderDate) => {
   const normalizedItems = (order.items || []).map((item, index) => ({
@@ -472,3 +583,171 @@ export const sendAdminOrderNotification = async (order, user) => {
     console.error("Admin Brevo Error:", error.response?.body || error);
   }
 };
+
+const sendCustomerTemplateEmail = async ({
+  order,
+  user,
+  subject,
+  templateIdKeys,
+  htmlContentBuilder,
+  paramsBuilder,
+  logPrefix,
+}) => {
+  const hydrated = await hydrateOrderForEmail(order, user);
+  const emailOrder = hydrated.order || order;
+  const emailUser = hydrated.user || user || {};
+
+  if (!emailUser?.email) {
+    console.warn(`${logPrefix} skipped: customer email missing`);
+    return;
+  }
+
+  const itemsHtml = buildItemsHtml(emailOrder.items);
+  const orderDate = formatDate(emailOrder.createdAt);
+  const templateId = getBrevoTemplateId(...templateIdKeys);
+  const params = paramsBuilder(emailOrder, emailUser, itemsHtml, orderDate);
+  const htmlContent = htmlContentBuilder(emailOrder, emailUser, params);
+
+  try {
+    await sendBrevoEmail({
+      to: [{ email: emailUser.email, name: emailUser.name }],
+      subject,
+      htmlContent,
+      templateId,
+      params,
+    });
+
+    console.log(`${logPrefix} sent successfully`);
+  } catch (error) {
+    console.error(`${logPrefix} error:`, error.response?.body || error);
+  }
+};
+
+export const sendOrderCancelledEmail = async (order, user) =>
+  sendCustomerTemplateEmail({
+    order,
+    user,
+    subject: "Your Order Has Been Cancelled",
+    templateIdKeys: [
+      "BREVO_ORDER_CANCELLED_TEMPLATE_ID",
+      "BREVO_CANCEL_ORDER_TEMPLATE_ID",
+    ],
+    paramsBuilder: (emailOrder, emailUser, itemsHtml, orderDate) => ({
+      ...buildCustomerTemplateBaseParams(emailOrder, emailUser, itemsHtml, orderDate),
+      order_status: "CANCELLED",
+      orderStatus: "CANCELLED",
+      cancellation_message:
+        "Your order has been cancelled successfully. If any payment was captured, our team will process it according to the payment method.",
+    }),
+    htmlContentBuilder: (emailOrder, emailUser, params) => `
+      <div style="font-family:Arial,sans-serif;background:#f5f5f5;padding:20px;">
+        <div style="max-width:600px;margin:auto;background:#ffffff;border-radius:8px;padding:24px;">
+          <h2>Your Order Has Been Cancelled</h2>
+          <p>Hello ${emailUser.name || "Customer"},</p>
+          <p>Your order #${emailOrder._id} has been cancelled.</p>
+          <p>Order Date: ${params.order_date}</p>
+          <p>Total: ${formatMoneyLabel(emailOrder.total, emailOrder.currency)}</p>
+          <p>${params.cancellation_message}</p>
+        </div>
+      </div>
+    `,
+    logPrefix: "[email/order-cancelled]",
+  });
+
+export const sendReturnRequestSubmittedEmail = async (order, user) =>
+  sendCustomerTemplateEmail({
+    order,
+    user,
+    subject: "Your Return Request Has Been Received",
+    templateIdKeys: [
+      "BREVO_RETURN_REQUEST_TEMPLATE_ID",
+      "BREVO_RETURN_SUBMITTED_TEMPLATE_ID",
+    ],
+    paramsBuilder: (emailOrder, emailUser, itemsHtml, orderDate) => ({
+      ...buildCustomerTemplateBaseParams(emailOrder, emailUser, itemsHtml, orderDate),
+      event_title: "Return Request Submitted",
+      event_message:
+        "We have received your return request and our team will review it shortly.",
+    }),
+    htmlContentBuilder: (_emailOrder, emailUser, params) => `
+      <div style="font-family:Arial,sans-serif;background:#f5f5f5;padding:20px;">
+        <div style="max-width:600px;margin:auto;background:#ffffff;border-radius:8px;padding:24px;">
+          <h2>${params.event_title}</h2>
+          <p>Hello ${emailUser.name || "Customer"},</p>
+          <p>Your return request for order #${params.order_id} has been submitted.</p>
+          <p>Reason: ${params.return_reason}</p>
+          <p>Requested At: ${params.return_requested_at}</p>
+          <p>${params.event_message}</p>
+        </div>
+      </div>
+    `,
+    logPrefix: "[email/return-request]",
+  });
+
+export const sendReturnDecisionEmail = async (order, user) => {
+  const returnStatus = order?.returnRequest?.status || "NONE";
+  const isApproved = returnStatus === "APPROVED";
+
+  return sendCustomerTemplateEmail({
+    order,
+    user,
+    subject: isApproved
+      ? "Your Return Request Has Been Approved"
+      : "Your Return Request Has Been Rejected",
+    templateIdKeys: isApproved
+      ? ["BREVO_RETURN_APPROVED_TEMPLATE_ID", "BREVO_RETURN_DECISION_TEMPLATE_ID"]
+      : ["BREVO_RETURN_REJECTED_TEMPLATE_ID", "BREVO_RETURN_DECISION_TEMPLATE_ID"],
+    paramsBuilder: (emailOrder, emailUser, itemsHtml, orderDate) => ({
+      ...buildCustomerTemplateBaseParams(emailOrder, emailUser, itemsHtml, orderDate),
+      event_title: isApproved ? "Return Approved" : "Return Rejected",
+      event_message: isApproved
+        ? "Your return request has been approved. Our team will process the refund according to your selected refund method."
+        : "Your return request could not be approved. Please check the note below or contact support.",
+    }),
+    htmlContentBuilder: (_emailOrder, emailUser, params) => `
+      <div style="font-family:Arial,sans-serif;background:#f5f5f5;padding:20px;">
+        <div style="max-width:600px;margin:auto;background:#ffffff;border-radius:8px;padding:24px;">
+          <h2>${params.event_title}</h2>
+          <p>Hello ${emailUser.name || "Customer"},</p>
+          <p>Your return request for order #${params.order_id} is now ${params.return_status}.</p>
+          <p>Decision Time: ${params.return_decided_at}</p>
+          <p>Admin Note: ${params.admin_decision_note || "No additional note provided."}</p>
+          <p>${params.event_message}</p>
+        </div>
+      </div>
+    `,
+    logPrefix: "[email/return-decision]",
+  });
+};
+
+export const sendReturnRefundPaidEmail = async (order, user) =>
+  sendCustomerTemplateEmail({
+    order,
+    user,
+    subject: "Your Return Refund Has Been Processed",
+    templateIdKeys: [
+      "BREVO_RETURN_REFUND_PAID_TEMPLATE_ID",
+      "BREVO_RETURN_REFUND_TEMPLATE_ID",
+    ],
+    paramsBuilder: (emailOrder, emailUser, itemsHtml, orderDate) => ({
+      ...buildCustomerTemplateBaseParams(emailOrder, emailUser, itemsHtml, orderDate),
+      event_title: "Refund Processed",
+      event_message:
+        "Your refund has been marked as paid. The amount should reflect in your selected account or UPI method based on bank processing timelines.",
+    }),
+    htmlContentBuilder: (_emailOrder, emailUser, params) => `
+      <div style="font-family:Arial,sans-serif;background:#f5f5f5;padding:20px;">
+        <div style="max-width:600px;margin:auto;background:#ffffff;border-radius:8px;padding:24px;">
+          <h2>${params.event_title}</h2>
+          <p>Hello ${emailUser.name || "Customer"},</p>
+          <p>Your refund for order #${params.order_id} has been marked as paid.</p>
+          <p>Refund Status: ${params.refund_status}</p>
+          <p>Refund Paid At: ${params.refund_paid_at}</p>
+          <p>Refund Method: ${params.refund_method}</p>
+          <p>Refund Amount: ${params.currency} ${params.total_refund_amount}</p>
+          <p>${params.event_message}</p>
+        </div>
+      </div>
+    `,
+    logPrefix: "[email/return-refund-paid]",
+  });

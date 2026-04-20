@@ -207,6 +207,21 @@ const getColorLabel = (colorValue, colorOptions = DEFAULT_COLOR_OPTIONS) => {
   return label ? label : `Custom (${colorValue.toUpperCase()})`;
 };
 
+const getColorStockValue = (colorOption) => {
+  const rawStock = colorOption?.stock;
+  if (rawStock === null || rawStock === undefined || String(rawStock).trim() === "") {
+    return null;
+  }
+
+  const numericStock = Number(rawStock);
+  return Number.isFinite(numericStock) ? numericStock : null;
+};
+
+const isColorAvailable = (colorOption) => {
+  const stock = getColorStockValue(colorOption);
+  return stock === null || stock > 0;
+};
+
 const getFileExtension = (name = "") => {
   const parts = String(name).toLowerCase().split(".");
   return parts.length > 1 ? parts.pop() : "";
@@ -682,6 +697,7 @@ const getSizeBasePrice = (prod, size) => {
     Array.isArray(product?.colors) && product.colors.length > 0
       ? product.colors
       : DEFAULT_COLOR_OPTIONS;
+  const selectableProductColorOptions = productColorOptions.filter(isColorAvailable);
   const defaultColorValue = productColorOptions[0]?.value || "#FFFFFF";
   const defaultColorLabel = getColorLabel(defaultColorValue, productColorOptions);
   const [productColor, setProductColor] = useState(defaultColorValue);
@@ -795,12 +811,12 @@ const getSizeBasePrice = (prod, size) => {
       return;
     }
 
-    const fallbackColor = productColorOptions[0];
+    const fallbackColor = selectableProductColorOptions[0] || productColorOptions[0];
     if (fallbackColor) {
       setProductColor(fallbackColor.value);
       setProductColorName(fallbackColor.label || getColorLabel(fallbackColor.value, productColorOptions));
     }
-  }, [isEditMode, originalDesign, productColor, productColorName, productColorOptions]);
+  }, [isEditMode, originalDesign, productColor, productColorName, productColorOptions, selectableProductColorOptions]);
 
   const getImageSizeFromFile = (file) =>
   new Promise((resolve, reject) => {
@@ -1493,8 +1509,22 @@ setPriceBreakdown((prev) => ({
     (entry) => String(entry?.size || "").toUpperCase() === String(selectedSize || "").toUpperCase()
   );
   const selectedSizeStock = selectedSizeStockEntry?.stock;
+  const selectedColorOption = productColorOptions.find(
+    (option) => String(option?.value || "").toLowerCase() === String(productColor || "").toLowerCase()
+  );
+  const selectedColorStock = getColorStockValue(selectedColorOption);
+  const sizeLimit =
+    selectedSizeStock !== undefined && selectedSizeStock !== null && Number(selectedSizeStock) >= 0
+      ? Number(selectedSizeStock)
+      : Number.POSITIVE_INFINITY;
+  const colorLimit =
+    selectedColorStock !== null && selectedColorStock >= 0
+      ? Number(selectedColorStock)
+      : Number.POSITIVE_INFINITY;
+  const resolvedStockLimit = Math.min(sizeLimit, colorLimit);
   const maxOrderQuantity =
-    selectedSizeStock !== undefined && Number(selectedSizeStock) > 0 ? Number(selectedSizeStock) : 99;
+    Number.isFinite(resolvedStockLimit) ? resolvedStockLimit : 99;
+  const isSelectionOutOfStock = maxOrderQuantity < 1;
   const customizationNames = [
     ...designLayers.map((layer, index) => getDesignLayerDisplayName(layer, index)),
     ...textLayers.map((layer, index) => getTextLayerDisplayName(layer, index)),
@@ -1583,7 +1613,7 @@ setPriceBreakdown((prev) => ({
     setSelectedQuantity((prev) => {
       const next = Number(prev || 1);
       if (next < 1) return 1;
-      return Math.min(next, maxOrderQuantity);
+      return Math.min(next, Math.max(1, maxOrderQuantity));
     });
   }, [maxOrderQuantity]);
 
@@ -1594,7 +1624,7 @@ setPriceBreakdown((prev) => ({
       return;
     }
 
-    const normalized = Math.max(1, Math.min(Math.floor(parsed), maxOrderQuantity));
+    const normalized = Math.max(1, Math.min(Math.floor(parsed), Math.max(1, maxOrderQuantity)));
     setSelectedQuantity(normalized);
   };
 
@@ -2496,6 +2526,11 @@ const startCropPreviewPan = (event, mode = "move") => {
     return;
   }
 
+  if (isSelectionOutOfStock) {
+    setError("The selected size or color is out of stock.");
+    return;
+  }
+
   let designIdToUse = savedDesignId;
 
   try {
@@ -2986,7 +3021,7 @@ const startCropPreviewPan = (event, mode = "move") => {
                           <p className="text-xs font-medium text-slate-700">Order quantity</p>
                           <p className="mt-1 text-[11px] text-slate-500">
                             {selectedSizeStock !== undefined
-                              ? `${maxOrderQuantity} item${maxOrderQuantity === 1 ? "" : "s"} available for size ${selectedSize || "Default"}`
+                              ? `${Math.max(0, maxOrderQuantity)} item${Math.max(0, maxOrderQuantity) === 1 ? "" : "s"} available for size ${selectedSize || "Default"}${selectedColorOption?.label ? ` in ${selectedColorOption.label}` : ""}`
                               : "Choose how many customized pieces you want to order."}
                           </p>
                         </div>
@@ -3010,7 +3045,7 @@ const startCropPreviewPan = (event, mode = "move") => {
                           <button
                             type="button"
                             onClick={() => updateSelectedQuantity(selectedQuantity + 1)}
-                            disabled={selectedQuantity >= maxOrderQuantity}
+                            disabled={selectedQuantity >= Math.max(1, maxOrderQuantity)}
                             className="h-9 w-9 rounded-full border border-slate-300 bg-white text-base font-semibold text-slate-700 disabled:opacity-40"
                           >
                             +
@@ -3027,17 +3062,40 @@ const startCropPreviewPan = (event, mode = "move") => {
                       {productColorOptions.map((option) => {
                         const currentColorKey = productColor?.toLowerCase() || "";
                         const isActive = option.value.toLowerCase() === currentColorKey;
+                        const colorStock = getColorStockValue(option);
+                        const colorOutOfStock = !isColorAvailable(option);
                         return (
                           <button
                             key={option.value}
                             type="button"
-                            className={`h-8 w-8 rounded-full border-2 ${isActive ? "border-sky-500" : "border-slate-300"}`}
+                            className={`relative h-8 w-8 rounded-full border-2 ${isActive ? "border-sky-500" : "border-slate-300"} ${colorOutOfStock ? "cursor-not-allowed opacity-40" : ""}`}
                             style={{ backgroundColor: option.value }}
-                            onClick={() => handleColorChange(option.value, option.label)}
-                          />
+                            onClick={() => !colorOutOfStock && handleColorChange(option.value, option.label)}
+                            disabled={colorOutOfStock}
+                            title={
+                              colorStock === null
+                                ? option.label
+                                : colorOutOfStock
+                                  ? `${option.label} - Out of stock`
+                                  : `${option.label} - ${colorStock} in stock`
+                            }
+                          >
+                            {colorOutOfStock ? (
+                              <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-700">
+                                ×
+                              </span>
+                            ) : null}
+                          </button>
                         );
                       })}
                     </div>
+                    {selectedColorStock !== null ? (
+                      <p className="mt-2 text-[11px] text-slate-500">
+                        {selectedColorStock > 0
+                          ? `${selectedColorStock} item${selectedColorStock === 1 ? "" : "s"} available in ${productColorName}`
+                          : `${productColorName} is out of stock`}
+                      </p>
+                    ) : null}
                   </div>
 
                 </div>
@@ -3892,17 +3950,19 @@ const startCropPreviewPan = (event, mode = "move") => {
                         {productColorOptions.map((option) => {
                           const currentColorKey = productColor?.toLowerCase() || "";
                           const isActive = option.value.toLowerCase() === currentColorKey;
+                          const colorOutOfStock = !isColorAvailable(option);
 
                           return (
                             <button
                               key={option.value}
                               type="button"
                               aria-label={option.label}
-                              title={option.label}
-                              onClick={() => handleColorChange(option.value, option.label)}
+                              title={colorOutOfStock ? `${option.label} - Out of stock` : option.label}
+                              onClick={() => !colorOutOfStock && handleColorChange(option.value, option.label)}
+                              disabled={colorOutOfStock}
                               className={`h-5 w-5 shrink-0 rounded-full border ${
                                 isActive ? "border-sky-500 ring-1 ring-sky-200" : "border-slate-300"
-                              }`}
+                              } ${colorOutOfStock ? "opacity-40" : ""}`}
                               style={{ backgroundColor: option.value }}
                             />
                           );
