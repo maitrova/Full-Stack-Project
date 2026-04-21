@@ -33,6 +33,13 @@ const formatCurrencyAmount = (value, currency = "INR") =>
   `${currency === "INR" ? "Rs." : `${currency} `}${formatAmount(value)}`;
 const formatMoneyLabel = (value, currency = "INR") =>
   `${currency === "INR" ? "Rs." : currency} ${formatAmount(value)}`;
+const escapeHtml = (value) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 
 const getEmailAssetBaseUrl = () =>
   String(
@@ -186,26 +193,45 @@ const hydrateOrderForEmail = async (order, user) => {
 };
 
 const buildItemsHtml = (items = []) =>
-  items
-    .map((item, index) => {
-      const previewImageUrl = resolveEmailImageUrl(item.previewImage);
-      return `
-      <tr>
-        <td style="padding:10px;border-bottom:1px solid #eee;">
-          <img src="${previewImageUrl}" width="60" />
-        </td>
-        <td style="padding:10px;border-bottom:1px solid #eee;">
-          <strong>${getItemName(item, index)}</strong><br/>
-          Size: ${item.size || "-"}<br/>
-          Qty: ${item.qty || 0}
-        </td>
-        <td style="padding:10px;border-bottom:1px solid #eee;text-align:right;">
-          Rs.${formatAmount(item.unitPrice)}
-        </td>
-      </tr>
+  !items.length
+    ? `
+      <p style="margin:0;color:#555555;font-size:14px;line-height:22px;">
+        No items available for this order.
+      </p>
+    `
+    : `
+      <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+        ${items
+          .map((item, index) => {
+            const previewImageUrl = resolveEmailImageUrl(item.previewImage);
+            const productName = escapeHtml(getItemName(item, index));
+            const size = escapeHtml(item.size || "-");
+            const quantity = Number(item.qty || 0);
+            const price = formatMoneyLabel(item.unitPrice, item.currency || "INR");
+
+            return `
+              <tr>
+                <td style="padding:12px 0;border-bottom:1px solid #eeeeee;width:72px;vertical-align:top;">
+                  ${
+                    previewImageUrl
+                      ? `<img src="${escapeHtml(previewImageUrl)}" alt="${productName}" width="60" style="display:block;border:1px solid #eeeeee;border-radius:6px;" />`
+                      : `<div style="width:60px;height:60px;line-height:60px;text-align:center;background:#f7f7f7;border:1px solid #eeeeee;border-radius:6px;color:#999999;font-size:11px;">No Image</div>`
+                  }
+                </td>
+                <td style="padding:12px 12px 12px 0;border-bottom:1px solid #eeeeee;vertical-align:top;">
+                  <p style="margin:0 0 6px 0;font-size:14px;line-height:20px;color:#111111;font-weight:bold;">${productName}</p>
+                  <p style="margin:0;font-size:13px;line-height:19px;color:#555555;">Size: ${size}</p>
+                  <p style="margin:0;font-size:13px;line-height:19px;color:#555555;">Qty: ${quantity}</p>
+                </td>
+                <td style="padding:12px 0;border-bottom:1px solid #eeeeee;text-align:right;vertical-align:top;white-space:nowrap;font-size:14px;line-height:20px;color:#111111;font-weight:bold;">
+                  ${escapeHtml(price)}
+                </td>
+              </tr>
+            `;
+          })
+          .join("")}
+      </table>
     `;
-    })
-    .join("");
 
 const maskAccountNumber = (value) => {
   const raw = String(value || "").trim();
@@ -214,7 +240,7 @@ const maskAccountNumber = (value) => {
   return `${"*".repeat(Math.max(raw.length - 4, 0))}${raw.slice(-4)}`;
 };
 
-const buildCustomerTemplateBaseParams = (order, user, itemsHtml, orderDate) => {
+const buildCustomerTemplateBaseParams = (order, user, orderDate) => {
   const normalizedItems = (order.items || []).map((item, index) => ({
     index: index + 1,
     name: getItemName(item, index),
@@ -273,8 +299,6 @@ const buildCustomerTemplateBaseParams = (order, user, itemsHtml, orderDate) => {
     delivery_address: deliveryAddress,
     billing_address: billingAddress || deliveryAddress,
     items: normalizedItems,
-    itemsHtml,
-    items_html: itemsHtml,
     return_status: returnRequest.status || "NONE",
     return_requested_at: safeFormatDateTime(returnRequest.requestedAt),
     return_decided_at: safeFormatDateTime(returnRequest.decidedAt),
@@ -304,7 +328,7 @@ const buildCustomerTemplateBaseParams = (order, user, itemsHtml, orderDate) => {
   return params;
 };
 
-const buildOrderTemplateParams = (order, user, itemsHtml, orderDate) => {
+const buildOrderTemplateParams = (order, user, orderDate) => {
   const normalizedItems = (order.items || []).map((item, index) => ({
     index: index + 1,
     name: getItemName(item, index),
@@ -336,8 +360,6 @@ const buildOrderTemplateParams = (order, user, itemsHtml, orderDate) => {
     total_amount: formatAmount(order.total),
     currency: order.currency || "INR",
     items: normalizedItems,
-    itemsHtml,
-    items_html: itemsHtml,
     shippedMessage:
       order.orderStatus === "SHIPPED"
         ? "Your order is on the way! You will receive it soon."
@@ -432,12 +454,7 @@ export const sendOrderStatusEmail = async (order, user) => {
     `BREVO_ORDER_TEMPLATE_ID_${emailOrder.orderStatus}`,
     "BREVO_ORDER_TEMPLATE_ID"
   );
-  const templateParams = buildOrderTemplateParams(
-    emailOrder,
-    emailUser,
-    itemsHtml,
-    orderDate
-  );
+  const templateParams = buildOrderTemplateParams(emailOrder, emailUser, orderDate);
 
   console.info("[email/order-status] Item image URLs", {
     orderId: String(emailOrder._id || ""),
@@ -602,10 +619,9 @@ const sendCustomerTemplateEmail = async ({
     return;
   }
 
-  const itemsHtml = buildItemsHtml(emailOrder.items);
   const orderDate = formatDate(emailOrder.createdAt);
   const templateId = getBrevoTemplateId(...templateIdKeys);
-  const params = paramsBuilder(emailOrder, emailUser, itemsHtml, orderDate);
+  const params = paramsBuilder(emailOrder, emailUser, orderDate);
   const htmlContent = htmlContentBuilder(emailOrder, emailUser, params);
 
   try {
@@ -632,8 +648,8 @@ export const sendOrderCancelledEmail = async (order, user) =>
       "BREVO_ORDER_CANCELLED_TEMPLATE_ID",
       "BREVO_CANCEL_ORDER_TEMPLATE_ID",
     ],
-    paramsBuilder: (emailOrder, emailUser, itemsHtml, orderDate) => ({
-      ...buildCustomerTemplateBaseParams(emailOrder, emailUser, itemsHtml, orderDate),
+    paramsBuilder: (emailOrder, emailUser, orderDate) => ({
+      ...buildCustomerTemplateBaseParams(emailOrder, emailUser, orderDate),
       order_status: "CANCELLED",
       orderStatus: "CANCELLED",
       cancellation_message:
@@ -663,8 +679,8 @@ export const sendReturnRequestSubmittedEmail = async (order, user) =>
       "BREVO_RETURN_REQUEST_TEMPLATE_ID",
       "BREVO_RETURN_SUBMITTED_TEMPLATE_ID",
     ],
-    paramsBuilder: (emailOrder, emailUser, itemsHtml, orderDate) => ({
-      ...buildCustomerTemplateBaseParams(emailOrder, emailUser, itemsHtml, orderDate),
+    paramsBuilder: (emailOrder, emailUser, orderDate) => ({
+      ...buildCustomerTemplateBaseParams(emailOrder, emailUser, orderDate),
       event_title: "Return Request Submitted",
       event_message:
         "We have received your return request and our team will review it shortly.",
@@ -697,8 +713,8 @@ export const sendReturnDecisionEmail = async (order, user) => {
     templateIdKeys: isApproved
       ? ["BREVO_RETURN_APPROVED_TEMPLATE_ID", "BREVO_RETURN_DECISION_TEMPLATE_ID"]
       : ["BREVO_RETURN_REJECTED_TEMPLATE_ID", "BREVO_RETURN_DECISION_TEMPLATE_ID"],
-    paramsBuilder: (emailOrder, emailUser, itemsHtml, orderDate) => ({
-      ...buildCustomerTemplateBaseParams(emailOrder, emailUser, itemsHtml, orderDate),
+    paramsBuilder: (emailOrder, emailUser, orderDate) => ({
+      ...buildCustomerTemplateBaseParams(emailOrder, emailUser, orderDate),
       event_title: isApproved ? "Return Approved" : "Return Rejected",
       event_message: isApproved
         ? "Your return request has been approved. Our team will process the refund according to your selected refund method."
@@ -729,8 +745,8 @@ export const sendReturnRefundPaidEmail = async (order, user) =>
       "BREVO_RETURN_REFUND_PAID_TEMPLATE_ID",
       "BREVO_RETURN_REFUND_TEMPLATE_ID",
     ],
-    paramsBuilder: (emailOrder, emailUser, itemsHtml, orderDate) => ({
-      ...buildCustomerTemplateBaseParams(emailOrder, emailUser, itemsHtml, orderDate),
+    paramsBuilder: (emailOrder, emailUser, orderDate) => ({
+      ...buildCustomerTemplateBaseParams(emailOrder, emailUser, orderDate),
       event_title: "Refund Processed",
       event_message:
         "Your refund has been marked as paid. The amount should reflect in your selected account or UPI method based on bank processing timelines.",
