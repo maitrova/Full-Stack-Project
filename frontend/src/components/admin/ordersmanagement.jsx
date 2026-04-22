@@ -406,6 +406,29 @@ const AdminOrders = () => {
 
   const getViewImage = (view) => resolveImageUrl(view?.previewImage, FALLBACK_PREVIEW);
 
+  const getFilenameFromUrl = (url, fallback = 'design-layer.png') => {
+    try {
+      const parsed = new URL(url, window.location.origin);
+      const candidate = parsed.pathname.split('/').pop();
+      return candidate || fallback;
+    } catch {
+      const candidate = String(url || '').split('?')[0].split('/').pop();
+      return candidate || fallback;
+    }
+  };
+
+  const sanitizeDownloadFilename = (value, fallback = 'design-layer.png') => {
+    const trimmed = String(value || '').trim();
+    if (!trimmed) return fallback;
+
+    const sanitized = trimmed
+      .replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return sanitized || fallback;
+  };
+
   const downloadImage = (url, filename) => {
     const resolvedUrl = resolveImageUrl(url, '');
     if (!resolvedUrl) {
@@ -424,7 +447,10 @@ const AdminOrders = () => {
         const blobUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = blobUrl;
-        a.download = filename || 'design-layer.png';
+        a.download = sanitizeDownloadFilename(
+          filename || getFilenameFromUrl(resolvedUrl, 'design-layer.png'),
+          'design-layer.png'
+        );
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(blobUrl);
@@ -1577,12 +1603,14 @@ const AdminOrders = () => {
                                           }}
                                         />
                                         <div className="flex-1">
-                                          <p className="text-sm font-medium text-gray-900">Layer {idx + 1}</p>
+                                          <p className="text-sm font-medium text-gray-900">
+                                            {layer.filename || `Layer ${idx + 1}`}
+                                          </p>
                                           <p className="text-xs text-gray-500">Zone: {layer.zone}</p>
                                           <p className="text-xs text-gray-500">Size: {layer.widthInches}" × {layer.heightInches}"</p>
                                           <p className="text-xs text-gray-500">Area: {layer.areaInches?.toFixed(2) || '0.00'}"²</p>
                                           <button
-                                            onClick={() => downloadImage(layer.imageUrl, `design-layer-${idx + 1}.png`)}
+                                            onClick={() => downloadImage(layer.imageUrl, layer.filename)}
                                             className="mt-2 text-xs text-indigo-600 hover:text-indigo-800"
                                           >
                                             Download Image

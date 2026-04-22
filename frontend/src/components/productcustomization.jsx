@@ -620,6 +620,7 @@ const createDesignLayer = (
   return {
     id,
     imageUrl,
+    filename: file?.name || getFilenameFromUrl(imageUrl, "design.png"),
     file,
     sourceFile: file,
     hasBgRemoved: false,
@@ -2345,6 +2346,7 @@ const startCropPreviewPan = (event, mode = "move") => {
   ({
     id,
     imageUrl,
+    filename,
     hasBgRemoved,
     x,
     y,
@@ -2391,6 +2393,7 @@ const startCropPreviewPan = (event, mode = "move") => {
   }) => ({
     id,
     imageUrl,
+    filename: filename || getFilenameFromUrl(imageUrl, "design.png"),
 
     hasBgRemoved: !!hasBgRemoved,
 

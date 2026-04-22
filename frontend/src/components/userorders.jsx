@@ -543,6 +543,11 @@ const UserOrders = () => {
     return null;
   };
 
+  const getReturnAdminNote = (order) => {
+    const note = order?.returnRequest?.adminDecisionNote;
+    return typeof note === 'string' && note.trim() ? note.trim() : null;
+  };
+
   const getReturnToneClasses = (tone) => {
     switch (tone) {
       case 'emerald':
@@ -746,6 +751,7 @@ const UserOrders = () => {
                 const isSubmittingReturnThisOrder = returnSubmittingOrderId === order._id && submitReturnLoading;
                 const cancellationNote = getCancellationNote(order);
                 const returnStatusInfo = getReturnStatusInfo(order);
+                const returnAdminNote = getReturnAdminNote(order);
                 return (
                   <li key={order._id} className="p-6 hover:bg-gray-50">
                     <div className="flex flex-col md:flex-row md:items-center justify-between">
@@ -786,6 +792,16 @@ const UserOrders = () => {
                           {returnStatusInfo ? (
                             <div className={`mt-3 rounded-md border px-3 py-2 text-xs font-medium ${getReturnToneClasses(returnStatusInfo.tone)}`}>
                               {returnStatusInfo.message}
+                            </div>
+                          ) : null}
+                          {returnAdminNote ? (
+                            <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                Admin Note
+                              </p>
+                              <p className="mt-1 text-xs text-slate-700">
+                                {returnAdminNote}
+                              </p>
                             </div>
                           ) : null}
                         </div>
@@ -1031,16 +1047,30 @@ const UserOrders = () => {
                 </div>
               ) : selectedOrder ? (
                 <div className="space-y-8">
-                  {/* Order Status */}
-                  <div className="bg-gray-50 rounded-lg p-6">
+                  {(() => {
+                    const returnStatusInfo = getReturnStatusInfo(selectedOrder);
+                    const returnAdminNote = getReturnAdminNote(selectedOrder);
+
+                    return (
+                      <div className="bg-gray-50 rounded-lg p-6">
                     {getCancellationNote(selectedOrder) ? (
                       <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
                         {getCancellationNote(selectedOrder)}
                       </div>
                     ) : null}
-                    {getReturnStatusInfo(selectedOrder) ? (
-                      <div className={`mb-4 rounded-lg border px-4 py-3 text-sm font-medium ${getReturnToneClasses(getReturnStatusInfo(selectedOrder).tone)}`}>
-                        {getReturnStatusInfo(selectedOrder).message}
+                    {returnStatusInfo ? (
+                      <div className={`mb-4 rounded-lg border px-4 py-3 text-sm font-medium ${getReturnToneClasses(returnStatusInfo.tone)}`}>
+                        {returnStatusInfo.message}
+                      </div>
+                    ) : null}
+                    {returnAdminNote ? (
+                      <div className="mb-4 rounded-lg border border-slate-200 bg-white px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Admin Note
+                        </p>
+                        <p className="mt-2 text-sm text-slate-700">
+                          {returnAdminNote}
+                        </p>
                       </div>
                     ) : null}
                     <div className="flex items-center justify-between mb-4">
@@ -1090,7 +1120,9 @@ const UserOrders = () => {
                         </div>
                       </div>
                     </div>
-                  </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Order Items */}
                   <div>

@@ -646,6 +646,7 @@ export const adminGetAllOrders = async (req, res) => {
                 designLayers: (v.designLayers || []).map((dl) => ({
                   id: dl.id,
                   imageUrl: resolveOrderAssetUrl(req, dl.imageUrl),
+                  filename: dl.filename || "",
                   hasBgRemoved: dl.hasBgRemoved,
                   x: dl.x,
                   y: dl.y,
@@ -780,6 +781,7 @@ export const adminGetOrderById = async (req, res) => {
                 designLayers: (v.designLayers || []).map((dl) => ({
                   id: dl.id,
                   imageUrl: resolveOrderAssetUrl(req, dl.imageUrl),
+                  filename: dl.filename || "",
                   hasBgRemoved: dl.hasBgRemoved,
                   x: dl.x,
                   y: dl.y,

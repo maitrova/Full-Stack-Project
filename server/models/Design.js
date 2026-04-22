@@ -48,6 +48,7 @@ const designLayerSchema = new mongoose.Schema(
   {
     id: String,
     imageUrl: String,
+    filename: String,
     hasBgRemoved: { type: Boolean, default: false },
 
     x: Number,

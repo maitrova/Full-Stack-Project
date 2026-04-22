@@ -69,6 +69,9 @@ const mapAdminReviewDocument = (review) => {
   };
 };
 
+const isPaidOrCodOrder = (order) =>
+  order?.status === "PAID" || order?.payment?.method === "COD";
+
 const buildPublicReviewSort = (sort) => {
   switch (String(sort || "").trim().toLowerCase()) {
     case "highest":
@@ -183,11 +186,10 @@ export const createOrUpdateMyReview = async (req, res) => {
     const order = await Order.findOne({
       _id: orderId,
       user: userId,
-      status: "PAID",
       orderStatus: "DELIVERED",
     }).lean();
 
-    if (!order) {
+    if (!order || !isPaidOrCodOrder(order)) {
       return res.status(404).json({ message: "Delivered order not found" });
     }
 
