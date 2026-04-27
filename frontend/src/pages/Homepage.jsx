@@ -10,6 +10,7 @@ import NewArrivals from '../components/Newarrivalss'
 import BestSellers from '../components/Bestsellers'
 import CategoryTilesHorizontal from '../components/Homepagecategotylist'
 import ProductCategoriesHorizontal from '../components/homepagecustomizationcategorieslist'
+import HomeBlogsSection from '../components/HomeBlogsSection.jsx'
 
 
 const Homepage = () => {
@@ -18,7 +19,8 @@ const Homepage = () => {
     {/* <Header/> */}
     <Hero/>
     <Dropproduct/>
-     <NewArrivals/>
+    <HomeBlogsSection />
+    <NewArrivals/>
     <BestSellers/>
     <ProductCategoriesHorizontal/>
     <CategoryTilesHorizontal/>

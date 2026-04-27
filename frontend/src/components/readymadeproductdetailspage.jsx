@@ -337,12 +337,6 @@ export default function ProductDetailPage() {
       return;
     }
 
-    if (!isLoggedIn) {
-      // Show login prompt modal instead of just a notification
-      handleLoginPrompt();
-      return;
-    }
-
     if (isReadymade) {
       if (hasVariants && !selectedSize) {
         setSizeError('Please select a size');
@@ -1476,8 +1470,8 @@ export default function ProductDetailPage() {
                 </div>
               )}
 
-              {/* Action Buttons (desktop) - Only show if logged in */}
-              {isLoggedIn ? (
+              {/* Action Buttons (desktop) */}
+              {
                 <div className="grid grid-cols-2 gap-4 mt-6">
                   <button
                     onClick={handleAddToCart}
@@ -1521,17 +1515,7 @@ export default function ProductDetailPage() {
                     Buy Now
                   </button>
                 </div>
-              ) : (
-                <div className="mt-6">
-                  <button
-                    onClick={() => navigate('/login', { state: { from: window.location.pathname } })}
-                    className="w-full h-14 rounded-xl font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:opacity-90 transition-all flex items-center justify-center gap-3"
-                  >
-                    <LogIn className="w-5 h-5" />
-                    Login to Add to Cart
-                  </button>
-                </div>
-              )}
+              }
             </div>
           </div>
         </div>
@@ -1550,7 +1534,7 @@ export default function ProductDetailPage() {
             {!isLoggedIn && (
               <div className="mb-1 rounded-lg border border-purple-100 bg-purple-50 p-2">
                 <p className="text-xs text-purple-700 text-center">
-                  Please login to add items to cart
+                  Guest cart is enabled. Login will be required when you continue to checkout.
                 </p>
               </div>
             )}
@@ -1587,7 +1571,7 @@ export default function ProductDetailPage() {
               )}
 
               <div className="flex gap-2">
-                {isLoggedIn ? (
+                {
                   <>
                     <button
                       onClick={handleAddToCart}
@@ -1631,15 +1615,7 @@ export default function ProductDetailPage() {
                       <span className="text-xs">Buy</span>
                     </button>
                   </>
-                ) : (
-                  <button
-                    onClick={() => navigate('/login', { state: { from: window.location.pathname } })}
-                    className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-sm font-semibold text-white transition-all hover:opacity-90"
-                  >
-                    <LogIn className="h-3.5 w-3.5" />
-                    <span className="text-xs">Login to Add</span>
-                  </button>
-                )}
+                }
               </div>
             </div>
           </div>

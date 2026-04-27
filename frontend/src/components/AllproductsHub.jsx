@@ -493,11 +493,6 @@ export default function AllProductsHub() {
   };
   
   const handleAddToCart = async (item) => {
-    if (!token) {
-      alert("Please login to add items to cart");
-      return;
-    }
-    
     try {
       setAddingToCartId(item._id);
       let cartData;

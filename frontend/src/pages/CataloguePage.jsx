@@ -115,11 +115,6 @@ export default function CataloguePage() {
 
   // Handle add to cart
   const handleAddToCart = async (design) => {
-    if (!token) {
-      alert("Please login to add items to cart");
-      return;
-    }
-
     try {
       // Get the kind from design, default to "DESIGN" if not specified
       const designKind = design.kind || "DESIGN";
@@ -170,11 +165,6 @@ export default function CataloguePage() {
 
   // Handle increment quantity
   const handleIncrement = async (design) => {
-    if (!token) {
-      alert("Please login to update cart");
-      return;
-    }
-
     const currentQty = getCartQuantityForDesign(design._id);
     const cartItem = cartItems.find(item => item.designId === design._id);
     
@@ -217,11 +207,6 @@ export default function CataloguePage() {
 
   // Handle decrement quantity
   const handleDecrement = async (design) => {
-    if (!token) {
-      alert("Please login to update cart");
-      return;
-    }
-
     const currentQty = getCartQuantityForDesign(design._id);
     const cartItem = cartItems.find(item => item.designId === design._id);
     
@@ -265,11 +250,6 @@ export default function CataloguePage() {
 
   // Handle remove from cart
   const handleRemoveFromCart = async (design) => {
-    if (!token) {
-      alert("Please login to update cart");
-      return;
-    }
-
     const cartItem = cartItems.find(item => item.designId === design._id);
     if (!cartItem) return;
 
@@ -651,7 +631,7 @@ export default function CataloguePage() {
                                   <ShoppingCart className="w-4 h-4" />
                                 )}
                                 <span className="text-sm font-medium">
-                                  {token ? 'Add to Cart' : 'Login to Cart'}
+                                  {'Add to Cart'}
                                 </span>
                               </button>
                             )}

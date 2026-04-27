@@ -319,10 +319,15 @@ export default function CheckoutAddresses() {
       : "";
 
   useEffect(() => {
+    if (!token) {
+      navigate("/login", { state: { from: "/checkout" }, replace: true });
+      return undefined;
+    }
+
     dispatch(fetchMyAddresses());
     dispatch(getCart());
     return () => dispatch(resetAddressState());
-  }, [dispatch]);
+  }, [dispatch, navigate, token]);
 
   useEffect(() => {
     if (deliverySaved) setDelivery((prev) => ({ ...prev, fullName: deliverySaved.fullName || "", mobileNumber: deliverySaved.mobileNumber || "", completeAddress: deliverySaved.completeAddress || "", landmark: deliverySaved.landmark || "", pincode: deliverySaved.pincode || "", city: deliverySaved.city || "", state: deliverySaved.state || "" }));

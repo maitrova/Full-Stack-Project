@@ -22,6 +22,8 @@ export const registerUser = createAsyncThunk(
         email,
         password,
         role,
+      }, {
+        withCredentials: true,
       });
       return response.data;
     } catch (error) {
@@ -36,7 +38,11 @@ export const loginUser = createAsyncThunk(
   async (credentials, { rejectWithValue }) => {
     try {
       const { identifier, password } = credentials;
-      const response = await axios.post(`${API_URL}/login`, { identifier, password });
+      const response = await axios.post(
+        `${API_URL}/login`,
+        { identifier, password },
+        { withCredentials: true }
+      );
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data || { message: "Login failed" });
@@ -87,6 +93,8 @@ export const googleLogin = createAsyncThunk(
     try {
       const response = await axios.post(`${API_URL}/google`, {
         token: googleToken,
+      }, {
+        withCredentials: true,
       });
       return response.data;
     } catch (error) {

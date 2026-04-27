@@ -89,7 +89,37 @@ async function run() {
         { code: "back", label: "Back", mockupUrl: "/mockups/oversized-comfort-tee/back.png", maskUrl: "/masks/oversized-comfort-tee/back_mask.png" },
       ],
     },
+    {
+      name: "Graphic French Terry T-Shirt",
+      slug: "graphic-french-terry-tee",
+      category: "tshirt",
+      subCategory: "graphic-french-terry",
+      basePrice: 899,
 
+      colors: defaultColors,
+      sizePricing: buildSizePricing([
+        { size: "S", price: 799, stock: 60 },
+        { size: "M", price: 799, stock: 80 },
+        { size: "L", price: 799, stock: 80 },
+        { size: "XL", price: 799, stock: 50 },
+        { size: "XXL", price: 799, stock: 30 },
+      ]),
+
+      views: [
+        {
+          code: "front",
+          label: "Front",
+          mockupUrl: "/mockups/graphic-french-terry-tee/front.png",
+          maskUrl: "/masks/graphic-french-terry-tee/front_mask.png",
+        },
+        {
+          code: "back",
+          label: "Back",
+          mockupUrl: "/mockups/graphic-french-terry-tee/back.png",
+          maskUrl: "/masks/graphic-french-terry-tee/back_mask.png",
+        },
+      ],
+    },
     {
       name: "Premium Polo Shirt",
       slug: "premium-polo",

@@ -98,6 +98,7 @@ import UserManagement from '../components/admin/UserManagement.jsx';
 import CompanyDocumentManager from '../components/admin/CompanyDocumentManager.jsx';
 import ReviewManagement from '../components/admin/ReviewManagement.jsx';
 import ReturnManagement from '../components/admin/ReturnManagement.jsx';
+import BlogManagement from '../components/admin/BlogManagement.jsx';
 
 const AdminDashboard = () => {
   const dispatch = useDispatch();
@@ -194,6 +195,7 @@ const AdminDashboard = () => {
         activeTab !== 'orders' && 
         activeTab !== 'returns' &&
         activeTab !== 'homepage' &&
+        activeTab !== 'blogs' &&
         activeTab !== 'search' &&
         activeTab !== 'adminDesigns' &&
         activeTab !== 'coupons' &&
@@ -295,6 +297,8 @@ const AdminDashboard = () => {
     setViewMode('returns');
   } else if (tab === 'homepage') {
     setViewMode('homepage');
+  } else if (tab === 'blogs') {
+    setViewMode('blogs');
   } else if (tab === 'search') {
     setViewMode('search');
   } else if (tab === 'coupons') {
@@ -624,6 +628,7 @@ const AdminDashboard = () => {
     { id: 'orders', label: 'Orders', icon: <ShoppingBag className="w-5 h-5" /> },
     { id: 'returns', label: 'Returns', icon: <FileText className="w-5 h-5" /> },
     { id: 'homepage', label: 'Homepage', icon: <Home className="w-5 h-5" /> },
+    { id: 'blogs', label: 'Blogs', icon: <FileText className="w-5 h-5" /> },
     { id: 'search', label: 'Product Search', icon: <Search className="w-5 h-5" /> },
     { id: 'adminUploads', label: 'Admin Uploads', icon: <Upload className="w-5 h-5" /> },
     { id: 'companyPolicies', label: 'Company Policies', icon: <FileText className="w-5 h-5" /> },
@@ -1000,6 +1005,7 @@ const AdminDashboard = () => {
                 {activeSidebarItem === 'orders' && 'Order Management'}
                 {activeSidebarItem === 'returns' && 'Return Management'}
                 {activeSidebarItem === 'homepage' && 'Homepage Management'}
+                {activeSidebarItem === 'blogs' && 'Blog Management'}
                 {activeSidebarItem === 'search' && 'Product Search'}
                 {activeSidebarItem === 'newArrival' && 'New Arrivals'}
                 {activeSidebarItem === 'bestSeller' && 'Best Sellers'}
@@ -1021,6 +1027,7 @@ const AdminDashboard = () => {
                 {activeSidebarItem === 'orders' && 'Manage and update customer orders'}
                 {activeSidebarItem === 'returns' && 'Review customer return requests and refund details'}
                 {activeSidebarItem === 'homepage' && 'Manage featured content displayed on the homepage'}
+                {activeSidebarItem === 'blogs' && 'Create, publish, and refine homepage blog content'}
                 {activeSidebarItem === 'search' && 'Search for products by their unique ID'}
                 {activeSidebarItem === 'newArrival' && 'Manage new arrival products'}
                 {activeSidebarItem === 'bestSeller' && 'Manage best selling products'}
@@ -1132,6 +1139,10 @@ const AdminDashboard = () => {
           {/* Homepage Component */}
           {activeSidebarItem === 'homepage' && (
             <HomepageAdmin />
+          )}
+
+          {activeSidebarItem === 'blogs' && (
+            <BlogManagement />
           )}
 
           {/* Product Search Component */}
@@ -1742,6 +1753,7 @@ const AdminDashboard = () => {
      activeSidebarItem !== 'orders' && 
      activeSidebarItem !== 'returns' && 
      activeSidebarItem !== 'homepage' && 
+     activeSidebarItem !== 'blogs' && 
      activeSidebarItem !== 'search' && 
      activeSidebarItem !== 'adminDesigns' &&
      activeSidebarItem !== 'adminUploads' &&

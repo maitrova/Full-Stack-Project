@@ -789,11 +789,6 @@ export default function UnifiedProductHub() {
 
   // Cart handler for common saved data
   const handleAddCommonToCart = async (item) => {
-    if (!token) {
-      alert("Please login to add items to cart");
-      return;
-    }
-
     try {
       setAddingToCartId(item._id);
       let cartData;

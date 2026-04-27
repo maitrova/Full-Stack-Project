@@ -8,6 +8,7 @@ import {
   getBrevoTemplateId,
   sendBrevoEmail,
 } from "../services/brevoEmailService.js";
+import { mergeGuestCartIntoUserCart } from "./cartController.js";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -99,6 +100,8 @@ export const registerUser = async (req, res) => {
       role: "user",
     });
 
+    await mergeGuestCartIntoUserCart(req, res, user._id);
+
     res.status(201).json({
       _id: user._id,
       name: user.name,
@@ -137,6 +140,8 @@ export const loginUser = async (req, res) => {
         message: "Invalid credentials",
       });
     }
+
+    await mergeGuestCartIntoUserCart(req, res, user._id);
 
     res.json({
       _id: user._id,
@@ -189,6 +194,8 @@ export const googleLogin = async (req, res) => {
       user.googleId = sub;
       await user.save();
     }
+
+    await mergeGuestCartIntoUserCart(req, res, user._id);
 
     res.json({
       _id: user._id,

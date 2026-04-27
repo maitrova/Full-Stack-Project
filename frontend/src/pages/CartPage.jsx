@@ -86,9 +86,7 @@ const CartPage = () => {
 
   // Fetch cart on component mount
   useEffect(() => {
-    if (isLoggedIn) {
-      dispatch(getCart());
-    }
+    dispatch(getCart());
   }, [dispatch, isLoggedIn]);
 
   // Clear notifications after 3 seconds
@@ -180,14 +178,6 @@ const CartPage = () => {
 
   // Handle quantity updates
   const handleQuantityChange = async (itemId, newQty) => {
-    if (!isLoggedIn) {
-      setNotification({
-        show: true,
-        message: 'Please login to update cart',
-        type: 'warning'
-      });
-      return;
-    }
     if (newQty < 1) return;
     try {
       setUpdatingItem(itemId);
@@ -210,7 +200,6 @@ const CartPage = () => {
 
   // Handle item removal
   const handleRemoveItem = async (itemId) => {
-    if (!isLoggedIn) return;
     try {
       setRemovingItem(itemId);
       await dispatch(removeCartItem(itemId)).unwrap();
@@ -232,7 +221,7 @@ const CartPage = () => {
 
   // Handle clear cart
   const handleClearCart = async () => {
-    if (!isLoggedIn || !cartItems.length) return;
+    if (!cartItems.length) return;
     if (!window.confirm('Are you sure you want to clear your cart?')) return;
     try {
       await dispatch(clearCart()).unwrap();
@@ -255,10 +244,10 @@ const CartPage = () => {
     if (!isLoggedIn) {
       setNotification({
         show: true,
-        message: 'Please login to checkout',
+        message: 'Please login to continue to checkout',
         type: 'warning'
       });
-      setTimeout(() => navigate('/login'), 1500);
+      setTimeout(() => navigate('/login', { state: { from: '/checkout' } }), 800);
       return;
     }
     if (cartItems.length === 0) {
@@ -356,39 +345,6 @@ const CartPage = () => {
     );
   }
 
-  // Not logged in state
-  if (!isLoggedIn) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-6 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center">
-            <div className="inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 bg-blue-50 rounded-full mb-6">
-              <svg className="w-10 h-10 sm:w-12 sm:h-12 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-              </svg>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Login to view your cart</h2>
-            <p className="text-gray-600 mb-6 px-4">Please login to view and manage your shopping cart</p>
-            <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4 px-4">
-              <button
-                onClick={() => navigate('/login')}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition duration-200 w-full sm:w-auto"
-              >
-                Login
-              </button>
-              <button
-                onClick={() => navigate('/readymade/products')}
-                className="px-6 py-3 border-2 border-blue-600 text-blue-600 rounded-lg font-medium hover:bg-blue-50 transition duration-200 w-full sm:w-auto"
-              >
-                Continue Shopping
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Empty cart state
   if (cartItems.length === 0) {
     return (
@@ -470,6 +426,13 @@ const CartPage = () => {
       )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {!isLoggedIn && (
+          <div className="pt-4">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+              Your cart is saved for this browser. Login is only required when you proceed to checkout.
+            </div>
+          </div>
+        )}
         {/* Mobile Header */}
         <div className="py-6 flex flex-col sm:flex-row justify-between items-start sm:items-center">
           <div>

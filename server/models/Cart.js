@@ -53,8 +53,13 @@ const cartSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
-      index: true, // ✅ keep index, remove unique
+      default: null,
+      index: true,
+    },
+    guestId: {
+      type: String,
+      default: null,
+      index: true,
     },
 
     items: [cartItemSchema],
@@ -69,10 +74,14 @@ const cartSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// ✅ Only ONE ACTIVE cart per user, but multiple ORDERED carts allowed
 cartSchema.index(
   { user: 1, status: 1 },
-  { partialFilterExpression: { status: "ACTIVE" } }
+  { partialFilterExpression: { status: "ACTIVE", user: { $exists: true, $ne: null } } }
+);
+
+cartSchema.index(
+  { guestId: 1, status: 1 },
+  { partialFilterExpression: { status: "ACTIVE", guestId: { $exists: true, $ne: null } } }
 );
 
 export const Cart = mongoose.model("Cart", cartSchema);

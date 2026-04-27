@@ -17,7 +17,8 @@ export const googleAuth = createAsyncThunk(
     try {
       const { data } = await axios.post(
         `${BASE_URL}/google`,
-        { token: googleToken }
+        { token: googleToken },
+        { withCredentials: true }
       );
 
       // Save to localStorage

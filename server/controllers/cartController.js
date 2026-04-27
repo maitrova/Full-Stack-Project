@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { randomUUID } from "crypto";
 // import { Cart } from "../models/Cart.js";
 import ReadymadeProduct from "../models/readymadeproducts.js"; // default export in your schema
 import { Design } from "../models/Design.js";
@@ -8,12 +9,84 @@ import { Cart } from "../models/Cart.js";
 import Dropproduct from "../models/dropproduct.model.js"; // ✅ NEW
 import { attachReadymadePricing, getReadymadePricing } from "../utils/readymadePricing.js";
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+const GUEST_CART_COOKIE = "guest_cart_id";
+const GUEST_CART_COOKIE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
 
-const getOrCreateActiveCart = async (userId) => {
+const parseCookies = (cookieHeader = "") =>
+  String(cookieHeader || "")
+    .split(";")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .reduce((acc, entry) => {
+      const separatorIndex = entry.indexOf("=");
+      if (separatorIndex === -1) return acc;
+      const key = entry.slice(0, separatorIndex).trim();
+      const value = entry.slice(separatorIndex + 1).trim();
+      if (!key) return acc;
+      acc[key] = decodeURIComponent(value);
+      return acc;
+    }, {});
+
+const getGuestCartIdFromRequest = (req) => {
+  const cookies = parseCookies(req.headers?.cookie || "");
+  const guestId = String(cookies[GUEST_CART_COOKIE] || "").trim();
+  return guestId || null;
+};
+
+const getGuestCartCookieOptions = () => ({
+  httpOnly: true,
+  sameSite: "lax",
+  secure: process.env.NODE_ENV === "production",
+  maxAge: GUEST_CART_COOKIE_MAX_AGE_MS,
+  path: "/",
+});
+
+const ensureGuestCartCookie = (req, res) => {
+  const existingGuestId = getGuestCartIdFromRequest(req);
+  if (existingGuestId) return existingGuestId;
+
+  const guestId = randomUUID();
+  res.cookie(GUEST_CART_COOKIE, guestId, getGuestCartCookieOptions());
+  return guestId;
+};
+
+const clearGuestCartCookie = (res) => {
+  res.clearCookie(GUEST_CART_COOKIE, {
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: true,
+  });
+};
+
+const resolveCartOwner = (req, res, { createGuest = false } = {}) => {
+  if (req.user?._id) {
+    return { userId: req.user._id, guestId: null, isGuest: false };
+  }
+
+  const guestId = createGuest
+    ? ensureGuestCartCookie(req, res)
+    : getGuestCartIdFromRequest(req);
+
+  return { userId: null, guestId, isGuest: Boolean(guestId) };
+};
+
+const getOrCreateActiveCart = async ({ userId = null, guestId = null }) => {
+  if (!userId && !guestId) {
+    throw new Error("Cart owner is required");
+  }
+
+  const filter = userId
+    ? { user: userId, status: "ACTIVE" }
+    : { guestId, status: "ACTIVE" };
+  const insertPayload = userId
+    ? { user: userId, guestId: null, status: "ACTIVE", items: [] }
+    : { user: null, guestId, status: "ACTIVE", items: [] };
+
   try {
     return await Cart.findOneAndUpdate(
-      { user: userId, status: "ACTIVE" },
-      { $setOnInsert: { user: userId, status: "ACTIVE", items: [] } },
+      filter,
+      { $setOnInsert: insertPayload },
       {
         new: true,
         upsert: true,
@@ -23,7 +96,7 @@ const getOrCreateActiveCart = async (userId) => {
     // If two requests race on first cart creation, the unique ACTIVE-cart
     // index can reject one insert. Fetch the winner instead of surfacing 500.
     if (error?.code === 11000) {
-      const existingCart = await Cart.findOne({ user: userId, status: "ACTIVE" });
+      const existingCart = await Cart.findOne(filter);
       if (existingCart) return existingCart;
     }
 
@@ -226,8 +299,10 @@ const getReadymadeVariantSelection = (product, size) => {
   };
 };
 
-const findActiveCartWithDetails = (userId) =>
-  Cart.findOne({ user: userId, status: "ACTIVE" })
+const findActiveCartWithDetails = ({ userId = null, guestId = null }) =>
+  Cart.findOne(
+    userId ? { user: userId, status: "ACTIVE" } : { guestId, status: "ACTIVE" }
+  )
     .populate({
       path: "items.readymadeProduct",
       populate: [
@@ -278,8 +353,8 @@ const enrichCartItems = (items = []) =>
     return updatedItem;
   });
 
-const buildActiveCartResponse = async (userId) => {
-  const cart = await findActiveCartWithDetails(userId);
+const buildActiveCartResponse = async ({ userId = null, guestId = null }) => {
+  const cart = await findActiveCartWithDetails({ userId, guestId });
   if (!cart) return null;
 
   return {
@@ -288,16 +363,65 @@ const buildActiveCartResponse = async (userId) => {
   };
 };
 
+const mergeCartItemsBySignature = (targetCart, sourceCart) => {
+  normalizeLegacyCart(targetCart);
+  normalizeLegacyCart(sourceCart);
+
+  for (const sourceItem of sourceCart.items || []) {
+    const sourceSignature = sourceItem.signature || buildCartItemSignature(sourceItem);
+    const existingIndex = targetCart.items.findIndex((item) => item.signature === sourceSignature);
+
+    if (existingIndex >= 0) {
+      targetCart.items[existingIndex].qty += Number(sourceItem.qty || 0);
+      targetCart.items[existingIndex].unitPrice = Number(
+        sourceItem.unitPrice || targetCart.items[existingIndex].unitPrice || 0
+      );
+      targetCart.items[existingIndex].basePrice = Number(
+        sourceItem.basePrice || targetCart.items[existingIndex].basePrice || 0
+      );
+      targetCart.items[existingIndex].priceDetails =
+        sourceItem.priceDetails || targetCart.items[existingIndex].priceDetails || null;
+      targetCart.items[existingIndex].previewImage =
+        sanitizePreviewImage(sourceItem.previewImage) || targetCart.items[existingIndex].previewImage;
+      continue;
+    }
+
+    targetCart.items.push({
+      ...sourceItem.toObject(),
+      _id: new mongoose.Types.ObjectId(),
+    });
+  }
+};
+
+export const mergeGuestCartIntoUserCart = async (req, res, userId) => {
+  const guestId = getGuestCartIdFromRequest(req);
+  if (!guestId || !userId) return;
+
+  const guestCart = await Cart.findOne({ guestId, status: "ACTIVE" });
+  if (!guestCart || !guestCart.items?.length) {
+    if (guestCart) {
+      await Cart.deleteOne({ _id: guestCart._id });
+      clearGuestCartCookie(res);
+    }
+    return;
+  }
+
+  const userCart = await getOrCreateActiveCart({ userId });
+  mergeCartItemsBySignature(userCart, guestCart);
+  await userCart.save();
+  await Cart.deleteOne({ _id: guestCart._id });
+  clearGuestCartCookie(res);
+};
+
 export const addToCart = async (req, res) => {
-  const userId = req.user?._id;
+  const { userId, guestId, isGuest } = resolveCartOwner(req, res, { createGuest: true });
   const body = req.body || {};
   let requestContext = buildAddToCartLogContext(body, {
     userId: userId ? String(userId) : null,
+    guestId: guestId || null,
   });
 
   try {
-    if (!userId) return res.status(401).json({ message: "Unauthorized" });
-
     const {
       kind,
       qty = 1,
@@ -310,7 +434,8 @@ export const addToCart = async (req, res) => {
     const requestedSize = size || body.selectedSize;
 
     requestContext = buildAddToCartLogContext(body, {
-      userId: String(userId),
+      userId: userId ? String(userId) : null,
+      guestId: guestId || null,
       designId: effectiveDesignId || null,
       size: requestedSize || null,
     });
@@ -470,7 +595,7 @@ export const addToCart = async (req, res) => {
     // =========================
     // CART MERGE / INSERT
     // =========================
-    const cart = await getOrCreateActiveCart(userId);
+    const cart = await getOrCreateActiveCart({ userId, guestId });
     normalizeLegacyCart(cart);
 
     const idx = cart.items.findIndex((it) => it.signature === signature);
@@ -523,15 +648,18 @@ export const addToCart = async (req, res) => {
 
       await cart.save();
 
-      const responseCart = await buildActiveCartResponse(userId);
+      const responseCart = await buildActiveCartResponse({ userId, guestId });
       return res.status(200).json({ message: "Cart updated", cart: responseCart });
     }
 
     cart.items.push(itemToInsert);
     await cart.save();
 
-    const responseCart = await buildActiveCartResponse(userId);
-    return res.status(201).json({ message: "Added to cart", cart: responseCart });
+    const responseCart = await buildActiveCartResponse({ userId, guestId });
+    return res.status(201).json({
+      message: isGuest ? "Added to guest cart" : "Added to cart",
+      cart: responseCart,
+    });
   } catch (err) {
     console.error("[cart/add] Failed", {
       ...requestContext,
@@ -550,12 +678,8 @@ export const addToCart = async (req, res) => {
 
 export const getCart = async (req, res) => {
   try {
-    const userId = req.user?._id;
-
-    if (!userId)
-      return res.status(401).json({ message: "Unauthorized" });
-
-    const cart = await buildActiveCartResponse(userId);
+    const { userId, guestId } = resolveCartOwner(req, res);
+    const cart = await buildActiveCartResponse({ userId, guestId });
 
     if (!cart) {
       return res.status(200).json({
@@ -581,8 +705,8 @@ export const getCart = async (req, res) => {
 
 export const updateCartItemQty = async (req, res) => {
   try {
-    const userId = req.user?._id;
-    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const { userId, guestId } = resolveCartOwner(req, res);
+    if (!userId && !guestId) return res.status(404).json({ message: "Cart not found" });
 
     const { itemId } = req.params;
     if (!isValidObjectId(itemId)) {
@@ -601,7 +725,9 @@ export const updateCartItemQty = async (req, res) => {
       return res.status(400).json({ message: "qty must be an integer >= 1" });
     }
 
-    const cart = await Cart.findOne({ user: userId, status: "ACTIVE" });
+    const cart = await Cart.findOne(
+      userId ? { user: userId, status: "ACTIVE" } : { guestId, status: "ACTIVE" }
+    );
     if (!cart) return res.status(404).json({ message: "Cart not found" });
 
     const item = cart.items.id(itemId);
@@ -697,7 +823,7 @@ export const updateCartItemQty = async (req, res) => {
         });
       }
 
-      const isOwner = d.user?.toString() === userId.toString();
+      const isOwner = Boolean(userId) && d.user?.toString() === String(userId);
       const isPublic = d.isPublished === true;
       if (!isOwner && !isPublic) {
         return res.status(403).json({ message: "You cannot update this design item" });
@@ -731,7 +857,7 @@ export const updateCartItemQty = async (req, res) => {
 
     await cart.save();
 
-    const responseCart = await buildActiveCartResponse(userId);
+    const responseCart = await buildActiveCartResponse({ userId, guestId });
     return res.status(200).json({ message: "Quantity updated", cart: responseCart });
   } catch (err) {
     console.error("updateCartItemQty error:", err);
@@ -744,15 +870,17 @@ export const updateCartItemQty = async (req, res) => {
 
 export const removeCartItem = async (req, res) => {
   try {
-    const userId = req.user?._id;
-    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    const { userId, guestId } = resolveCartOwner(req, res);
+    if (!userId && !guestId) return res.status(404).json({ message: "Cart not found" });
 
     const { itemId } = req.params;
     if (!isValidObjectId(itemId)) {
       return res.status(400).json({ message: "Invalid itemId" });
     }
 
-    const cart = await Cart.findOne({ user: userId, status: "ACTIVE" });
+    const cart = await Cart.findOne(
+      userId ? { user: userId, status: "ACTIVE" } : { guestId, status: "ACTIVE" }
+    );
     if (!cart) return res.status(404).json({ message: "Cart not found" });
 
     const item = cart.items.id(itemId);
@@ -761,10 +889,42 @@ export const removeCartItem = async (req, res) => {
     item.deleteOne(); // remove subdocument
     await cart.save();
 
-    const responseCart = await buildActiveCartResponse(userId);
+    const responseCart = await buildActiveCartResponse({ userId, guestId });
     return res.status(200).json({ message: "Item removed", cart: responseCart });
   } catch (err) {
     console.error("removeCartItem error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const clearCart = async (req, res) => {
+  try {
+    const { userId, guestId, isGuest } = resolveCartOwner(req, res);
+    if (!userId && !guestId) {
+      return res.status(200).json({ message: "Cart already empty", cart: null });
+    }
+
+    const cart = await Cart.findOne(
+      userId ? { user: userId, status: "ACTIVE" } : { guestId, status: "ACTIVE" }
+    );
+
+    if (!cart) {
+      return res.status(200).json({ message: "Cart already empty", cart: null });
+    }
+
+    cart.items = [];
+    await cart.save();
+
+    if (isGuest) {
+      clearGuestCartCookie(res);
+      await Cart.deleteOne({ _id: cart._id });
+      return res.status(200).json({ message: "Guest cart cleared", cart: null });
+    }
+
+    const responseCart = await buildActiveCartResponse({ userId, guestId: null });
+    return res.status(200).json({ message: "Cart cleared", cart: responseCart });
+  } catch (err) {
+    console.error("clearCart error:", err);
     return res.status(500).json({ message: "Server error" });
   }
 };

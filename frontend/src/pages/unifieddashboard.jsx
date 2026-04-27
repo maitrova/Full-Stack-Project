@@ -357,11 +357,6 @@ export default function UnifiedDashboard() {
   };
 
   const handleAddToCart = async (item, type) => {
-    if (!token) {
-      alert("Please login to add items to cart");
-      return;
-    }
-
     try {
       let cartData;
       
@@ -426,8 +421,6 @@ export default function UnifiedDashboard() {
   };
 
   const handleIncrement = async (item, type) => {
-    if (!token) return alert("Please login to update cart");
-
     const currentQty = type === "design" 
       ? getCartQuantityForDesign(item._id)
       : getReadymadeCartQuantity(item._id);
@@ -474,8 +467,6 @@ export default function UnifiedDashboard() {
   };
 
   const handleDecrement = async (item, type) => {
-    if (!token) return alert("Please login to update cart");
-
     const currentQty = type === "design" 
       ? getCartQuantityForDesign(item._id)
       : getReadymadeCartQuantity(item._id);
@@ -522,8 +513,6 @@ export default function UnifiedDashboard() {
   };
 
   const handleRemoveFromCart = async (item, type) => {
-    if (!token) return alert("Please login to update cart");
-
     const cartItem = cartItems.find(cartItem => 
       type === "design" 
         ? cartItem.designId === item._id
@@ -974,7 +963,7 @@ export default function UnifiedDashboard() {
                                   <ShoppingCart className="w-4 h-4" />
                                 )}
                                 <span className="text-sm font-medium">
-                                  {token ? 'Add to Cart' : 'Login to Cart'}
+                                  {'Add to Cart'}
                                 </span>
                               </button>
                             )}

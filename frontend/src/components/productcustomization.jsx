@@ -1,6 +1,6 @@
 // src/pages/DesignerPage.jsx
 import React, { useState, useEffect, useRef } from "react";
-import { useParams, useSearchParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate, Link, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProductBySlug } from "../redux/slices/productsSlice.js";
 import { 
@@ -44,12 +44,36 @@ const DEFAULT_TEXT_PRICE_RULES = [
 ];
 const SUPPORTED_DESIGN_MIME_TYPES = new Set([
   "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/webp",
+  "image/gif",
+  "image/bmp",
+  "image/tiff",
+  "image/x-tiff",
+  "image/svg+xml",
+  "image/avif",
+  "image/heic",
+  "image/heif",
 ]);
-const SUPPORTED_DESIGN_EXTENSIONS = new Set(["png"]);
-const SUPPORTED_DESIGN_FORMATS_LABEL = "PNG";
-const SUPPORTED_DESIGN_ACCEPT = ".png,image/png";
+const SUPPORTED_DESIGN_EXTENSIONS = new Set([
+  "png",
+  "jpg",
+  "jpeg",
+  "webp",
+  "gif",
+  "bmp",
+  "tif",
+  "tiff",
+  "svg",
+  "avif",
+  "heic",
+  "heif",
+]);
+const SUPPORTED_DESIGN_FORMATS_LABEL = "PNG, JPG, JPEG, WEBP, GIF, BMP, TIFF, SVG, AVIF, HEIC, HEIF";
+const SUPPORTED_DESIGN_ACCEPT = "image/*,.heic,.heif,.svg,.tif,.tiff";
 const REMOVE_BG_RECOMMENDATION =
-  "Use PNG files only. PNG gives the most reliable remove-background result and cleaner edges.";
+  "PNG usually gives the cleanest edges, but you can upload other common image formats too.";
 
 
 
@@ -291,6 +315,7 @@ const resolveOutputAssetUrl = (relativePath = "") => {
 
 const isSupportedDesignSource = ({ name = "", type = "" } = {}) => {
   const normalizedType = String(type || "").toLowerCase();
+  if (normalizedType.startsWith("image/")) return true;
   if (SUPPORTED_DESIGN_MIME_TYPES.has(normalizedType)) return true;
   return SUPPORTED_DESIGN_EXTENSIONS.has(getFileExtension(name));
 };
@@ -662,6 +687,7 @@ export default function DesignerPage() {
   const [searchParams] = useSearchParams();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const token = useSelector(selectCurrentToken);
   const { current: product, currentStatus, currentError } = useSelector(
     (state) => state.products
@@ -757,6 +783,16 @@ const getSizeBasePrice = (prod, size) => {
   const removeBgRequestSeqRef = useRef(0);
   const cropPreviewFrameRef = useRef(null);
   const cropDragStateRef = useRef(null);
+  const customizerReturnPath = `${location.pathname}${location.search}`;
+  const promptLoginForRestrictedAction = (message) => {
+    setSaveError(message);
+    setSaveSuccess(false);
+    navigate("/login", {
+      state: {
+        from: customizerReturnPath,
+      },
+    });
+  };
   const supportsPocketZone = String(slug || product?.slug || "")
     .trim()
     .toLowerCase() === "hoodie";
@@ -1260,6 +1296,16 @@ const finalUrl = rawUrl.startsWith("http")
   }, [slug, dispatch]);
 
   useEffect(() => {
+    if (editDesignId && !token) {
+      setIsEditMode(false);
+      setOriginalDesign(null);
+      setEditModeInitialized(false);
+      setLoadingEditData(false);
+      setSaveError("Please login to edit a saved design. You can still customize this product as a guest.");
+      navigate(`/products/${slug}/customize`, { replace: true });
+      return;
+    }
+
     if (!editDesignId || !product) {
       console.log("Not in edit mode or product not loaded yet");
       setIsEditMode(false);
@@ -1361,7 +1407,7 @@ setPriceBreakdown((prev) => ({
     };
 
     loadDesignForEdit();
-  }, [editDesignId, product, editModeInitialized]);
+  }, [editDesignId, product, editModeInitialized, navigate, slug, token]);
 
   useEffect(() => {
     if (!product?.views?.length) {
@@ -2253,8 +2299,7 @@ const startCropPreviewPan = (event, mode = "move") => {
     if (!product) return;
 
     if (!token) {
-      setSaveError("Please login to save your design.");
-      setSaveSuccess(false);
+      promptLoginForRestrictedAction("Please login to save your design.");
       return null;
     }
 
@@ -2525,7 +2570,7 @@ const startCropPreviewPan = (event, mode = "move") => {
 
   const handleSaveAndAddToCart = async () => {
   if (!token) {
-    setSaveError("Please login to add items to cart.");
+    promptLoginForRestrictedAction("Please login to add items to cart.");
     return;
   }
 
@@ -2691,6 +2736,12 @@ const startCropPreviewPan = (event, mode = "move") => {
   const mockupUrl = currentView?.mockupUrl;
   const maskUrl = currentView?.maskUrl;
   const canAddSavedDesignToCart = Boolean(savedDesignId || editDesignId);
+  const primarySaveActionLabel = token
+    ? (saving ? "Saving…" : isEditMode ? "Update Design" : "Save Design")
+    : "Login to Save";
+  const primaryCartActionLabel = token
+    ? (addingToCart ? "Adding…" : savedDesignId ? "Add to Cart" : "Save & Add to Cart")
+    : "Login for Cart";
 
   return (
     <div className="flex min-h-[100dvh] flex-col overflow-x-hidden bg-gradient-to-b from-slate-100 via-white to-slate-100 text-slate-900 sm:min-h-screen sm:overflow-visible">
@@ -2703,10 +2754,11 @@ const startCropPreviewPan = (event, mode = "move") => {
             </div>
             
             <Link
-              to="/usersaved_designs"
+              to={token ? "/usersaved_designs" : "/login"}
+              state={token ? undefined : { from: customizerReturnPath }}
               className="rounded-full border border-sky-600 px-3 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-50 transition"
             >
-              My Designs
+              {token ? "My Designs" : "Login"}
             </Link>
           </div>
 
@@ -2745,7 +2797,7 @@ const startCropPreviewPan = (event, mode = "move") => {
               disabled={saving || addingToCart}
               className="rounded-full border border-sky-600 bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
             >
-              {saving ? "Savingâ€¦" : isEditMode ? "Update Design" : "Save Design"}
+              {primarySaveActionLabel}
             </button>
 
             <button
@@ -2753,11 +2805,7 @@ const startCropPreviewPan = (event, mode = "move") => {
               disabled={saving || addingToCart}
               className="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
             >
-              {addingToCart
-                ? "Addingâ€¦"
-                : savedDesignId
-                  ? "Add to Cart"
-                  : "Save & Add to Cart"}
+              {primaryCartActionLabel}
             </button>
           </div>
 
@@ -2767,7 +2815,7 @@ const startCropPreviewPan = (event, mode = "move") => {
               disabled={saving || addingToCart}
               className="rounded-full border border-sky-600 bg-sky-600 px-4 py-1 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
             >
-              {saving ? "Saving…" : isEditMode ? "Update Design" : "Save Design"}
+              {primarySaveActionLabel}
             </button>
 
             <button
@@ -2775,11 +2823,7 @@ const startCropPreviewPan = (event, mode = "move") => {
               disabled={saving || addingToCart}
               className="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
             >
-              {addingToCart
-                ? "Adding…"
-                : savedDesignId
-                  ? "Add to Cart"
-                  : "Save & Add to Cart"}
+              {primaryCartActionLabel}
             </button>
           </div>
         </div>
@@ -2787,6 +2831,11 @@ const startCropPreviewPan = (event, mode = "move") => {
 
       {/* Main area */}
       <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-x-hidden px-2 pb-2 pt-2 sm:gap-6 sm:overflow-visible sm:px-6 sm:pb-6 sm:pt-3">
+        {!token && (
+          <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+            Explore and customize freely. Login is only required when you want to save the design or add it to your cart.
+          </div>
+        )}
         <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-x-hidden lg:grid lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)_minmax(0,320px)] lg:items-start lg:gap-6 lg:overflow-visible">
           {/* Mobile helper card */}
           <div className="hidden">
@@ -3982,7 +4031,7 @@ const startCropPreviewPan = (event, mode = "move") => {
                         disabled={saving || addingToCart}
                         className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-700 disabled:opacity-50"
                       >
-                        {saving ? "Saving..." : isEditMode ? "Update" : "Save"}
+                        {token ? (saving ? "Saving..." : isEditMode ? "Update" : "Save") : "Login"}
                       </button>
                       <button
                         type="button"
@@ -3990,11 +4039,13 @@ const startCropPreviewPan = (event, mode = "move") => {
                         disabled={saving || addingToCart}
                         className="rounded-full border border-emerald-600 bg-emerald-600 px-2.5 py-1 text-[10px] font-semibold text-white disabled:opacity-50"
                       >
-                        {addingToCart
-                          ? "Adding..."
-                          : savedDesignId
-                            ? "Add to Cart"
-                            : "Save & Cart"}
+                        {token
+                          ? (addingToCart
+                            ? "Adding..."
+                            : savedDesignId
+                              ? "Add to Cart"
+                              : "Save & Cart")
+                          : "Cart Login"}
                       </button>
                     </div>
                   </div>

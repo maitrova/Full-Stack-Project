@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FiLock, FiLogIn, FiPhone, FiMail, FiEyeOff, FiEye } from 'react-icons/fi';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { 
   loginUser, 
@@ -32,6 +32,7 @@ const LoginPage = () => {
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const { userInfo, status, error } = useSelector((state) => state.user);
   const forgotStatus = useSelector(selectForgotStatus);
@@ -43,9 +44,17 @@ const LoginPage = () => {
   // Redirect after ANY login (normal or Google)
   useEffect(() => {
     if (userInfo) {
-      navigate('/');
+      const fromState = location.state?.from;
+      const redirectTo =
+        typeof fromState === "string"
+          ? fromState
+          : fromState?.pathname
+            ? `${fromState.pathname}${fromState.search || ""}${fromState.hash || ""}`
+            : "/";
+
+      navigate(redirectTo, { replace: true });
     }
-  }, [userInfo, navigate]);
+  }, [userInfo, location.state, navigate]);
 
   // Handle forgot password success
   useEffect(() => {

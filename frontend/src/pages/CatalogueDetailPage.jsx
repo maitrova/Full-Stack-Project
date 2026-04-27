@@ -244,10 +244,6 @@ export default function CatalogueDetailPage() {
 
   // Handle add to cart
   const handleAddToCart = async () => {
-    if (!token) {
-      setNotification({ show: true, message: "Please login to add items to cart", type: "warning" });
-      return;
-    }
     if (!design) return;
 
     if (!selectedSize) {
@@ -290,15 +286,6 @@ export default function CatalogueDetailPage() {
 
   // Handle increment quantity
   const handleIncrement = async () => {
-    if (!token) {
-      setNotification({
-        show: true,
-        message: 'Please login to update cart',
-        type: 'warning'
-      });
-      return;
-    }
-
     if (!design) return;
 
     const currentQty = quantity;
@@ -331,15 +318,6 @@ export default function CatalogueDetailPage() {
 
   // Handle decrement quantity
   const handleDecrement = async () => {
-    if (!token) {
-      setNotification({
-        show: true,
-        message: 'Please login to update cart',
-        type: 'warning'
-      });
-      return;
-    }
-
     if (!design) return;
 
     const currentQty = quantity;
@@ -372,15 +350,6 @@ export default function CatalogueDetailPage() {
 
   // Handle remove from cart
   const handleRemoveFromCart = async () => {
-    if (!token) {
-      setNotification({
-        show: true,
-        message: 'Please login to update cart',
-        type: 'warning'
-      });
-      return;
-    }
-
     if (!design) return;
 
     const cartItem = cartItems.find(item => 

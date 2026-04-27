@@ -24,6 +24,10 @@ const getPersistedToken = () => {
 };
 
 const getAuthToken = (state) => selectCurrentToken(state) || getPersistedToken();
+const getAuthHeaders = (state) => {
+  const token = getAuthToken(state);
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 const CART_ADD_DEBUG_PREFIX = "[cart/addToCart]";
 
@@ -144,6 +148,7 @@ const createApi = () => {
   const api = axios.create({
     baseURL: `${import.meta.env.VITE_API_URL}`,
     timeout: 10000,
+    withCredentials: true,
     headers: {
       Accept: "application/json",
     },
@@ -157,29 +162,19 @@ export const addToCart = createAsyncThunk(
   "cart/addToCart",
   async (cartData, { rejectWithValue, getState }) => {
     try {
-      // Get token from Redux state
       const state = getState();
-      const token = getAuthToken(state);
-      
-      if (!token) {
-        return rejectWithValue({
-          message: "Please login to add items to cart",
-          status: 401,
-        });
-      }
-      
       const api = createApi();
       const requestDebug = {
         baseURL: api.defaults.baseURL || null,
         endpoint: "/cart/add",
-        hasToken: Boolean(token),
+        hasToken: Boolean(getAuthToken(state)),
         payload: summarizeCartPayload(cartData),
       };
 
       console.info(CART_ADD_DEBUG_PREFIX, "Request", requestDebug);
       
       const response = await api.post("/cart/add", cartData, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: getAuthHeaders(state),
       });
 
       console.info(CART_ADD_DEBUG_PREFIX, "Success", {
@@ -206,21 +201,11 @@ export const getCart = createAsyncThunk(
   "cart/getCart",
   async (_, { rejectWithValue, getState }) => {
     try {
-      // Get token from Redux state
       const state = getState();
-      const token = getAuthToken(state);
-      
-      if (!token) {
-        return rejectWithValue({
-          message: "Please login to view your cart",
-          status: 401,
-        });
-      }
-      
       const api = createApi();
       
       const response = await api.get("/cart", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: getAuthHeaders(state),
       });
       
       return response.data;
@@ -238,9 +223,7 @@ export const getCart = createAsyncThunk(
         
         errorMessage = error.response.data?.message || errorMessage;
         
-        if (statusCode === 401) {
-          errorMessage = "Please login to view your cart";
-        }
+        if (statusCode === 401) errorMessage = "Please login to continue";
       } else if (error.request) {
         errorMessage = "No response from server";
       } else {
@@ -259,24 +242,14 @@ export const updateCartItemQty = createAsyncThunk(
   "cart/updateCartItemQty",
   async ({ itemId, qty }, { rejectWithValue, getState }) => {
     try {
-      // Get token from Redux state
       const state = getState();
-      const token = getAuthToken(state);
-      
-      if (!token) {
-        return rejectWithValue({
-          message: "Please login to update cart",
-          status: 401,
-        });
-      }
-      
       const api = createApi();
       
       const response = await api.patch(
         `/cart/item/${itemId}`,
         { qty },
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: getAuthHeaders(state),
         }
       );
       
@@ -310,21 +283,11 @@ export const removeCartItem = createAsyncThunk(
   "cart/removeCartItem",
   async (itemId, { rejectWithValue, getState }) => {
     try {
-      // Get token from Redux state
       const state = getState();
-      const token = getAuthToken(state);
-      
-      if (!token) {
-        return rejectWithValue({
-          message: "Please login to remove items from cart",
-          status: 401,
-        });
-      }
-      
       const api = createApi();
       
       const response = await api.delete(`/cart/item/${itemId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: getAuthHeaders(state),
       });
       
       return { ...response.data, itemId };
@@ -357,21 +320,11 @@ export const clearCart = createAsyncThunk(
   "cart/clearCart",
   async (_, { rejectWithValue, getState }) => {
     try {
-      // Get token from Redux state
       const state = getState();
-      const token = getAuthToken(state);
-      
-      if (!token) {
-        return rejectWithValue({
-          message: "Please login to clear cart",
-          status: 401,
-        });
-      }
-      
       const api = createApi();
       
       const response = await api.delete("/cart/clear", {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: getAuthHeaders(state),
       });
       
       return response.data;

@@ -4,7 +4,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import { logoutUser, selectCurrentToken } from '../redux/slices/Userslice.js';
 import {
   getCart,
-  resetCart,
   selectCart,
   selectCartItemCount,
   selectCartSummary,
@@ -140,11 +139,7 @@ const Header = () => {
   const isAuthenticated = !!token;
 
   useEffect(() => {
-    if (token) {
-      dispatch(getCart());
-    } else {
-      dispatch(resetCart());
-    }
+    dispatch(getCart());
   }, [dispatch, token]);
 
   useEffect(() => {
@@ -230,7 +225,6 @@ const Header = () => {
   };
 
   const handleLogout = () => {
-    dispatch(resetCart());
     dispatch(logoutUser());
     setIsMobileMenuOpen(false);
   };

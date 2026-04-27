@@ -34,6 +34,7 @@ import brandroute from './routes/brandroute.js';
 import couponRouter from "./routes/couponRoutes.js";
 import headerBannerRouter from "./routes/headerBannerRoutes.js";
 import reviewRouter from "./routes/reviewRoutes.js";
+import blogsRouter from "./routes/blogsRoutes.js";
 
 import colorselection from './routes/adminColorRoutes.js';
 import companypdfs from './routes/companyPdfRoutes.js';
@@ -97,7 +98,7 @@ const staticOutputs = express.static(outputsDir, {
   },
 });
 
-// app.use("/outputs", staticOutputs);
+
 app.use("/api/outputs", staticOutputs);
 
 // Health check endpoint for Kubernetes
@@ -134,6 +135,7 @@ app.use("/api/company-pdfs", companypdfs);
 app.use("/api/coupons", couponRouter);
 app.use("/api/header-banner", headerBannerRouter);
 app.use("/api/reviews", reviewRouter);
+app.use("/api/blogs", blogsRouter);
 // Error handling
 app.use((err, req, res, next) => {
   console.error("Server error:", err);
