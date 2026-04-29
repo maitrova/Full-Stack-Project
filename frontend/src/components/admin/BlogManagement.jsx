@@ -2,8 +2,20 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { selectCurrentToken } from "../../redux/slices/Userslice.js";
 import { buildImageUrl } from "../../utils/responsiveImage.js";
+import RichTextEditor from "../RichTextEditor.jsx";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend/api";
+
+const createEmptySectionImage = () => ({
+  imageUrl: "",
+  altText: "",
+  targetHeading: "",
+});
+
+const createEmptyFaq = () => ({
+  question: "",
+  answer: "",
+});
 
 const emptyForm = {
   title: "",
@@ -13,11 +25,20 @@ const emptyForm = {
   excerpt: "",
   content: "",
   coverImage: "",
+  coverImageAlt: "",
   coverImageFile: null,
-  readTimeMinutes: 5,
+  metaTitle: "",
+  metaDescription: "",
+  focusKeyword: "",
   isPublished: true,
   isFeatured: false,
   publishedAt: "",
+  sectionImages: [
+    createEmptySectionImage(),
+    createEmptySectionImage(),
+    createEmptySectionImage(),
+  ],
+  faqItems: [createEmptyFaq(), createEmptyFaq()],
 };
 
 const formatDateInput = (value) => {
@@ -25,6 +46,29 @@ const formatDateInput = (value) => {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
   return parsed.toISOString().slice(0, 10);
+};
+
+const normalizeEditorContent = (value) => {
+  const next = String(value || "").trim();
+  if (!next) return "";
+  if (/<[a-z][\s\S]*>/i.test(next)) return next;
+
+  return next
+    .split(/\n\s*\n/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => `<p>${part.replace(/\n/g, "<br />")}</p>`)
+    .join("");
+};
+
+const estimateReadTime = (value) => {
+  const plainText = String(value || "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const words = plainText ? plainText.split(" ").length : 0;
+  return Math.max(1, Math.ceil(words / 200));
 };
 
 const BlogManagement = () => {
@@ -43,6 +87,8 @@ const BlogManagement = () => {
     }),
     [token]
   );
+
+  const estimatedReadTime = useMemo(() => estimateReadTime(form.content), [form.content]);
 
   const loadBlogs = async () => {
     try {
@@ -80,6 +126,38 @@ const BlogManagement = () => {
     }));
   };
 
+  const updateSectionImage = (index, key, value) => {
+    setForm((current) => ({
+      ...current,
+      sectionImages: current.sectionImages.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [key]: value } : item
+      ),
+    }));
+  };
+
+  const updateFaq = (index, key, value) => {
+    setForm((current) => ({
+      ...current,
+      faqItems: current.faqItems.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [key]: value } : item
+      ),
+    }));
+  };
+
+  const addSectionImage = () => {
+    setForm((current) => ({
+      ...current,
+      sectionImages: [...current.sectionImages, createEmptySectionImage()],
+    }));
+  };
+
+  const addFaq = () => {
+    setForm((current) => ({
+      ...current,
+      faqItems: [...current.faqItems, createEmptyFaq()],
+    }));
+  };
+
   const handleEdit = (blog) => {
     setEditingId(blog._id);
     setForm({
@@ -88,13 +166,29 @@ const BlogManagement = () => {
       category: blog.category || "Insights",
       authorName: blog.authorName || "Maitrova Team",
       excerpt: blog.excerpt || "",
-      content: blog.content || "",
+      content: normalizeEditorContent(blog.content || ""),
       coverImage: blog.coverImage || "",
+      coverImageAlt: blog.coverImageAlt || "",
       coverImageFile: null,
-      readTimeMinutes: Number(blog.readTimeMinutes || 5),
+      metaTitle: blog.metaTitle || "",
+      metaDescription: blog.metaDescription || "",
+      focusKeyword: blog.focusKeyword || "",
       isPublished: Boolean(blog.isPublished),
       isFeatured: Boolean(blog.isFeatured),
       publishedAt: formatDateInput(blog.publishedAt),
+      sectionImages: Array.isArray(blog.sectionImages) && blog.sectionImages.length > 0
+        ? blog.sectionImages.map((item) => ({
+            imageUrl: item?.imageUrl || "",
+            altText: item?.altText || "",
+            targetHeading: item?.targetHeading || "",
+          }))
+        : [createEmptySectionImage(), createEmptySectionImage(), createEmptySectionImage()],
+      faqItems: Array.isArray(blog.faqItems) && blog.faqItems.length > 0
+        ? blog.faqItems.map((item) => ({
+            question: item?.question || "",
+            answer: item?.answer || "",
+          }))
+        : [createEmptyFaq(), createEmptyFaq()],
     });
     setSuccess("");
     setError("");
@@ -138,10 +232,25 @@ const BlogManagement = () => {
       payload.append("excerpt", form.excerpt || "");
       payload.append("content", form.content || "");
       payload.append("coverImage", form.coverImage || "");
-      payload.append("readTimeMinutes", String(Number(form.readTimeMinutes || 5) || 5));
+      payload.append("coverImageAlt", form.coverImageAlt || "");
+      payload.append("metaTitle", form.metaTitle || "");
+      payload.append("metaDescription", form.metaDescription || "");
+      payload.append("focusKeyword", form.focusKeyword || "");
       payload.append("isPublished", String(Boolean(form.isPublished)));
       payload.append("isFeatured", String(Boolean(form.isFeatured)));
       payload.append("publishedAt", form.publishedAt || "");
+      payload.append(
+        "sectionImages",
+        JSON.stringify(
+          form.sectionImages.filter((item) => item.imageUrl.trim() && item.targetHeading.trim())
+        )
+      );
+      payload.append(
+        "faqItems",
+        JSON.stringify(
+          form.faqItems.filter((item) => item.question.trim() && item.answer.trim())
+        )
+      );
 
       if (form.coverImageFile) {
         payload.append("coverImageFile", form.coverImageFile);
@@ -179,15 +288,13 @@ const BlogManagement = () => {
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{success}</div>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <form onSubmit={handleSubmit} className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-6 flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold text-slate-900">
-                {editingId ? "Edit Blog" : "Create Blog"}
-              </h2>
+              <h2 className="text-xl font-semibold text-slate-900">{editingId ? "Edit Blog" : "Create Blog"}</h2>
               <p className="mt-1 text-sm text-slate-600">
-                Manage homepage-ready blog cards with internal detail pages.
+                Build structured blog pages with one H1 title, H2/H3 content, SEO metadata, FAQs, and section image placements.
               </p>
             </div>
             {editingId ? (
@@ -203,7 +310,7 @@ const BlogManagement = () => {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Title</label>
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Title / Only H1</label>
               <input value={form.title} onChange={(e) => handleChange("title", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100" />
             </div>
 
@@ -223,29 +330,49 @@ const BlogManagement = () => {
             </div>
 
             <div>
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Read Time</label>
-              <input type="number" min="1" max="60" value={form.readTimeMinutes} onChange={(e) => handleChange("readTimeMinutes", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100" />
-            </div>
-
-            <div>
               <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Published Date</label>
               <input type="date" value={form.publishedAt} onChange={(e) => handleChange("publishedAt", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100" />
             </div>
 
+            <div>
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Focus Keyword</label>
+              <input value={form.focusKeyword} onChange={(e) => handleChange("focusKeyword", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100" />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Auto Read Time</label>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                {estimatedReadTime} min read
+              </div>
+            </div>
+
             <div className="md:col-span-2">
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Cover Image</label>
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">SEO Meta Title</label>
+              <input value={form.metaTitle} onChange={(e) => handleChange("metaTitle", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100" />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">SEO Meta Description</label>
+              <textarea value={form.metaDescription} onChange={(e) => handleChange("metaDescription", e.target.value)} rows={2} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100" />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Hero Image</label>
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml,image/avif"
                 onChange={(e) => handleChange("coverImageFile", e.target.files?.[0] || null)}
                 className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition file:mr-3 file:rounded-full file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:font-semibold file:text-slate-700 focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
               />
-              <p className="mt-2 text-xs text-slate-500">
-                Upload from admin and it will be stored on the server like other images.
-              </p>
+              <p className="mt-2 text-xs text-slate-500">Upload the hero image shown above the introduction paragraph.</p>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Hero Image Alt Text</label>
+              <input value={form.coverImageAlt} onChange={(e) => handleChange("coverImageAlt", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100" />
               {form.coverImage ? (
                 <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
-                  <img src={buildImageUrl(form.coverImage)} alt="Cover preview" className="h-48 w-full object-cover" />
+                  <img src={buildImageUrl(form.coverImage)} alt={form.coverImageAlt || "Cover preview"} className="h-48 w-full object-cover" />
                 </div>
               ) : null}
             </div>
@@ -257,7 +384,53 @@ const BlogManagement = () => {
 
             <div className="md:col-span-2">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Content</label>
-              <textarea value={form.content} onChange={(e) => handleChange("content", e.target.value)} rows={10} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm leading-7 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100" />
+              <p className="mb-3 text-xs text-slate-500">Use the title as the only H1. Inside content, use H2 and H3 so the TOC and section nesting can be generated automatically.</p>
+              <RichTextEditor value={form.content} onChange={(value) => handleChange("content", value)} />
+            </div>
+
+            <div className="md:col-span-2 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Section Images</h3>
+                  <p className="mt-1 text-xs text-slate-500">Add image URLs and the exact H2 heading text after which each image should appear.</p>
+                </div>
+                <button type="button" onClick={addSectionImage} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700">
+                  Add Image Slot
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {form.sectionImages.map((item, index) => (
+                  <div key={`section-image-${index}`} className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-2">
+                    <input value={item.targetHeading} onChange={(e) => updateSectionImage(index, "targetHeading", e.target.value)} placeholder="Target H2 heading text" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100" />
+                    <input value={item.altText} onChange={(e) => updateSectionImage(index, "altText", e.target.value)} placeholder="Image alt text" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100" />
+                    <div className="md:col-span-2">
+                      <input value={item.imageUrl} onChange={(e) => updateSectionImage(index, "imageUrl", e.target.value)} placeholder="Image URL or stored path" className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="md:col-span-2 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">FAQs</h3>
+                  <p className="mt-1 text-xs text-slate-500">These entries are rendered on the page and exported as FAQ schema.</p>
+                </div>
+                <button type="button" onClick={addFaq} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700">
+                  Add FAQ
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {form.faqItems.map((item, index) => (
+                  <div key={`faq-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <input value={item.question} onChange={(e) => updateFaq(index, "question", e.target.value)} placeholder="Question" className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100" />
+                    <textarea value={item.answer} onChange={(e) => updateFaq(index, "answer", e.target.value)} placeholder="Answer" rows={3} className="mt-3 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100" />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -303,7 +476,7 @@ const BlogManagement = () => {
                     <div className="min-w-0">
                       {blog.coverImage ? (
                         <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200">
-                          <img src={buildImageUrl(blog.coverImage)} alt={blog.title} className="h-40 w-full object-cover" />
+                          <img src={buildImageUrl(blog.coverImage)} alt={blog.coverImageAlt || blog.title} className="h-40 w-full object-cover" />
                         </div>
                       ) : null}
                       <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em]">

@@ -171,6 +171,19 @@ export const getProductById = createAsyncThunk(
   }
 );
 
+export const getProductByPath = createAsyncThunk(
+  'productList/getProductByPath',
+  async ({ category, subCategory, productSlug }, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`${API_BASE}/path/${encodeURIComponent(category)}/${encodeURIComponent(subCategory)}/${encodeURIComponent(productSlug)}`);
+      return response.data.data;
+    } catch (error) {
+      console.error('getProductByPath Error:', error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch product');
+    }
+  }
+);
+
 export const searchProducts = createAsyncThunk(
   'productList/searchProducts',
   async ({ searchTerm, page = 1, limit = 100 }, { rejectWithValue }) => {
@@ -555,6 +568,20 @@ const productListSlice = createSlice({
         state.currentProduct = action.payload;
       })
       .addCase(getProductById.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      // Get Product by Path
+      .addCase(getProductByPath.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(getProductByPath.fulfilled, (state, action) => {
+        state.loading = false;
+        state.currentProduct = action.payload;
+      })
+      .addCase(getProductByPath.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })

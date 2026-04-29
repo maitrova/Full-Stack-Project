@@ -1,5 +1,46 @@
 import mongoose from "mongoose";
 
+const faqItemSchema = new mongoose.Schema(
+  {
+    question: {
+      type: String,
+      trim: true,
+      maxlength: 220,
+      default: "",
+    },
+    answer: {
+      type: String,
+      trim: true,
+      maxlength: 1200,
+      default: "",
+    },
+  },
+  { _id: false }
+);
+
+const sectionImageSchema = new mongoose.Schema(
+  {
+    imageUrl: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    altText: {
+      type: String,
+      trim: true,
+      maxlength: 240,
+      default: "",
+    },
+    targetHeading: {
+      type: String,
+      trim: true,
+      maxlength: 220,
+      default: "",
+    },
+  },
+  { _id: false }
+);
+
 const blogSchema = new mongoose.Schema(
   {
     title: {
@@ -43,6 +84,38 @@ const blogSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: "",
+    },
+    coverImageAlt: {
+      type: String,
+      trim: true,
+      maxlength: 240,
+      default: "",
+    },
+    metaTitle: {
+      type: String,
+      trim: true,
+      maxlength: 180,
+      default: "",
+    },
+    metaDescription: {
+      type: String,
+      trim: true,
+      maxlength: 320,
+      default: "",
+    },
+    focusKeyword: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+      default: "",
+    },
+    sectionImages: {
+      type: [sectionImageSchema],
+      default: [],
+    },
+    faqItems: {
+      type: [faqItemSchema],
+      default: [],
     },
     readTimeMinutes: {
       type: Number,

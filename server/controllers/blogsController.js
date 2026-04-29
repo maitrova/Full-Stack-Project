@@ -70,6 +70,34 @@ const parseBoolean = (value, fallback = false) => {
   return fallback;
 };
 
+const stripHtml = (value = "") =>
+  String(value || "")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const estimateReadTimeMinutes = (content = "") => {
+  const wordCount = stripHtml(content).split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.ceil(wordCount / 200));
+};
+
+const parseJsonArrayField = (value) => {
+  if (Array.isArray(value)) return value;
+  if (value === undefined || value === null || value === "") return [];
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      throw new Error("Invalid JSON array payload");
+    }
+  }
+  return [];
+};
+
 const normalizeBlogPayload = async (body = {}, excludeId = null) => {
   const title = String(body.title || "").trim();
   const excerpt = String(body.excerpt || "").trim();
@@ -82,6 +110,19 @@ const normalizeBlogPayload = async (body = {}, excludeId = null) => {
   const baseSlug = slugify(body.slug || title);
   const slug = await ensureUniqueSlug(baseSlug, excludeId);
   const publishedAt = body.publishedAt ? new Date(body.publishedAt) : new Date();
+  const faqItems = parseJsonArrayField(body.faqItems)
+    .map((item) => ({
+      question: String(item?.question || "").trim(),
+      answer: String(item?.answer || "").trim(),
+    }))
+    .filter((item) => item.question && item.answer);
+  const sectionImages = parseJsonArrayField(body.sectionImages)
+    .map((item) => ({
+      imageUrl: String(item?.imageUrl || "").trim(),
+      altText: String(item?.altText || "").trim(),
+      targetHeading: String(item?.targetHeading || "").trim(),
+    }))
+    .filter((item) => item.imageUrl && item.targetHeading);
 
   return {
     title,
@@ -91,7 +132,13 @@ const normalizeBlogPayload = async (body = {}, excludeId = null) => {
     excerpt,
     content,
     coverImage: String(body.coverImage || "").trim(),
-    readTimeMinutes: Math.max(1, Number(body.readTimeMinutes || 5) || 5),
+    coverImageAlt: String(body.coverImageAlt || "").trim(),
+    metaTitle: String(body.metaTitle || "").trim(),
+    metaDescription: String(body.metaDescription || "").trim(),
+    focusKeyword: String(body.focusKeyword || "").trim(),
+    sectionImages,
+    faqItems,
+    readTimeMinutes: estimateReadTimeMinutes(content),
     isPublished: parseBoolean(body.isPublished, true),
     isFeatured: parseBoolean(body.isFeatured, false),
     publishedAt: Number.isNaN(publishedAt.getTime()) ? new Date() : publishedAt,

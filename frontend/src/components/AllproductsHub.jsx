@@ -41,6 +41,7 @@ import {
 } from "../redux/slices/Cartslice.js";
 import { selectCurrentToken } from "../redux/slices/Userslice.js";
 import { buildImageUrl, getResponsiveImageProps } from "../utils/responsiveImage.js";
+import { buildReadymadeProductPath } from "../utils/readymadeRoutes.js";
 
 // All products specific color palette - More muted, professional colors
 const ALL_PRODUCTS_COLORS = {
@@ -1299,7 +1300,7 @@ export default function AllProductsHub() {
                         <Link
                           to={
                             product.type === "readymade"
-                              ? `/readymade/${product._id}`
+                              ? (buildReadymadeProductPath(product) || `/readymade/${product._id}`)
                               : `/catalogue/${product._id}`
                           }
                           className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
@@ -1402,7 +1403,7 @@ export default function AllProductsHub() {
                             <Link
                               to={
                                 product.type === "readymade"
-                                  ? `/readymade/${product._id}`
+                                  ? (buildReadymadeProductPath(product) || `/readymade/${product._id}`)
                                   : `/catalogue/${product._id}`
                               }
                               className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"

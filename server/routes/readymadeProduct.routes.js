@@ -15,6 +15,7 @@ import {
   getProductFilters,
   updateProductList,
   getAllReadymadeProductsPublic,
+  getReadymadeProductByPath,
   getHomeCategoryTiles,
   getHomeSubCategoryTiles,
   
@@ -37,6 +38,7 @@ const productUpload = upload.fields([
 readymadeproducts.get("/categorylist", getHomeCategoryTiles);
 readymadeproducts.get("/subcategorylist", getHomeSubCategoryTiles);
 readymadeproducts.get("/public", getAllReadymadeProductsPublic);
+readymadeproducts.get("/path/:category/:subCategory/:productSlug", getReadymadeProductByPath);
 readymadeproducts.get("/", getAllReadymadeProducts); // Get all products with pagination
 readymadeproducts.get("/:id", getReadymadeProductById); // Get single product
 readymadeproducts.get("/search", searchProducts); // Search products

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { getProductById as fetchReadymadeProductById } from '../redux/slices/productList.js';
+import { getProductById as fetchReadymadeProductById, getProductByPath as fetchReadymadeProductByPath } from '../redux/slices/productList.js';
 import DOMPurify from "dompurify";
 import { 
   addToCart, 
@@ -16,6 +16,7 @@ import {
 } from '../redux/slices/Cartslice.js';
 import { selectCurrentToken } from '../redux/slices/Userslice.js';
 import { buildImageUrl, getRawImagePath, getResponsiveImageProps } from "../utils/responsiveImage.js";
+import { buildReadymadeProductPath } from "../utils/readymadeRoutes.js";
 import ProductImageLightbox from "./ProductImageLightbox.jsx";
 import ProductReviews from "./ProductReviews.jsx";
 
@@ -57,7 +58,7 @@ const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
 const IMAGE_URL = import.meta.env.VITE_IMAGE_URL;
 
 export default function ProductDetailPage() {
-  const { id, type = 'product' } = useParams();
+  const { id, type = 'product', categoryName, subCategoryName, productSlug } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [selectedVariant, setSelectedVariant] = useState(null);
@@ -112,7 +113,17 @@ export default function ProductDetailPage() {
 
       try {
         if (isReadymade) {
-          await dispatch(fetchReadymadeProductById(id)).unwrap();
+          if (categoryName && subCategoryName && productSlug) {
+            await dispatch(
+              fetchReadymadeProductByPath({
+                category: categoryName,
+                subCategory: subCategoryName,
+                productSlug,
+              })
+            ).unwrap();
+          } else {
+            await dispatch(fetchReadymadeProductById(id)).unwrap();
+          }
         } else {
           const res = await fetch(`${API_URL}/savedata/${id}`, {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -132,10 +143,10 @@ export default function ProductDetailPage() {
       }
     };
 
-    if (id) {
+    if (id || (categoryName && subCategoryName && productSlug)) {
       fetchData();
     }
-  }, [id, type, dispatch, token, isReadymade]);
+  }, [id, type, dispatch, token, isReadymade, categoryName, subCategoryName, productSlug]);
 
   // Set item data for readymade products
   useEffect(() => {
@@ -1755,7 +1766,7 @@ export default function ProductDetailPage() {
                 return (
                   <Link
                     key={relatedItem._id}
-                    to={`/readymade/${relatedItem._id}`}
+                    to={buildReadymadeProductPath(relatedItem) || `/readymade/${relatedItem._id}`}
                     className="group w-[10rem] flex-none snap-start overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg sm:w-[11rem]"
                   >
                     <div className="relative aspect-square overflow-hidden bg-gray-50">

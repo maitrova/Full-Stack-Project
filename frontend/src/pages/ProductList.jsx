@@ -64,6 +64,7 @@ import {
 } from "../redux/slices/Cartslice.js";
 import { selectCurrentToken } from "../redux/slices/Userslice.js";
 import { buildImageUrl, getResponsiveImageProps } from "../utils/responsiveImage.js";
+import { buildReadymadeProductPath } from "../utils/readymadeRoutes.js";
 
 // Modern professional color palette
 const MODERN_COLORS = {
@@ -1148,7 +1149,7 @@ export default function UnifiedProductHub() {
     const viewDetailsLink = isCustom
       ? `/products/${product.slug}`
       : type === "readymade"
-      ? `/readymade/${product._id}`
+      ? (buildReadymadeProductPath(product) || `/readymade/${product._id}`)
       : type === "design"
       ? `/catalogue/${product._id}`
       : "#";

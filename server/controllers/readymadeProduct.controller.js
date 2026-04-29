@@ -58,6 +58,14 @@ const parseOptionalDate = (value) => {
   return date;
 };
 
+const normalizeRouteSegment = (value = "") =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
 const normalizeUploadedPath = (file) => normalizeStoredPath(file?.path);
 
 const optimizeSizeChartUpload = async (file) => {
@@ -253,6 +261,63 @@ export const getReadymadeProductById = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: error.message
+    });
+  }
+};
+
+export const getReadymadeProductByPath = async (req, res) => {
+  try {
+    const { category, subCategory, productSlug } = req.params;
+
+    const products = await ReadymadeProduct.find({ isActive: true })
+      .populate("category", "name")
+      .populate("subCategory", "name")
+      .populate("brand", "name")
+      .select("-__v")
+      .lean();
+
+    const matchedProduct = products.find((product) => {
+      const productCategory =
+        typeof product.category === "string" ? product.category : product.category?.name || "";
+      const productSubCategory =
+        typeof product.subCategory === "string" ? product.subCategory : product.subCategory?.name || "";
+      const productTitle = product.title || "";
+
+      return (
+        normalizeRouteSegment(productCategory) === normalizeRouteSegment(category) &&
+        normalizeRouteSegment(productSubCategory) === normalizeRouteSegment(subCategory) &&
+        normalizeRouteSegment(productTitle) === normalizeRouteSegment(productSlug)
+      );
+    });
+
+    if (!matchedProduct) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    matchedProduct.category =
+      typeof matchedProduct.category === "string"
+        ? matchedProduct.category
+        : matchedProduct.category?.name || null;
+    matchedProduct.subCategory =
+      typeof matchedProduct.subCategory === "string"
+        ? matchedProduct.subCategory
+        : matchedProduct.subCategory?.name || null;
+    matchedProduct.brand =
+      typeof matchedProduct.brand === "string"
+        ? matchedProduct.brand
+        : matchedProduct.brand?.name || null;
+
+    return res.status(200).json({
+      success: true,
+      data: attachReadymadePricing(matchedProduct),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
     });
   }
 };

@@ -19,6 +19,7 @@ import {
 } from '../redux/slices/Cartslice.js';
 import { selectCurrentToken } from '../redux/slices/Userslice.js';
 import { buildImageUrl, getRawImagePath, getResponsiveImageProps } from "../utils/responsiveImage.js";
+import { buildReadymadeProductPath } from "../utils/readymadeRoutes.js";
 
 // Constants
 const ensureImageUrl = (imagePath) => buildImageUrl(imagePath) || null;
@@ -296,6 +297,8 @@ const CartPage = () => {
     if (item.kind === "READYMADE") {
       const dropId = getDropId(item);
       if (dropId) return navigate(`/dropproducts/${dropId}`);
+      const readymadePath = buildReadymadeProductPath(item.readymadeProduct);
+      if (readymadePath) return navigate(readymadePath);
       if (item.readymadeProduct?._id) return navigate(`/readymade/${item.readymadeProduct._id}`);
     }
     if (item.kind === "DESIGN" && item.design?._id) {

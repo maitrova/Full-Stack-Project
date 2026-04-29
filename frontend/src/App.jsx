@@ -305,6 +305,12 @@ function App() {
         } />
 
         {/* Readymade Product Details */}
+        <Route path="/:categoryName/:subCategoryName/:productSlug" element={
+          <MainLayout>
+            <ReadymadeProductDetailPage />
+          </MainLayout>
+        } />
+
         <Route path="/readymade/:id" element={
           <MainLayout>
             <ReadymadeProductDetailPage />

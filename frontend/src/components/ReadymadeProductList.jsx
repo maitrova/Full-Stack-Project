@@ -13,6 +13,7 @@ import {
   clearSuccess
 } from '../redux/slices/Cartslice.js'; // Adjust path as needed
 import { buildImageUrl, getRawImagePath, getResponsiveImageProps } from "../utils/responsiveImage.js";
+import { buildReadymadeProductPath } from "../utils/readymadeRoutes.js";
 
 const ReadymadeProductList = () => {
   const dispatch = useDispatch();
@@ -562,7 +563,7 @@ const ReadymadeProductList = () => {
                   {/* Action Buttons */}
                   <div className="flex space-x-3">
                     <Link
-                      to={`/products/${product?._id}`}
+                      to={buildReadymadeProductPath(product) || `/readymade/${product?._id}`}
                       className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium text-center transition-all duration-200 transform hover:scale-[1.02] shadow-md hover:shadow-lg"
                     >
                       View Details

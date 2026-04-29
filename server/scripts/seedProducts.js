@@ -186,27 +186,6 @@ async function run() {
       ],
     },
 
-    {
-      name: "Women's Round Neck T-Shirt",
-      slug: "womens-round-tee",
-      category: "womens",
-      subCategory: "casual",
-      basePrice: 749,
-
-      colors: defaultColors,
-      sizePricing: buildSizePricing([
-        { size: "XS", price: 499, stock: 35 },
-        { size: "S", price: 499, stock: 50 },
-        { size: "M", price: 499, stock: 50 },
-        { size: "L", price: 499, stock: 40 },
-        { size: "XL", price: 499, stock: 25 },
-      ]),
-
-      views: [
-        { code: "front", label: "Front", mockupUrl: "/mockups/womens-round-tee/front.png", maskUrl: "/masks/womens-round-tee/front_mask.png" },
-        { code: "back", label: "Back", mockupUrl: "/mockups/womens-round-tee/back.png", maskUrl: "/masks/womens-round-tee/back_mask.png" },
-      ],
-    },
   ];
 
   for (const product of products) {

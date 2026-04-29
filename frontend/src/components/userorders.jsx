@@ -30,6 +30,7 @@ import {
 import { INDIAN_BANK_OPTIONS } from '../constants/indianBanks.js';
 import { selectCurrentToken } from '../redux/slices/Userslice.js';
 import ReviewModal from './ReviewModal.jsx';
+import { buildReadymadeProductPath } from "../utils/readymadeRoutes.js";
 
 const BankLogoBadge = ({ option, className = '' }) => (
   <span className={`inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-[10px] font-bold tracking-wide text-white ${option.color} ${className}`}>
@@ -565,6 +566,8 @@ const UserOrders = () => {
     if (!item) return null;
 
     if (item.kind === 'READYMADE') {
+      const readymadePath = buildReadymadeProductPath(item.readymadeProduct || item.product || item);
+      if (readymadePath) return readymadePath;
       const readymadeId =
         item.readymadeProduct?._id ||
         item.readymadeProduct ||
