@@ -23,6 +23,49 @@ const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/api";
 const emptyAddress = { fullName: "", mobileNumber: "", completeAddress: "", landmark: "", pincode: "", city: "", state: "" };
 const emptyCouponState = { code: "", status: "idle", message: "", discount: 0, coupon: null, subtotal: null };
 
+const buildPurchaseItems = (items = []) =>
+  items.map((item) => {
+    const productSource =
+      item?.dropproduct ||
+      item?.readymadeProduct ||
+      item?.design ||
+      item?.product ||
+      null;
+
+    const productId =
+      productSource?._id ||
+      item?.dropproductId ||
+      item?.readymadeProductId ||
+      item?.designId ||
+      item?.productId ||
+      item?._id ||
+      "";
+
+    const productName =
+      productSource?.title ||
+      productSource?.name ||
+      productSource?.designName ||
+      (item?.kind === "DESIGN" ? "Customized Product" : "Product");
+
+    const quantity = Number(item?.qty || item?.quantity || 1);
+    const unitPrice = Number(
+      item?.unitPrice ??
+        productSource?.effectivePrice ??
+        productSource?.price ??
+        productSource?.basePrice ??
+        0
+    );
+
+    return {
+      id: String(productId),
+      name: productName,
+      quantity,
+      item_price: unitPrice,
+      kind: item?.kind || "PRODUCT",
+      size: item?.size || item?.selectedSize || "",
+    };
+  });
+
 function Input({ label, value, onChange, placeholder, type = "text" }) {
   return (
     <div className="space-y-1.5">
@@ -481,7 +524,9 @@ export default function CheckoutAddresses() {
     setPricingPreview({ subtotal: Number(pricing.subtotal || 0), shipping: Number(pricing.shipping || 0), discount: Number(pricing.discount || 0), total: Number(pricing.total || 0), coupon: pricing.coupon || null });
   };
 
-  const handleOrderSuccess = ({ orderId, paymentLabel }) => {
+  const handleOrderSuccess = ({ orderId, paymentLabel, totalAmount }) => {
+    const purchaseItems = buildPurchaseItems(cartItems);
+
     dispatch(getCart());
     navigate("/checkout/success", {
       replace: true,
@@ -489,6 +534,9 @@ export default function CheckoutAddresses() {
         orderSuccess: {
           orderId,
           paymentLabel,
+          totalAmount: Number(totalAmount || 0),
+          items: purchaseItems,
+          itemCount: purchaseItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
           createdAt: Date.now(),
         },
       },
@@ -522,6 +570,7 @@ export default function CheckoutAddresses() {
       handleOrderSuccess({
         orderId: data?.orderId || data?.order?._id || "",
         paymentLabel: "Cash on Delivery",
+        totalAmount: effectiveTotal,
       });
     } catch (cashOnDeliveryError) {
       setCodError(cashOnDeliveryError.message || "Failed to place cash on delivery order");
@@ -690,6 +739,7 @@ export default function CheckoutAddresses() {
                           handleOrderSuccess({
                             orderId,
                             paymentLabel: "Online payment",
+                            totalAmount: effectiveTotal,
                           });
                         }}
                         onOrderCreated={handleOrderCreated}

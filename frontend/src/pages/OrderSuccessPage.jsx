@@ -1,10 +1,11 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 const getSuccessPayload = (locationState) => {
   const payload = locationState?.orderSuccess;
   if (!payload || typeof payload !== "object") return null;
   if (!payload.orderId) return null;
+  if (payload.totalAmount === undefined || payload.totalAmount === null) return null;
   return payload;
 };
 
@@ -12,12 +13,38 @@ export default function OrderSuccessPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const successPayload = getSuccessPayload(location.state);
+  const hasTrackedPurchaseRef = useRef(false);
 
   useEffect(() => {
     if (!successPayload) {
       navigate("/", { replace: true });
     }
   }, [navigate, successPayload]);
+
+  useEffect(() => {
+    if (!successPayload || hasTrackedPurchaseRef.current) {
+      return;
+    }
+
+    if (typeof window !== "undefined" && typeof window.fbq === "function") {
+      const trackedItems = Array.isArray(successPayload.items) ? successPayload.items : [];
+
+      window.fbq("track", "Purchase", {
+        value: Number(successPayload.totalAmount || 0),
+        currency: "INR",
+        content_ids: trackedItems.map((item) => String(item.id || "")).filter(Boolean),
+        contents: trackedItems.map((item) => ({
+          id: String(item.id || ""),
+          quantity: Number(item.quantity || 1),
+          item_price: Number(item.item_price || 0),
+        })),
+        content_type: "product",
+        num_items: Number(successPayload.itemCount || trackedItems.length || 0),
+        order_id: String(successPayload.orderId),
+      });
+      hasTrackedPurchaseRef.current = true;
+    }
+  }, [successPayload]);
 
   if (!successPayload) return null;
 
@@ -50,6 +77,41 @@ export default function OrderSuccessPage() {
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Order Reference</div>
               <div className="mt-2 break-all text-sm font-semibold text-slate-900">{successPayload.orderId}</div>
             </div>
+
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Order Total</div>
+                  <div className="mt-2 text-lg font-semibold text-slate-900">Rs. {Number(successPayload.totalAmount || 0).toFixed(2)}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Items</div>
+                  <div className="mt-2 text-lg font-semibold text-slate-900">{Number(successPayload.itemCount || 0)}</div>
+                </div>
+              </div>
+            </div>
+
+            {Array.isArray(successPayload.items) && successPayload.items.length > 0 ? (
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Order Details</div>
+                <div className="mt-3 space-y-3">
+                  {successPayload.items.map((item, index) => (
+                    <div key={`${item.id || item.name || "item"}-${index}`} className="flex items-start justify-between gap-4 border-b border-slate-100 pb-3 last:border-b-0 last:pb-0">
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900">{item.name || "Product"}</div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          Qty: {Number(item.quantity || 1)}
+                          {item.size ? ` • Size: ${item.size}` : ""}
+                        </div>
+                      </div>
+                      <div className="text-sm font-semibold text-slate-900">
+                        Rs. {Number(item.item_price || 0).toFixed(2)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
