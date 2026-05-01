@@ -82,11 +82,25 @@ export default function OrderSuccessPage() {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Order Total</div>
-                  <div className="mt-2 text-lg font-semibold text-slate-900">Rs. {Number(successPayload.totalAmount || 0).toFixed(2)}</div>
+                  <div
+                    id="purchase-total-amount"
+                    data-meta-price={Number(successPayload.totalAmount || 0).toFixed(2)}
+                    data-meta-currency="INR"
+                    aria-label={`Order total Rs. ${Number(successPayload.totalAmount || 0).toFixed(2)}`}
+                    className="mt-2 text-lg font-semibold text-slate-900"
+                  >
+                    Rs. {Number(successPayload.totalAmount || 0).toFixed(2)}
+                  </div>
                 </div>
                 <div className="text-right">
                   <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Items</div>
-                  <div className="mt-2 text-lg font-semibold text-slate-900">{Number(successPayload.itemCount || 0)}</div>
+                  <div
+                    id="purchase-total-items"
+                    data-meta-item-count={Number(successPayload.itemCount || 0)}
+                    className="mt-2 text-lg font-semibold text-slate-900"
+                  >
+                    {Number(successPayload.itemCount || 0)}
+                  </div>
                 </div>
               </div>
             </div>
@@ -96,7 +110,15 @@ export default function OrderSuccessPage() {
                 <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Order Details</div>
                 <div className="mt-3 space-y-3">
                   {successPayload.items.map((item, index) => (
-                    <div key={`${item.id || item.name || "item"}-${index}`} className="flex items-start justify-between gap-4 border-b border-slate-100 pb-3 last:border-b-0 last:pb-0">
+                    <div
+                      key={`${item.id || item.name || "item"}-${index}`}
+                      id={`purchase-item-${index + 1}`}
+                      data-meta-product-id={item.id || ""}
+                      data-meta-product-name={item.name || "Product"}
+                      data-meta-quantity={Number(item.quantity || 1)}
+                      data-meta-item-price={Number(item.item_price || 0).toFixed(2)}
+                      className="flex items-start justify-between gap-4 border-b border-slate-100 pb-3 last:border-b-0 last:pb-0"
+                    >
                       <div>
                         <div className="text-sm font-semibold text-slate-900">{item.name || "Product"}</div>
                         <div className="mt-1 text-xs text-slate-500">
@@ -104,7 +126,11 @@ export default function OrderSuccessPage() {
                           {item.size ? ` • Size: ${item.size}` : ""}
                         </div>
                       </div>
-                      <div className="text-sm font-semibold text-slate-900">
+                      <div
+                        id={`purchase-item-price-${index + 1}`}
+                        aria-label={`${item.name || "Product"} price Rs. ${Number(item.item_price || 0).toFixed(2)}`}
+                        className="text-sm font-semibold text-slate-900"
+                      >
                         Rs. {Number(item.item_price || 0).toFixed(2)}
                       </div>
                     </div>
