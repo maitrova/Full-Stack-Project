@@ -98,6 +98,33 @@ export default function ProductDetailPage() {
     Array.isArray(itemData?.variants) &&
     itemData.variants.length > 0;
 
+  const trackMetaAddToCart = ({
+    productId,
+    productName,
+    quantity: trackedQuantity,
+    unitPrice,
+    currency = 'INR',
+  }) => {
+    if (typeof window === 'undefined' || typeof window.fbq !== 'function') {
+      return;
+    }
+
+    const normalizedQuantity = Number(trackedQuantity || 1);
+    const normalizedUnitPrice = Number(unitPrice || 0);
+    const normalizedProductId = productId ? String(productId) : '';
+
+    window.fbq('track', 'AddToCart', {
+      content_ids: normalizedProductId ? [normalizedProductId] : [],
+      content_name: productName || 'Readymade Product',
+      content_type: 'product',
+      contents: normalizedProductId
+        ? [{ id: normalizedProductId, quantity: normalizedQuantity, item_price: normalizedUnitPrice }]
+        : [],
+      currency,
+      value: normalizedUnitPrice * normalizedQuantity,
+    });
+  };
+
   const getVariantBySize = (size) => {
     if (!itemData?.variants || !size) return null;
     return itemData.variants.find(
@@ -439,6 +466,13 @@ export default function ProductDetailPage() {
 
       console.log('Adding to cart:', cartData);
       await dispatch(addToCart(cartData)).unwrap();
+      trackMetaAddToCart({
+        productId: itemData?._id,
+        productName: itemData?.title || itemData?.name,
+        quantity: isReadymade ? quantity : 1,
+        unitPrice: displayData?.price,
+        currency: displayData?.currency || 'INR',
+      });
       await dispatch(getCart());
       
     } catch (error) {
@@ -1485,7 +1519,11 @@ export default function ProductDetailPage() {
               {
                 <div className="grid grid-cols-2 gap-4 mt-6">
                   <button
+                    type="button"
+                    id="readymade-add-to-cart-desktop"
                     onClick={handleAddToCart}
+                    aria-label="Add to cart"
+                    data-meta-track="add-to-cart"
                     disabled={isOutOfStock || isAddingToCart || cartLoading || (hasVariants && !selectedSize)}
                     className={`h-14 rounded-xl font-semibold transition-all flex items-center justify-center gap-3 ${
                       isOutOfStock || (hasVariants && !selectedSize)
@@ -1585,7 +1623,11 @@ export default function ProductDetailPage() {
                 {
                   <>
                     <button
+                      type="button"
+                      id="readymade-add-to-cart-mobile"
                       onClick={handleAddToCart}
+                      aria-label="Add to cart"
+                      data-meta-track="add-to-cart"
                       disabled={isOutOfStock || isAddingToCart || cartLoading || (hasVariants && !selectedSize)}
                       className={`flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg text-sm font-semibold transition-all ${
                         isOutOfStock || (hasVariants && !selectedSize)

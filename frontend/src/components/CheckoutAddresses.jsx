@@ -105,46 +105,6 @@ function CouponCelebration({ visible, code, discount }) {
   );
 }
 
-function OrderSuccessPopup({ visible, paymentLabel }) {
-  if (!visible) return null;
-
-  return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-sm">
-      <div className="w-full max-w-md overflow-hidden rounded-[28px] border border-emerald-200 bg-white shadow-[0_40px_120px_-48px_rgba(15,23,42,0.55)]">
-        <div className="bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_36%),linear-gradient(135deg,_#ecfdf5,_#f8fafc,_#ffffff)] px-6 py-6">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-200">
-            <svg className="h-7 w-7" viewBox="0 0 20 20" fill="currentColor">
-              <path
-                fillRule="evenodd"
-                d="M16.704 5.29a1 1 0 010 1.42l-7.13 7.13a1 1 0 01-1.414 0l-3.164-3.164a1 1 0 111.414-1.415l2.457 2.457 6.423-6.423a1 1 0 011.414 0z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </div>
-          <div className="mt-4 text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
-            Order Confirmed
-          </div>
-          <h3 className="mt-2 text-2xl font-semibold text-slate-900">
-            Your order has been placed successfully
-          </h3>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            {paymentLabel} has been recorded. Redirecting you to your orders page in a moment.
-          </p>
-          <div className="mt-5 h-2 overflow-hidden rounded-full bg-emerald-100">
-            <div className="h-full w-full origin-left animate-[successRedirect_3.5s_linear_forwards] rounded-full bg-emerald-500" />
-          </div>
-        </div>
-      </div>
-      <style>{`
-        @keyframes successRedirect {
-          from { transform: scaleX(1); }
-          to { transform: scaleX(0); }
-        }
-      `}</style>
-    </div>
-  );
-}
-
 const formatCouponPrimaryText = (coupon) => {
   if (!coupon) return "";
   if (coupon.discountType === "PERCENTAGE") {
@@ -293,11 +253,6 @@ export default function CheckoutAddresses() {
   const [codLoading, setCodLoading] = useState(false);
   const [codError, setCodError] = useState("");
   const [codMinimumOrderAmount, setCodMinimumOrderAmount] = useState(0);
-  const [orderSuccessState, setOrderSuccessState] = useState({
-    visible: false,
-    paymentLabel: "",
-  });
-
   const isEditing = useMemo(() => mode.startsWith("edit"), [mode]);
   const normalizedCouponCode = useMemo(() => String(couponCode || "").trim().toUpperCase(), [couponCode]);
   const isCouponApplied = couponState.status === "applied" && couponState.code === normalizedCouponCode;
@@ -343,16 +298,6 @@ export default function CheckoutAddresses() {
     const timer = window.setTimeout(() => setShowCouponCelebration(false), 2600);
     return () => window.clearTimeout(timer);
   }, [showCouponCelebration]);
-
-  useEffect(() => {
-    if (!orderSuccessState.visible) return undefined;
-
-    const timer = window.setTimeout(() => {
-      navigate("/orders");
-    }, 3500);
-
-    return () => window.clearTimeout(timer);
-  }, [navigate, orderSuccessState.visible]);
 
   useEffect(() => {
     let cancelled = false;
@@ -536,11 +481,17 @@ export default function CheckoutAddresses() {
     setPricingPreview({ subtotal: Number(pricing.subtotal || 0), shipping: Number(pricing.shipping || 0), discount: Number(pricing.discount || 0), total: Number(pricing.total || 0), coupon: pricing.coupon || null });
   };
 
-  const handleOrderSuccess = (paymentLabel) => {
+  const handleOrderSuccess = ({ orderId, paymentLabel }) => {
     dispatch(getCart());
-    setOrderSuccessState({
-      visible: true,
-      paymentLabel,
+    navigate("/checkout/success", {
+      replace: true,
+      state: {
+        orderSuccess: {
+          orderId,
+          paymentLabel,
+          createdAt: Date.now(),
+        },
+      },
     });
   };
 
@@ -568,7 +519,10 @@ export default function CheckoutAddresses() {
       }
 
       handleOrderCreated(data);
-      handleOrderSuccess("Cash on Delivery");
+      handleOrderSuccess({
+        orderId: data?.orderId || data?.order?._id || "",
+        paymentLabel: "Cash on Delivery",
+      });
     } catch (cashOnDeliveryError) {
       setCodError(cashOnDeliveryError.message || "Failed to place cash on delivery order");
     } finally {
@@ -580,10 +534,6 @@ export default function CheckoutAddresses() {
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,_#eef6ff_0%,_#f8fafc_24%,_#ffffff_100%)]">
-      <OrderSuccessPopup
-        visible={orderSuccessState.visible}
-        paymentLabel={orderSuccessState.paymentLabel}
-      />
       <div className="mx-auto max-w-7xl px-4 py-6 md:px-8 md:py-10">
         <div className="relative overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_26%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.15),_transparent_24%),linear-gradient(135deg,_#0f172a,_#1e293b_48%,_#0f766e)] px-6 py-8 text-white shadow-[0_36px_90px_-44px_rgba(15,23,42,0.55)] md:px-10 md:py-10">
           <div className="relative grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
@@ -737,10 +687,13 @@ export default function CheckoutAddresses() {
                         couponCode={isCouponApplied ? normalizedCouponCode : ""}
                         onSuccess={({ orderId }) => {
                           console.log("Paid order:", orderId);
-                          handleOrderSuccess("Online payment");
+                          handleOrderSuccess({
+                            orderId,
+                            paymentLabel: "Online payment",
+                          });
                         }}
                         onOrderCreated={handleOrderCreated}
-                        disabled={checkoutDisabled || codLoading || orderSuccessState.visible}
+                        disabled={checkoutDisabled || codLoading}
                       />
                     </div>
                     <div>

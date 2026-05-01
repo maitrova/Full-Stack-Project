@@ -75,6 +75,33 @@ const SUPPORTED_DESIGN_ACCEPT = "image/*,.heic,.heif,.svg,.tif,.tiff";
 const REMOVE_BG_RECOMMENDATION =
   "PNG usually gives the cleanest edges, but you can upload other common image formats too.";
 
+const trackMetaAddToCart = ({
+  productId,
+  productName,
+  quantity,
+  unitPrice,
+  currency = "INR",
+}) => {
+  if (typeof window === "undefined" || typeof window.fbq !== "function") {
+    return;
+  }
+
+  const normalizedQuantity = Number(quantity || 1);
+  const normalizedUnitPrice = Number(unitPrice || 0);
+  const normalizedProductId = productId ? String(productId) : "";
+
+  window.fbq("track", "AddToCart", {
+    content_ids: normalizedProductId ? [normalizedProductId] : [],
+    content_name: productName || "Customized Product",
+    content_type: "product",
+    contents: normalizedProductId
+      ? [{ id: normalizedProductId, quantity: normalizedQuantity, item_price: normalizedUnitPrice }]
+      : [],
+    currency,
+    value: normalizedUnitPrice * normalizedQuantity,
+  });
+};
+
 
 
 const normalizeImagePriceRules = (rules = DEFAULT_IMAGE_PRICE_RULES) => {
@@ -2625,6 +2652,13 @@ const startCropPreviewPan = (event, mode = "move") => {
     });
 
     const addToCartResult = await dispatch(addToCart(cartPayload)).unwrap();
+    trackMetaAddToCart({
+      productId: product?._id || product?.id,
+      productName: product?.title || product?.name || product?.productName,
+      quantity: cartPayload.qty,
+      unitPrice: cartPayload.unitPrice,
+      currency: "INR",
+    });
 
     console.info("[productcustomization] add to cart success", {
       designId: designIdToUse,
@@ -2801,7 +2835,11 @@ const startCropPreviewPan = (event, mode = "move") => {
             </button>
 
             <button
+              type="button"
+              id="customization-add-to-cart-header-mobile"
               onClick={handleSaveAndAddToCart}
+              aria-label="Add customized product to cart"
+              data-meta-track="add-to-cart"
               disabled={saving || addingToCart}
               className="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
             >
@@ -2819,7 +2857,11 @@ const startCropPreviewPan = (event, mode = "move") => {
             </button>
 
             <button
+              type="button"
+              id="customization-add-to-cart-header-desktop"
               onClick={handleSaveAndAddToCart}
+              aria-label="Add customized product to cart"
+              data-meta-track="add-to-cart"
               disabled={saving || addingToCart}
               className="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
             >
@@ -4035,7 +4077,10 @@ const startCropPreviewPan = (event, mode = "move") => {
                       </button>
                       <button
                         type="button"
+                        id="customization-add-to-cart-footer-mobile"
                         onClick={handleSaveAndAddToCart}
+                        aria-label="Add customized product to cart"
+                        data-meta-track="add-to-cart"
                         disabled={saving || addingToCart}
                         className="rounded-full border border-emerald-600 bg-emerald-600 px-2.5 py-1 text-[10px] font-semibold text-white disabled:opacity-50"
                       >

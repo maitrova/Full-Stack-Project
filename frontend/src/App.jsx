@@ -41,6 +41,7 @@ import PublishDesignModal from "./components/PublishDesignModal.jsx";
 import Shipping from "./companypdfs/Shipping.jsx";
 import AdminRoute from "./components/AdminRoute.jsx";
 import BlogDetailPage from "./pages/BlogDetailPage.jsx";
+import OrderSuccessPage from "./pages/OrderSuccessPage.jsx";
 // You'll need to create this
 
 // Layout component with header for all pages except auth
@@ -277,6 +278,12 @@ function App() {
         <Route path="/checkoutpage" element={
           <MainLayout>
             <CheckoutPage />
+          </MainLayout>
+        } />
+
+        <Route path="/checkout/success" element={
+          <MainLayout>
+            <OrderSuccessPage />
           </MainLayout>
         } />
 

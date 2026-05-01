@@ -238,6 +238,25 @@ const DropProductDetailsPage = () => {
   const discount = calculateDiscount(originalPrice, currentPrice);
   const canPurchase = currentStock > 0 && !!selectedVariant;
 
+  const trackMetaAddToCart = () => {
+    if (typeof window === "undefined" || typeof window.fbq !== "function") return;
+
+    window.fbq("track", "AddToCart", {
+      content_ids: [String(product?._id || "")],
+      content_name: product?.name || product?.title || "Drop Product",
+      content_type: "product",
+      contents: [
+        {
+          id: String(product?._id || ""),
+          quantity,
+          item_price: Number(currentPrice || 0),
+        },
+      ],
+      currency: "INR",
+      value: Number(currentPrice || 0) * Number(quantity || 1),
+    });
+  };
+
   const handleSizeSelect = (size) => {
     setSelectedSize(size);
     setQuantity(1);
@@ -328,6 +347,7 @@ const DropProductDetailsPage = () => {
 
     try {
       await dispatch(addToCart(cartData)).unwrap();
+      trackMetaAddToCart();
     } catch (err) {
       console.error("Failed to add to cart:", err);
     }
@@ -835,6 +855,10 @@ const DropProductDetailsPage = () => {
             <div className="hidden space-y-4 border-t pt-8 lg:block">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <button
+                  type="button"
+                  id="dropproduct-add-to-cart-desktop"
+                  aria-label="Add to cart"
+                  data-meta-track="add-to-cart"
                   onClick={handleAddToCart}
                   disabled={!canPurchase || cartLoading}
                   className={`h-14 rounded-xl font-semibold transition-all flex items-center justify-center gap-3 ${
@@ -965,6 +989,9 @@ const DropProductDetailsPage = () => {
           <div className="flex gap-2">
             <button
               type="button"
+              id="dropproduct-add-to-cart-mobile"
+              aria-label="Add to cart"
+              data-meta-track="add-to-cart"
               onClick={handleAddToCart}
               disabled={!canPurchase || cartLoading}
               className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-lg text-sm font-semibold transition-all ${
