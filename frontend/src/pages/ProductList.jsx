@@ -1147,7 +1147,7 @@ export default function UnifiedProductHub() {
     const discountPercent = !isCustom && type === "readymade" ? getCommonItemDiscount(product) : 0;
 
     const viewDetailsLink = isCustom
-      ? `/products/${product.slug}`
+      ? `/product/${product.slug}`
       : type === "readymade"
       ? (buildReadymadeProductPath(product) || `/readymade/${product._id}`)
       : type === "design"

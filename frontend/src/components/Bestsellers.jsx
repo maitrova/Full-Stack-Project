@@ -411,7 +411,7 @@ const getItemImages = (item) => {
               Showing {items.length} best sellers
             </div>
             <Link
-              to="/allproducts?filter=bestSellers"
+              to="/products?filter=bestSellers"
               className="inline-block text-sm text-gray-700 hover:text-gray-900 font-medium transition-colors"
             >
               View All →

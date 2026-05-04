@@ -396,7 +396,7 @@ const getItemImages = (item) => {
               Showing {items.length} new arrivals
             </div>
             <Link
-              to="/allproducts?filter=newArrivals"
+              to="/products?filter=newArrivals"
               className="inline-block text-sm text-gray-700 hover:text-gray-900 font-medium transition-colors"
             >
               View All →

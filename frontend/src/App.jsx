@@ -120,7 +120,7 @@ function App() {
           </MainLayout>
         } />
 
-        <Route path="/products" element={
+        <Route path="/products-legacy" element={
           <MainLayout>
             <ProductList />
           </MainLayout>
@@ -191,7 +191,25 @@ function App() {
           </MainLayout>
         } />
 
-        <Route path="/Allproducts" element={
+        <Route path="/products/:categoryName/:subCategoryName" element={
+          <MainLayout>
+            <AllProductsHub/>
+          </MainLayout>
+        } />
+
+        <Route path="/products/:categoryName" element={
+          <MainLayout>
+            <AllProductsHub/>
+          </MainLayout>
+        } />
+
+        <Route path="/products" element={
+          <MainLayout>
+            <AllProductsHub/>
+          </MainLayout>
+        } />
+
+        <Route path="/allproducts" element={
           <MainLayout>
             <AllProductsHub/>
           </MainLayout>
@@ -312,7 +330,7 @@ function App() {
         } />
 
         {/* Readymade Product Details */}
-        <Route path="/:categoryName/:subCategoryName/:productSlug" element={
+        <Route path="/products/:categoryName/:subCategoryName/:productSlug" element={
           <MainLayout>
             <ReadymadeProductDetailPage />
           </MainLayout>
@@ -324,7 +342,7 @@ function App() {
           </MainLayout>
         } />
 
-        <Route path="/products/:id" element={
+        <Route path="/product/:id" element={
           <MainLayout>
             <ReadymadeProductDetailPage />
           </MainLayout>

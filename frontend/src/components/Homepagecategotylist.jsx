@@ -8,6 +8,7 @@ import {
 } from "../redux/slices/Homepagecategorylist.js";
 import { Link } from "react-router-dom";
 import { BiCategoryAlt } from "react-icons/bi"; // optional icon
+import { buildProductsListingPath } from "../utils/readymadeRoutes.js";
 
 const IMAGE_URL = import.meta.env.VITE_IMAGE_URL; 
 
@@ -90,7 +91,7 @@ const CategoryTilesHorizontal = ({ limit = 12, onlyActive = true }) => {
             return (
               <Link
                 key={category.category}
-                to={`/allproducts?category=${encodeURIComponent(category.category)}`}
+                to={buildProductsListingPath(category.category)}
                 className="group block"
               >
                 <div className="bg-white border border-gray-100 rounded-xl overflow-hidden hover:border-gray-300 transition-all duration-200 hover:shadow-md">

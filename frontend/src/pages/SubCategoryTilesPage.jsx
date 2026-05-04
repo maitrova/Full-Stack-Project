@@ -9,6 +9,7 @@ import {
   selectSubCategoriesLoading,
   selectSubCategoriesError,
 } from "../redux/slices/Homepagecategorylist.js";
+import { buildProductsListingPath } from "../utils/readymadeRoutes.js";
 
 export default function SubCategoryTilesPage() {
   const dispatch = useDispatch();
@@ -47,7 +48,7 @@ export default function SubCategoryTilesPage() {
       return {
         title: name,
         image: rawPath,
-        href: `/allproducts?category=${encodeURIComponent(category)}&subCategory=${encodeURIComponent(name)}`,
+        href: buildProductsListingPath(category, name),
 
         count: item.count ?? null,
       };
@@ -61,7 +62,7 @@ export default function SubCategoryTilesPage() {
         <nav className="mb-3 text-sm">
           <ol className="flex flex-wrap items-center gap-2 text-gray-600">
             <li className="flex items-center gap-2">
-              <Link to="/allproducts" className="text-blue-600 hover:underline">
+              <Link to="/products" className="text-blue-600 hover:underline">
                 All Products
               </Link>
               <span className="text-gray-400">{">"}</span>

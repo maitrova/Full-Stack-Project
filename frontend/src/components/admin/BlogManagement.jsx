@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { selectCurrentToken } from "../../redux/slices/Userslice.js";
 import { buildImageUrl } from "../../utils/responsiveImage.js";
-import RichTextEditor from "../RichTextEditor.jsx";
+import BlogRichTextEditor from "./BlogRichTextEditor.jsx";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend/api";
 
@@ -385,7 +385,7 @@ const BlogManagement = () => {
             <div className="md:col-span-2">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Content</label>
               <p className="mb-3 text-xs text-slate-500">Use the title as the only H1. Inside content, use H2 and H3 so the TOC and section nesting can be generated automatically.</p>
-              <RichTextEditor value={form.content} onChange={(value) => handleChange("content", value)} />
+              <BlogRichTextEditor value={form.content} onChange={(value) => handleChange("content", value)} />
             </div>
 
             <div className="md:col-span-2 rounded-3xl border border-slate-200 bg-slate-50 p-4">

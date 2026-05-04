@@ -305,7 +305,7 @@ const CartPage = () => {
       return navigate(`/catalogue/${item.design._id}`);
     }
     if (item.product?._id) {
-      return navigate(`/products/${item.product._id}`);
+      return navigate(`/product/${item.product._id}`);
     }
   };
 
@@ -363,7 +363,7 @@ const CartPage = () => {
             <p className="text-gray-600 mb-6 px-4">Looks like you haven't added any items to your cart yet</p>
             <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4 px-4">
               <Link
-                to="/allproducts"
+                to="/products"
                 className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition duration-200 w-full sm:w-auto text-center"
               >
                 Browse Products
@@ -744,7 +744,7 @@ const CartPage = () => {
             {/* Continue Shopping - Mobile Optimized */}
             <div className="mt-6">
               <Link
-                to="/allproducts"
+                to="/products"
                 className="inline-flex items-center justify-center sm:justify-start text-blue-600 hover:text-blue-800 w-full sm:w-auto"
               >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

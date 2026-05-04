@@ -28,6 +28,16 @@ const normalizeDesignHomepageItem = (design) => {
 
 const normalizeReadymadeHomepageItem = (product) => {
   const pricedProduct = attachReadymadePricing({ ...product });
+  const category =
+    typeof pricedProduct.category === "string"
+      ? pricedProduct.category
+      : pricedProduct.category?.name || "";
+
+  const subCategory =
+    typeof pricedProduct.subCategory === "string"
+      ? pricedProduct.subCategory
+      : pricedProduct.subCategory?.name || "";
+
   const images = Array.isArray(pricedProduct.images)
     ? pricedProduct.images
         .map((img) =>
@@ -62,6 +72,8 @@ const normalizeReadymadeHomepageItem = (product) => {
     type: "readymade",
     _id: pricedProduct._id,
     title: pricedProduct.title,
+    category,
+    subCategory,
     previewImage,
     previewImages,
     price: pricedProduct.effectivePrice ?? pricedProduct.price ?? 0,
@@ -86,8 +98,10 @@ export const getEligibleNewArrivals = async (req, res) => {
         .lean(),
       ReadymadeProduct.find({ newArrival: true })
         .select(
-          "_id title images thumbnail price salePrice saleStartAt saleEndAt variants currency newArrival createdAt"
+          "_id title images thumbnail price salePrice saleStartAt saleEndAt variants currency newArrival createdAt category subCategory"
         )
+        .populate("category", "name")
+        .populate("subCategory", "name")
         .sort({ createdAt: -1 })
         .lean(),
     ]);
@@ -164,7 +178,12 @@ export const getHomepageNewArrivals = async (req, res) => {
 
     const [designs, readymades] = await Promise.all([
       designIds.length ? Design.find({ _id: { $in: designIds } }).lean() : [],
-      readymadeIds.length ? ReadymadeProduct.find({ _id: { $in: readymadeIds } }).lean() : [],
+      readymadeIds.length
+        ? ReadymadeProduct.find({ _id: { $in: readymadeIds } })
+            .populate("category", "name")
+            .populate("subCategory", "name")
+            .lean()
+        : [],
     ]);
 
     return res.json({
@@ -189,8 +208,10 @@ export const getEligibleBestSellers = async (req, res) => {
         .lean(),
       ReadymadeProduct.find({ bestSeller: true })
         .select(
-          "_id title images thumbnail price salePrice saleStartAt saleEndAt variants currency bestSeller createdAt"
+          "_id title images thumbnail price salePrice saleStartAt saleEndAt variants currency bestSeller createdAt category subCategory"
         )
+        .populate("category", "name")
+        .populate("subCategory", "name")
         .sort({ createdAt: -1 })
         .lean(),
     ]);
@@ -267,7 +288,12 @@ export const getHomepageBestSellers = async (req, res) => {
 
     const [designs, readymades] = await Promise.all([
       designIds.length ? Design.find({ _id: { $in: designIds } }).lean() : [],
-      readymadeIds.length ? ReadymadeProduct.find({ _id: { $in: readymadeIds } }).lean() : [],
+      readymadeIds.length
+        ? ReadymadeProduct.find({ _id: { $in: readymadeIds } })
+            .populate("category", "name")
+            .populate("subCategory", "name")
+            .lean()
+        : [],
     ]);
 
     return res.json({

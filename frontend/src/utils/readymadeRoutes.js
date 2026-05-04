@@ -6,6 +6,11 @@ const slugifyPathSegment = (value = "") =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
+const deslugifyPathSegment = (value = "") =>
+  String(value || "")
+    .trim()
+    .replace(/-/g, " ");
+
 const getReadymadeSource = (value) => {
   if (!value || typeof value !== "object") return value || null;
   if (value.readymadeProduct && typeof value.readymadeProduct === "object") return value.readymadeProduct;
@@ -24,10 +29,26 @@ export const buildReadymadeProductPath = (value) => {
   const title = slugifyPathSegment(product.title || product.name || product.productName);
 
   if (category && subCategory && title) {
-    return `/${category}/${subCategory}/${title}`;
+    return `/products/${category}/${subCategory}/${title}`;
   }
 
   return id ? `/readymade/${id}` : null;
 };
 
 export const slugifyReadymadeSegment = slugifyPathSegment;
+export const deslugifyReadymadeSegment = deslugifyPathSegment;
+
+export const buildProductsListingPath = (category, subCategory) => {
+  const categorySegment = slugifyPathSegment(category);
+  const subCategorySegment = slugifyPathSegment(subCategory);
+
+  if (categorySegment && !subCategorySegment) {
+    return `/products/${categorySegment}`;
+  }
+
+  if (categorySegment && subCategorySegment) {
+    return `/products/${categorySegment}/${subCategorySegment}`;
+  }
+
+  return "/products";
+};

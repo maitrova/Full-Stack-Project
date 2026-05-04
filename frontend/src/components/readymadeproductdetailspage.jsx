@@ -16,7 +16,7 @@ import {
 } from '../redux/slices/Cartslice.js';
 import { selectCurrentToken } from '../redux/slices/Userslice.js';
 import { buildImageUrl, getRawImagePath, getResponsiveImageProps } from "../utils/responsiveImage.js";
-import { buildReadymadeProductPath } from "../utils/readymadeRoutes.js";
+import { buildProductsListingPath, buildReadymadeProductPath } from "../utils/readymadeRoutes.js";
 import ProductImageLightbox from "./ProductImageLightbox.jsx";
 import ProductReviews from "./ProductReviews.jsx";
 
@@ -93,6 +93,12 @@ export default function ProductDetailPage() {
   
   const { currentProduct: product } = useSelector((state) => state.productList);
   const isReadymade = type === 'product';
+  const categoryListingPath = isReadymade
+    ? buildProductsListingPath(itemData?.category)
+    : '/catalogue';
+  const subCategoryListingPath = isReadymade
+    ? buildProductsListingPath(itemData?.category, itemData?.subCategory)
+    : '/catalogue';
   
   const hasVariants = isReadymade &&
     Array.isArray(itemData?.variants) &&
@@ -187,6 +193,15 @@ export default function ProductDetailPage() {
       setSizeError('');
     }
   }, [product, isReadymade]);
+
+  const handleBackNavigation = () => {
+    if (!isReadymade) {
+      navigate('/catalogue');
+      return;
+    }
+
+    navigate(subCategoryListingPath || categoryListingPath || '/products');
+  };
 
   useEffect(() => {
     if (!isReadymade || !itemData?._id) {
@@ -769,14 +784,14 @@ export default function ProductDetailPage() {
           <p className="text-gray-600 mb-6">{error || 'The requested item is not available'}</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
-              onClick={() => navigate(-1)}
+              onClick={handleBackNavigation}
               className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-medium flex items-center justify-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
               Go Back
             </button>
             <button
-              onClick={() => navigate(isReadymade ? '/readymade/products' : '/catalogue')}
+              onClick={() => navigate(isReadymade ? '/products' : '/catalogue')}
               className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:opacity-90 transition-all font-medium"
             >
               Browse {isReadymade ? 'Products' : 'Catalogue'}
@@ -985,14 +1000,14 @@ export default function ProductDetailPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <button
-              onClick={() => navigate(-1)}
+              onClick={handleBackNavigation}
               className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors group"
             >
               <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-gray-200 transition-colors">
                 <ArrowLeft className="w-4 h-4" />
               </div>
               <span className="font-medium hidden sm:inline">
-                Back to {isReadymade ? 'Products' : 'Catalogue'}
+                Back to {isReadymade ? (displayData?.subCategory || 'Products') : 'Catalogue'}
               </span>
             </button>
 
@@ -1049,13 +1064,39 @@ export default function ProductDetailPage() {
               <div className="flex items-center">
                 <ChevronRight className="w-4 h-4 text-gray-400 mx-1" />
                 <Link 
-                  to={isReadymade ? '/readymade/products' : '/catalogue'} 
+                  to={isReadymade ? '/products' : '/catalogue'} 
                   className="text-gray-600 hover:text-blue-600 ml-1"
                 >
                   {isReadymade ? 'Products' : 'Catalogue'}
                 </Link>
               </div>
             </li>
+            {isReadymade && displayData?.category && (
+              <li>
+                <div className="flex items-center">
+                  <ChevronRight className="w-4 h-4 text-gray-400 mx-1" />
+                  <Link
+                    to={categoryListingPath}
+                    className="text-gray-600 hover:text-blue-600 ml-1"
+                  >
+                    {displayData.category}
+                  </Link>
+                </div>
+              </li>
+            )}
+            {isReadymade && displayData?.subCategory && (
+              <li>
+                <div className="flex items-center">
+                  <ChevronRight className="w-4 h-4 text-gray-400 mx-1" />
+                  <Link
+                    to={subCategoryListingPath}
+                    className="text-gray-600 hover:text-blue-600 ml-1"
+                  >
+                    {displayData.subCategory}
+                  </Link>
+                </div>
+              </li>
+            )}
             <li aria-current="page">
               <div className="flex items-center">
                 <ChevronRight className="w-4 h-4 text-gray-400 mx-1" />

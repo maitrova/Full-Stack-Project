@@ -744,7 +744,7 @@ export default function CustomProductsHub() {
                 {filteredProducts.map((product) => {
                   const productLink = product.slug 
                     ? `/products/${product.slug}/customize`
-                    : `/products/${product._id}`;
+                    : `/product/${product._id}`;
                   
                   return (
                     <Link
@@ -823,7 +823,7 @@ export default function CustomProductsHub() {
                 {filteredProducts.map((product) => {
                   const productLink = product.slug 
                     ? `/products/${product.slug}/customize`
-                    : `/products/${product._id}`;
+                    : `/product/${product._id}`;
                   
                   return (
                     <Link

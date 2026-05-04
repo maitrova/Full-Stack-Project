@@ -1,7 +1,7 @@
 // client/src/pages/AllProductsHub.jsx
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Grid,
   Search,
@@ -41,7 +41,11 @@ import {
 } from "../redux/slices/Cartslice.js";
 import { selectCurrentToken } from "../redux/slices/Userslice.js";
 import { buildImageUrl, getResponsiveImageProps } from "../utils/responsiveImage.js";
-import { buildReadymadeProductPath } from "../utils/readymadeRoutes.js";
+import {
+  buildProductsListingPath,
+  buildReadymadeProductPath,
+  slugifyReadymadeSegment,
+} from "../utils/readymadeRoutes.js";
 
 // All products specific color palette - More muted, professional colors
 const ALL_PRODUCTS_COLORS = {
@@ -74,18 +78,20 @@ const ALL_PRODUCTS_PRICE_RANGES = [
 
 export default function AllProductsHub() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { categoryName: routeCategoryName, subCategoryName: routeSubCategoryName } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   
   // URL parameters
   const urlFilter = searchParams.get('filter');
-  const urlCategory = searchParams.get('category');
-  const urlSubCategory = searchParams.get('subCategory');
   const urlPriceMin = searchParams.get('price_min');
   const urlPriceMax = searchParams.get('price_max');
   const urlSort = searchParams.get('sort');
   const urlType = searchParams.get('type');
   const urlRating = searchParams.get('rating');
   const urlSearch = searchParams.get('search');
+  const queryCategory = searchParams.get('category');
+  const querySubCategory = searchParams.get('subCategory');
   
   // State
   const [searchQuery, setSearchQuery] = useState(urlSearch || '');
@@ -107,8 +113,8 @@ export default function AllProductsHub() {
   const [ratingFilter, setRatingFilter] = useState(
     urlRating ? parseInt(urlRating) : 0
   );
-  const [selectedCommonCategory, setSelectedCommonCategory] = useState(urlCategory || 'all');
-  const [selectedCommonSubCategory, setSelectedCommonSubCategory] = useState(urlSubCategory || 'all');
+  const [selectedCommonCategory, setSelectedCommonCategory] = useState(queryCategory || 'all');
+  const [selectedCommonSubCategory, setSelectedCommonSubCategory] = useState(querySubCategory || 'all');
   const [quickPriceRange, setQuickPriceRange] = useState(null);
   const [expandedCategories, setExpandedCategories] = useState({});
   const [showCartSuccess, setShowCartSuccess] = useState(false);
@@ -143,8 +149,8 @@ export default function AllProductsHub() {
     search: urlSearch || '',
     sort: urlSort || 'featured',
     type: urlType || 'all',
-    category: urlCategory || 'all',
-    subCategory: urlSubCategory || 'all',
+    category: queryCategory || 'all',
+    subCategory: querySubCategory || 'all',
     price_min: urlPriceMin ? parseInt(urlPriceMin) : 0,
     price_max: urlPriceMax ? parseInt(urlPriceMax) : 10000,
     rating: urlRating ? parseInt(urlRating) : 0,
@@ -155,65 +161,64 @@ export default function AllProductsHub() {
   const updateURLParams = useCallback((newFilters = {}) => {
     setFilters(prev => ({ ...prev, ...newFilters }));
   }, []);
+
+  const buildSearchParamsWithoutCategory = useCallback((nextFilters) => {
+    const params = new URLSearchParams();
+
+    let filterParam = '';
+    switch(nextFilters.sort) {
+      case 'newest':
+        filterParam = 'newArrivals';
+        break;
+      case 'best-sellers':
+        filterParam = 'bestSellers';
+        break;
+      case 'trending':
+        filterParam = 'trending';
+        break;
+      default:
+        filterParam = nextFilters.filter;
+    }
+
+    if (filterParam) params.set('filter', filterParam);
+    if (nextFilters.sort && nextFilters.sort !== 'featured') params.set('sort', nextFilters.sort);
+    if (nextFilters.type && nextFilters.type !== 'all') params.set('type', nextFilters.type);
+    if (nextFilters.price_min > 0 || nextFilters.price_max < 10000) {
+      params.set('price_min', nextFilters.price_min);
+      params.set('price_max', nextFilters.price_max);
+    }
+    if (nextFilters.rating > 0) params.set('rating', nextFilters.rating);
+    if (nextFilters.search) params.set('search', nextFilters.search);
+
+    return params;
+  }, []);
+
+  const navigateToListing = useCallback((category, subCategory, nextFilters, options = {}) => {
+    const { replace = false } = options;
+    const params = buildSearchParamsWithoutCategory(nextFilters);
+    const search = params.toString();
+
+    if (category && category !== 'all') {
+      const pathname = buildProductsListingPath(
+        category,
+        subCategory && subCategory !== 'all' ? subCategory : null
+      );
+      navigate(`${pathname}${search ? `?${search}` : ''}`, { replace });
+      return;
+    }
+
+    navigate(`/products${search ? `?${search}` : ''}`, { replace });
+  }, [buildSearchParamsWithoutCategory, navigate]);
   
   // Single useEffect to handle URL updates with debouncing
   useEffect(() => {
     const timer = setTimeout(() => {
-      const params = new URLSearchParams();
-      
-      // Set filter param based on sort option
-      let filterParam = '';
-      switch(filters.sort) {
-        case 'newest':
-          filterParam = 'newArrivals';
-          break;
-        case 'best-sellers':
-          filterParam = 'bestSellers';
-          break;
-        case 'trending':
-          filterParam = 'trending';
-          break;
-        default:
-          filterParam = filters.filter;
-      }
-      
-      // Add all parameters
-      if (filterParam) params.set('filter', filterParam);
-      
-      if (filters.sort && filters.sort !== 'featured') {
-        params.set('sort', filters.sort);
-      }
-      
-      if (filters.category && filters.category !== 'all') {
-        params.set('category', filters.category);
-      }
-      
-      if (filters.category !== 'all' && filters.subCategory && filters.subCategory !== 'all') {
-        params.set('subCategory', filters.subCategory);
-      }
-      
-      if (filters.type && filters.type !== 'all') {
-        params.set('type', filters.type);
-      }
-      
-      if (filters.price_min > 0 || filters.price_max < 10000) {
-        params.set('price_min', filters.price_min);
-        params.set('price_max', filters.price_max);
-      }
-      
-      if (filters.rating > 0) {
-        params.set('rating', filters.rating);
-      }
-      
-      if (filters.search) {
-        params.set('search', filters.search);
-      }
-      
+      const params = buildSearchParamsWithoutCategory(filters);
       setSearchParams(params, { replace: true });
     }, 300); // 300ms debounce
     
     return () => clearTimeout(timer);
-  }, [filters, setSearchParams]);
+  }, [buildSearchParamsWithoutCategory, filters, setSearchParams]);
   
   // Fetch data on mount
   useEffect(() => {
@@ -222,10 +227,42 @@ export default function AllProductsHub() {
   
   // Update local state when URL changes
   useEffect(() => {
+    if (queryCategory) {
+      navigateToListing(queryCategory, querySubCategory, {
+        ...filters,
+        category: queryCategory,
+        subCategory: querySubCategory,
+      }, { replace: true });
+    }
+  }, [filters, navigateToListing, queryCategory, querySubCategory]);
+
+  const resolveCategoryFromRoute = useMemo(() => {
+    if (!routeCategoryName) return null;
+
+    const match = commonSavedData.find(
+      (item) => slugifyReadymadeSegment(item.category) === routeCategoryName
+    );
+
+    return match?.category || null;
+  }, [commonSavedData, routeCategoryName]);
+
+  const resolveSubCategoryFromRoute = useMemo(() => {
+    if (!routeCategoryName || !routeSubCategoryName) return null;
+
+    const match = commonSavedData.find(
+      (item) =>
+        slugifyReadymadeSegment(item.category) === routeCategoryName &&
+        slugifyReadymadeSegment(item.subCategory) === routeSubCategoryName
+    );
+
+    return match?.subCategory || null;
+  }, [commonSavedData, routeCategoryName, routeSubCategoryName]);
+
+  useEffect(() => {
     setSearchQuery(urlSearch || '');
     setProductTypeFilter(urlType === 'design' ? 'design' : urlType === 'readymade' ? 'readymade' : 'all');
-    setSelectedCommonCategory(urlCategory || 'all');
-    setSelectedCommonSubCategory(urlSubCategory || 'all');
+    setSelectedCommonCategory(resolveCategoryFromRoute || queryCategory || 'all');
+    setSelectedCommonSubCategory(resolveSubCategoryFromRoute || querySubCategory || 'all');
     setRatingFilter(urlRating ? parseInt(urlRating) : 0);
     setPriceRange([
       urlPriceMin ? parseInt(urlPriceMin) : 0,
@@ -244,14 +281,14 @@ export default function AllProductsHub() {
       search: urlSearch || '',
       sort: sortFromUrl,
       type: urlType || 'all',
-      category: urlCategory || 'all',
-      subCategory: urlSubCategory || 'all',
+      category: resolveCategoryFromRoute || queryCategory || 'all',
+      subCategory: resolveSubCategoryFromRoute || querySubCategory || 'all',
       price_min: urlPriceMin ? parseInt(urlPriceMin) : 0,
       price_max: urlPriceMax ? parseInt(urlPriceMax) : 10000,
       rating: urlRating ? parseInt(urlRating) : 0,
       filter: urlFilter || ''
     });
-  }, [urlFilter, urlCategory, urlSubCategory, urlPriceMin, urlPriceMax, urlSort, urlType, urlRating, urlSearch]);
+  }, [queryCategory, querySubCategory, resolveCategoryFromRoute, resolveSubCategoryFromRoute, urlFilter, urlPriceMin, urlPriceMax, urlSort, urlType, urlRating, urlSearch]);
   
   // Handle filter changes
   const handleSearchChange = (value) => {
@@ -272,12 +309,16 @@ export default function AllProductsHub() {
   const handleCategoryChange = (value) => {
     setSelectedCommonCategory(value);
     setSelectedCommonSubCategory('all');
+    const nextFilters = { ...filters, category: value, subCategory: 'all' };
     updateURLParams({ category: value, subCategory: 'all' });
+    navigateToListing(value, 'all', nextFilters, { replace: false });
   };
   
   const handleSubCategoryChange = (value) => {
     setSelectedCommonSubCategory(value);
+    const nextFilters = { ...filters, category: selectedCommonCategory, subCategory: value };
     updateURLParams({ subCategory: value });
+    navigateToListing(selectedCommonCategory, value, nextFilters, { replace: false });
   };
   
   const selectCategory = (value, closeMobile = false) => {

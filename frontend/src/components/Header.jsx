@@ -57,7 +57,7 @@ const socialLinks = [
 ];
 
 const navItems = [
-  { path: '/allproducts', label: 'Products' },
+  { path: '/products', label: 'Products' },
   { path: '/customproducts', label: 'Custom Design' },
 ];
 
@@ -319,7 +319,7 @@ const Header = () => {
           <div className="py-8 text-center">
             <p className="mb-4 text-sm text-slate-500">Your cart is empty</p>
             <Link
-              to="/allproducts"
+              to="/products"
               className="inline-flex rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
               onClick={() => setShowDropdown(false)}
             >
