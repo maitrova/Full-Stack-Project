@@ -126,6 +126,12 @@ function App() {
           </MainLayout>
         } />
 
+        <Route path="/trending/:slug" element={
+          <MainLayout>
+            <DropProductDetailsPage />
+          </MainLayout>
+        } />
+
         <Route path="/dropproducts/:id" element={
           <MainLayout>
             <DropProductDetailsPage />

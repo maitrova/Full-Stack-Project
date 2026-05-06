@@ -89,6 +89,7 @@ async function run() {
         { code: "back", label: "Back", mockupUrl: "/mockups/oversized-comfort-tee/back.png", maskUrl: "/masks/oversized-comfort-tee/back_mask.png" },
       ],
     },
+
     {
       name: "Graphic French Terry T-Shirt",
       slug: "graphic-french-terry-tee",
@@ -120,6 +121,7 @@ async function run() {
         },
       ],
     },
+    
     {
       name: "Premium Polo Shirt",
       slug: "premium-polo",

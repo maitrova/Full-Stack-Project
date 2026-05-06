@@ -9,6 +9,7 @@ import {
 } from "../redux/slices/dropproducts.js";
 import { Package } from "lucide-react";
 import { buildImageUrl } from "../utils/responsiveImage.js";
+import { buildDropProductPath } from "../utils/dropProductRoutes.js";
 
 const hasActiveOffer = (product) => {
   const mrp = Number(product?.minPrice || 0);
@@ -154,8 +155,9 @@ const Dropproduct = () => {
     dispatch(getAllDropproducts());
   }, [dispatch]);
 
-  const handleProductClick = (productId) => {
-    navigate(`/dropproducts/${productId}`);
+  const handleProductClick = (product) => {
+    const path = buildDropProductPath(product);
+    if (path) navigate(path);
   };
 
   if (loading && products.length === 0) {
@@ -192,11 +194,11 @@ const Dropproduct = () => {
               <div
                 key={product._id}
                 className="cursor-pointer group"
-                onClick={() => handleProductClick(product._id)}
+                onClick={() => handleProductClick(product)}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleProductClick(product._id);
+                  if (e.key === "Enter") handleProductClick(product);
                 }}
               >
                 <div className="mx-auto max-w-[220px] overflow-hidden rounded-lg bg-white transition-all duration-200 hover:shadow-md">

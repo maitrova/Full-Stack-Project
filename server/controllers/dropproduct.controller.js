@@ -20,6 +20,14 @@ const normalizeDropproductPaths = (product) => {
   };
 };
 
+const slugifyDropProductName = (value = "") =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
 const parseOptionalNumber = (value) => {
   if (Array.isArray(value)) value = value[0];
   if (value === undefined || value === null) return null;
@@ -329,6 +337,26 @@ export const getAllDropproducts = async (req, res) => {
 export const getDropproductById = async (req, res) => {
   try {
     const product = await Dropproduct.findById(req.params.id);
+
+    if (!product) {
+      return res.status(404).json({ message: "Dropproduct not found" });
+    }
+
+    return res.status(200).json(normalizeDropproductPaths(product));
+  } catch (error) {
+    return res.status(500).json({
+      message: "Failed to fetch product",
+      error: error.message,
+    });
+  }
+};
+
+export const getDropproductBySlug = async (req, res) => {
+  try {
+    const targetSlug = slugifyDropProductName(req.params.slug);
+    const products = await Dropproduct.find({ isActive: true }).sort({ createdAt: -1 });
+
+    const product = products.find((item) => slugifyDropProductName(item.name) === targetSlug);
 
     if (!product) {
       return res.status(404).json({ message: "Dropproduct not found" });

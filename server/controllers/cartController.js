@@ -9,8 +9,8 @@ import { Cart } from "../models/Cart.js";
 import Dropproduct from "../models/dropproduct.model.js"; // ✅ NEW
 import { attachReadymadePricing, getReadymadePricing } from "../utils/readymadePricing.js";
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
-const GUEST_CART_COOKIE = "guest_cart_id";
-const GUEST_CART_COOKIE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 30;
+const GUEST_CART_COOKIE = "guest_cart_id_v2";
+const LEGACY_GUEST_CART_COOKIES = ["guest_cart_id"];
 
 const parseCookies = (cookieHeader = "") =>
   String(cookieHeader || "")
@@ -37,11 +37,22 @@ const getGuestCartCookieOptions = () => ({
   httpOnly: true,
   sameSite: "lax",
   secure: process.env.NODE_ENV === "production",
-  maxAge: GUEST_CART_COOKIE_MAX_AGE_MS,
   path: "/",
 });
 
+const clearLegacyGuestCartCookies = (res) => {
+  LEGACY_GUEST_CART_COOKIES.forEach((cookieName) => {
+    res.clearCookie(cookieName, {
+      path: "/",
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+    });
+  });
+};
+
 const ensureGuestCartCookie = (req, res) => {
+  clearLegacyGuestCartCookies(res);
   const existingGuestId = getGuestCartIdFromRequest(req);
   if (existingGuestId) return existingGuestId;
 
@@ -51,6 +62,7 @@ const ensureGuestCartCookie = (req, res) => {
 };
 
 const clearGuestCartCookie = (res) => {
+  clearLegacyGuestCartCookies(res);
   res.clearCookie(GUEST_CART_COOKIE, {
     path: "/",
     sameSite: "lax",
@@ -299,8 +311,12 @@ const getReadymadeVariantSelection = (product, size) => {
   };
 };
 
-const findActiveCartWithDetails = ({ userId = null, guestId = null }) =>
-  Cart.findOne(
+const findActiveCartWithDetails = ({ userId = null, guestId = null }) => {
+  if (!userId && !guestId) {
+    return null;
+  }
+
+  return Cart.findOne(
     userId ? { user: userId, status: "ACTIVE" } : { guestId, status: "ACTIVE" }
   )
     .populate({
@@ -315,6 +331,7 @@ const findActiveCartWithDetails = ({ userId = null, guestId = null }) =>
     .populate("items.design")
     .populate("items.product")
     .lean();
+};
 
 const enrichCartItems = (items = []) =>
   items.map((it) => {
@@ -678,6 +695,7 @@ export const addToCart = async (req, res) => {
 
 export const getCart = async (req, res) => {
   try {
+    clearLegacyGuestCartCookies(res);
     const { userId, guestId } = resolveCartOwner(req, res);
     const cart = await buildActiveCartResponse({ userId, guestId });
 

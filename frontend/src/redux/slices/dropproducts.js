@@ -88,6 +88,18 @@ export const getDropproductById = createAsyncThunk(
   }
 );
 
+export const getDropproductBySlug = createAsyncThunk(
+  'dropproducts/getBySlug',
+  async (slug, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/slug/${slug}`);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
 export const updateDropproduct = createAsyncThunk(
   'dropproducts/update',
   async ({ id, productData }, { rejectWithValue }) => {
@@ -212,6 +224,19 @@ const dropproductSlice = createSlice({
         state.currentProduct = action.payload;
       })
       .addCase(getDropproductById.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload?.message || action.payload || 'Failed to fetch product';
+      })
+      .addCase(getDropproductBySlug.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.currentProduct = null;
+      })
+      .addCase(getDropproductBySlug.fulfilled, (state, action) => {
+        state.loading = false;
+        state.currentProduct = action.payload;
+      })
+      .addCase(getDropproductBySlug.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload?.message || action.payload || 'Failed to fetch product';
       })

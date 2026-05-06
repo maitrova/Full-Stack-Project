@@ -8,6 +8,7 @@ import {
   createDropproduct,
   getAllDropproducts,
   getDropproductById,
+  getDropproductBySlug,
   updateDropproduct,
   deleteDropproduct,
 } from "../controllers/dropproduct.controller.js";
@@ -56,6 +57,7 @@ const uploadDropFiles = upload.fields([
 /* 🔹 Routes */
 droprouter.post("/", uploadDropFiles, createDropproduct);
 droprouter.get("/", getAllDropproducts);
+droprouter.get("/slug/:slug", getDropproductBySlug);
 droprouter.get("/:id", getDropproductById);
 droprouter.put("/:id", uploadDropFiles, updateDropproduct);
 droprouter.delete("/:id", deleteDropproduct);

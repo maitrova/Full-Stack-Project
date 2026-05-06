@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from "react-redux";
 import DOMPurify from "dompurify";
 import {
   getDropproductById,
+  getDropproductBySlug,
   selectCurrentProduct,
   selectLoading,
   clearCurrentProduct,
@@ -39,11 +40,12 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { buildImageUrl, getResponsiveImageProps } from "../utils/responsiveImage.js";
+import { buildDropProductPath } from "../utils/dropProductRoutes.js";
 import ProductImageLightbox from "./ProductImageLightbox.jsx";
 import ProductReviews from "./ProductReviews.jsx";
 
 const DropProductDetailsPage = () => {
-  const { id } = useParams();
+  const { id, slug } = useParams();
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -88,10 +90,23 @@ const DropProductDetailsPage = () => {
     };
   });
 
+  const canonicalPath = useMemo(() => buildDropProductPath(product), [product]);
+
   useEffect(() => {
-    if (id) dispatch(getDropproductById(id));
+    if (!slug || !product?._id || !canonicalPath) return;
+    if (window.location.pathname !== canonicalPath) {
+      navigate(canonicalPath, { replace: true });
+    }
+  }, [canonicalPath, navigate, product?._id, slug]);
+
+  useEffect(() => {
+    if (slug) {
+      dispatch(getDropproductBySlug(slug));
+    } else if (id) {
+      dispatch(getDropproductById(id));
+    }
     return () => dispatch(clearCurrentProduct());
-  }, [id, dispatch]);
+  }, [dispatch, id, slug]);
 
   // Clear cart error after timeout
   useEffect(() => {
