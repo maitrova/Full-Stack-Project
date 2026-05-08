@@ -45,7 +45,7 @@ const socialLinks = [
   {
     key: 'facebook',
     label: 'Facebook',
-    href: 'https://facebook.com/maitrova',
+    href: 'https://www.facebook.com/share/1L82BUXkL1/?mibextid=wwXIfr',
     desktopClass: 'border-sky-100 bg-sky-50/80 text-sky-600 hover:border-sky-200 hover:bg-sky-100/80 hover:text-sky-700',
     mobileIconClass: 'bg-sky-100 text-sky-600',
     icon: (

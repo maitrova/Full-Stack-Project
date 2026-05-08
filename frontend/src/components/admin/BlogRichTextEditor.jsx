@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
+import BlogImageBlock from "./extensions/BlogImageBlock.jsx";
 
 const ToolbarButton = ({ active = false, onClick, title, children }) => (
   <button
@@ -20,9 +21,18 @@ const ToolbarButton = ({ active = false, onClick, title, children }) => (
 
 const normalizeEditorValue = (value) => String(value || "").trim();
 
-export default function BlogRichTextEditor({ value, onChange, error }) {
+export default function BlogRichTextEditor({ value, onChange, error, onImageUpload }) {
   const [linkDraft, setLinkDraft] = useState("");
   const [showLinkEditor, setShowLinkEditor] = useState(false);
+  const [showImageEditor, setShowImageEditor] = useState(false);
+  const [imageAltDraft, setImageAltDraft] = useState("");
+  const [imageLinkDraft, setImageLinkDraft] = useState("");
+  const [imageUrlDraft, setImageUrlDraft] = useState("");
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
+  const [imageError, setImageError] = useState("");
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const imageFileRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const editor = useEditor({
     extensions: [
@@ -34,15 +44,22 @@ export default function BlogRichTextEditor({ value, onChange, error }) {
         autolink: true,
         linkOnPaste: true,
       }),
+      BlogImageBlock,
     ],
     content: value || "",
     onUpdate: ({ editor: currentEditor }) => {
-      onChange(currentEditor.getHTML());
+      const nextHtml = currentEditor.getHTML();
+      console.log("[BlogEditor] onUpdate HTML:", nextHtml);
+      console.log(
+        "[BlogEditor] image block count:",
+        (nextHtml.match(/data-blog-image=\"true\"/g) || []).length
+      );
+      onChange(nextHtml);
     },
     editorProps: {
       attributes: {
         class:
-          "blog-editor prose prose-slate max-w-none min-h-[380px] px-5 py-4 text-[15px] leading-7 focus:outline-none",
+          "blog-editor prose prose-slate max-w-none min-h-[380px] px-5 py-4 text-[15px] leading-7 prose-p:leading-7 prose-li:leading-7 [&_h2]:mt-8 [&_h2]:mb-4 [&_h2]:text-3xl [&_h2]:font-bold [&_h2]:tracking-tight [&_h2]:text-slate-900 [&_h2]:border-b [&_h2]:border-slate-200 [&_h2]:pb-2 [&_h3]:mt-6 [&_h3]:mb-3 [&_h3]:text-2xl [&_h3]:font-semibold [&_h3]:tracking-tight [&_h3]:text-slate-800 [&_figure[data-blog-image='true']]:my-6 [&_figure[data-blog-image='true']]:overflow-hidden [&_figure[data-blog-image='true']]:rounded-2xl [&_figure[data-blog-image='true']]:border [&_figure[data-blog-image='true']]:border-slate-200 [&_figure[data-blog-image='true']]:bg-slate-50 [&_figure[data-blog-image='true']_img]:w-full [&_figure[data-blog-image='true']_img]:rounded-2xl [&_figure[data-blog-image='true']_img]:object-cover focus:outline-none",
       },
     },
   });
@@ -90,6 +107,89 @@ export default function BlogRichTextEditor({ value, onChange, error }) {
   const openLinkEditor = () => {
     setLinkDraft(editor.getAttributes("link").href || "");
     setShowLinkEditor(true);
+  };
+
+  const resetImageEditor = () => {
+    setShowImageEditor(false);
+    setImageAltDraft("");
+    setImageLinkDraft("");
+    setImageUrlDraft("");
+    setImagePreviewUrl("");
+    setImageError("");
+    setIsUploadingImage(false);
+    imageFileRef.current = null;
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const openImageEditor = () => {
+    setShowImageEditor(true);
+    setShowLinkEditor(false);
+    setImageError("");
+  };
+
+  const handleImageFileChange = (event) => {
+    const nextFile = event.target.files?.[0] || null;
+    imageFileRef.current = nextFile;
+    setImageError("");
+    console.log("[BlogEditor] selected inline image file:", nextFile);
+
+    if (nextFile) {
+      setImagePreviewUrl(URL.createObjectURL(nextFile));
+      if (!imageAltDraft.trim()) {
+        const fileName = String(nextFile.name || "")
+          .replace(/\.[^.]+$/, "")
+          .replace(/[-_]+/g, " ")
+          .trim();
+        setImageAltDraft(fileName);
+      }
+      return;
+    }
+
+    setImagePreviewUrl("");
+  };
+
+  const insertImageBlock = async () => {
+    try {
+      setImageError("");
+      setIsUploadingImage(true);
+      console.log("[BlogEditor] insertImageBlock started");
+
+      let finalImageUrl = imageUrlDraft.trim();
+      if (!finalImageUrl && imageFileRef.current && onImageUpload) {
+        console.log("[BlogEditor] uploading inline image file");
+        finalImageUrl = await onImageUpload(imageFileRef.current);
+      }
+      console.log("[BlogEditor] finalImageUrl:", finalImageUrl);
+
+      if (!finalImageUrl) {
+        throw new Error("Select an image or provide an image URL");
+      }
+
+      const safeAlt = imageAltDraft.trim() || "Blog image";
+      const safeLink = imageLinkDraft.trim();
+      const safeHrefAttr = safeLink ? ` data-href="${safeLink}"` : "";
+      const targetAttrs = /^https?:\/\//i.test(safeLink) ? ' target="_blank" rel="noreferrer"' : "";
+      const imageHtml = safeLink
+        ? `<figure data-blog-image="true"${safeHrefAttr}><a href="${safeLink}"${targetAttrs}><img src="${finalImageUrl}" alt="${safeAlt}" /></a></figure><p></p>`
+        : `<figure data-blog-image="true"><img src="${finalImageUrl}" alt="${safeAlt}" /></figure><p></p>`;
+
+      console.log("[BlogEditor] inserting image HTML:", imageHtml);
+
+      const insertResult = editor
+        .chain()
+        .focus()
+        .insertContent(imageHtml)
+        .run();
+      console.log("[BlogEditor] insert result:", insertResult);
+      console.log("[BlogEditor] HTML after insert:", editor.getHTML());
+      resetImageEditor();
+    } catch (uploadError) {
+      console.error("[BlogEditor] insertImageBlock failed:", uploadError);
+      setImageError(uploadError.message || "Failed to insert image");
+      setIsUploadingImage(false);
+    }
   };
 
   const insertSectionTemplate = () => {
@@ -202,6 +302,9 @@ export default function BlogRichTextEditor({ value, onChange, error }) {
           >
             Link
           </ToolbarButton>
+          <ToolbarButton onClick={openImageEditor} title="Upload inline image">
+            Image
+          </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}
             title="Clear formatting"
@@ -238,6 +341,84 @@ export default function BlogRichTextEditor({ value, onChange, error }) {
           </div>
         ) : null}
 
+        {showImageEditor ? (
+          <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="md:col-span-2">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Upload Image
+                </label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml,image/avif"
+                  onChange={handleImageFileChange}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none transition file:mr-3 file:rounded-full file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:font-semibold file:text-slate-700 focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Or Use Image URL
+                </label>
+                <input
+                  value={imageUrlDraft}
+                  onChange={(event) => setImageUrlDraft(event.target.value)}
+                  placeholder="https://example.com/image.jpg"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Image Alt Text
+                </label>
+                <input
+                  value={imageAltDraft}
+                  onChange={(event) => setImageAltDraft(event.target.value)}
+                  placeholder="Describe the image"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Click Redirect Link
+                </label>
+                <input
+                  value={imageLinkDraft}
+                  onChange={(event) => setImageLinkDraft(event.target.value)}
+                  placeholder="https://example.com/product-page"
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+                />
+              </div>
+            </div>
+
+            {imagePreviewUrl ? (
+              <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200">
+                <img src={imagePreviewUrl} alt="Inline preview" className="max-h-52 w-full object-cover" />
+              </div>
+            ) : null}
+
+            {imageError ? <div className="mt-3 text-sm text-rose-600">{imageError}</div> : null}
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={insertImageBlock}
+                disabled={isUploadingImage}
+                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+              >
+                {isUploadingImage ? "Uploading..." : "Insert Image"}
+              </button>
+              <button
+                type="button"
+                onClick={resetImageEditor}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
@@ -254,13 +435,17 @@ export default function BlogRichTextEditor({ value, onChange, error }) {
             Insert FAQ Block
           </button>
           <div className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-500">
-            Keep the blog title as the only H1. Use H2 and H3 inside content.
+            Keep the blog title as the only H1. Use H2 and H3 inside content. Insert images directly where they should appear.
           </div>
         </div>
       </div>
 
       <div className="bg-white">
         <EditorContent editor={editor} />
+      </div>
+
+      <div className="border-t border-slate-200 bg-white px-4 py-3 text-xs text-slate-500">
+        Test tip: type a line, select it, click `H2` or `H3`, then click outside. H2 should look larger and bolder than H3 in the editor itself.
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">

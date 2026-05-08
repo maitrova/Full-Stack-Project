@@ -43,6 +43,11 @@ const normalizeCoverImageUrl = (file) => {
   return `outputs/${relativePath}`;
 };
 
+const normalizeUploadedImagePayload = (file) => ({
+  url: normalizeCoverImageUrl(file),
+  originalName: String(file?.originalname || "").trim(),
+});
+
 const removeLocalCoverImage = (imageUrl) => {
   const normalizedUrl = String(imageUrl || "").trim();
   if (!normalizedUrl.startsWith("outputs/blog-covers/")) return;
@@ -250,6 +255,29 @@ export const updateBlog = async (req, res) => {
     }
     console.error("updateBlog error:", error);
     return res.status(400).json({ message: error.message || "Failed to update blog" });
+  }
+};
+
+export const uploadBlogInlineImage = async (req, res) => {
+  if (!ensureAdmin(req, res)) return;
+
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "Image file is required" });
+    }
+
+    return res.status(201).json({
+      message: "Inline image uploaded successfully",
+      image: normalizeUploadedImagePayload(req.file),
+    });
+  } catch (error) {
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {}
+    }
+    console.error("uploadBlogInlineImage error:", error);
+    return res.status(400).json({ message: error.message || "Failed to upload image" });
   }
 };
 

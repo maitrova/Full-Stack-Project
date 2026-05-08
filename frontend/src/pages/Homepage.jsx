@@ -2,8 +2,6 @@ import React from 'react'
 // import Header from '../components/Header'
 import Hero from '../components/Hero'
 
-import Footer from '../components/Footer'
-
 // import HomepageFeatured from '../components/Newarrivals'
 import Dropproduct from '../components/DropproductUserView'
 import NewArrivals from '../components/Newarrivalss'
@@ -19,12 +17,12 @@ const Homepage = () => {
     {/* <Header/> */}
     <Hero/>
     <Dropproduct/>
-    <HomeBlogsSection />
+    
     <NewArrivals/>
     <BestSellers/>
     <ProductCategoriesHorizontal/>
     <CategoryTilesHorizontal/>
-    <Footer/>
+    <HomeBlogsSection />
     </>
   )
 }

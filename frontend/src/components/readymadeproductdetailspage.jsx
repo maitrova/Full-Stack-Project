@@ -52,7 +52,6 @@ import {
   Ruler,
   LogIn
 } from 'lucide-react';
-import Footer from './Footer.jsx';
 
 const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
 const IMAGE_URL = import.meta.env.VITE_IMAGE_URL;
@@ -1052,60 +1051,6 @@ export default function ProductDetailPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Breadcrumb */}
-        <nav className="hidden sm:flex mb-8" aria-label="Breadcrumb">
-          <ol className="inline-flex items-center space-x-1 md:space-x-3">
-            <li className="inline-flex items-center">
-              <Link to="/" className="text-gray-600 hover:text-blue-600">
-                Home
-              </Link>
-            </li>
-            <li>
-              <div className="flex items-center">
-                <ChevronRight className="w-4 h-4 text-gray-400 mx-1" />
-                <Link 
-                  to={isReadymade ? '/products' : '/catalogue'} 
-                  className="text-gray-600 hover:text-blue-600 ml-1"
-                >
-                  {isReadymade ? 'Products' : 'Catalogue'}
-                </Link>
-              </div>
-            </li>
-            {isReadymade && displayData?.category && (
-              <li>
-                <div className="flex items-center">
-                  <ChevronRight className="w-4 h-4 text-gray-400 mx-1" />
-                  <Link
-                    to={categoryListingPath}
-                    className="text-gray-600 hover:text-blue-600 ml-1"
-                  >
-                    {displayData.category}
-                  </Link>
-                </div>
-              </li>
-            )}
-            {isReadymade && displayData?.subCategory && (
-              <li>
-                <div className="flex items-center">
-                  <ChevronRight className="w-4 h-4 text-gray-400 mx-1" />
-                  <Link
-                    to={subCategoryListingPath}
-                    className="text-gray-600 hover:text-blue-600 ml-1"
-                  >
-                    {displayData.subCategory}
-                  </Link>
-                </div>
-              </li>
-            )}
-            <li aria-current="page">
-              <div className="flex items-center">
-                <ChevronRight className="w-4 h-4 text-gray-400 mx-1" />
-                <span className="text-gray-400 ml-1 truncate max-w-[200px]">{displayData.title}</span>
-              </div>
-            </li>
-          </ol>
-        </nav>
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - Preview */}
           <div className="lg:col-span-2 space-y-6">
@@ -1902,8 +1847,6 @@ export default function ProductDetailPage() {
           initialBreakdown={displayData?.ratingBreakdown}
         />
       ) : null}
-      <Footer/>
-
       <ProductImageLightbox
         isOpen={isImageViewerOpen}
         items={galleryItems}

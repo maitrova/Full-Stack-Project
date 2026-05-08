@@ -2,6 +2,8 @@
 import React, { useEffect, useRef } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import Header from "./components/Header.jsx";
+import Breadcrumbs from "./components/Breadcrumbs.jsx";
+import Footer from "./components/Footer.jsx";
 import ProductList from "./pages/ProductList.jsx";
 import Homepage from "./pages/Homepage.jsx";
 import AdminDesignsPage from "./pages/AdminDesignsPage.jsx";
@@ -47,9 +49,11 @@ import OrderSuccessPage from "./pages/OrderSuccessPage.jsx";
 // Layout component with header for all pages except auth
 const MainLayout = ({ children }) => {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex min-h-screen flex-col bg-gray-50">
       <Header />
-      <main>{children}</main>
+      <Breadcrumbs />
+      <main className="flex-1">{children}</main>
+      <Footer />
     </div>
   );
 };
@@ -57,8 +61,9 @@ const MainLayout = ({ children }) => {
 // Layout without header for auth pages
 const AuthLayout = ({ children }) => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {children}
+    <div className="flex min-h-screen flex-col bg-gradient-to-br from-gray-50 to-gray-100">
+      <main className="flex-1">{children}</main>
+      <Footer />
     </div>
   );
 };
@@ -94,11 +99,37 @@ const GtmRouteTracker = () => {
   return null;
 };
 
+const CanonicalTag = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    const baseUrl =
+      (import.meta.env.VITE_SITE_URL || "").trim() ||
+      (typeof window !== "undefined" ? window.location.origin : "https://maitrova.in");
+
+    const normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
+    const pathname = location.pathname || "/";
+    const canonicalUrl = `${normalizedBaseUrl}${pathname === "/" ? "" : pathname}`;
+
+    let canonicalElement = document.head.querySelector('link[rel="canonical"]');
+    if (!canonicalElement) {
+      canonicalElement = document.createElement("link");
+      canonicalElement.setAttribute("rel", "canonical");
+      document.head.appendChild(canonicalElement);
+    }
+
+    canonicalElement.setAttribute("href", canonicalUrl);
+  }, [location.pathname]);
+
+  return null;
+};
+
 function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
       <GtmRouteTracker />
+      <CanonicalTag />
       <Routes>
         {/* Auth pages without header */}
         <Route path="/login" element={

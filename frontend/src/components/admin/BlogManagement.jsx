@@ -279,6 +279,26 @@ const BlogManagement = () => {
     }
   };
 
+  const handleInlineImageUpload = async (file) => {
+    console.log("[BlogManagement] handleInlineImageUpload file:", file);
+    const payload = new FormData();
+    payload.append("inlineImageFile", file);
+
+    const response = await fetch(`${API_URL}/blogs/admin/upload-image`, {
+      method: "POST",
+      headers: authHeaders,
+      body: payload,
+    });
+
+    const data = await response.json();
+    console.log("[BlogManagement] inline image upload response:", response.status, data);
+    if (!response.ok) {
+      throw new Error(data?.message || "Failed to upload inline image");
+    }
+
+    return data?.image?.url || "";
+  };
+
   return (
     <div className="space-y-6">
       {error ? (
@@ -384,8 +404,12 @@ const BlogManagement = () => {
 
             <div className="md:col-span-2">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Content</label>
-              <p className="mb-3 text-xs text-slate-500">Use the title as the only H1. Inside content, use H2 and H3 so the TOC and section nesting can be generated automatically.</p>
-              <BlogRichTextEditor value={form.content} onChange={(value) => handleChange("content", value)} />
+              <p className="mb-3 text-xs text-slate-500">Use the title as the only H1. Inside content, use H2 and H3 so the TOC and section nesting can be generated automatically. Upload inline images from the editor and optionally give each image its own redirect link.</p>
+              <BlogRichTextEditor
+                value={form.content}
+                onChange={(value) => handleChange("content", value)}
+                onImageUpload={handleInlineImageUpload}
+              />
             </div>
 
             <div className="md:col-span-2 rounded-3xl border border-slate-200 bg-slate-50 p-4">

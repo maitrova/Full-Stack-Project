@@ -45,7 +45,7 @@ const sanitizeHtml = (value) =>
   DOMPurify.sanitize(value || "", {
     USE_PROFILES: { html: true },
     ADD_TAGS: ["iframe"],
-    ADD_ATTR: ["target", "rel", "class", "id", "src", "alt", "title"],
+    ADD_ATTR: ["target", "rel", "class", "id", "src", "alt", "title", "data-blog-image", "data-href"],
   });
 
 const setMetaTag = (name, content) => {
@@ -128,6 +128,17 @@ const BlogDetailPage = () => {
       const text = heading.textContent?.trim() || "";
       const id = `${slugifyHeading(text) || "section"}-${index + 1}`;
       heading.id = id;
+      if (level === 2) {
+        heading.setAttribute(
+          "class",
+          "mt-12 mb-4 text-3xl font-semibold tracking-tight text-slate-900"
+        );
+      } else {
+        heading.setAttribute(
+          "class",
+          "mt-8 mb-3 text-2xl font-semibold tracking-tight text-slate-800"
+        );
+      }
       headings.push({ id, label: text, level });
 
       const imageConfig = sectionImagesByHeading.get(normalizeHeadingLabel(text));
@@ -144,7 +155,11 @@ const BlogDetailPage = () => {
     });
 
     root?.querySelectorAll("a").forEach((anchor) => {
-      anchor.setAttribute("class", "font-semibold text-sky-700 underline decoration-sky-300 underline-offset-4");
+      if (anchor.querySelector("img")) {
+        anchor.setAttribute("class", "block overflow-hidden rounded-[24px] transition hover:opacity-95");
+      } else {
+        anchor.setAttribute("class", "font-semibold text-sky-700 underline decoration-sky-300 underline-offset-4");
+      }
       if (/^https?:\/\//i.test(anchor.getAttribute("href") || "")) {
         anchor.setAttribute("target", "_blank");
         anchor.setAttribute("rel", "noreferrer");
@@ -161,6 +176,32 @@ const BlogDetailPage = () => {
 
     root?.querySelectorAll("blockquote").forEach((quote) => {
       quote.setAttribute("class", "border-l-4 border-sky-400 bg-sky-50/70 px-5 py-3 italic text-slate-700");
+    });
+
+    root?.querySelectorAll("figure").forEach((figure) => {
+      figure.setAttribute("class", "my-8 overflow-hidden rounded-[24px]");
+
+      const href = figure.getAttribute("data-href") || "";
+      const image = figure.querySelector("img");
+
+      if (href && image && !figure.querySelector("a")) {
+        const anchor = doc.createElement("a");
+        anchor.setAttribute("href", href);
+        anchor.setAttribute("class", "block overflow-hidden rounded-[24px] transition hover:opacity-95");
+        if (/^https?:\/\//i.test(href)) {
+          anchor.setAttribute("target", "_blank");
+          anchor.setAttribute("rel", "noreferrer");
+        }
+        image.replaceWith(anchor);
+        anchor.appendChild(image);
+      }
+    });
+
+    root?.querySelectorAll("img").forEach((image) => {
+      const rawSrc = image.getAttribute("data-src") || image.getAttribute("src") || "";
+      image.setAttribute("src", buildImageUrl(rawSrc));
+      image.setAttribute("class", "w-full rounded-[24px] object-cover");
+      image.setAttribute("loading", "lazy");
     });
 
     return {
@@ -280,15 +321,17 @@ const BlogDetailPage = () => {
             <span>{blog.readTimeMinutes} min read</span>
           </div>
 
-          <div className="mt-8 overflow-hidden rounded-[28px] border border-slate-200 bg-slate-100">
+          <div className="mt-7 overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50">
             {blog.coverImage ? (
-              <img
-                src={buildImageUrl(blog.coverImage)}
-                alt={blog.coverImageAlt || blog.title}
-                className="aspect-[16/8] w-full object-cover"
-              />
+              <div className="flex justify-center px-4 py-3 sm:px-5">
+                <img
+                  src={buildImageUrl(blog.coverImage)}
+                  alt={blog.coverImageAlt || blog.title}
+                  className="max-h-[220px] w-auto max-w-full rounded-[18px] object-contain shadow-sm"
+                />
+              </div>
             ) : (
-              <div className="aspect-[16/8] w-full bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.22),_transparent_34%),linear-gradient(135deg,_#0f172a,_#1e293b_48%,_#0f766e)]" />
+              <div className="h-[160px] w-full bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.16),_transparent_34%),linear-gradient(135deg,_#e2e8f0,_#f8fafc_48%,_#e2e8f0)]" />
             )}
           </div>
 
@@ -298,29 +341,35 @@ const BlogDetailPage = () => {
         </header>
 
         <div className="mt-10 grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="h-fit rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm lg:sticky lg:top-24">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Contents</h2>
-            {contentData.headings.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-500">Add H2 and H3 headings in the editor to generate the table of contents.</p>
-            ) : (
-              <nav className="mt-4 space-y-2">
-                {contentData.headings.map((heading) => (
-                  <a
-                    key={heading.id}
-                    href={`#${heading.id}`}
-                    className={`block text-sm text-slate-600 transition hover:text-sky-700 ${heading.level === 3 ? "pl-4" : ""}`}
-                  >
-                    {heading.label}
-                  </a>
-                ))}
-              </nav>
-            )}
-          </aside>
+        <aside className="h-fit rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm lg:sticky lg:top-24">
+  <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+    Contents
+  </h2>
+
+  {contentData.headings.length === 0 ? (
+    <p className="mt-4 text-sm text-slate-500">
+      Add H2 and H3 headings in the editor to generate the table of contents.
+    </p>
+  ) : (
+    <div className="mt-4 space-y-2">
+      {contentData.headings.map((heading) => (
+        <div
+          key={heading.id}
+          className={`block text-sm text-slate-600 ${
+            heading.level === 3 ? "pl-4" : ""
+          }`}
+        >
+          {heading.label}
+        </div>
+      ))}
+    </div>
+  )}
+</aside>
 
           <div className="space-y-8">
             <div className="rounded-[28px] border border-slate-200 bg-white px-6 py-8 shadow-sm sm:px-10 sm:py-10">
               <div
-                className="prose prose-slate max-w-none prose-headings:scroll-mt-28 prose-h2:mt-12 prose-h2:text-3xl prose-h2:font-semibold prose-h3:mt-8 prose-h3:text-2xl prose-p:leading-8 prose-li:leading-8 prose-img:rounded-[24px]"
+                className="prose prose-slate max-w-none prose-headings:scroll-mt-28 prose-p:leading-8 prose-li:leading-8 prose-img:rounded-[24px]"
                 dangerouslySetInnerHTML={{ __html: contentData.html }}
               />
             </div>

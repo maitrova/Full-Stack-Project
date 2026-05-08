@@ -15,23 +15,21 @@ const formatDate = (value) => {
 };
 
 const BlogCard = ({ blog, index }) => (
-  <article className="group relative w-[260px] min-w-[260px] snap-start overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_44px_-34px_rgba(15,23,42,0.38)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_56px_-30px_rgba(15,23,42,0.42)] sm:w-[280px] sm:min-w-[280px]">
+  <article className="group relative w-[230px] min-w-[230px] snap-start overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_44px_-34px_rgba(15,23,42,0.22)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_46px_-30px_rgba(15,23,42,0.26)] sm:w-[248px] sm:min-w-[248px]">
     <Link to={`/blogs/${blog.slug}`} className="grid h-full">
-      <div className="relative aspect-[16/9] overflow-hidden">
+      <div className="relative flex aspect-[16/10] items-center justify-center overflow-hidden bg-slate-50 p-3">
         {blog.coverImage ? (
           <img
             src={buildImageUrl(blog.coverImage)}
             alt={blog.title}
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.05]"
+            className="max-h-full w-auto max-w-full object-contain transition duration-300 group-hover:scale-[1.02]"
           />
         ) : (
-          <div className="h-full w-full bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.24),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.26),_transparent_28%),linear-gradient(135deg,_#0f172a,_#172554_45%,_#0f766e)]" />
+          <div className="h-full w-full rounded-[18px] bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.12),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.14),_transparent_28%),linear-gradient(135deg,_#e2e8f0,_#f8fafc_45%,_#e2e8f0)]" />
         )}
 
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.04),rgba(15,23,42,0.16)_50%,rgba(15,23,42,0.72))]" />
-
         <div className="absolute left-3 top-3 flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-white/20 bg-white/15 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-md">
+          <span className="rounded-full border border-slate-200 bg-white/95 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-700">
             {blog.category}
           </span>
           {blog.isFeatured ? (
@@ -41,29 +39,29 @@ const BlogCard = ({ blog, index }) => (
           ) : null}
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between gap-3 px-4 pb-4">
+        <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between gap-3 px-4 pb-3">
           <div className="min-w-0">
-            <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-white/70">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-500">
               Issue {String(index + 1).padStart(2, "0")}
             </p>
-            <h3 className="mt-1.5 line-clamp-2 text-lg font-semibold leading-tight tracking-[-0.02em] text-white">
+            <h3 className="mt-1.5 line-clamp-2 text-base font-semibold leading-tight tracking-[-0.02em] text-slate-900">
               {blog.title}
             </h3>
           </div>
-          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 text-base text-white backdrop-blur-md transition group-hover:translate-x-1">
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-sm text-slate-700 transition group-hover:translate-x-1">
             {">"}
           </span>
         </div>
       </div>
 
-      <div className="relative flex h-full flex-col justify-between px-4 pb-4 pt-3.5">
+      <div className="relative flex h-full flex-col justify-between px-4 pb-4 pt-3">
         <div className="flex flex-wrap items-center gap-2 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-500">
           <span className="text-slate-700 line-clamp-1">{blog.authorName}</span>
           <span className="h-1 w-1 rounded-full bg-slate-300" />
           <span>{formatDate(blog.publishedAt)}</span>
         </div>
 
-        <p className="mt-2.5 line-clamp-2 text-sm leading-6 text-slate-600">
+        <p className="mt-2 line-clamp-2 text-[13px] leading-5 text-slate-600">
           {blog.excerpt}
         </p>
 
@@ -237,9 +235,9 @@ const HomeBlogsSection = () => {
             {[0, 1, 2].map((item) => (
               <div
                 key={item}
-                className="w-[260px] min-w-[260px] overflow-hidden rounded-[24px] border border-slate-200/70 bg-white p-4 shadow-[0_18px_44px_-34px_rgba(15,23,42,0.38)] sm:w-[280px] sm:min-w-[280px]"
+                className="w-[230px] min-w-[230px] overflow-hidden rounded-[24px] border border-slate-200/70 bg-white p-4 shadow-[0_18px_44px_-34px_rgba(15,23,42,0.22)] sm:w-[248px] sm:min-w-[248px]"
               >
-                <div className="aspect-[16/9] animate-pulse rounded-[18px] bg-slate-200" />
+                <div className="aspect-[16/10] animate-pulse rounded-[18px] bg-slate-200" />
                 <div className="mt-4 h-3 w-24 animate-pulse rounded bg-slate-200" />
                 <div className="mt-3 h-7 w-4/5 animate-pulse rounded bg-slate-200" />
                 <div className="mt-3 h-12 animate-pulse rounded bg-slate-100" />
