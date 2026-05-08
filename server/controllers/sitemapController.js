@@ -353,3 +353,30 @@ export const getImageSitemap = async (req, res) => {
     return res.status(500).json({ message: "Failed to generate image sitemap" });
   }
 };
+
+export const getRobotsTxt = async (req, res) => {
+  try {
+    const siteUrl = getSiteUrl();
+    const imageBaseUrl = getImageBaseUrl();
+    const backendBaseUrl = imageBaseUrl.replace(/\/+$/, "");
+    const sitemapUrl = `${backendBaseUrl}/sitemap.xml`;
+    const imageSitemapUrl = `${backendBaseUrl}/image-sitemap.xml`;
+
+    const body = [
+      "User-agent: *",
+      "Allow: /",
+      "",
+      `Sitemap: ${sitemapUrl}`,
+      `Sitemap: ${imageSitemapUrl}`,
+      "",
+      `Host: ${siteUrl.replace(/^https?:\/\//i, "")}`,
+    ].join("\n");
+
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    return res.status(200).send(`${body}\n`);
+  } catch (error) {
+    console.error("getRobotsTxt error:", error);
+    return res.status(500).json({ message: "Failed to generate robots.txt" });
+  }
+};
