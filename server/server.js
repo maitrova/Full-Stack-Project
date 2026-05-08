@@ -35,6 +35,7 @@ import couponRouter from "./routes/couponRoutes.js";
 import headerBannerRouter from "./routes/headerBannerRoutes.js";
 import reviewRouter from "./routes/reviewRoutes.js";
 import blogsRouter from "./routes/blogsRoutes.js";
+import sitemapRouter from "./routes/sitemapRoutes.js";
 
 import colorselection from './routes/adminColorRoutes.js';
 import companypdfs from './routes/companyPdfRoutes.js';
@@ -105,6 +106,8 @@ app.use("/api/outputs", staticOutputs);
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+app.use("/", sitemapRouter);
 
 // Routes
 app.use('/api', removebgrouter);
