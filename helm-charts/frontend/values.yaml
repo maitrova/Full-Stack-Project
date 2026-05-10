@@ -23,14 +23,14 @@ envVars:
   VITE_API_URL: https://maitrova.in/api
   VITE_IMAGE_URL: https://maitrova.in/api
   VITE_GOOGLE_CLIENT_ID: 777795975212-0kfni6fgt4036k9rplvf1l7n70hukngo.apps.googleusercontent.com
-  TINY_API_KEY: 9kc8pbu3fdit4eo9my7zcogxotadjubnds2lg596gw8o4mwe
+  TINY_API_KEY: zw2jgzn33vvux613t7n3yd98ucpo2mndapfqerjws3jfb3ep
   # Add any frontend env vars here 
 
 # Secret Environment Variables (if frontend needs any)
 envSecrets:
   # Add any frontend secrets here
   # EXAMPLE: API_KEY: "your-api-key"
-  TINY_API_KEY: 9kc8pbu3fdit4eo9my7zcogxotadjubnds2lg596gw8o4mwe
+  TINY_API_KEY: zw2jgzn33vvux613t7n3yd98ucpo2mndapfqerjws3jfb3ep
 # Resource Limits
 resources:
   limits:
