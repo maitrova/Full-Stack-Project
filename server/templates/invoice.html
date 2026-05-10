@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Maitrova Invoice</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: Georgia, serif;
+}
+
+.invoice-wrapper {
+    width: 900px;
+    margin: auto;
+    background: #fff;
+}
+
+.header {
+    background: #6b6400;
+    color: #f5e7b2;
+    padding: 40px 60px;
+    position: relative;
+}
+
+.header h1 {
+    font-size: 60px;
+    margin: 0;
+}
+
+.logo {
+    position: absolute;
+    right: 60px;
+    top: 40px;
+    font-size: 28px;
+    font-weight: bold;
+    color: #f5e7b2;
+}
+
+.content {
+    padding: 60px;
+}
+
+.top-section {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 50px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 40px;
+}
+
+th, td {
+    border: 1px solid #cfcfcf;
+    padding: 12px;
+    font-size: 15px;
+}
+
+th {
+    text-align: left;
+    background: #f4f4f4;
+}
+
+.totals {
+    width: 300px;
+    margin-left: auto;
+    margin-top: 30px;
+}
+
+.totals div {
+    display: flex;
+    justify-content: space-between;
+    margin: 8px 0;
+}
+
+.totals strong {
+    font-size: 17px;
+}
+
+.signature-line {
+    margin-top: 50px;
+    border-top: 1px solid #aaa;
+    width: 300px;
+    margin-left: auto;
+    padding-top: 10px;
+    text-align: right;
+    font-style: italic;
+}
+</style>
+</head>
+
+<body>
+
+<div class="invoice-wrapper">
+
+    <div class="header">
+        <h1>Invoice</h1>
+        <div class="logo">Maitrova</div>
+    </div>
+
+    <div class="content">
+
+        <div class="top-section">
+            <div>
+                <p><strong>Invoice number:</strong> {{invoiceNumber}}</p>
+                <p><strong>Invoice to:</strong><br>
+                    {{customerName}}<br>
+                    {{customerAddress}}
+                </p>
+            </div>
+
+            <div>
+                <p><strong>Date:</strong> {{invoiceDate}}</p>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:55%">Item description</th>
+                    <th>Qty</th>
+                    <th>Price</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{items}}
+            </tbody>
+        </table>
+
+        <div class="totals">
+            <div>
+                <span>Subtotal</span>
+                <span>{{subtotal}}</span>
+            </div>
+            <div>
+                <span>Tax</span>
+                <span>0</span>
+            </div>
+            <div>
+                <strong>TOTAL</strong>
+                <strong>{{total}}</strong>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Thank you for your business!</p>
+        </div>
+
+        <div class="signature-line">
+            Maitrova
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>

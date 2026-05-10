@@ -1,0 +1,167 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches: [ rem-back2 ]
+  workflow_dispatch:
+
+env:
+  DOCKER_USERNAME: maitrova
+  BACKEND_IMAGE: maitrova/crud-backend
+  FRONTEND_IMAGE: maitrova/crud-frontend
+
+jobs:
+  build_and_push:
+    runs-on: ubuntu-latest
+    outputs:
+      backend_tag: ${{ steps.tags.outputs.backend }}
+      frontend_tag: ${{ steps.tags.outputs.frontend }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Generate version tags
+        id: tags
+        run: |
+          echo "backend=b${{ github.run_number }}" >> $GITHUB_OUTPUT
+          echo "frontend=f${{ github.run_number }}" >> $GITHUB_OUTPUT
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:latest
+            ${{ env.BACKEND_IMAGE }}:${{ steps.tags.outputs.backend }}
+          cache-from: type=registry,ref=${{ env.BACKEND_IMAGE }}:latest
+          cache-to: type=inline
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          build-args: |
+            VITE_API_URL=https://maitrova.in/api
+            VITE_IMAGE_URL=https://maitrova.in/api
+            VITE_GOOGLE_CLIENT_ID=777795975212-0kfni6fgt4036k9rplvf1l7n70hukngo.apps.googleusercontent.com
+            TINY_API_KEY=zw2jgzn33vvux613t7n3yd98ucpo2mndapfqerjws3jfb3ep
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:latest
+            ${{ env.FRONTEND_IMAGE }}:${{ steps.tags.outputs.frontend }}
+          cache-from: type=registry,ref=${{ env.FRONTEND_IMAGE }}:latest
+          cache-to: type=inline
+
+      - name: Output tags
+        run: |
+          echo "✅ Images pushed successfully!"
+          echo "Backend: ${{ env.BACKEND_IMAGE }}:${{ steps.tags.outputs.backend }}"
+          echo "Frontend: ${{ env.FRONTEND_IMAGE }}:${{ steps.tags.outputs.frontend }}"
+
+  deploy_backend:
+    needs: build_and_push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cleanup old Backend Helm chart on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            rm -rf /tmp/backend
+            echo "✅ Cleaned up old backend helm chart"
+
+      - name: Copy Backend Helm chart to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          source: "helm-charts/backend"
+          target: "/tmp/"
+          strip_components: 1
+
+      - name: Deploy Backend to VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            set -e
+            helm upgrade --install backend /tmp/backend \
+              --namespace production \
+              --create-namespace \
+              --history-max 3 \
+              --set image.tag=${{ needs.build_and_push.outputs.backend_tag }} \
+              --wait \
+              --atomic
+            
+            echo "✅ Backend deployed successfully with tag ${{ needs.build_and_push.outputs.backend_tag }}"
+
+  deploy_frontend:
+    needs: build_and_push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cleanup old Frontend Helm chart on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            rm -rf /tmp/frontend
+            echo "✅ Cleaned up old frontend helm chart"
+
+      - name: Copy Frontend Helm chart to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          source: "helm-charts/frontend"
+          target: "/tmp/"
+          strip_components: 1
+
+      - name: Deploy Frontend to VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            set -e
+            helm upgrade --install fontend /tmp/frontend \
+              --namespace production \
+              --create-namespace \
+              --history-max 3 \
+              --set image.tag=${{ needs.build_and_push.outputs.frontend_tag }} \
+              --wait \
+              --atomic
+            
+            echo "✅ Frontend deployed successfully with tag ${{ needs.build_and_push.outputs.frontend_tag }}"

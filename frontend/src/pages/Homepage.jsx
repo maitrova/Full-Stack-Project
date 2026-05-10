@@ -1,23 +1,28 @@
 import React from 'react'
-import Header from '../components/Header'
+// import Header from '../components/Header'
 import Hero from '../components/Hero'
-import ProductCategories from '../components/productcategory'
-import NewArrivalsWithImage from '../components/Newarrivals'
-import CustomerReviews from '../components/customerreview'
-import Footer from '../components/Footer'
-import PromotionalProductsComponent from '../components/promotionalproducts'
+
+// import HomepageFeatured from '../components/Newarrivals'
+import Dropproduct from '../components/DropproductUserView'
+import NewArrivals from '../components/Newarrivalss'
+import BestSellers from '../components/Bestsellers'
+import CategoryTilesHorizontal from '../components/Homepagecategotylist'
+import ProductCategoriesHorizontal from '../components/homepagecustomizationcategorieslist'
+import HomeBlogsSection from '../components/HomeBlogsSection.jsx'
 
 
 const Homepage = () => {
   return (
     <>
-    <Header/>
+    {/* <Header/> */}
     <Hero/>
-    <ProductCategories/>
-    <PromotionalProductsComponent/>
-    <NewArrivalsWithImage/>
-    <CustomerReviews/>
-    <Footer/>
+    <Dropproduct/>
+    
+    <NewArrivals/>
+    <BestSellers/>
+    <ProductCategoriesHorizontal/>
+    <CategoryTilesHorizontal/>
+    <HomeBlogsSection />
     </>
   )
 }

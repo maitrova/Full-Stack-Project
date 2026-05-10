@@ -1,13 +1,18 @@
 // userSlice.js
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import axios from "axios";
 
 // Base URL for your API
-const API_URL = 'http://localhost:5000/api/auth';
+const BASE_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
+const API_URL = `${BASE_URL}/auth`;
 
-// Async thunk for user registration
+// --------------------
+// Auth Thunks
+// --------------------
+
+// Register
 export const registerUser = createAsyncThunk(
-  'user/register',
+  "user/register",
   async (userData, { rejectWithValue }) => {
     try {
       const { name, phone, email, password, role } = userData;
@@ -16,114 +21,381 @@ export const registerUser = createAsyncThunk(
         phone,
         email,
         password,
-        role
+        role,
+      }, {
+        withCredentials: true,
       });
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response.data);
+      return rejectWithValue(error.response?.data || { message: "Registration failed" });
     }
   }
 );
 
-// Async thunk for user login
+// Login
 export const loginUser = createAsyncThunk(
-  'user/login',
+  "user/login",
   async (credentials, { rejectWithValue }) => {
     try {
-      const { phone, password } = credentials;
-      const response = await axios.post(`${API_URL}/login`, {
-        phone,
-        password
-      });
+      const { identifier, password } = credentials;
+      const response = await axios.post(
+        `${API_URL}/login`,
+        { identifier, password },
+        { withCredentials: true }
+      );
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response.data);
+      return rejectWithValue(error.response?.data || { message: "Login failed" });
     }
   }
 );
 
-// Async thunk for user logout
+// Logout
 export const logoutUser = createAsyncThunk(
-  'user/logout',
+  "user/logout",
   async (_, { rejectWithValue }) => {
     try {
-      // Optional: Add API call to invalidate token on server if needed
-      // await axios.post(`${API_URL}/logout`);
-      return null; // This will clear the userInfo in the state
+      return null;
     } catch (error) {
-      return rejectWithValue(error.response?.data || 'Logout failed');
+      return rejectWithValue(error.response?.data || { message: "Logout failed" });
+    }
+  }
+);
+
+// --------------------
+// Profile Thunks
+// --------------------
+
+// GET Profile
+export const fetchUserProfile = createAsyncThunk(
+  "user/fetchProfile",
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const token = getState().user.userInfo?.token;
+      if (!token) return rejectWithValue({ message: "No token found" });
+
+      const response = await axios.get(`${API_URL}/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      // response is user object: { _id, name, phone, email, role, ... }
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || { message: "Failed to fetch profile" });
+    }
+  }
+);
+
+// Google Login
+export const googleLogin = createAsyncThunk(
+  "user/googleLogin",
+  async (googleToken, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(`${API_URL}/google`, {
+        token: googleToken,
+      }, {
+        withCredentials: true,
+      });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data || { message: "Google login failed" }
+      );
+    }
+  }
+);
+
+// PUT Update Profile
+export const updateUserProfile = createAsyncThunk(
+  "user/updateProfile",
+  async (profileData, { getState, rejectWithValue }) => {
+    try {
+      const token = getState().user.userInfo?.token;
+      if (!token) return rejectWithValue({ message: "No token found" });
+
+      const response = await axios.put(`${API_URL}/profile`, profileData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      /**
+       * Backend returns:
+       * { _id, name, phone, email, role, token }
+       */
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || { message: "Profile update failed" });
+    }
+  }
+);
+
+// --------------------
+// Forgot Password
+// --------------------
+export const forgotPassword = createAsyncThunk(
+  "user/forgotPassword",
+  async (email, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(`${API_URL}/forgot-password`, {
+        email,
+      });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data || { message: "Failed to send OTP" }
+      );
+    }
+  }
+);
+
+// --------------------
+// Reset Password
+// --------------------
+export const resetPassword = createAsyncThunk(
+  "user/resetPassword",
+  async ({ email, otp, newPassword }, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(`${API_URL}/reset-password`, {
+        email,
+        otp,
+        newPassword,
+      });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data || { message: "Password reset failed" }
+      );
     }
   }
 );
 
 const userSlice = createSlice({
-  name: 'user',
+  name: "user",
   initialState: {
-    userInfo: null, // Will be automatically rehydrated by redux-persist
-    status: 'idle',
-    error: null
+    userInfo: null, // persisted
+    status: "idle",
+    error: null,
+
+    // optional: separate profile state
+    profile: null,
+    profileStatus: "idle",
+    profileError: null,
+
+    forgotStatus: "idle",
+    forgotError: null,
+
+    resetStatus: "idle",
+    resetError: null,
+    resetSuccess: null,
   },
   reducers: {
-    // Synchronous logout action (alternative approach)
     logout: (state) => {
       state.userInfo = null;
-      state.status = 'idle';
+      state.status = "idle";
       state.error = null;
-    }
+
+      state.profile = null;
+      state.profileStatus = "idle";
+      state.profileError = null;
+    },
   },
   extraReducers: (builder) => {
     builder
-      // Register cases
+      // --------------------
+      // Register
+      // --------------------
       .addCase(registerUser.pending, (state) => {
-        state.status = 'loading';
+        state.status = "loading";
       })
       .addCase(registerUser.fulfilled, (state, action) => {
-        state.status = 'succeeded';
+        state.status = "succeeded";
         state.userInfo = action.payload;
         state.error = null;
+
+        // You can also set profile from signup response if you want:
+        state.profile = {
+          _id: action.payload?._id,
+          name: action.payload?.name,
+          phone: action.payload?.phone,
+          email: action.payload?.email,
+          role: action.payload?.role,
+        };
       })
       .addCase(registerUser.rejected, (state, action) => {
-        state.status = 'failed';
-        state.error = action.payload?.message || 'Registration failed';
+        state.status = "failed";
+        state.error = action.payload?.message || "Registration failed";
       })
-      
-      // Login cases
+
+      // --------------------
+      // Login
+      // --------------------
       .addCase(loginUser.pending, (state) => {
-        state.status = 'loading';
+        state.status = "loading";
       })
       .addCase(loginUser.fulfilled, (state, action) => {
-        state.status = 'succeeded';
+        state.status = "succeeded";
         state.userInfo = action.payload;
         state.error = null;
+
+        // Optionally preload profile from login response
+        state.profile = {
+          _id: action.payload?._id,
+          name: action.payload?.name,
+          phone: action.payload?.phone,
+          email: action.payload?.email,
+          role: action.payload?.role,
+        };
       })
       .addCase(loginUser.rejected, (state, action) => {
-        state.status = 'failed';
-        state.error = action.payload?.message || 'Login failed';
+        state.status = "failed";
+        state.error = action.payload?.message || "Login failed";
       })
-      
-      // Logout cases
+
+            // --------------------
+      // Google Login
+      // --------------------
+      .addCase(googleLogin.pending, (state) => {
+        state.status = "loading";
+      })
+      .addCase(googleLogin.fulfilled, (state, action) => {
+        state.status = "succeeded";
+        state.userInfo = action.payload;
+        state.error = null;
+
+        state.profile = {
+          _id: action.payload?._id,
+          name: action.payload?.name,
+          phone: action.payload?.phone,
+          email: action.payload?.email,
+          role: action.payload?.role,
+        };
+      })
+      .addCase(googleLogin.rejected, (state, action) => {
+        state.status = "failed";
+        state.error = action.payload?.message || "Google login failed";
+      })
+
+
+      // --------------------
+      // Logout thunk
+      // --------------------
       .addCase(logoutUser.pending, (state) => {
-        state.status = 'loading';
+        state.status = "loading";
       })
       .addCase(logoutUser.fulfilled, (state) => {
-        state.status = 'idle';
+        state.status = "idle";
         state.userInfo = null;
         state.error = null;
+
+        state.profile = null;
+        state.profileStatus = "idle";
+        state.profileError = null;
       })
       .addCase(logoutUser.rejected, (state, action) => {
-        state.status = 'idle';
-        state.error = action.payload?.message || 'Logout failed';
+        state.status = "idle";
+        state.error = action.payload?.message || "Logout failed";
+      })
+
+      // --------------------
+      // Fetch Profile
+      // --------------------
+      .addCase(fetchUserProfile.pending, (state) => {
+        state.profileStatus = "loading";
+        state.profileError = null;
+      })
+      .addCase(fetchUserProfile.fulfilled, (state, action) => {
+        state.profileStatus = "succeeded";
+        state.profile = action.payload;
+        state.profileError = null;
+      })
+      .addCase(fetchUserProfile.rejected, (state, action) => {
+        state.profileStatus = "failed";
+        state.profileError = action.payload?.message || "Failed to fetch profile";
+      })
+
+      .addCase(forgotPassword.pending, (state) => {
+        state.forgotStatus = "loading";
+        state.forgotError = null;
+      })
+      .addCase(forgotPassword.fulfilled, (state, action) => {
+        state.forgotStatus = "succeeded";
+        state.forgotError = null;
+      })
+      .addCase(forgotPassword.rejected, (state, action) => {
+        state.forgotStatus = "failed";
+        state.forgotError =
+          action.payload?.message || "Failed to send OTP";
+      })
+
+
+      // --------------------
+// Reset Password
+// --------------------
+    .addCase(resetPassword.pending, (state) => {
+      state.resetStatus = "loading";
+      state.resetError = null;
+      state.resetSuccess = null;
+    })
+    .addCase(resetPassword.fulfilled, (state, action) => {
+      state.resetStatus = "succeeded";
+      state.resetError = null;
+      state.resetSuccess = action.payload?.message;
+    })
+    .addCase(resetPassword.rejected, (state, action) => {
+      state.resetStatus = "failed";
+      state.resetError =
+        action.payload?.message || "Password reset failed";
+    })
+
+      // --------------------
+      // Update Profile
+      // --------------------
+      .addCase(updateUserProfile.pending, (state) => {
+        state.profileStatus = "loading";
+        state.profileError = null;
+      })
+      .addCase(updateUserProfile.fulfilled, (state, action) => {
+        state.profileStatus = "succeeded";
+        state.profileError = null;
+
+        // update profile object
+        state.profile = {
+          _id: action.payload?._id,
+          name: action.payload?.name,
+          phone: action.payload?.phone,
+          email: action.payload?.email,
+          role: action.payload?.role,
+        };
+
+        // update persisted userInfo too (especially token if refreshed)
+        state.userInfo = {
+          ...state.userInfo,
+          ...action.payload,
+        };
+      })
+      .addCase(updateUserProfile.rejected, (state, action) => {
+        state.profileStatus = "failed";
+        state.profileError = action.payload?.message || "Profile update failed";
       });
-  }
+  },
 });
 
-// Export the synchronous logout action
 export const { logout } = userSlice.actions;
-
 export default userSlice.reducer;
 
+// --------------------
 // Selectors
+// --------------------
 export const selectCurrentToken = (state) => state.user.userInfo?.token;
 export const selectCurrentUser = (state) => state.user.userInfo;
 export const selectAuthStatus = (state) => state.user.status;
 export const selectAuthError = (state) => state.user.error;
+
+export const selectUserProfile = (state) => state.user.profile;
+export const selectProfileStatus = (state) => state.user.profileStatus;
+export const selectProfileError = (state) => state.user.profileError;
+export const selectForgotStatus = (state) => state.user.forgotStatus;
+export const selectForgotError = (state) => state.user.forgotError;
+
+export const selectResetStatus = (state) => state.user.resetStatus;
+export const selectResetError = (state) => state.user.resetError;
+export const selectResetSuccess = (state) => state.user.resetSuccess;

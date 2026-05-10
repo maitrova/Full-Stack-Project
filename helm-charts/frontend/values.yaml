@@ -1,0 +1,75 @@
+# Frontend Configuration
+name: frontend
+fullnameOverride: frontend
+
+replicaCount: 1
+image:
+  repository: maitrova/crud-frontend
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Service Configuration
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 80
+
+# Environment Configuration
+env: production
+
+# Application Environment Variables
+envVars:
+  NODE_ENV: production
+  VITE_API_URL: https://maitrova.in/api
+  VITE_IMAGE_URL: https://maitrova.in/api
+  VITE_GOOGLE_CLIENT_ID: 777795975212-0kfni6fgt4036k9rplvf1l7n70hukngo.apps.googleusercontent.com
+  TINY_API_KEY: zw2jgzn33vvux613t7n3yd98ucpo2mndapfqerjws3jfb3ep
+  # Add any frontend env vars here 
+
+# Secret Environment Variables (if frontend needs any)
+envSecrets:
+  # Add any frontend secrets here
+  # EXAMPLE: API_KEY: "your-api-key"
+  TINY_API_KEY: zw2jgzn33vvux613t7n3yd98ucpo2mndapfqerjws3jfb3ep
+# Resource Limits
+resources:
+  limits:
+    cpu: "500m"
+    memory: 512Mi
+  requests:
+    cpu: "100m"
+    memory: 256Mi
+
+# Health Checks
+livenessProbe:
+  enabled: false
+  httpGet:
+    path: /
+    port: 80
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: false
+  httpGet:
+    path: /
+    port: 80
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# Autoscaling
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Pod Disruption Budget
+pdb:
+  enabled: true
+  minAvailable: 1

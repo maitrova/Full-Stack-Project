@@ -1,8 +1,27 @@
 import express from 'express';
-import addProduct from '../controllers/products.js';
+import { addProduct, deleteProduct, getProductById, getProducts, getProductsByMainCategory, getProductsBySubCategory, updateProduct, upload } from '../controllers/products.js';
+
 
 const productrouter = express.Router();
 
-productrouter.post('/', addProduct);
+// Use multer middleware for multiple file uploads (max 5 images)
+productrouter.post('/add-product', upload.array('images', 5), addProduct);
+productrouter.get('/products', getProducts);
+
+// Get products by main category
+productrouter.get('/products/category/:mainCategory', getProductsByMainCategory);
+// Get products by main category and sub category
+productrouter.get('/products/category/:mainCategory/:subCategory', getProductsBySubCategory);
+
+// Get single product by ID
+productrouter.get('/products/:id', getProductById);
+
+// Update product with optional file upload
+productrouter.put('/update/:id', upload.array('images', 5), updateProduct);
+
+
+productrouter.delete('/products/delete/:id', deleteProduct); 
+
+
 
 export default productrouter;

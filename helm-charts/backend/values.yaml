@@ -1,0 +1,115 @@
+# Backend Configuration
+name: backend
+fullnameOverride: backend
+
+replicaCount: 1
+
+image:
+  repository: maitrova/crud-backend
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Service Configuration
+service:
+  type: ClusterIP
+  port: 5000
+  targetPort: 5000
+
+# Environment Configuration
+env: production
+
+# Application Environment Variables
+envVars:
+  APP_ENV: production
+  PORT: "5000"
+  NODE_ENV: production
+  PYTHON_EXECUTABLE: "python3"
+  BREVO_ORDER_TEMPLATE_ID_PROCESSING: 18
+  BREVO_ADMIN_ORDER_TEMPLATE_ID: 15
+  BREVO_ORDER_TEMPLATE_ID_READY: 19
+  BREVO_ORDER_TEMPLATE_ID_SHIPPED: 22
+  BREVO_ORDER_TEMPLATE_ID_DELIVERED: 21
+
+  BREVO_ORDER_CANCELLED_TEMPLATE_ID: 28
+  BREVO_RETURN_REQUEST_TEMPLATE_ID: 23
+  BREVO_RETURN_APPROVED_TEMPLATE_ID: 25
+  BREVO_RETURN_REJECTED_TEMPLATE_ID: 26
+  BREVO_RETURN_REFUND_PAID_TEMPLATE_ID: 27
+  ADMIN_NOTIFICATION_EMAIL:  orders@maitrova.in
+  ADMIN_NOTIFICATION_EMAILS:  orders@maitrova.in,founder@maitrova.in,nagalahemanth411@gmail.com
+  ADMIN_NOTIFICATION_NAME: Maitrova Admin
+
+# Secret Environment Variables (non-sensitive enough for Helm, stored in cluster secret)
+envSecrets:
+  JWT_SECRET: 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
+  GOOGLE_CLIENT_ID: 777795975212-0kfni6fgt4036k9rplvf1l7n70hukngo.apps.googleusercontent.com
+  MONGOOSE_PASSWORD: "Saigollapalli@122"
+  MONGOOSE_URL: "mongodb://maitrova:Saigollapalli%40122@mongodb:27017/appdb?authSource=admin"
+  # MONGOOSE_URL: "mongodb+srv://hemanthnagala876_db_user:VRYnuUeDAbgNzdpp@cluster0.ru99jrx.mongodb.net/"
+  API_URL: "https://maitrova.in/api"
+  BREVO_RESET_PASSWORD_KEY: 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
+  RAZORPAY_KEY_ID: rzp_live_SBONFp6WLKiUm2
+  RAZORPAY_KEY_SECRET: MChErYsdAwX0FL1Ng3MWCGFs
+
+# Keys pulled from a pre-existing K8s secret (never committed to git).
+# Apply manually: kubectl apply -f helm-charts/backend/backend-secret.yaml -n <namespace>
+externalSecret:
+  name: backend-secret-brevo
+  keys:
+    - BREVO_API_KEY
+
+
+
+# Resource Limits
+# Memory: Node.js (~250MB) + onnxruntime model (~300MB) + inference peak (~800MB) = ~1.4GB peak
+# CPU request raised to 1 core so onnxruntime inference is not throttled on busy nodes
+resources:
+  limits:
+    cpu: "2"
+    memory: 3Gi
+  requests:
+    cpu: "1"
+    memory: 1.5Gi
+
+# Health Checks
+livenessProbe:
+  enabled: false
+  httpGet:
+    path: /api/health
+    port: 5000
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: false
+  httpGet:
+    path: /api/health
+    port: 5000
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# Autoscaling
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Pod Disruption Budget
+pdb:
+  enabled: true
+  minAvailable: 1
+
+# Persistent Storage Configuration
+persistence:
+  enabled: true
+  storageClass: "local-path"
+  accessMode: ReadWriteMany
+  size: 5Gi
+  hostPath: /home/sai/backend_data
+  mountPath: /app/outputs
