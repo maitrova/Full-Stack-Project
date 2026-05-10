@@ -4,7 +4,80 @@ import { selectCurrentToken } from "../../redux/slices/Userslice.js";
 import { buildImageUrl } from "../../utils/responsiveImage.js";
 import BlogRichTextEditor from "./BlogRichTextEditor.jsx";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend/api";
+const DEFAULT_API_URL = "https://maitrova.in/backend/api";
+
+const normalizeApiUrl = (value) => {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) return DEFAULT_API_URL;
+
+  if (/^https?:\/\//i.test(rawValue)) {
+    return rawValue.replace(/\/+$/, "");
+  }
+
+  if (rawValue.startsWith("//")) {
+    return `${window.location.protocol}${rawValue}`.replace(/\/+$/, "");
+  }
+
+  if (/^:\d+/i.test(rawValue)) {
+    return `${window.location.protocol}//${window.location.hostname}${rawValue}`.replace(/\/+$/, "");
+  }
+
+  if (/^(localhost|127\.0\.0\.1)(:\d+)?(\/.*)?$/i.test(rawValue)) {
+    return `${window.location.protocol}//${rawValue}`.replace(/\/+$/, "");
+  }
+
+  return rawValue.replace(/\/+$/, "");
+};
+
+const API_URL = normalizeApiUrl(import.meta.env.VITE_API_URL || DEFAULT_API_URL);
+const API_ORIGIN = API_URL.replace(/\/api$/i, "");
+
+const normalizeContentAssetUrlsForEditor = (value) => {
+  const html = String(value || "").trim();
+  if (!html || !/<[a-z][\s\S]*>/i.test(html)) return html;
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<div id="blog-editor-root">${html}</div>`, "text/html");
+  const root = doc.getElementById("blog-editor-root");
+
+  root?.querySelectorAll("img").forEach((image) => {
+    const rawSrc = image.getAttribute("src") || image.getAttribute("data-src") || "";
+    if (!rawSrc) return;
+    image.setAttribute("src", buildImageUrl(rawSrc));
+  });
+
+  return root?.innerHTML || html;
+};
+
+const normalizeContentAssetUrlsForStorage = (value) => {
+  const html = String(value || "").trim();
+  if (!html || !/<[a-z][\s\S]*>/i.test(html)) return html;
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<div id="blog-editor-root">${html}</div>`, "text/html");
+  const root = doc.getElementById("blog-editor-root");
+
+  root?.querySelectorAll("img").forEach((image) => {
+    const rawSrc = String(image.getAttribute("src") || "").trim();
+    if (!rawSrc) return;
+
+    try {
+      const parsedUrl = new URL(rawSrc, window.location.origin);
+      const normalizedPath = parsedUrl.pathname.replace(/\\/g, "/");
+      const outputsMatch = normalizedPath.match(/\/api\/(outputs\/.+)$/i) || normalizedPath.match(/\/(outputs\/.+)$/i);
+
+      if (outputsMatch?.[1]) {
+        image.setAttribute("src", outputsMatch[1]);
+      }
+    } catch {
+      if (rawSrc.startsWith(`${API_ORIGIN}/api/outputs/`)) {
+        image.setAttribute("src", rawSrc.replace(`${API_ORIGIN}/api/`, ""));
+      }
+    }
+  });
+
+  return root?.innerHTML || html;
+};
 
 const createEmptySectionImage = () => ({
   imageUrl: "",
@@ -51,7 +124,7 @@ const formatDateInput = (value) => {
 const normalizeEditorContent = (value) => {
   const next = String(value || "").trim();
   if (!next) return "";
-  if (/<[a-z][\s\S]*>/i.test(next)) return next;
+  if (/<[a-z][\s\S]*>/i.test(next)) return normalizeContentAssetUrlsForEditor(next);
 
   return next
     .split(/\n\s*\n/)
@@ -230,7 +303,7 @@ const BlogManagement = () => {
       payload.append("category", form.category || "");
       payload.append("authorName", form.authorName || "");
       payload.append("excerpt", form.excerpt || "");
-      payload.append("content", form.content || "");
+      payload.append("content", normalizeContentAssetUrlsForStorage(form.content || ""));
       payload.append("coverImage", form.coverImage || "");
       payload.append("coverImageAlt", form.coverImageAlt || "");
       payload.append("metaTitle", form.metaTitle || "");
@@ -280,23 +353,22 @@ const BlogManagement = () => {
   };
 
   const handleInlineImageUpload = async (file) => {
-    console.log("[BlogManagement] handleInlineImageUpload file:", file);
     const payload = new FormData();
-    payload.append("inlineImageFile", file);
+    payload.append("inlineImageFile", file, file?.name || "blog-inline-image");
+    const uploadUrl = `${API_URL}/blogs/admin/upload-image`;
 
-    const response = await fetch(`${API_URL}/blogs/admin/upload-image`, {
+    const response = await fetch(uploadUrl, {
       method: "POST",
       headers: authHeaders,
       body: payload,
     });
 
     const data = await response.json();
-    console.log("[BlogManagement] inline image upload response:", response.status, data);
     if (!response.ok) {
-      throw new Error(data?.message || "Failed to upload inline image");
+      throw new Error(data?.message || `Failed to upload inline image to ${uploadUrl}`);
     }
 
-    return data?.image?.url || "";
+    return buildImageUrl(data?.image?.url || "");
   };
 
   return (

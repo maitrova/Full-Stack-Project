@@ -357,10 +357,8 @@ export const getImageSitemap = async (req, res) => {
 export const getRobotsTxt = async (req, res) => {
   try {
     const siteUrl = getSiteUrl();
-    const imageBaseUrl = getImageBaseUrl();
-    const backendBaseUrl = imageBaseUrl.replace(/\/+$/, "");
-    const sitemapUrl = `${backendBaseUrl}/sitemap.xml`;
-    const imageSitemapUrl = `${backendBaseUrl}/image-sitemap.xml`;
+    const sitemapUrl = `${siteUrl}/sitemap.xml`;
+    const imageSitemapUrl = `${siteUrl}/image-sitemap.xml`;
 
     const body = [
       "User-agent: *",

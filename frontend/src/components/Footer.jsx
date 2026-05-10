@@ -5,6 +5,7 @@ const Footer = () => {
   
   const mainLinks = [
     { label: 'FAQ', href: '/faq' },
+    { label: 'About Us', href: '/about-us' },
     { label: 'Returns', href: '/return-refund-policy' },
     { label: 'Shipping', href: '/payment-shipping-cancellation-policy' },
     // { label: 'Contact', href: '/contact' },

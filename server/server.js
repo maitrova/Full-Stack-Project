@@ -108,7 +108,6 @@ app.get('/health', (req, res) => {
 });
 
 app.use("/", sitemapRouter);
-app.use("/api", sitemapRouter);
 
 // Routes
 app.use('/api', removebgrouter);
