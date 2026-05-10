@@ -30,6 +30,12 @@ backend:
     hosts:
       - host: maitrova.in
         paths:
+          - path: /sitemap.xml
+            pathType: Exact
+          - path: /robots.txt
+            pathType: Exact
+          - path: /image-sitemap.xml
+            pathType: Exact
           - path: /api
             pathType: Prefix
     tls:
