@@ -12,28 +12,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Install Rclone
         run: |
           sudo apt-get update
           sudo apt-get install -y rclone
 
-      - name: Create Google Service Account File
-        run: |
-          echo '${{ secrets.GDRIVE_SERVICE_ACCOUNT }}' > sa.json
-
       - name: Configure Rclone
         run: |
           mkdir -p ~/.config/rclone
+          echo '${{ secrets.RCLONE_CONFIG }}' > ~/.config/rclone/rclone.conf
 
-          cat > ~/.config/rclone/rclone.conf << EOF
-          [gdrive]
-          type = drive
-          scope = drive
-          service_account_file = sa.json
-          root_folder_id = ${{ secrets.GDRIVE_FOLDER_ID }}
-          EOF
-
-      - name: Create MongoDB Backup from Pod
+      - name: Create MongoDB Backup from Kubernetes Pod
         id: backup
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -54,7 +46,8 @@ jobs:
             echo "Using Mongo pod: $POD_NAME"
 
             echo "Running mongodump..."
-            kubectl exec -n production $POD_NAME -- mongodump --out /tmp/mongo_data
+            kubectl exec -n production $POD_NAME -- \
+              mongodump --out /tmp/mongo_data
 
             echo "Creating archive..."
             kubectl exec -n production $POD_NAME -- \
@@ -63,25 +56,40 @@ jobs:
             echo "Copying backup to VPS..."
             kubectl cp production/$POD_NAME:/tmp/$BACKUP_NAME ./$BACKUP_NAME
 
-            echo "Cleaning pod..."
+            echo "Cleaning temporary files..."
             kubectl exec -n production $POD_NAME -- \
               rm -rf /tmp/mongo_data /tmp/$BACKUP_NAME
 
-            echo $BACKUP_NAME
+            echo "Backup created: $BACKUP_NAME"
 
-      - name: Set Backup Name
+      - name: Find Backup File
         run: |
-          BACKUP_NAME="${{ steps.backup.outputs.stdout }}"
+          BACKUP_NAME=$(ls mongo_backup_*.tar.gz | head -n 1)
+
+          if [ -z "$BACKUP_NAME" ]; then
+            echo "Backup file not found!"
+            exit 1
+          fi
+
           echo "BACKUP_NAME=$BACKUP_NAME" >> $GITHUB_ENV
-          echo "Backup file: $BACKUP_NAME"
 
-      - name: Upload to Google Drive
+          echo "Found backup file:"
+          ls -lh $BACKUP_NAME
+
+      - name: Upload Backup to Google Drive
         run: |
-          rclone copy ./${{ env.BACKUP_NAME }} gdrive:
-          echo "✅ Uploaded to Google Drive"
+          rclone copy "./${{ env.BACKUP_NAME }}" gdrive:DB-backup -P
+
+          echo "✅ Uploaded successfully to Google Drive"
+
+      - name: Verify Upload
+        run: |
+          echo "Files in Google Drive:"
+          rclone ls gdrive:DB-backup
 
       - name: Cleanup Runner
+        if: always()
         run: |
-          rm -f ./${{ env.BACKUP_NAME }}
-          rm -f sa.json
+          rm -f mongo_backup_*.tar.gz
+
           echo "✅ Cleanup completed"
