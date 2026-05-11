@@ -34,6 +34,7 @@ jobs:
           EOF
 
       - name: Create MongoDB Backup from Pod
+        id: backup
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -43,6 +44,8 @@ jobs:
           script: |
             set -e
 
+            export KUBECONFIG=/home/sai/.kube/config
+
             BACKUP_DATE=$(date +%Y%m%d_%H%M%S)
             BACKUP_NAME="mongo_backup_${BACKUP_DATE}.tar.gz"
 
@@ -50,77 +53,35 @@ jobs:
 
             echo "Using Mongo pod: $POD_NAME"
 
-            echo "Cleaning old temp files..."
-            kubectl exec -n production $POD_NAME -- \
-              rm -rf /tmp/mongo_data /tmp/*.tar.gz
-
             echo "Running mongodump..."
-            kubectl exec -n production $POD_NAME -- \
-              mongodump --out /tmp/mongo_data
+            kubectl exec -n production $POD_NAME -- mongodump --out /tmp/mongo_data
 
             echo "Creating archive..."
             kubectl exec -n production $POD_NAME -- \
               tar -czf /tmp/$BACKUP_NAME -C /tmp mongo_data
 
             echo "Copying backup to VPS..."
-            kubectl cp \
-              production/$POD_NAME:/tmp/$BACKUP_NAME \
-              ./$BACKUP_NAME
+            kubectl cp production/$POD_NAME:/tmp/$BACKUP_NAME ./$BACKUP_NAME
 
             echo "Cleaning pod..."
             kubectl exec -n production $POD_NAME -- \
               rm -rf /tmp/mongo_data /tmp/$BACKUP_NAME
 
-            echo $BACKUP_NAME > latest_backup.txt
-
-            echo "✅ Backup completed"
-
-      - name: Get Backup Name
-        id: backupname
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          port: ${{ secrets.VPS_PORT }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          script: |
-            cat latest_backup.txt
+            echo $BACKUP_NAME
 
       - name: Set Backup Name
         run: |
-          BACKUP_NAME=$(echo "${{ steps.backupname.outputs.stdout }}" | tail -n 1)
+          BACKUP_NAME="${{ steps.backup.outputs.stdout }}"
           echo "BACKUP_NAME=$BACKUP_NAME" >> $GITHUB_ENV
-          echo "Backup: $BACKUP_NAME"
-
-      - name: Download Backup from VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          port: ${{ secrets.VPS_PORT }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          source: "${{ env.BACKUP_NAME }}"
-          target: "./"
+          echo "Backup file: $BACKUP_NAME"
 
       - name: Upload to Google Drive
         run: |
           rclone copy ./${{ env.BACKUP_NAME }} gdrive:
           echo "✅ Uploaded to Google Drive"
 
-      - name: Cleanup VPS
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          port: ${{ secrets.VPS_PORT }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          script: |
-            rm -f latest_backup.txt
-            rm -f ${{ env.BACKUP_NAME }}
-            echo "✅ VPS cleaned"
-
       - name: Cleanup Runner
         run: |
           rm -f ./${{ env.BACKUP_NAME }}
           rm -f sa.json
-          echo "✅ Runner cleaned"
+          echo "✅ Cleanup completed"
