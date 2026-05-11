@@ -44,7 +44,8 @@ import {
   Globe,
   Cpu,
   BarChart3,
-  AlertCircle
+  AlertCircle,
+  Ruler
 } from "lucide-react";
 
 // Import cart actions and selectors
@@ -78,6 +79,7 @@ import {
   resetProductSizeSelection
 } from "../redux/slices/productsizeselection.js";
 import ProductImageLightbox from "../components/ProductImageLightbox.jsx";
+import { getResponsiveImageProps } from "../utils/responsiveImage.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
 
@@ -454,6 +456,10 @@ export default function CatalogueDetailPage() {
   if (!design) return null;
 
   const views = design.views || [];
+  const sizeChartImageProps = getResponsiveImageProps(design.product?.sizeChart, {
+    sizes: "100vw",
+  });
+  const sizeChartUrl = sizeChartImageProps.src;
   const galleryViewIndexes = views.reduce((acc, view, index) => {
     if (view?.previewImage) {
       acc.push(index);
@@ -525,6 +531,38 @@ export default function CatalogueDetailPage() {
       )}
     </div>
   );
+
+  const renderSizeChart = () => {
+    if (!sizeChartUrl) return null;
+
+    return (
+      <div className="border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-sm">
+        <div className="p-4 sm:p-6">
+          <div className="mb-4 flex items-center gap-2">
+            <Ruler className="w-5 h-5 text-gray-900" />
+            <h3 className="text-lg font-semibold text-gray-900 tracking-tight">Size Chart</h3>
+          </div>
+          <button
+            type="button"
+            onClick={() => window.open(sizeChartUrl, "_blank", "noopener,noreferrer")}
+            className="group block w-full text-left"
+          >
+            <img
+              src={sizeChartUrl}
+              alt={`${design.productName || design.title || "Product"} size chart`}
+              className="w-full rounded-xl border border-gray-200 bg-white object-contain transition-transform group-hover:scale-[1.01]"
+              srcSet={sizeChartImageProps.srcSet}
+              sizes={sizeChartImageProps.sizes}
+              loading={sizeChartImageProps.loading}
+              decoding={sizeChartImageProps.decoding}
+              fetchPriority={sizeChartImageProps.fetchPriority}
+            />
+            <div className="mt-3 text-sm text-gray-500">Click the size chart to open it full size.</div>
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -621,17 +659,6 @@ export default function CatalogueDetailPage() {
                 <Link to="/" className="text-gray-500 hover:text-gray-900 transition-colors tracking-tight">
                   HOME
                 </Link>
-              </li>
-              <li>
-                <div className="flex items-center">
-                  <ChevronRight className="w-4 h-4 text-gray-400 mx-1" />
-                  <Link 
-                    to="/catalogue" 
-                    className="text-gray-500 hover:text-gray-900 transition-colors tracking-tight"
-                  >
-                    CATALOGUE
-                  </Link>
-                </div>
               </li>
               <li aria-current="page">
                 <div className="flex items-center">
@@ -779,6 +806,8 @@ export default function CatalogueDetailPage() {
                 )}
               </div>
             </div>
+
+            {renderSizeChart()}
 
             {/* Action Buttons */}
             <div className="hidden lg:grid grid-cols-1 sm:grid-cols-2 gap-4">

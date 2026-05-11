@@ -1,5 +1,43 @@
 // backend/controllers/productController.js
 import { Product } from "../models/Product.js";
+import fsPromises from "fs/promises";
+import multer from "multer";
+import path from "path";
+import { fileURLToPath } from "url";
+import {
+  deleteOptimizedImageSet,
+  normalizeStoredPath,
+  optimizeUploadedImage,
+} from "../utils/imageOptimization.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const SERVER_ROOT = path.resolve(__dirname, "..");
+const SIZE_CHART_TMP_DIR = path.join(
+  SERVER_ROOT,
+  "outputs",
+  "customization-products",
+  "tmp"
+);
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024,
+  },
+  fileFilter: (req, file, cb) => {
+    if (file?.mimetype?.startsWith("image/")) {
+      cb(null, true);
+      return;
+    }
+
+    cb(new Error("Please upload an image file up to 50MB for the size chart."));
+  },
+});
+
+export const customizationProductUpload = upload.fields([
+  { name: "sizeChart", maxCount: 1 },
+]);
 
 const DEFAULT_PRODUCT_COLORS = [
   { value: "#FFFFFF", label: "White" },
@@ -106,6 +144,56 @@ const DEFAULT_TEXT_PRICE_RULES = [
   { maxSideInches: 4, price: 40 },
   { maxSideInches: null, price: 100 },
 ];
+
+const parseStructuredField = (value, fieldName) => {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string") return value;
+
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return undefined;
+
+  try {
+    return JSON.parse(trimmedValue);
+  } catch (error) {
+    throw new Error(`Invalid ${fieldName} payload`);
+  }
+};
+
+const optimizeCustomizationSizeChartUpload = async (file) => {
+  if (!file?.buffer?.length) return null;
+
+  await fsPromises.mkdir(SIZE_CHART_TMP_DIR, { recursive: true });
+
+  const extension = path.extname(file.originalname || "") || ".png";
+  const tempFileName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${extension}`;
+  const absoluteTempPath = path.join(SIZE_CHART_TMP_DIR, tempFileName);
+  const relativeTempPath = normalizeStoredPath(absoluteTempPath);
+
+  await fsPromises.writeFile(absoluteTempPath, file.buffer);
+
+  const optimizedChart = await optimizeUploadedImage(relativeTempPath, {
+    cleanupSource: true,
+    outputDir: "outputs/customization-products/size-chart",
+    baseName: `${Date.now()}-${file.originalname || "size-chart"}`,
+    widths: {
+      small: 600,
+      medium: 1200,
+      blur: 24,
+    },
+    qualities: {
+      small: 74,
+      medium: 82,
+      blur: 40,
+    },
+  });
+
+  return optimizedChart.url;
+};
+
+const safeDeleteFile = async (filePath) => {
+  if (!filePath) return;
+  await deleteOptimizedImageSet(filePath);
+};
 
 const sanitizeImagePriceRules = (rules = []) => {
   const source = Array.isArray(rules) ? rules : [];
@@ -342,12 +430,17 @@ export const updateProductAdmin = async (req, res) => {
       basePrice,
       currency,
       pricingMode,
-      colors,
-      sizePricing,
-      views,
-      unlimitedPricing,
-      normalPricing,
+      removeSizeChart,
     } = req.body;
+    const colors = parseStructuredField(req.body.colors, "colors");
+    const sizePricing = parseStructuredField(req.body.sizePricing, "sizePricing");
+    const views = parseStructuredField(req.body.views, "views");
+    const unlimitedPricing = parseStructuredField(
+      req.body.unlimitedPricing,
+      "unlimitedPricing"
+    );
+    const normalPricing = parseStructuredField(req.body.normalPricing, "normalPricing");
+    const uploadedSizeChart = req.files?.sizeChart?.[0] || null;
 
     if (typeof name === "string" && name.trim()) product.name = name.trim();
     if (typeof slug === "string" && slug.trim()) product.slug = slug.trim();
@@ -384,6 +477,14 @@ export const updateProductAdmin = async (req, res) => {
 
     if (normalPricing && typeof normalPricing === "object") {
       product.normalPricing = sanitizeNormalPricing(normalPricing, product.normalPricing);
+    }
+
+    if (uploadedSizeChart) {
+      await safeDeleteFile(product.sizeChart);
+      product.sizeChart = await optimizeCustomizationSizeChartUpload(uploadedSizeChart);
+    } else if (String(removeSizeChart) === "true") {
+      await safeDeleteFile(product.sizeChart);
+      product.sizeChart = null;
     }
 
     const updatedProduct = await product.save();

@@ -58,6 +58,7 @@ import { selectCurrentToken } from "../redux/slices/Userslice.js";
 import { fetchProducts } from "../redux/slices/productsSlice.js";
 import { fetchReadymadeProducts } from "../redux/slices/predesignedslice.js";
 import { buildReadymadeProductPath } from "../utils/readymadeRoutes.js";
+import { buildCatalogueDesignPath } from "../utils/catalogueDesignRoutes.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
 
@@ -1035,7 +1036,7 @@ export default function UnifiedDashboard() {
                           <Link
                             to={
                               isDesign
-                                ? `/catalogue/${item._id}`
+                                ? (buildCatalogueDesignPath(item) || `/catalogue/${item._id}`)
                                 : isReadymade
                                 ? (buildReadymadeProductPath(item) || `/readymade/${item._id}`)
                                 : `/product/${item.slug}`

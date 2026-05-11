@@ -46,6 +46,7 @@ import {
   buildReadymadeProductPath,
   slugifyReadymadeSegment,
 } from "../utils/readymadeRoutes.js";
+import { buildCatalogueDesignPath } from "../utils/catalogueDesignRoutes.js";
 
 // All products specific color palette - More muted, professional colors
 const ALL_PRODUCTS_COLORS = {
@@ -1342,7 +1343,7 @@ export default function AllProductsHub() {
                           to={
                             product.type === "readymade"
                               ? (buildReadymadeProductPath(product) || `/readymade/${product._id}`)
-                              : `/catalogue/${product._id}`
+                              : (buildCatalogueDesignPath(product) || `/catalogue/${product._id}`)
                           }
                           className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
                         >
@@ -1445,7 +1446,7 @@ export default function AllProductsHub() {
                               to={
                                 product.type === "readymade"
                                   ? (buildReadymadeProductPath(product) || `/readymade/${product._id}`)
-                                  : `/catalogue/${product._id}`
+                                  : (buildCatalogueDesignPath(product) || `/catalogue/${product._id}`)
                               }
                               className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
                             >

@@ -1,6 +1,7 @@
 // server/routes/productRoutes.js
 import express from "express";
 import {
+  customizationProductUpload,
   getAllProducts,
   getAllProductsAdmin,
   getHomeProductCategories,
@@ -15,7 +16,7 @@ const router = express.Router();
 
 router.get("/admin/list", protect, getAllProductsAdmin);
 router.get("/admin/:id", protect, getProductAdminById);
-router.put("/admin/:id", protect, updateProductAdmin);
+router.put("/admin/:id", protect, customizationProductUpload, updateProductAdmin);
 router.get('/categories', getProductCategories);
 router.get('/categorylist', getHomeProductCategories);
 // GET all products (for listing page)

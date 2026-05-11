@@ -5,6 +5,7 @@ import {
   selectCurrentToken,
   selectCurrentUser,
 } from "../redux/slices/Userslice.js";
+import { buildImageUrl } from "../utils/responsiveImage.js";
 
 const API_BASE = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
 const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"];
@@ -22,6 +23,7 @@ const DEFAULT_TEXT_PRICE_RULES = [
   { maxSideInches: 4, price: 40 },
   { maxSideInches: "", price: 100 },
 ];
+const MAX_SIZE_CHART_BYTES = 50 * 1024 * 1024;
 
 const createEmptyColor = () => ({ label: "", value: "#FFFFFF", stock: "" });
 const createEmptySizeRow = () => ({ size: "M", price: 0, stock: 0 });
@@ -113,6 +115,9 @@ const mapProductToForm = (product) => ({
     ),
   },
   views: Array.isArray(product?.views) ? product.views : [],
+  sizeChart: product?.sizeChart || "",
+  sizeChartFile: null,
+  removeSizeChart: false,
 });
 
 const buildPayload = (form) => ({
@@ -165,6 +170,28 @@ const buildPayload = (form) => ({
   },
 });
 
+const buildFormData = (form) => {
+  const payload = buildPayload(form);
+  const formData = new FormData();
+
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value && typeof value === "object") {
+      formData.append(key, JSON.stringify(value));
+      return;
+    }
+
+    formData.append(key, value ?? "");
+  });
+
+  if (form.sizeChartFile) {
+    formData.append("sizeChart", form.sizeChartFile);
+  }
+
+  formData.append("removeSizeChart", String(Boolean(form.removeSizeChart)));
+
+  return formData;
+};
+
 export default function ProductPricingManager() {
   const token = useSelector(selectCurrentToken);
   const user = useSelector(selectCurrentUser);
@@ -190,6 +217,7 @@ export default function ProductPricingManager() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [sizeChartPreviewUrl, setSizeChartPreviewUrl] = useState("");
 
   const selectedProduct = products.find((product) => product._id === selectedId) || null;
   const totalStock = (form?.sizePricing || []).reduce(
@@ -202,6 +230,22 @@ export default function ProductPricingManager() {
     const timer = window.setTimeout(() => setSuccess(""), 2500);
     return () => window.clearTimeout(timer);
   }, [success]);
+
+  useEffect(() => {
+    if (!form) {
+      setSizeChartPreviewUrl("");
+      return undefined;
+    }
+
+    if (form.sizeChartFile) {
+      const previewUrl = URL.createObjectURL(form.sizeChartFile);
+      setSizeChartPreviewUrl(previewUrl);
+      return () => URL.revokeObjectURL(previewUrl);
+    }
+
+    setSizeChartPreviewUrl(form.sizeChart ? buildImageUrl(form.sizeChart) : "");
+    return undefined;
+  }, [form?.sizeChart, form?.sizeChartFile]);
 
   useEffect(() => {
     if (!token || !isAdmin) return;
@@ -377,6 +421,39 @@ export default function ProductPricingManager() {
     }));
   };
 
+  const handleSizeChartChange = (event) => {
+    const nextFile = event.target.files?.[0] || null;
+    event.target.value = "";
+
+    if (!nextFile) return;
+
+    if (!String(nextFile.type || "").startsWith("image/")) {
+      setError("Please choose an image file for the size chart.");
+      return;
+    }
+
+    if (nextFile.size > MAX_SIZE_CHART_BYTES) {
+      setError("Please choose an image up to 50MB for the size chart.");
+      return;
+    }
+
+    setError("");
+    setForm((prev) => ({
+      ...prev,
+      sizeChartFile: nextFile,
+      removeSizeChart: false,
+    }));
+  };
+
+  const handleRemoveSizeChart = () => {
+    setForm((prev) => ({
+      ...prev,
+      sizeChart: "",
+      sizeChartFile: null,
+      removeSizeChart: true,
+    }));
+  };
+
   const handleSave = async () => {
     if (!form || !selectedId) return;
 
@@ -385,8 +462,11 @@ export default function ProductPricingManager() {
       setError("");
       setSuccess("");
 
-      const response = await api.put(`/${selectedId}`, buildPayload(form), {
-        headers: { Authorization: `Bearer ${token}` },
+      const response = await api.put(`/${selectedId}`, buildFormData(form), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
       });
 
       const updatedProduct = response.data?.data;
@@ -427,7 +507,7 @@ export default function ProductPricingManager() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Customization Product Manager</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Manage product colors, sizes, stock, and slab-based image and text customization charges for seeded products.
+          Manage product colors, sizes, stock, size charts, and slab-based image and text customization charges for seeded products.
         </p>
       </div>
 
@@ -570,6 +650,58 @@ export default function ProductPricingManager() {
                     className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm uppercase outline-none focus:border-sky-500"
                   />
                 </label>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 p-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900">Size Chart</h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Upload an image size chart for this customization product. It will show below the product images on the public catalogue page.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <label className="inline-flex cursor-pointer items-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleSizeChartChange}
+                        className="hidden"
+                      />
+                      {form.sizeChartFile || form.sizeChart ? "Replace Size Chart" : "Upload Size Chart"}
+                    </label>
+                    {(form.sizeChartFile || form.sizeChart) && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveSizeChart}
+                        className="rounded-lg border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                  {sizeChartPreviewUrl ? (
+                    <div className="space-y-3">
+                      <img
+                        src={sizeChartPreviewUrl}
+                        alt={`${form.name} size chart`}
+                        className="max-h-96 w-full rounded-xl border border-slate-200 bg-white object-contain"
+                      />
+                      <div className="text-sm text-slate-600">
+                        {form.sizeChartFile
+                          ? `${form.sizeChartFile.name} selected`
+                          : "Current size chart will be shown on the catalogue product page."}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-slate-500">
+                      No size chart uploaded for this product yet. Accepted format: any image type up to 50MB.
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>

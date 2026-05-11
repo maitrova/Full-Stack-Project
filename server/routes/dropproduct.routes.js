@@ -37,11 +37,11 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  // ✅ allow up to 7 total files (6 images + 1 thumbnail)
-  limits: { files: 8, fileSize: 10 * 1024 * 1024 },
+  // allow larger size-chart uploads while keeping the same field layout
+  limits: { files: 8, fileSize: 50 * 1024 * 1024 },
   fileFilter: (_, file, cb) => {
     if (!file.mimetype.startsWith("image/")) {
-      return cb(new Error("Only image files allowed"));
+      return cb(new Error("Only image files are allowed"));
     }
     cb(null, true);
   },
@@ -54,12 +54,24 @@ const uploadDropFiles = upload.fields([
   { name: "sizeChart", maxCount: 1 },
 ]);
 
+const handleDropUpload = (req, res, next) => {
+  uploadDropFiles(req, res, (error) => {
+    if (!error) return next();
+
+    if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ message: "Files must be 50MB or smaller." });
+    }
+
+    return res.status(400).json({ message: error.message || "Upload failed" });
+  });
+};
+
 /* 🔹 Routes */
-droprouter.post("/", uploadDropFiles, createDropproduct);
+droprouter.post("/", handleDropUpload, createDropproduct);
 droprouter.get("/", getAllDropproducts);
 droprouter.get("/slug/:slug", getDropproductBySlug);
 droprouter.get("/:id", getDropproductById);
-droprouter.put("/:id", uploadDropFiles, updateDropproduct);
+droprouter.put("/:id", handleDropUpload, updateDropproduct);
 droprouter.delete("/:id", deleteDropproduct);
 
 export default droprouter;

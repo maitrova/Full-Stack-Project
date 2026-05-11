@@ -34,6 +34,7 @@ import {
 
 // Import user selector for login check
 import { selectCurrentToken } from "../redux/slices/Userslice.js";
+import { buildCatalogueDesignPath } from "../utils/catalogueDesignRoutes.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
 
@@ -526,6 +527,7 @@ export default function CataloguePage() {
                 const isUpdating = cartLoading && localCartItems[d._id] !== undefined;
                 const designKind = d.kind || "DESIGN";
                 const normalizedKind = designKind.toUpperCase();
+                const detailPath = buildCatalogueDesignPath(d) || `/catalogue/${d._id}`;
                 
                 return (
                   <div 
@@ -671,7 +673,7 @@ export default function CataloguePage() {
 
                       {/* Info */}
                       <div className="p-3 sm:p-5">
-                        <Link to={`/catalogue/${d._id}`} className="block">
+                        <Link to={detailPath} className="block">
                           <div className="mb-3">
                             <h2 className="font-bold text-gray-900 line-clamp-1 mb-1 group-hover:text-indigo-600 transition-colors">
                               {d.title || d.productName}
@@ -692,7 +694,7 @@ export default function CataloguePage() {
                             )}
                           </div>
                           <Link 
-                            to={`/catalogue/${d._id}`}
+                            to={detailPath}
                             className="inline-flex items-center gap-1.5 text-indigo-600 font-medium text-sm group-hover:gap-2 transition-all"
                           >
                             View Details

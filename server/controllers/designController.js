@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { Design } from "../models/Design.js";
 import { Product } from "../models/Product.js";
 
@@ -74,6 +75,13 @@ const normalizeImagePriceRules = (rules = DEFAULT_IMAGE_PRICE_RULES) => {
       return a.maxSideInches - b.maxSideInches;
     });
 };
+const slugifyDesignSegment = (value = "") =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 
 const resolveImagePriceRule = (widthInches, heightInches, rules = DEFAULT_IMAGE_PRICE_RULES) => {
   const largestSide = Math.max(Number(widthInches || 0), Number(heightInches || 0));
@@ -940,9 +948,32 @@ export const getDesignMeta = async (req, res) => {
 
 export const getDesign = async (req, res) => {
   try {
-    const design = await Design.findById(req.params.id).lean();
+    const identifier = String(req.params.id || "").trim();
+    let design = null;
+
+    if (mongoose.Types.ObjectId.isValid(identifier)) {
+      design = await Design.findById(identifier).lean();
+    }
+
+    if (!design) {
+      const publishedDesigns = await Design.find({ isPublished: true }).sort({ publishedAt: -1 }).lean();
+      design =
+        publishedDesigns.find((item) => {
+          const slugSource = item.title || item.productName || "";
+          return slugifyDesignSegment(slugSource) === identifier;
+        }) || null;
+    }
+
     if (!design) {
       return res.status(404).json({ error: "Design not found" });
+    }
+
+    const productId = design.product?._id || design.product;
+    if (productId && mongoose.Types.ObjectId.isValid(String(productId))) {
+      const product = await Product.findById(productId).lean();
+      if (product) {
+        design.product = product;
+      }
     }
     
     const apiUrl = process.env.API_URL || 'https://maitrova.in/backend';

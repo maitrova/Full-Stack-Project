@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   createDropproduct,
@@ -24,6 +24,12 @@ const sizeOptions = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 const emptyVariant = { size: '', price: '', stock: '', sku: '' };
 
 const imageUrl = (path) => buildImageUrl(path);
+const getFileLabel = (value) => {
+  if (!value) return '';
+  if (typeof value === 'object' && value.name) return value.name;
+  const normalized = String(value).replace(/\\/g, '/');
+  return normalized.split('/').pop() || normalized;
+};
 
 const money = (value) =>
   `Rs. ${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -62,13 +68,11 @@ export default function DropproductAdmin() {
   const [images, setImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [existingImages, setExistingImages] = useState([]);
-  const [thumbnail, setThumbnail] = useState(null);
-  const [thumbnailPreview, setThumbnailPreview] = useState(null);
-  const [removeThumbnail, setRemoveThumbnail] = useState(false);
   const [sizeChart, setSizeChart] = useState(null);
   const [sizeChartPreview, setSizeChartPreview] = useState(null);
   const [removeSizeChart, setRemoveSizeChart] = useState(false);
   const [errors, setErrors] = useState({});
+  const sizeChartInputRef = useRef(null);
 
   useEffect(() => { dispatch(getAllDropproducts()); }, [dispatch]);
   useEffect(() => {
@@ -97,9 +101,6 @@ export default function DropproductAdmin() {
     setExistingImages(currentProduct.images || []);
     setImages([]);
     setImagePreviews([]);
-    setThumbnail(null);
-    setThumbnailPreview(imageUrl(currentProduct.thumbnail));
-    setRemoveThumbnail(false);
     setSizeChart(null);
     setSizeChartPreview(imageUrl(currentProduct.sizeChart));
     setRemoveSizeChart(false);
@@ -111,7 +112,6 @@ export default function DropproductAdmin() {
     setCategory(''); setNewCategory(''); setSubCategory(''); setNewSubCategory('');
     setVariants([{ ...emptyVariant }]);
     setImages([]); setImagePreviews([]); setExistingImages([]);
-    setThumbnail(null); setThumbnailPreview(null); setRemoveThumbnail(false);
     setSizeChart(null); setSizeChartPreview(null); setRemoveSizeChart(false);
     setErrors({}); setEditMode(false); dispatch(clearCurrentProduct());
   };
@@ -131,19 +131,33 @@ export default function DropproductAdmin() {
   const dropVariant = (index) => variants.length > 1 && setVariants((prev) => prev.filter((_, i) => i !== index));
 
   const addFiles = (event, type) => {
-    const file = type === 'single' ? event.target.files?.[0] : null;
+    const file = (type === 'single' || type === 'sizeChart') ? event.target.files?.[0] : null;
     const files = type === 'multi' ? Array.from(event.target.files || []) : file ? [file] : [];
-    const valid = files.filter((item) => item.type.startsWith('image/'));
-    if (!valid.length) return;
+    const valid = type === 'sizeChart'
+      ? files.filter((item) => item.type.startsWith('image/') && item.size <= 50 * 1024 * 1024)
+      : files.filter((item) => item.type.startsWith('image/'));
+    if (!valid.length) {
+      if (type === 'sizeChart') {
+        setErrors((prev) => ({ ...prev, sizeChart: 'Please choose an image file up to 50MB for the size chart.' }));
+      }
+      event.target.value = '';
+      return;
+    }
     if (type === 'multi') {
       if (valid.length + images.length + existingImages.length > 6) return setErrors((prev) => ({ ...prev, images: 'Maximum 6 images allowed' }));
       setImages((prev) => [...prev, ...valid]);
       setImagePreviews((prev) => [...prev, ...valid.map((item) => URL.createObjectURL(item))]);
       clearField('images');
+      event.target.value = '';
       return;
     }
-    if (type === 'thumbnail') { setThumbnail(valid[0]); setThumbnailPreview(URL.createObjectURL(valid[0])); setRemoveThumbnail(false); clearField('thumbnail'); }
-    if (type === 'sizeChart') { setSizeChart(valid[0]); setSizeChartPreview(URL.createObjectURL(valid[0])); setRemoveSizeChart(false); clearField('sizeChart'); }
+    if (type === 'sizeChart') {
+      setSizeChart(valid[0]);
+      setSizeChartPreview(URL.createObjectURL(valid[0]));
+      setRemoveSizeChart(false);
+      clearField('sizeChart');
+      event.target.value = '';
+    }
   };
 
   const validate = () => {
@@ -186,9 +200,7 @@ export default function DropproductAdmin() {
       category: (newCategory || category).trim(),
       subCategory: (newSubCategory || subCategory).trim(),
       images,
-      thumbnail: thumbnail || null,
       sizeChart: sizeChart || null,
-      removeThumbnail,
       removeSizeChart,
       variants: variants.map((v) => ({ size: v.size.toUpperCase(), price: Number(v.price), stock: Number(v.stock), sku: v.sku || `SKU-${form.name.substring(0, 3).toUpperCase()}-${v.size.toUpperCase()}` })),
     };
@@ -262,9 +274,62 @@ export default function DropproductAdmin() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border rounded-lg p-6"><div><label className="block text-sm font-medium text-gray-700 mb-2">Offer Price (Rs.)</label><input type="number" name="salePrice" value={form.salePrice} onChange={onInput} min="0" step="0.01" className={`w-full px-4 py-3 border rounded-lg ${errors.salePrice ? 'border-red-500' : 'border-gray-300'}`} placeholder="Optional offer price" />{errors.salePrice && <p className="mt-1 text-sm text-red-600">{errors.salePrice}</p>}</div><div><label className="block text-sm font-medium text-gray-700 mb-2">Offer Start</label><input type="datetime-local" name="saleStartAt" value={form.saleStartAt} onChange={onInput} className="w-full px-4 py-3 border border-gray-300 rounded-lg" /></div><div><label className="block text-sm font-medium text-gray-700 mb-2">Offer End</label><input type="datetime-local" name="saleEndAt" value={form.saleEndAt} onChange={onInput} className={`w-full px-4 py-3 border rounded-lg ${errors.saleEndAt ? 'border-red-500' : 'border-gray-300'}`} />{errors.saleEndAt && <p className="mt-1 text-sm text-red-600">{errors.saleEndAt}</p>}</div></div>
           <div className="border rounded-lg p-6"><div className="flex items-center justify-between mb-4"><h3 className="text-lg font-semibold text-gray-900">Size-wise Pricing and Stock *</h3><button type="button" onClick={addVariant} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300" disabled={variants.length >= sizeOptions.length}><Plus className="w-4 h-4 inline mr-1" />Add Size</button></div>{errors.variants && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{Array.isArray(errors.variants) ? errors.variants.join(' | ') : errors.variants}</div>}<div className="space-y-4">{variants.map((variant, index) => <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end p-4 border border-gray-200 rounded-lg"><div><label className="block text-sm font-medium text-gray-700 mb-2">Size *</label><select value={variant.size} onChange={(e) => onVariant(index, 'size', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg"><option value="">Select Size</option>{sizeOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></div><div><label className="block text-sm font-medium text-gray-700 mb-2">Price (Rs.) *</label><input type="number" value={variant.price} onChange={(e) => onVariant(index, 'price', e.target.value)} min="0" step="0.01" className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div><div><label className="block text-sm font-medium text-gray-700 mb-2">Stock *</label><input type="number" value={variant.stock} onChange={(e) => onVariant(index, 'stock', e.target.value)} min="0" className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div><div><label className="block text-sm font-medium text-gray-700 mb-2">SKU (Optional)</label><input type="text" value={variant.sku} onChange={(e) => onVariant(index, 'sku', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div><div className="flex justify-end"><button type="button" onClick={() => dropVariant(index)} disabled={variants.length === 1} className="p-2 text-red-600 disabled:text-gray-400"><Trash2 className="w-5 h-5" /></button></div></div>)}</div></div>
           <div className={`border-2 border-dashed rounded-lg p-6 ${errors.images ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}><div className="text-center"><Upload className="mx-auto h-12 w-12 text-gray-400" /><label className="cursor-pointer"><span className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg inline-flex items-center"><Upload className="w-4 h-4 mr-2" />Upload Images</span><input type="file" multiple accept="image/*" onChange={(e) => addFiles(e, 'multi')} className="hidden" /></label><p className="text-xs text-gray-500 mt-2">Maximum 6 images. Uploading new images replaces the current gallery in edit mode.</p></div>{errors.images && <p className="mt-2 text-sm text-red-600 text-center">{errors.images}</p>}{(existingImages.length > 0 || imagePreviews.length > 0) && <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">{existingImages.map((item, index) => <img key={`existing-${index}`} src={imageUrl(item)} alt={`Existing ${index + 1}`} className="w-full h-32 object-cover rounded-lg border" />)}{imagePreviews.map((preview, index) => <div key={`new-${index}`} className="relative group"><img src={preview} alt={`Preview ${index + 1}`} className="w-full h-32 object-cover rounded-lg border" /><button type="button" onClick={() => { setImages((prev) => prev.filter((_, i) => i !== index)); setImagePreviews((prev) => prev.filter((_, i) => i !== index)); clearField('images'); }} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100"><X className="w-4 h-4" /></button></div>)}</div>}</div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">{thumbnailPreview ? <div><div className="flex justify-between mb-3"><h4 className="text-sm font-medium text-gray-700">Thumbnail Preview</h4><button type="button" onClick={() => { setThumbnail(null); setThumbnailPreview(null); setRemoveThumbnail(editMode); clearField('thumbnail'); }} className="text-red-600 text-sm font-medium">Remove</button></div><img src={thumbnailPreview} alt="Thumbnail preview" className="w-full max-w-xs rounded-lg border" /></div> : <div className="text-center"><label className="cursor-pointer"><span className="px-4 py-2 bg-indigo-600 text-white rounded-lg inline-flex items-center">Upload Thumbnail</span><input type="file" accept="image/*" onChange={(e) => addFiles(e, 'thumbnail')} className="hidden" /></label></div>}</div>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">{sizeChartPreview ? <div><div className="flex justify-between mb-3"><h4 className="text-sm font-medium text-gray-700">Size Chart Preview</h4><button type="button" onClick={() => { setSizeChart(null); setSizeChartPreview(null); setRemoveSizeChart(editMode); clearField('sizeChart'); }} className="text-red-600 text-sm font-medium">Remove</button></div><img src={sizeChartPreview} alt="Size chart preview" className="w-full max-w-xs rounded-lg border" /></div> : <div className="text-center"><label className="cursor-pointer"><span className="px-4 py-2 bg-indigo-600 text-white rounded-lg inline-flex items-center">Upload Size Chart</span><input type="file" accept="image/*" onChange={(e) => addFiles(e, 'sizeChart')} className="hidden" /></label></div>}</div>
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
+            {sizeChartPreview ? (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700">Size Chart Preview</h4>
+                    <p className="text-xs text-gray-500 mt-1">This will be shown on the drop product details page.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSizeChart(null);
+                      setSizeChartPreview(null);
+                      setRemoveSizeChart(editMode);
+                      clearField('sizeChart');
+                      if (sizeChartInputRef.current) sizeChartInputRef.current.value = '';
+                    }}
+                    className="text-red-600 text-sm font-medium"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <img src={sizeChartPreview} alt="Size chart preview" className="w-full max-w-xs rounded-lg border" />
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => sizeChartInputRef.current?.click()}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg"
+                  >
+                    Replace Size Chart
+                  </button>
+                  <span className="text-xs text-gray-500">{getFileLabel(sizeChart || sizeChartPreview) || 'Current saved size chart'}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center">
+                <p className="text-sm font-medium text-gray-700 mb-2">Optional size chart</p>
+                <p className="text-xs text-gray-500 mb-4">Upload any image format up to 50MB for the size chart. It will appear on the product details page.</p>
+                <button
+                  type="button"
+                  onClick={() => sizeChartInputRef.current?.click()}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg inline-flex items-center"
+                >
+                  Upload Size Chart
+                </button>
+                <p className="mt-3 text-xs text-gray-500">Any image format up to 50MB.</p>
+              </div>
+            )}
+            <input
+              ref={sizeChartInputRef}
+              type="file"
+              accept="image/*"
+              onChange={(e) => addFiles(e, 'sizeChart')}
+              className="hidden"
+            />
+            {errors.sizeChart && <p className="mt-3 text-sm text-red-600">{errors.sizeChart}</p>}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4"><label className="flex items-center"><input type="checkbox" name="isActive" checked={form.isActive} onChange={onInput} className="h-4 w-4 text-blue-600 rounded" /><span className="ml-2 text-sm text-gray-700">Active Product</span></label><label className="flex items-center"><input type="checkbox" name="newArrival" checked={form.newArrival} onChange={onInput} className="h-4 w-4 text-green-600 rounded" /><span className="ml-2 text-sm text-gray-700">Mark as New Arrival</span></label><label className="flex items-center"><input type="checkbox" name="bestSeller" checked={form.bestSeller} onChange={onInput} className="h-4 w-4 text-amber-600 rounded" /><span className="ml-2 text-sm text-gray-700">Mark as Best Seller</span></label></div>
           <div className="flex justify-end space-x-3 pt-6 border-t"><button type="button" onClick={() => setOpen(false)} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Cancel</button><button type="submit" disabled={loading} className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">{loading ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Saving...</> : <><Save className="w-5 h-5 mr-2" />{editMode ? 'Update Product' : 'Create Product'}</>}</button></div>

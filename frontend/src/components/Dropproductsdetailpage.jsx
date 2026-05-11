@@ -38,11 +38,14 @@ import {
   Twitter,
   Package,
   AlertCircle,
+  Ruler,
 } from "lucide-react";
 import { buildImageUrl, getResponsiveImageProps } from "../utils/responsiveImage.js";
 import { buildDropProductPath } from "../utils/dropProductRoutes.js";
 import ProductImageLightbox from "./ProductImageLightbox.jsx";
 import ProductReviews from "./ProductReviews.jsx";
+
+const imageLikeFilePattern = /\.(avif|bmp|gif|heic|heif|ico|jpe?g|jfif|png|svg|tiff?|webp)$/i;
 
 const DropProductDetailsPage = () => {
   const { id, slug } = useParams();
@@ -69,6 +72,11 @@ const DropProductDetailsPage = () => {
   const mainImageRef = useRef(null);
   const thumbnailContainerRef = useRef(null);
   const assetUrl = (path) => buildImageUrl(path);
+  const sizeChartImageProps = getResponsiveImageProps(product?.sizeChart, {
+    sizes: "100vw",
+  });
+  const sizeChartUrl = sizeChartImageProps.src;
+  const isSizeChartImage = imageLikeFilePattern.test(String(product?.sizeChart || ""));
   const normalizedGalleryImages = useMemo(() => {
     const images = Array.isArray(product?.images) ? product.images.filter(Boolean) : [];
     if (images.length > 0) return images;
@@ -676,6 +684,41 @@ const DropProductDetailsPage = () => {
                 </>
               )}
             </div>
+
+            {sizeChartUrl && (
+              <div className="space-y-4 border-t pt-8">
+                <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-lg">
+                  <div className="p-4 sm:p-6">
+                    <div className="mb-4 flex items-center gap-2">
+                      <Ruler className="h-5 w-5 text-indigo-600" />
+                      <h3 className="text-xl font-semibold text-gray-900">Size Chart</h3>
+                    </div>
+                    <div
+                      className="group relative cursor-zoom-in"
+                      onClick={() => window.open(sizeChartUrl, "_blank")}
+                    >
+                      {isSizeChartImage ? (
+                        <img
+                          src={sizeChartUrl}
+                          srcSet={sizeChartImageProps.srcSet}
+                          sizes={sizeChartImageProps.sizes}
+                          alt={`${product.name} size chart`}
+                          className="w-full rounded-lg border border-gray-200 transition-transform group-hover:scale-[1.02]"
+                          loading={sizeChartImageProps.loading}
+                          decoding={sizeChartImageProps.decoding}
+                          fetchPriority={sizeChartImageProps.fetchPriority}
+                        />
+                      ) : (
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-5 text-sm text-gray-700">
+                          This size chart was uploaded as a file. Click here to open it.
+                        </div>
+                      )}
+                    </div>
+                    <p className="mt-3 text-sm text-gray-500">Tap to open the full size chart.</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right Column - Product Info */}
@@ -824,17 +867,6 @@ const DropProductDetailsPage = () => {
                     <span className="font-semibold text-gray-900">Stock:</span> {currentStock}
                   </div>
                 )}
-              </div>
-            )}
-
-            {product?.sizeChart && (
-              <div className="space-y-4 border-t pt-8">
-                <h3 className="text-xl font-semibold text-gray-900">Size Chart</h3>
-                <img
-                  src={assetUrl(product.sizeChart)}
-                  alt={`${product.name} size chart`}
-                  className="w-full max-w-xl rounded-2xl border border-gray-200 bg-white"
-                />
               </div>
             )}
 

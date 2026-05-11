@@ -104,10 +104,7 @@ const buildBreadcrumbs = (pathname, search) => {
 
   const catalogueDetailMatch = matchPath("/catalogue/:id", pathname);
   if (catalogueDetailMatch) {
-    return [
-      { label: "Catalogue", to: "/catalogue" },
-      { label: "Design" },
-    ];
+    return [{ label: "Design" }];
   }
 
   if (pathname === "/checkout/success") {

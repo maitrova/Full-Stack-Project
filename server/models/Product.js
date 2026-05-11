@@ -150,6 +150,11 @@ const productSchema = new mongoose.Schema(
       },
     },
 
+    sizeChart: {
+      type: String,
+      default: null,
+    },
+
     currency: { type: String, default: "INR" },
   },
   { timestamps: true }

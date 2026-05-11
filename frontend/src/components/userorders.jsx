@@ -32,6 +32,7 @@ import { selectCurrentToken } from '../redux/slices/Userslice.js';
 import ReviewModal from './ReviewModal.jsx';
 import { buildReadymadeProductPath } from "../utils/readymadeRoutes.js";
 import { buildDropProductPath } from "../utils/dropProductRoutes.js";
+import { buildCatalogueDesignPath } from "../utils/catalogueDesignRoutes.js";
 
 const BankLogoBadge = ({ option, className = '' }) => (
   <span className={`inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-[10px] font-bold tracking-wide text-white ${option.color} ${className}`}>
@@ -582,6 +583,11 @@ const UserOrders = () => {
     }
 
     if (item.kind === 'DESIGN') {
+      const designPath = buildCatalogueDesignPath(item.design || item);
+      if (designPath) {
+        return designPath;
+      }
+
       const designId = item.design?._id || item.design;
       if (designId) {
         return `/catalogue/${designId}`;

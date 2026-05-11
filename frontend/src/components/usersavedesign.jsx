@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { selectCurrentToken } from "../redux/slices/Userslice.js";
+import { buildCatalogueDesignPath } from "../utils/catalogueDesignRoutes.js";
 import {
   addToCart,
   selectCartItems,
@@ -425,7 +426,7 @@ export default function Usersaveddesigns() {
           </button>
           
           <Link 
-            to={`/catalogue/${design._id}`}
+            to={buildCatalogueDesignPath(design) || `/catalogue/${design._id}`}
             className="block w-full text-left px-4 py-3 text-sm text-sky-700 hover:bg-sky-50 flex items-center gap-3 border-b border-slate-100"
             onClick={() => setShowActionsMenu(null)}
           >
@@ -499,7 +500,7 @@ export default function Usersaveddesigns() {
             )}
           </button>
           <Link
-            to={`/catalogue/${design._id}`}
+            to={buildCatalogueDesignPath(design) || `/catalogue/${design._id}`}
             className="flex-1 px-3 py-3 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -769,7 +770,7 @@ export default function Usersaveddesigns() {
                                     </svg>
                                   </button>
                                   <Link
-                                    to={`/catalogue/${d._id}`}
+                                    to={buildCatalogueDesignPath(d) || `/catalogue/${d._id}`}
                                     className="p-1.5 text-sky-700 hover:bg-sky-50 rounded transition-colors"
                                     title="View details"
                                   >

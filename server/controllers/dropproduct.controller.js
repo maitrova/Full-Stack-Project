@@ -87,6 +87,10 @@ const optimizeDropImage = async (file) => {
 const optimizeDropSizeChart = async (file) => {
   if (!file?.path) return null;
 
+  if (!String(file.mimetype || "").startsWith("image/")) {
+    return normalizeStoredPath(file.path);
+  }
+
   const optimizedChart = await optimizeUploadedImage(normalizeStoredPath(file.path), {
     cleanupSource: true,
     outputDir: "outputs/drop-products/size-chart",

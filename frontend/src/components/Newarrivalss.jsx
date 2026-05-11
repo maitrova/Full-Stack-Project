@@ -10,6 +10,7 @@ import { Link } from "react-router-dom";
 import { buildImageUrl, getRawImagePath } from "../utils/responsiveImage.js";
 import { getHomepageItemPricing } from "../utils/homepageProductPricing.js";
 import { buildReadymadeProductPath } from "../utils/readymadeRoutes.js";
+import { buildCatalogueDesignPath } from "../utils/catalogueDesignRoutes.js";
 
 const NewArrivals = () => {
   const dispatch = useDispatch();
@@ -181,7 +182,7 @@ const getItemImages = (item) => {
     const images = getItemImages(item);
     const label = item.name || item.title;
     const pricing = getHomepageItemPricing(item);
-    const detailPath = item.type === "design" ? `/catalogue/${item._id}` : (buildReadymadeProductPath(item) || `/readymade/${item._id}`);
+    const detailPath = item.type === "design" ? (buildCatalogueDesignPath(item) || `/catalogue/${item._id}`) : (buildReadymadeProductPath(item) || `/readymade/${item._id}`);
     
     return (
       <Link
