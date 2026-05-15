@@ -74,6 +74,31 @@ const buildVariantGroup = (relativeDir, baseName) => ({
   medium: buildVariantPath(relativeDir, baseName, "md"),
 });
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const unlinkWithRetry = async (
+  absolutePath,
+  { retries = 5, baseDelayMs = 120 } = {}
+) => {
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      await fs.unlink(absolutePath);
+      return;
+    } catch (error) {
+      if (error.code === "ENOENT") {
+        return;
+      }
+
+      const isRetryable = ["EBUSY", "EPERM", "EMFILE", "ENFILE"].includes(error.code);
+      if (!isRetryable || attempt === retries) {
+        throw error;
+      }
+
+      await sleep(baseDelayMs * (attempt + 1));
+    }
+  }
+};
+
 export const optimizeUploadedImage = async (
   sourcePath,
   {
@@ -126,11 +151,11 @@ export const optimizeUploadedImage = async (
 
   if (cleanupSource && !Object.values(variants).includes(normalizedPath)) {
     try {
-      await fs.unlink(absolutePath);
+      await unlinkWithRetry(absolutePath);
     } catch (error) {
-      if (error.code !== "ENOENT") {
-        throw error;
-      }
+      console.warn(
+        `cleanupSource skipped for ${absolutePath}: ${error.code || error.message}`
+      );
     }
   }
 
@@ -173,13 +198,7 @@ export const deleteOptimizedImageSet = async (filePath) => {
 
   await Promise.all(
     [...new Set(pathsToDelete)].map(async (relativePath) => {
-      try {
-        await fs.unlink(path.resolve(SERVER_ROOT, relativePath));
-      } catch (error) {
-        if (error.code !== "ENOENT") {
-          throw error;
-        }
-      }
+      await unlinkWithRetry(path.resolve(SERVER_ROOT, relativePath));
     })
   );
 };

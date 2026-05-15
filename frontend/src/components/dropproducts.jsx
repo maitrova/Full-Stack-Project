@@ -16,14 +16,25 @@ import {
   selectSuccess,
   selectTotalProducts,
 } from '../redux/slices/dropproducts.js';
-import RichTextEditor from './RichTextEditor.jsx';
-import { AlertCircle, CheckCircle, Edit, Eye, Loader2, Plus, Save, Trash2, Upload, X } from 'lucide-react';
-import { buildImageUrl } from '../utils/responsiveImage.js';
+import BlogRichTextEditor from './admin/BlogRichTextEditor.jsx';
+import { AlertCircle, CheckCircle, Edit, Eye, Loader2, Plus, Save, Trash2, Upload, Video, X } from 'lucide-react';
+import { buildImageUrl, getRawImagePath } from '../utils/responsiveImage.js';
 
 const sizeOptions = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 const emptyVariant = { size: '', price: '', stock: '', sku: '' };
 
 const imageUrl = (path) => buildImageUrl(path);
+const normalizeDropImage = (image) => ({
+  url: getRawImagePath(image) || '',
+  altText: typeof image === 'object' ? image?.altText || '' : '',
+});
+const getErrorMessage = (value, fallback) => {
+  if (!value) return fallback;
+  if (typeof value === 'string') return value;
+  if (typeof value?.message === 'string') return value.message;
+  if (typeof value?.error === 'string') return value.error;
+  return fallback;
+};
 const getFileLabel = (value) => {
   if (!value) return '';
   if (typeof value === 'object' && value.name) return value.name;
@@ -33,6 +44,13 @@ const getFileLabel = (value) => {
 
 const money = (value) =>
   `Rs. ${Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const hasAllowedVideoType = (file) => {
+  if (!file) return false;
+  const mimeType = String(file.type || '').toLowerCase();
+  if (mimeType.startsWith('video/')) return true;
+  const fileName = String(file.name || '').toLowerCase();
+  return /\.(mp4|webm|ogg|ogv|mov|m4v|avi|mkv)$/i.test(fileName);
+};
 
 const offerActive = (product) => {
   const mrp = Number(product?.minPrice || 0);
@@ -71,8 +89,12 @@ export default function DropproductAdmin() {
   const [sizeChart, setSizeChart] = useState(null);
   const [sizeChartPreview, setSizeChartPreview] = useState(null);
   const [removeSizeChart, setRemoveSizeChart] = useState(false);
+  const [productVideo, setProductVideo] = useState(null);
+  const [videoPreview, setVideoPreview] = useState(null);
+  const [removeVideo, setRemoveVideo] = useState(false);
   const [errors, setErrors] = useState({});
   const sizeChartInputRef = useRef(null);
+  const videoInputRef = useRef(null);
 
   useEffect(() => { dispatch(getAllDropproducts()); }, [dispatch]);
   useEffect(() => {
@@ -82,7 +104,7 @@ export default function DropproductAdmin() {
   }, [dispatch, success]);
   useEffect(() => { if (!open) resetForm(); }, [open]);
   useEffect(() => {
-    if (!currentProduct || !editMode) return;
+    if (!currentProduct) return;
     setForm({
       name: currentProduct.name || '',
       description: currentProduct.description || '',
@@ -98,14 +120,17 @@ export default function DropproductAdmin() {
     setSubCategory(currentProduct.subCategory || '');
     setNewSubCategory('');
     setVariants(currentProduct.variants?.length ? currentProduct.variants.map((v) => ({ size: v.size || '', price: String(v.price ?? ''), stock: String(v.stock ?? ''), sku: v.sku || '' })) : [{ ...emptyVariant }]);
-    setExistingImages(currentProduct.images || []);
+    setExistingImages((currentProduct.images || []).map(normalizeDropImage).filter((image) => image.url));
     setImages([]);
     setImagePreviews([]);
     setSizeChart(null);
     setSizeChartPreview(imageUrl(currentProduct.sizeChart));
     setRemoveSizeChart(false);
+    setProductVideo(null);
+    setVideoPreview(imageUrl(currentProduct.video));
+    setRemoveVideo(false);
     setErrors({});
-  }, [currentProduct, editMode]);
+  }, [currentProduct]);
 
   const resetForm = () => {
     setForm({ name: '', description: '', salePrice: '', saleStartAt: '', saleEndAt: '', isActive: true, bestSeller: false, newArrival: false });
@@ -113,6 +138,7 @@ export default function DropproductAdmin() {
     setVariants([{ ...emptyVariant }]);
     setImages([]); setImagePreviews([]); setExistingImages([]);
     setSizeChart(null); setSizeChartPreview(null); setRemoveSizeChart(false);
+    setProductVideo(null); setVideoPreview(null); setRemoveVideo(false);
     setErrors({}); setEditMode(false); dispatch(clearCurrentProduct());
   };
 
@@ -131,21 +157,35 @@ export default function DropproductAdmin() {
   const dropVariant = (index) => variants.length > 1 && setVariants((prev) => prev.filter((_, i) => i !== index));
 
   const addFiles = (event, type) => {
-    const file = (type === 'single' || type === 'sizeChart') ? event.target.files?.[0] : null;
+    const file = (type === 'single' || type === 'sizeChart' || type === 'video') ? event.target.files?.[0] : null;
     const files = type === 'multi' ? Array.from(event.target.files || []) : file ? [file] : [];
     const valid = type === 'sizeChart'
       ? files.filter((item) => item.type.startsWith('image/') && item.size <= 50 * 1024 * 1024)
+      : type === 'video'
+      ? files.filter((item) => hasAllowedVideoType(item))
       : files.filter((item) => item.type.startsWith('image/'));
     if (!valid.length) {
       if (type === 'sizeChart') {
         setErrors((prev) => ({ ...prev, sizeChart: 'Please choose an image file up to 50MB for the size chart.' }));
+      } else if (type === 'video') {
+        if (files[0]) {
+          console.warn('Rejected drop product video file', {
+            name: files[0].name,
+            type: files[0].type,
+            size: files[0].size,
+          });
+        }
+        setErrors((prev) => ({ ...prev, video: 'Please choose a valid video file.' }));
       }
       event.target.value = '';
       return;
     }
     if (type === 'multi') {
       if (valid.length + images.length + existingImages.length > 6) return setErrors((prev) => ({ ...prev, images: 'Maximum 6 images allowed' }));
-      setImages((prev) => [...prev, ...valid]);
+      setImages((prev) => [
+        ...prev,
+        ...valid.map((file) => ({ file, altText: '' })),
+      ]);
       setImagePreviews((prev) => [...prev, ...valid.map((item) => URL.createObjectURL(item))]);
       clearField('images');
       event.target.value = '';
@@ -156,6 +196,14 @@ export default function DropproductAdmin() {
       setSizeChartPreview(URL.createObjectURL(valid[0]));
       setRemoveSizeChart(false);
       clearField('sizeChart');
+      event.target.value = '';
+      return;
+    }
+    if (type === 'video') {
+      setProductVideo(valid[0]);
+      setVideoPreview(URL.createObjectURL(valid[0]));
+      setRemoveVideo(false);
+      clearField('video');
       event.target.value = '';
     }
   };
@@ -184,13 +232,23 @@ export default function DropproductAdmin() {
       if (!Number.isFinite(Number(v.stock)) || Number(v.stock) < 0) variantErrors.push(`Valid stock is required for size ${size || i + 1}`);
     });
     if (variantErrors.length) next.variants = variantErrors;
-    if (!editMode && existingImages.length + images.length === 0) next.images = 'At least one image is required';
+    if (existingImages.length + images.length === 0) next.images = 'At least one image is required';
     setErrors(next);
     return Object.keys(next).length === 0;
   };
 
   const openCreate = () => { dispatch(clearError()); setEditMode(false); setOpen(true); };
-  const openEdit = async (id) => { dispatch(clearError()); await dispatch(getDropproductById(id)).unwrap(); setEditMode(true); setOpen(true); };
+  const openEdit = async (id) => {
+    dispatch(clearError());
+    resetForm();
+    setEditMode(true);
+    setOpen(true);
+    try {
+      await dispatch(getDropproductById(id)).unwrap();
+    } catch (loadError) {
+      setErrors({ general: getErrorMessage(loadError, 'Failed to load drop product') });
+    }
+  };
 
   const save = async (e) => {
     e.preventDefault();
@@ -199,9 +257,13 @@ export default function DropproductAdmin() {
       ...form,
       category: (newCategory || category).trim(),
       subCategory: (newSubCategory || subCategory).trim(),
-      images,
+      images: images.map((item) => item.file).filter(Boolean),
+      imageAltTexts: images.map((item) => item.altText || ''),
+      existingImages,
       sizeChart: sizeChart || null,
       removeSizeChart,
+      video: productVideo || null,
+      removeVideo,
       variants: variants.map((v) => ({ size: v.size.toUpperCase(), price: Number(v.price), stock: Number(v.stock), sku: v.sku || `SKU-${form.name.substring(0, 3).toUpperCase()}-${v.size.toUpperCase()}` })),
     };
     try {
@@ -210,7 +272,7 @@ export default function DropproductAdmin() {
       setOpen(false);
       resetForm();
     } catch (saveError) {
-      setErrors({ general: saveError?.message || saveError?.payload || 'Failed to save drop product' });
+      setErrors({ general: getErrorMessage(saveError, 'Failed to save drop product') });
       dispatch(clearError());
     }
   };
@@ -246,7 +308,7 @@ export default function DropproductAdmin() {
         {filtered.map((product) => {
           const active = offerActive(product);
           return <div key={product._id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="relative h-52 bg-gray-100">{imageUrl(product.thumbnail || product.images?.[0]) ? <img src={imageUrl(product.thumbnail || product.images?.[0])} alt={product.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-400"><Eye className="w-10 h-10" /></div>}
+            <div className="relative h-52 bg-gray-100">{imageUrl(product.images?.[0] || product.thumbnail) ? <img src={imageUrl(product.images?.[0] || product.thumbnail)} alt={product.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-400"><Eye className="w-10 h-10" /></div>}
               <div className="absolute top-3 left-3 flex gap-2">{product.newArrival && <span className="px-2 py-1 rounded-full bg-emerald-500 text-white text-xs font-semibold">New</span>}{product.bestSeller && <span className="px-2 py-1 rounded-full bg-amber-500 text-white text-xs font-semibold">Best</span>}</div>
             </div>
             <div className="p-4">
@@ -270,10 +332,89 @@ export default function DropproductAdmin() {
             <div><label className="block text-sm font-medium text-gray-700 mb-2">Category *</label><select value={category} onChange={(e) => { setCategory(e.target.value); setNewCategory(''); clearField('category'); }} className={`w-full px-4 py-3 border rounded-lg ${errors.category ? 'border-red-500' : 'border-gray-300'}`}><option value="">Select existing category</option>{allCategories.map((item) => <option key={item} value={item}>{item}</option>)}</select><input value={newCategory} onChange={(e) => { setNewCategory(e.target.value); setCategory(''); clearField('category'); }} className="mt-2 w-full px-4 py-3 border border-gray-300 rounded-lg" placeholder="Or create a new category" />{errors.category && <p className="mt-1 text-sm text-red-600">{errors.category}</p>}</div>
             <div><label className="block text-sm font-medium text-gray-700 mb-2">Sub-category *</label><select value={subCategory} onChange={(e) => { setSubCategory(e.target.value); setNewSubCategory(''); clearField('subCategory'); }} className={`w-full px-4 py-3 border rounded-lg ${errors.subCategory ? 'border-red-500' : 'border-gray-300'}`}><option value="">Select existing sub-category</option>{allSubCategories.map((item) => <option key={item} value={item}>{item}</option>)}</select><input value={newSubCategory} onChange={(e) => { setNewSubCategory(e.target.value); setSubCategory(''); clearField('subCategory'); }} className="mt-2 w-full px-4 py-3 border border-gray-300 rounded-lg" placeholder="Or create a new sub-category" />{errors.subCategory && <p className="mt-1 text-sm text-red-600">{errors.subCategory}</p>}</div>
           </div>
-          <div><label className="block text-sm font-medium text-gray-700 mb-2">Description *</label><RichTextEditor value={form.description} onChange={(html) => { setForm((prev) => ({ ...prev, description: html })); clearField('description'); }} error={errors.description} />{errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}</div>
+          <div><label className="block text-sm font-medium text-gray-700 mb-2">Description *</label><BlogRichTextEditor value={form.description} onChange={(html) => { setForm((prev) => ({ ...prev, description: html })); clearField('description'); }} error={errors.description} />{errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}</div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border rounded-lg p-6"><div><label className="block text-sm font-medium text-gray-700 mb-2">Offer Price (Rs.)</label><input type="number" name="salePrice" value={form.salePrice} onChange={onInput} min="0" step="0.01" className={`w-full px-4 py-3 border rounded-lg ${errors.salePrice ? 'border-red-500' : 'border-gray-300'}`} placeholder="Optional offer price" />{errors.salePrice && <p className="mt-1 text-sm text-red-600">{errors.salePrice}</p>}</div><div><label className="block text-sm font-medium text-gray-700 mb-2">Offer Start</label><input type="datetime-local" name="saleStartAt" value={form.saleStartAt} onChange={onInput} className="w-full px-4 py-3 border border-gray-300 rounded-lg" /></div><div><label className="block text-sm font-medium text-gray-700 mb-2">Offer End</label><input type="datetime-local" name="saleEndAt" value={form.saleEndAt} onChange={onInput} className={`w-full px-4 py-3 border rounded-lg ${errors.saleEndAt ? 'border-red-500' : 'border-gray-300'}`} />{errors.saleEndAt && <p className="mt-1 text-sm text-red-600">{errors.saleEndAt}</p>}</div></div>
           <div className="border rounded-lg p-6"><div className="flex items-center justify-between mb-4"><h3 className="text-lg font-semibold text-gray-900">Size-wise Pricing and Stock *</h3><button type="button" onClick={addVariant} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300" disabled={variants.length >= sizeOptions.length}><Plus className="w-4 h-4 inline mr-1" />Add Size</button></div>{errors.variants && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{Array.isArray(errors.variants) ? errors.variants.join(' | ') : errors.variants}</div>}<div className="space-y-4">{variants.map((variant, index) => <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end p-4 border border-gray-200 rounded-lg"><div><label className="block text-sm font-medium text-gray-700 mb-2">Size *</label><select value={variant.size} onChange={(e) => onVariant(index, 'size', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg"><option value="">Select Size</option>{sizeOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></div><div><label className="block text-sm font-medium text-gray-700 mb-2">Price (Rs.) *</label><input type="number" value={variant.price} onChange={(e) => onVariant(index, 'price', e.target.value)} min="0" step="0.01" className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div><div><label className="block text-sm font-medium text-gray-700 mb-2">Stock *</label><input type="number" value={variant.stock} onChange={(e) => onVariant(index, 'stock', e.target.value)} min="0" className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div><div><label className="block text-sm font-medium text-gray-700 mb-2">SKU (Optional)</label><input type="text" value={variant.sku} onChange={(e) => onVariant(index, 'sku', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" /></div><div className="flex justify-end"><button type="button" onClick={() => dropVariant(index)} disabled={variants.length === 1} className="p-2 text-red-600 disabled:text-gray-400"><Trash2 className="w-5 h-5" /></button></div></div>)}</div></div>
-          <div className={`border-2 border-dashed rounded-lg p-6 ${errors.images ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}><div className="text-center"><Upload className="mx-auto h-12 w-12 text-gray-400" /><label className="cursor-pointer"><span className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg inline-flex items-center"><Upload className="w-4 h-4 mr-2" />Upload Images</span><input type="file" multiple accept="image/*" onChange={(e) => addFiles(e, 'multi')} className="hidden" /></label><p className="text-xs text-gray-500 mt-2">Maximum 6 images. Uploading new images replaces the current gallery in edit mode.</p></div>{errors.images && <p className="mt-2 text-sm text-red-600 text-center">{errors.images}</p>}{(existingImages.length > 0 || imagePreviews.length > 0) && <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">{existingImages.map((item, index) => <img key={`existing-${index}`} src={imageUrl(item)} alt={`Existing ${index + 1}`} className="w-full h-32 object-cover rounded-lg border" />)}{imagePreviews.map((preview, index) => <div key={`new-${index}`} className="relative group"><img src={preview} alt={`Preview ${index + 1}`} className="w-full h-32 object-cover rounded-lg border" /><button type="button" onClick={() => { setImages((prev) => prev.filter((_, i) => i !== index)); setImagePreviews((prev) => prev.filter((_, i) => i !== index)); clearField('images'); }} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100"><X className="w-4 h-4" /></button></div>)}</div>}</div>
+          <div className={`border-2 border-dashed rounded-lg p-6 ${errors.images ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}>
+            <div className="text-center">
+              <Upload className="mx-auto h-12 w-12 text-gray-400" />
+              <label className="cursor-pointer">
+                <span className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg inline-flex items-center">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload Images
+                </span>
+                <input type="file" multiple accept="image/*" onChange={(e) => addFiles(e, 'multi')} className="hidden" />
+              </label>
+              <p className="text-xs text-gray-500 mt-2">
+                Maximum 6 images. You can remove individual existing images in edit mode and set alt text for every image.
+              </p>
+            </div>
+            {errors.images && <p className="mt-2 text-sm text-red-600 text-center">{errors.images}</p>}
+            {(existingImages.length > 0 || imagePreviews.length > 0) && (
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {existingImages.map((item, index) => (
+                  <div key={`existing-${index}`} className="rounded-lg border border-gray-200 p-3">
+                    <img src={imageUrl(item.url)} alt={item.altText || `Existing ${index + 1}`} className="w-full h-32 object-cover rounded-lg border" />
+                    <input
+                      type="text"
+                      value={item.altText || ''}
+                      onChange={(e) => {
+                        setExistingImages((prev) =>
+                          prev.map((image, imageIndex) =>
+                            imageIndex === index ? { ...image, altText: e.target.value } : image
+                          )
+                        );
+                      }}
+                      placeholder="Alt text for SEO"
+                      className="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExistingImages((prev) => prev.filter((_, imageIndex) => imageIndex !== index));
+                        clearField('images');
+                      }}
+                      className="mt-3 inline-flex items-center rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete Image
+                    </button>
+                  </div>
+                ))}
+                {imagePreviews.map((preview, index) => (
+                  <div key={`new-${index}`} className="rounded-lg border border-gray-200 p-3">
+                    <div className="relative group">
+                      <img src={preview} alt={`Preview ${index + 1}`} className="w-full h-32 object-cover rounded-lg border" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImages((prev) => prev.filter((_, imageIndex) => imageIndex !== index));
+                          setImagePreviews((prev) => prev.filter((_, imageIndex) => imageIndex !== index));
+                          clearField('images');
+                        }}
+                        className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={images[index]?.altText || ''}
+                      onChange={(e) => {
+                        setImages((prev) =>
+                          prev.map((image, imageIndex) =>
+                            imageIndex === index ? { ...image, altText: e.target.value } : image
+                          )
+                        );
+                      }}
+                      placeholder="Alt text for SEO"
+                      className="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
             {sizeChartPreview ? (
               <div>
@@ -330,6 +471,63 @@ export default function DropproductAdmin() {
               className="hidden"
             />
             {errors.sizeChart && <p className="mt-3 text-sm text-red-600">{errors.sizeChart}</p>}
+          </div>
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
+            {videoPreview ? (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700">Video Preview</h4>
+                    <p className="text-xs text-gray-500 mt-1">This video will be shown on the drop product details page.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProductVideo(null);
+                      setVideoPreview(null);
+                      setRemoveVideo(editMode);
+                      clearField('video');
+                      if (videoInputRef.current) videoInputRef.current.value = '';
+                    }}
+                    className="text-red-600 text-sm font-medium"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <video src={videoPreview} controls className="w-full max-w-xl rounded-lg border" />
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => videoInputRef.current?.click()}
+                    className="px-4 py-2 bg-slate-700 text-white rounded-lg"
+                  >
+                    Replace Video
+                  </button>
+                  <span className="text-xs text-gray-500">{getFileLabel(productVideo || videoPreview) || 'Current saved video'}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center">
+                <Video className="mx-auto h-12 w-12 text-gray-400" />
+                <p className="text-sm font-medium text-gray-700 mb-2">Optional product video</p>
+                <p className="text-xs text-gray-500 mb-4">Upload a product video in any supported browser video format.</p>
+                <button
+                  type="button"
+                  onClick={() => videoInputRef.current?.click()}
+                  className="px-4 py-2 bg-slate-700 text-white rounded-lg inline-flex items-center"
+                >
+                  Upload Video
+                </button>
+              </div>
+            )}
+            <input
+              ref={videoInputRef}
+              type="file"
+              accept="video/mp4,video/webm,video/ogg,video/*"
+              onChange={(e) => addFiles(e, 'video')}
+              className="hidden"
+            />
+            {errors.video && <p className="mt-3 text-sm text-red-600">{errors.video}</p>}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4"><label className="flex items-center"><input type="checkbox" name="isActive" checked={form.isActive} onChange={onInput} className="h-4 w-4 text-blue-600 rounded" /><span className="ml-2 text-sm text-gray-700">Active Product</span></label><label className="flex items-center"><input type="checkbox" name="newArrival" checked={form.newArrival} onChange={onInput} className="h-4 w-4 text-green-600 rounded" /><span className="ml-2 text-sm text-gray-700">Mark as New Arrival</span></label><label className="flex items-center"><input type="checkbox" name="bestSeller" checked={form.bestSeller} onChange={onInput} className="h-4 w-4 text-amber-600 rounded" /><span className="ml-2 text-sm text-gray-700">Mark as Best Seller</span></label></div>
           <div className="flex justify-end space-x-3 pt-6 border-t"><button type="button" onClick={() => setOpen(false)} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Cancel</button><button type="submit" disabled={loading} className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">{loading ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Saving...</> : <><Save className="w-5 h-5 mr-2" />{editMode ? 'Update Product' : 'Create Product'}</>}</button></div>

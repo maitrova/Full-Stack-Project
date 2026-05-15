@@ -17,6 +17,7 @@ export const createDropproduct = createAsyncThunk(
       formData.append('saleStartAt', productData.saleStartAt ?? '');
       formData.append('saleEndAt', productData.saleEndAt ?? '');
       formData.append('variants', JSON.stringify(productData.variants || []));
+      formData.append('imageAltTexts', JSON.stringify(productData.imageAltTexts || []));
 
       (productData.images || []).forEach((file) => {
         if (file instanceof File) {
@@ -24,12 +25,12 @@ export const createDropproduct = createAsyncThunk(
         }
       });
 
-      if (productData.thumbnail instanceof File) {
-        formData.append('thumbnail', productData.thumbnail);
-      }
-
       if (productData.sizeChart instanceof File) {
         formData.append('sizeChart', productData.sizeChart);
+      }
+
+      if (productData.video instanceof File) {
+        formData.append('video', productData.video);
       }
 
       if (productData.isActive !== undefined) {
@@ -41,11 +42,11 @@ export const createDropproduct = createAsyncThunk(
       if (productData.newArrival !== undefined) {
         formData.append('newArrival', String(productData.newArrival));
       }
-      if (productData.removeThumbnail) {
-        formData.append('removeThumbnail', 'true');
-      }
       if (productData.removeSizeChart) {
         formData.append('removeSizeChart', 'true');
+      }
+      if (productData.removeVideo) {
+        formData.append('removeVideo', 'true');
       }
 
       const response = await axios.post(API_BASE_URL, formData, {
@@ -121,7 +122,12 @@ export const updateDropproduct = createAsyncThunk(
           return;
         }
 
-        if ((key === 'thumbnail' || key === 'sizeChart') && value instanceof File) {
+        if (key === 'imageAltTexts' || key === 'existingImages') {
+          formData.append(key, JSON.stringify(value || []));
+          return;
+        }
+
+        if ((key === 'sizeChart' || key === 'video') && value instanceof File) {
           formData.append(key, value);
           return;
         }

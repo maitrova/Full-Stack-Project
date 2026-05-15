@@ -8,7 +8,7 @@ import {
   selectLoading,
 } from "../redux/slices/dropproducts.js";
 import { Package } from "lucide-react";
-import { buildImageUrl } from "../utils/responsiveImage.js";
+import { buildImageUrl, getImageAltText } from "../utils/responsiveImage.js";
 import { buildDropProductPath } from "../utils/dropProductRoutes.js";
 
 const hasActiveOffer = (product) => {
@@ -35,18 +35,21 @@ const getOfferDiscountPercent = (product) => {
 const getProductImages = (product) => {
   const images = [];
 
-  if (product?.thumbnail) {
-    const thumbUrl = buildImageUrl(product.thumbnail);
-    if (thumbUrl) images.push(thumbUrl);
-  }
-
   if (Array.isArray(product?.images)) {
     product.images.forEach((image) => {
-      const imageUrl = buildImageUrl(image);
-      if (imageUrl && !images.includes(imageUrl)) {
-        images.push(imageUrl);
+      const nextImageUrl = buildImageUrl(image);
+      if (nextImageUrl && !images.some((entry) => entry.src === nextImageUrl)) {
+        images.push({
+          src: nextImageUrl,
+          altText: getImageAltText(image, product?.name || "Product"),
+        });
       }
     });
+  }
+
+  if (!images.length && product?.thumbnail) {
+    const thumbUrl = buildImageUrl(product.thumbnail);
+    if (thumbUrl) images.push({ src: thumbUrl, altText: product?.name || "Product" });
   }
 
   return images;
@@ -105,8 +108,8 @@ const ImageSlider = ({ images, alt }) => {
           }`}
         >
           <img
-            src={image}
-            alt={alt}
+            src={typeof image === "string" ? image : image.src}
+            alt={typeof image === "string" ? alt : image.altText || alt}
             className="w-full h-full object-contain p-4"
             loading="lazy"
           />

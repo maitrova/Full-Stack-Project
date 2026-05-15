@@ -35,32 +35,46 @@ const storage = multer.diskStorage({
   },
 });
 
+const hasAllowedVideoType = (file) => {
+  if (!file) return false;
+
+  const mimeType = String(file.mimetype || "").toLowerCase();
+  if (mimeType.startsWith("video/")) {
+    return true;
+  }
+
+  const fileName = String(file.originalname || "").toLowerCase();
+  return /\.(mp4|webm|ogg|ogv|mov|m4v|avi|mkv)$/i.test(fileName);
+};
+
 const upload = multer({
   storage,
-  // allow larger size-chart uploads while keeping the same field layout
-  limits: { files: 8, fileSize: 50 * 1024 * 1024 },
+  limits: { files: 8 },
   fileFilter: (_, file, cb) => {
-    if (!file.mimetype.startsWith("image/")) {
+    if (file.fieldname === "video") {
+      if (!hasAllowedVideoType(file)) {
+        return cb(new Error("Only video files are allowed for video uploads"));
+      }
+      return cb(null, true);
+    }
+
+    if (!String(file.mimetype || "").startsWith("image/")) {
       return cb(new Error("Only image files are allowed"));
     }
     cb(null, true);
   },
 });
 
-/* ✅ Accept both images + thumbnail */
+/* Accept gallery images and optional size chart */
 const uploadDropFiles = upload.fields([
   { name: "images", maxCount: 6 },
-  { name: "thumbnail", maxCount: 1 },
   { name: "sizeChart", maxCount: 1 },
+  { name: "video", maxCount: 1 },
 ]);
 
 const handleDropUpload = (req, res, next) => {
   uploadDropFiles(req, res, (error) => {
     if (!error) return next();
-
-    if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
-      return res.status(400).json({ message: "Files must be 50MB or smaller." });
-    }
 
     return res.status(400).json({ message: error.message || "Upload failed" });
   });

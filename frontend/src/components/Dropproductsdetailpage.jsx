@@ -40,7 +40,7 @@ import {
   AlertCircle,
   Ruler,
 } from "lucide-react";
-import { buildImageUrl, getResponsiveImageProps } from "../utils/responsiveImage.js";
+import { buildImageUrl, getImageAltText, getResponsiveImageProps } from "../utils/responsiveImage.js";
 import { buildDropProductPath } from "../utils/dropProductRoutes.js";
 import ProductImageLightbox from "./ProductImageLightbox.jsx";
 import ProductReviews from "./ProductReviews.jsx";
@@ -76,27 +76,50 @@ const DropProductDetailsPage = () => {
     sizes: "100vw",
   });
   const sizeChartUrl = sizeChartImageProps.src;
+  const videoUrl = buildImageUrl(product?.video);
   const isSizeChartImage = imageLikeFilePattern.test(String(product?.sizeChart || ""));
-  const normalizedGalleryImages = useMemo(() => {
+  const galleryMedia = useMemo(() => {
     const images = Array.isArray(product?.images) ? product.images.filter(Boolean) : [];
-    if (images.length > 0) return images;
-    if (product?.thumbnail) return [product.thumbnail];
-    return [];
-  }, [product?.images, product?.thumbnail]);
+    const normalizedImages =
+      images.length > 0 ? images : product?.thumbnail ? [product.thumbnail] : [];
+    const mediaItems = normalizedImages.map((image, index) => {
+      const imageProps = getResponsiveImageProps(image, {
+        sizes: "(max-width: 768px) 100vw, 1200px",
+        loading: index === 0 ? "eager" : "lazy",
+      });
 
-  const galleryItems = normalizedGalleryImages.map((image, index) => {
-    const imageProps = getResponsiveImageProps(image, {
-      sizes: "(max-width: 768px) 100vw, 1200px",
-      loading: index === 0 ? "eager" : "lazy",
+      return {
+        type: "image",
+        source: image,
+        src: imageProps.src || assetUrl(image),
+        thumbSrc: assetUrl(image),
+        alt: getImageAltText(image, `${product?.name || "Product"} - ${index + 1}`),
+        label: `Image ${index + 1}`,
+        imageProps,
+      };
     });
 
-    return {
-      src: imageProps.src || assetUrl(image),
-      thumbSrc: assetUrl(image),
-      alt: `${product?.name || "Product"} - ${index + 1}`,
-      label: `Image ${index + 1}`,
-    };
-  });
+    if (videoUrl) {
+      mediaItems.push({
+        type: "video",
+        source: product?.video,
+        src: videoUrl,
+        thumbSrc: mediaItems[0]?.thumbSrc || undefined,
+        alt: `${product?.name || "Product"} video`,
+        label: "Video",
+      });
+    }
+
+    return mediaItems;
+  }, [assetUrl, product?.images, product?.name, product?.thumbnail, product?.video, videoUrl]);
+
+  const galleryItems = galleryMedia.map((item) => ({
+    src: item.src,
+    thumbSrc: item.thumbSrc,
+    alt: item.alt,
+    label: item.label,
+    type: item.type,
+  }));
 
   const canonicalPath = useMemo(() => buildDropProductPath(product), [product]);
 
@@ -170,8 +193,9 @@ const DropProductDetailsPage = () => {
         selectedVariant?.sku ? `SKU: ${selectedVariant.sku}` : null,
         variants.length ? `${variants.length} size option${variants.length > 1 ? "s" : ""}` : null,
         product?.sizeChart ? "Size chart available" : null,
+        product?.video ? "Product video available" : null,
       ].filter(Boolean),
-    [product?.sizeChart, selectedVariant?.sku, variants.length]
+    [product?.sizeChart, product?.video, selectedVariant?.sku, variants.length]
   );
 
   // ✅ Keep size default when product loads
@@ -193,32 +217,24 @@ const DropProductDetailsPage = () => {
   }, [product?._id]);
 
   useEffect(() => {
-    if (!normalizedGalleryImages.length) {
+    if (!galleryMedia.length) {
       setSelectedImageIndex(0);
       return;
     }
 
-    if (selectedImageIndex >= normalizedGalleryImages.length) {
+    if (selectedImageIndex >= galleryMedia.length) {
       setSelectedImageIndex(0);
     }
-  }, [normalizedGalleryImages, selectedImageIndex]);
-
-  // Auto-rotate images
-  useEffect(() => {
-    if (normalizedGalleryImages.length <= 1) return;
-    const interval = setInterval(() => nextImage(), 5000);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [normalizedGalleryImages, selectedImageIndex]);
+  }, [galleryMedia, selectedImageIndex]);
 
   const scrollToImage = (index) => {
     setSelectedImageIndex(index);
-    setImageLoading(!loadedImages[index]);
+    setImageLoading(galleryMedia[index]?.type === "image" ? !loadedImages[index] : false);
 
     if (thumbnailContainerRef.current) {
       const thumbnailWidth = 80; // width + gap
       const containerWidth = thumbnailContainerRef.current.clientWidth;
-      const thumbnailsCount = normalizedGalleryImages.length;
+      const thumbnailsCount = galleryMedia.length;
       const maxScroll = thumbnailsCount * thumbnailWidth - containerWidth;
       const scrollPosition = index * thumbnailWidth - containerWidth / 2 + thumbnailWidth / 2;
 
@@ -230,14 +246,14 @@ const DropProductDetailsPage = () => {
   };
 
   const nextImage = () => {
-    const nextIndex = (selectedImageIndex + 1) % (normalizedGalleryImages.length || 1);
+    const nextIndex = (selectedImageIndex + 1) % (galleryMedia.length || 1);
     scrollToImage(nextIndex);
   };
 
   const prevImage = () => {
     const prevIndex =
-      (selectedImageIndex - 1 + (normalizedGalleryImages.length || 1)) %
-      (normalizedGalleryImages.length || 1);
+      (selectedImageIndex - 1 + (galleryMedia.length || 1)) %
+      (galleryMedia.length || 1);
     scrollToImage(prevIndex);
   };
 
@@ -534,64 +550,73 @@ const DropProductDetailsPage = () => {
             {/* Main Image */}
             <div className="relative rounded-3xl shadow-xl overflow-hidden group bg-gradient-to-br from-slate-100 via-white to-slate-100">
               <div className="relative h-[500px] md:h-[600px] overflow-hidden">
-                {normalizedGalleryImages.map((image, index) => {
-                  const imageProps = getResponsiveImageProps(image, {
-                    sizes: "(max-width: 1024px) 100vw, 50vw",
-                    loading: index === 0 ? "eager" : "lazy",
-                  });
-
+                {galleryMedia.map((item, index) => {
                   return (
                   <div
-                    key={index}
+                    key={`${item.type}-${item.src}-${index}`}
                     className={`absolute inset-0 transition-opacity duration-500 ${
                       index === selectedImageIndex ? "opacity-100" : "opacity-0"
                     }`}
                   >
-                    {imageLoading && <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>}
+                    {item.type === "image" && imageLoading && <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>}
 
-                    <img
-                      ref={mainImageRef}
-                      src={imageProps.src}
-                      srcSet={imageProps.srcSet}
-                      sizes={imageProps.sizes}
-                      alt={`${product.name} - ${index + 1}`}
-                      className={`w-full h-full object-contain p-4 transition-transform duration-700 ${
-                        imageLoading ? "opacity-0" : "opacity-100"
-                      }`}
-                      onClick={() => setIsImageViewerOpen(true)}
-                      style={
-                        imageProps.placeholder
-                          ? {
-                              backgroundImage: `url(${imageProps.placeholder})`,
-                              backgroundPosition: "center",
-                              backgroundSize: "cover",
-                            }
-                          : undefined
-                      }
-                      onLoad={() => {
-                        setLoadedImages((prev) => (prev[index] ? prev : { ...prev, [index]: true }));
-                        if (index === selectedImageIndex) {
-                          setImageLoading(false);
+                    {item.type === "image" ? (
+                      <img
+                        ref={mainImageRef}
+                        src={item.imageProps?.src}
+                        srcSet={item.imageProps?.srcSet}
+                        sizes={item.imageProps?.sizes}
+                        alt={item.alt}
+                        className={`w-full h-full object-contain p-4 transition-transform duration-700 ${
+                          imageLoading ? "opacity-0" : "opacity-100"
+                        }`}
+                        onClick={() => setIsImageViewerOpen(true)}
+                        style={
+                          item.imageProps?.placeholder
+                            ? {
+                                backgroundImage: `url(${item.imageProps.placeholder})`,
+                                backgroundPosition: "center",
+                                backgroundSize: "cover",
+                              }
+                            : undefined
                         }
-                      }}
-                      onError={() => {
-                        setLoadedImages((prev) => ({ ...prev, [index]: true }));
-                        if (index === selectedImageIndex) {
-                          setImageLoading(false);
-                        }
-                      }}
-                      loading={imageProps.loading}
-                      decoding={imageProps.decoding}
-                      fetchPriority={imageProps.fetchPriority}
-                    />
+                        onLoad={() => {
+                          setLoadedImages((prev) => (prev[index] ? prev : { ...prev, [index]: true }));
+                          if (index === selectedImageIndex) {
+                            setImageLoading(false);
+                          }
+                        }}
+                        onError={() => {
+                          setLoadedImages((prev) => ({ ...prev, [index]: true }));
+                          if (index === selectedImageIndex) {
+                            setImageLoading(false);
+                          }
+                        }}
+                        loading={item.imageProps?.loading}
+                        decoding={item.imageProps?.decoding}
+                        fetchPriority={item.imageProps?.fetchPriority}
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center p-4">
+                        <video
+                          src={item.src}
+                          autoPlay={index === selectedImageIndex}
+                          muted
+                          loop
+                          playsInline
+                          controls
+                          className="h-full w-full rounded-2xl bg-black object-contain"
+                        />
+                      </div>
+                    )}
                   </div>
                   );
                 })}
 
-                {!!normalizedGalleryImages.length && (
+                {!!galleryMedia.length && (
                   <div className="pointer-events-none absolute inset-x-0 bottom-6 flex justify-center">
                     <span className="rounded-full bg-black/65 px-4 py-2 text-xs font-semibold tracking-tight text-white shadow-lg backdrop-blur-sm">
-                      Tap image for full screen
+                      {galleryMedia[selectedImageIndex]?.type === "video" ? "Play product video" : "Tap image for full screen"}
                     </span>
                   </div>
                 )}
@@ -618,7 +643,7 @@ const DropProductDetailsPage = () => {
 
                 {/* Counter */}
                 <div className="absolute bottom-6 right-6 px-3 py-1 bg-black/60 backdrop-blur-sm text-white text-sm rounded-full">
-                  {selectedImageIndex + 1} / {normalizedGalleryImages.length}
+                  {selectedImageIndex + 1} / {galleryMedia.length}
                 </div>
 
                 {/* Discount */}
@@ -637,14 +662,16 @@ const DropProductDetailsPage = () => {
                 className="flex space-x-3 overflow-x-auto pb-4 scrollbar-hide"
                 style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
               >
-                {normalizedGalleryImages.map((image, index) => {
-                  const thumbProps = getResponsiveImageProps(image, {
-                    sizes: "80px",
-                  });
-
+                {galleryMedia.map((item, index) => {
+                  const thumbProps =
+                    item.type === "image"
+                      ? getResponsiveImageProps(item.source, {
+                          sizes: "80px",
+                        })
+                      : null;
                   return (
                   <button
-                    key={index}
+                    key={`${item.type}-${item.src}-${index}`}
                     onClick={() => scrollToImage(index)}
                     className={`flex-none w-20 h-20 rounded-xl border-2 overflow-hidden transition-all duration-300 ${
                       index === selectedImageIndex
@@ -652,22 +679,39 @@ const DropProductDetailsPage = () => {
                         : "border-gray-200 hover:border-gray-300"
                     }`}
                   >
-                    <img
-                      src={thumbProps.src}
-                      srcSet={thumbProps.srcSet}
-                      sizes={thumbProps.sizes}
-                      alt={`Thumbnail ${index + 1}`}
-                      className="w-full h-full object-cover"
-                      loading={thumbProps.loading}
-                      decoding={thumbProps.decoding}
-                      fetchPriority={thumbProps.fetchPriority}
-                    />
+                    {item.type === "image" ? (
+                      <img
+                        src={thumbProps?.src}
+                        srcSet={thumbProps?.srcSet}
+                        sizes={thumbProps?.sizes}
+                        alt={`Thumbnail ${index + 1}`}
+                        className="w-full h-full object-cover"
+                        loading={thumbProps?.loading}
+                        decoding={thumbProps?.decoding}
+                        fetchPriority={thumbProps?.fetchPriority}
+                      />
+                    ) : (
+                      <div className="relative h-full w-full bg-black">
+                        <video
+                          src={item.src}
+                          className="h-full w-full object-cover"
+                          autoPlay={index === selectedImageIndex}
+                          muted
+                          loop
+                          playsInline
+                          preload="metadata"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/35 text-white text-xs font-semibold">
+                          Video
+                        </div>
+                      </div>
+                    )}
                   </button>
                   );
                 })}
               </div>
 
-              {normalizedGalleryImages.length > 5 && (
+              {galleryMedia.length > 5 && (
                 <>
                   <button
                     onClick={() => thumbnailContainerRef.current?.scrollBy({ left: -100, behavior: "smooth" })}
@@ -719,6 +763,7 @@ const DropProductDetailsPage = () => {
                 </div>
               </div>
             )}
+
           </div>
 
           {/* Right Column - Product Info */}

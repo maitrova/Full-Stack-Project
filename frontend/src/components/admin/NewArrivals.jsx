@@ -14,6 +14,7 @@ import {
   setCurrentSubCategory,
   
 } from '../../redux/slices/productList.js';
+import { buildImageUrl } from '../../utils/responsiveImage.js';
 import { setIsEditing } from '../../redux/slices/adminSlice.js';    
 const NewArrivals = ({ 
   filters, 
@@ -170,7 +171,7 @@ const NewArrivals = ({
       <div className="w-full h-40 bg-gray-100 rounded-lg mb-4 overflow-hidden">
         {product.images && product.images.length > 0 ? (
           <img
-            src={product.images[0].startsWith('http') ? product.images[0] : `${import.meta.env.VITE_IMAGE_URL}/${product.images[0]}`}
+            src={buildImageUrl(product.images[0])}
             alt={product.title}
             className="w-full h-full object-cover"
             onError={(e) => {
@@ -398,7 +399,7 @@ const NewArrivals = ({
                 <div className="w-full h-40 bg-gray-100 rounded-lg mb-4 overflow-hidden">
                   {product.images && product.images.length > 0 ? (
                     <img
-                      src={product.images[0].startsWith('http') ? product.images[0] : `${import.meta.env.VITE_IMAGE_URL}/${product.images[0]}`}
+                      src={buildImageUrl(product.images[0])}
                       alt={product.title}
                       className="w-full h-full object-cover"
                       onError={(e) => {

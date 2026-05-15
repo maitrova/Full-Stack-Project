@@ -67,19 +67,33 @@ const dropproductSchema = new mongoose.Schema(
       trim: true,
     },
     images: {
-      type: [String],
+      type: [mongoose.Schema.Types.Mixed],
       required: true,
       validate: {
-        validator: (v) => v.length >= 1 && v.length <= 6,
-        message: "Images must be between 1 and 6",
+        validator: (value) =>
+          Array.isArray(value) &&
+          value.length >= 1 &&
+          value.length <= 6 &&
+          value.every((image) => {
+            if (typeof image === "string") {
+              return Boolean(image.trim());
+            }
+
+            if (image && typeof image === "object") {
+              return Boolean(String(image.url || "").trim());
+            }
+
+            return false;
+          }),
+        message: "Images must be between 1 and 6 valid image entries",
       },
     },
-    thumbnail: {
+    sizeChart: {
       type: String,
       default: null,
     },
 
-    sizeChart: {
+    video: {
       type: String,
       default: null,
     },

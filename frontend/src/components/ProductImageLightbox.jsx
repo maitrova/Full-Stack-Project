@@ -26,6 +26,7 @@ export default function ProductImageLightbox({
 
   const currentItem = slides[activeIndex] || null;
   const canNavigate = slides.length > 1;
+  const isVideoSlide = currentItem?.type === "video";
 
   const resetView = () => {
     setScale(MIN_SCALE);
@@ -207,7 +208,8 @@ export default function ProductImageLightbox({
             <button
               type="button"
               onClick={() => zoomTo(scale - ZOOM_STEP)}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20"
+              disabled={isVideoSlide}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="Zoom out"
             >
               <ZoomOut className="h-5 w-5" />
@@ -215,7 +217,8 @@ export default function ProductImageLightbox({
             <button
               type="button"
               onClick={() => zoomTo(scale + ZOOM_STEP)}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20"
+              disabled={isVideoSlide}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="Zoom in"
             >
               <ZoomIn className="h-5 w-5" />
@@ -223,7 +226,8 @@ export default function ProductImageLightbox({
             <button
               type="button"
               onClick={resetView}
-              className="hidden h-10 items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 text-sm font-medium text-white transition hover:bg-white/20 sm:flex"
+              disabled={isVideoSlide}
+              className="hidden h-10 items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 text-sm font-medium text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 sm:flex"
             >
               <RotateCcw className="h-4 w-4" />
               Reset
@@ -258,28 +262,41 @@ export default function ProductImageLightbox({
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
-            <img
-              src={currentItem.src}
-              alt={currentItem.alt || currentItem.label || title}
-              className={`max-h-full max-w-full select-none object-contain transition-transform duration-200 ${
-                scale > MIN_SCALE ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in"
-              }`}
-              style={{
-                transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
-                touchAction: scale > MIN_SCALE ? "none" : "pan-y",
-              }}
-              draggable={false}
-              onClick={(event) => {
-                event.stopPropagation();
-                if (scale === MIN_SCALE) {
-                  zoomTo(1.5);
-                }
-              }}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerCancel={handlePointerUp}
-            />
+            {isVideoSlide ? (
+              <video
+                src={currentItem.src}
+                autoPlay
+                muted
+                loop
+                playsInline
+                controls
+                className="max-h-full max-w-full rounded-3xl bg-black object-contain"
+                onClick={(event) => event.stopPropagation()}
+              />
+            ) : (
+              <img
+                src={currentItem.src}
+                alt={currentItem.alt || currentItem.label || title}
+                className={`max-h-full max-w-full select-none object-contain transition-transform duration-200 ${
+                  scale > MIN_SCALE ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in"
+                }`}
+                style={{
+                  transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
+                  touchAction: scale > MIN_SCALE ? "none" : "pan-y",
+                }}
+                draggable={false}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (scale === MIN_SCALE) {
+                    zoomTo(1.5);
+                  }
+                }}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
+              />
+            )}
           </div>
 
           {canNavigate && (
@@ -308,12 +325,29 @@ export default function ProductImageLightbox({
                       : "border-white/10 hover:border-white/30"
                   }`}
                 >
-                  <img
-                    src={item.thumbSrc || item.src}
-                    alt={item.alt || item.label || `Image ${index + 1}`}
-                    className="h-full w-full object-cover"
-                    draggable={false}
-                  />
+                  {item.type === "video" ? (
+                    <div className="relative h-full w-full bg-black">
+                      <video
+                        src={item.src}
+                        className="h-full w-full object-cover"
+                        autoPlay={index === activeIndex}
+                        muted
+                        loop
+                        playsInline
+                        preload="metadata"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/35 text-xs font-semibold text-white">
+                        Video
+                      </div>
+                    </div>
+                  ) : (
+                    <img
+                      src={item.thumbSrc || item.src}
+                      alt={item.alt || item.label || `Image ${index + 1}`}
+                      className="h-full w-full object-cover"
+                      draggable={false}
+                    />
+                  )}
                 </button>
               ))}
             </div>

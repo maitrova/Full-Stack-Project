@@ -44,10 +44,11 @@ const getOrderItemImage = (item) => {
   if (item.readymadeProduct?.thumbnail) return item.readymadeProduct.thumbnail;
   if (item.design?.previewImage) return item.design.previewImage;
   if (item.design?.views?.[0]?.previewImage) return item.design.views[0].previewImage;
-  if (item.dropproduct?.thumbnail) return item.dropproduct.thumbnail;
   if (Array.isArray(item.dropproduct?.images) && item.dropproduct.images[0]) {
-    return item.dropproduct.images[0];
+    const firstDropImage = item.dropproduct.images[0];
+    return typeof firstDropImage === "string" ? firstDropImage : firstDropImage?.url || "";
   }
+  if (item.dropproduct?.thumbnail) return item.dropproduct.thumbnail;
   return "";
 };
 
@@ -349,7 +350,7 @@ export const adminGetUserById = async (req, res) => {
         .populate("billingAddress")
         .populate({ path: "items.readymadeProduct", select: "title thumbnail" })
         .populate({ path: "items.design", select: "title productName previewImage views" })
-        .populate({ path: "items.dropproduct", select: "name thumbnail images" })
+        .populate({ path: "items.dropproduct", select: "name images thumbnail" })
         .populate({ path: "items.product", select: "name title" })
         .sort({ createdAt: -1 })
         .lean(),

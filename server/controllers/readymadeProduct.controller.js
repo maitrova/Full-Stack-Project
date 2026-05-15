@@ -146,6 +146,8 @@ export const getAllReadymadeProducts = async (req, res) => {
     const skip = (page - 1) * limit;
     
     const products = await ReadymadeProduct.find(query)
+      .populate("category", "name")
+      .populate("subCategory", "name")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))

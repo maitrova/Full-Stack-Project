@@ -5,13 +5,37 @@ const reviewSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      default: null,
       index: true,
     },
     order: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Order",
-      required: true,
+      default: null,
+    },
+    reviewerName: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: 120,
+    },
+    reviewerEmail: {
+      type: String,
+      default: "",
+      trim: true,
+      lowercase: true,
+      maxlength: 180,
+    },
+    source: {
+      type: String,
+      enum: ["CUSTOMER", "ADMIN"],
+      default: "CUSTOMER",
+      index: true,
+    },
+    createdByAdmin: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
     },
     kind: {
       type: String,
@@ -68,6 +92,7 @@ reviewSchema.index(
   {
     unique: true,
     partialFilterExpression: {
+      user: { $exists: true, $type: "objectId" },
       kind: "READYMADE",
       readymadeProduct: { $exists: true, $type: "objectId" },
     },
@@ -79,6 +104,7 @@ reviewSchema.index(
   {
     unique: true,
     partialFilterExpression: {
+      user: { $exists: true, $type: "objectId" },
       kind: "DROPPRODUCT",
       dropproduct: { $exists: true, $type: "objectId" },
     },

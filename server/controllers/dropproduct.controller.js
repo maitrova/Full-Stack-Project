@@ -1,6 +1,5 @@
 import Dropproduct from "../models/dropproduct.model.js";
 import {
-  createReadymadeThumbnail,
   deleteOptimizedImageSet,
   normalizeStoredPath,
   optimizeUploadedImage,
@@ -13,10 +12,26 @@ const normalizeDropproductPaths = (product) => {
   return {
     ...normalized,
     images: Array.isArray(normalized.images)
-      ? normalized.images.map((imagePath) => normalizeStoredPath(imagePath))
+      ? normalized.images
+          .map((image) => {
+            if (typeof image === "string") {
+              return { url: normalizeStoredPath(image), altText: "" };
+            }
+
+            if (image && typeof image === "object") {
+              return {
+                ...image,
+                url: normalizeStoredPath(image.url),
+                altText: String(image.altText || "").trim(),
+              };
+            }
+
+            return null;
+          })
+          .filter(Boolean)
       : [],
-    thumbnail: normalizeStoredPath(normalized.thumbnail),
     sizeChart: normalizeStoredPath(normalized.sizeChart),
+    video: normalizeStoredPath(normalized.video),
   };
 };
 
@@ -82,6 +97,77 @@ const optimizeDropImage = async (file) => {
   });
 
   return optimized.url;
+};
+
+const getDropImageUrl = (image) => {
+  if (!image) return null;
+  if (typeof image === "string") return image;
+  if (typeof image === "object") return image.url || null;
+  return null;
+};
+
+const normalizeDropImageAltTexts = (value) => {
+  if (value === undefined || value === null || value === "") {
+    return [];
+  }
+
+  const parsed = typeof value === "string" ? JSON.parse(value) : value;
+  if (!Array.isArray(parsed)) {
+    throw new Error("imageAltTexts must be a JSON array");
+  }
+
+  return parsed.map((item) => String(item || "").trim());
+};
+
+const normalizeExistingDropImages = (value, currentImages = []) => {
+  if (value === undefined || value === null || value === "") {
+    return currentImages.map((image) =>
+      typeof image === "string"
+        ? { url: image, altText: "" }
+        : { url: image?.url || "", altText: String(image?.altText || "").trim() }
+    );
+  }
+
+  const parsed = typeof value === "string" ? JSON.parse(value) : value;
+  if (!Array.isArray(parsed)) {
+    throw new Error("existingImages must be a JSON array");
+  }
+
+  const currentImageMap = new Map(
+    currentImages.map((image) => {
+      const imageUrl = getDropImageUrl(image);
+      return [
+        imageUrl,
+        {
+          url: imageUrl,
+          altText:
+            typeof image === "object" ? String(image.altText || "").trim() : "",
+        },
+      ];
+    })
+  );
+
+  return parsed.map((image) => {
+    const url = String(image?.url || image).trim();
+    const currentImage = currentImageMap.get(url);
+
+    if (!url || !currentImage) {
+      throw new Error("Invalid existing image reference");
+    }
+
+    return {
+      url,
+      altText: String(image?.altText ?? currentImage.altText ?? "").trim(),
+    };
+  });
+};
+
+const buildDropImageObjects = async (uploadedFiles = [], altTexts = []) => {
+  const urls = await Promise.all(uploadedFiles.map((file) => optimizeDropImage(file)));
+  return urls.map((url, index) => ({
+    url,
+    altText: String(altTexts[index] || "").trim(),
+  }));
 };
 
 const optimizeDropSizeChart = async (file) => {
@@ -154,8 +240,8 @@ const normalizeVariants = (variants) => {
 export const createDropproduct = async (req, res) => {
   try {
     const uploadedImages = req.files?.images || [];
-    const uploadedThumbnail = req.files?.thumbnail?.[0] || null;
     const uploadedSizeChart = req.files?.sizeChart?.[0] || null;
+    const uploadedVideo = req.files?.video?.[0] || null;
 
     if (uploadedImages.length < 1) {
       return res.status(400).json({ message: "At least 1 image is required" });
@@ -179,12 +265,8 @@ export const createDropproduct = async (req, res) => {
     }
 
     const variants = normalizeVariants(req.body.variants);
-    const images = await Promise.all(uploadedImages.map((file) => optimizeDropImage(file)));
-    const thumbnail = uploadedThumbnail
-      ? await createReadymadeThumbnail(normalizeStoredPath(uploadedThumbnail.path), {
-          cleanupSource: true,
-        })
-      : images[0];
+    const imageAltTexts = normalizeDropImageAltTexts(req.body.imageAltTexts);
+    const images = await buildDropImageObjects(uploadedImages, imageAltTexts);
 
     const product = await Dropproduct.create({
       name,
@@ -198,8 +280,8 @@ export const createDropproduct = async (req, res) => {
       bestSeller: String(req.body.bestSeller ?? "false") === "true",
       newArrival: String(req.body.newArrival ?? "false") === "true",
       images,
-      thumbnail,
       sizeChart: await optimizeDropSizeChart(uploadedSizeChart),
+      video: normalizeStoredPath(uploadedVideo?.path),
       variants,
     });
 
@@ -217,37 +299,33 @@ export const updateDropproduct = async (req, res) => {
     }
 
     const uploadedImages = req.files?.images || [];
-    const uploadedThumbnail = req.files?.thumbnail?.[0] || null;
     const uploadedSizeChart = req.files?.sizeChart?.[0] || null;
+    const uploadedVideo = req.files?.video?.[0] || null;
 
-    let images = product.images;
-    let thumbnail = product.thumbnail;
+    const imageAltTexts = normalizeDropImageAltTexts(req.body.imageAltTexts);
+    let images = normalizeExistingDropImages(req.body.existingImages, product.images || []);
     let sizeChart = product.sizeChart;
+    let video = product.video;
 
     if (uploadedImages.length > 0) {
-      if (uploadedImages.length > 6) {
-        return res.status(400).json({ message: "Maximum 6 images allowed" });
-      }
-
-      await Promise.all((product.images || []).map((imagePath) => safeUnlink(imagePath)));
-      images = await Promise.all(uploadedImages.map((file) => optimizeDropImage(file)));
-
-      if (thumbnail && !images.includes(thumbnail)) {
-        thumbnail = images[0];
-      }
+      images = [...images, ...(await buildDropImageObjects(uploadedImages, imageAltTexts))];
     }
 
-    if (uploadedThumbnail) {
-      await safeUnlink(thumbnail);
-      thumbnail = await createReadymadeThumbnail(
-        normalizeStoredPath(uploadedThumbnail.path),
-        { cleanupSource: true }
-      );
+    if (images.length > 6) {
+      return res.status(400).json({ message: "Maximum 6 images allowed" });
     }
 
-    if (String(req.body.removeThumbnail) === "true") {
-      await safeUnlink(thumbnail);
-      thumbnail = images[0] || null;
+    if (images.length < 1) {
+      return res.status(400).json({ message: "At least 1 image is required" });
+    }
+
+    const nextImageUrlSet = new Set(images.map((image) => getDropImageUrl(image)).filter(Boolean));
+    const removedImageUrls = (product.images || [])
+      .map((image) => getDropImageUrl(image))
+      .filter((url) => url && !nextImageUrlSet.has(url));
+
+    if (removedImageUrls.length > 0) {
+      await Promise.all(removedImageUrls.map((imagePath) => safeUnlink(imagePath)));
     }
 
     if (uploadedSizeChart) {
@@ -256,6 +334,14 @@ export const updateDropproduct = async (req, res) => {
     } else if (String(req.body.removeSizeChart) === "true") {
       await safeUnlink(sizeChart);
       sizeChart = null;
+    }
+
+    if (uploadedVideo) {
+      await safeUnlink(video);
+      video = normalizeStoredPath(uploadedVideo.path);
+    } else if (String(req.body.removeVideo) === "true") {
+      await safeUnlink(video);
+      video = null;
     }
 
     let variants;
@@ -293,8 +379,8 @@ export const updateDropproduct = async (req, res) => {
           ? String(req.body.newArrival) === "true"
           : product.newArrival,
       images,
-      thumbnail,
       sizeChart,
+      video,
       ...(variants ? { variants } : {}),
     };
 
@@ -384,8 +470,8 @@ export const deleteDropproduct = async (req, res) => {
     }
 
     await Promise.all((product.images || []).map((img) => safeUnlink(img)));
-    await safeUnlink(product.thumbnail);
     await safeUnlink(product.sizeChart);
+    await safeUnlink(product.video);
 
     await product.deleteOne();
 

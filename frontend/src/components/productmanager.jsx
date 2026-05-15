@@ -11,6 +11,7 @@ import {
   clearReadymadeError,
   clearReadymadeSuccess
 } from '../redux/slices/predesignedslice.js';
+import BlogRichTextEditor from './admin/BlogRichTextEditor.jsx';
 
 const IMAGE_URL = import.meta.env.VITE_IMAGE_URL;
 // Carousel Component
@@ -728,15 +729,15 @@ const ReadymadeProductsManager = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Description *
                 </label>
-                <textarea
-                  name="description"
+                <BlogRichTextEditor
                   value={formData.description}
-                  onChange={handleInputChange}
-                  rows="4"
-                  required
-                  disabled={loading}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  placeholder="Detailed product description..."
+                  onChange={(html) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      description: html,
+                    }))
+                  }
+                  error={Boolean(error)}
                 />
               </div>
 

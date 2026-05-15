@@ -74,8 +74,8 @@ const getCartItemImage = (item) =>
   item?.image ||
   item?.readymadeProduct?.thumbnail ||
   item?.readymadeProduct?.images?.[0]?.url ||
-  item?.dropproduct?.thumbnail ||
   item?.dropproduct?.images?.[0] ||
+  item?.dropproduct?.thumbnail ||
   item?.product?.thumbnail ||
   item?.product?.images?.[0]?.url ||
   null;

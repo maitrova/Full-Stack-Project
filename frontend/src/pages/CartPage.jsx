@@ -128,8 +128,8 @@ const CartPage = () => {
     if (item.previewImage) return getRawImagePath(item.previewImage);
     let imagePath = null;
     if (item.kind === "READYMADE") {
-      if (item.dropproduct?.thumbnail) imagePath = item.dropproduct.thumbnail;
-      else if (item.dropproduct?.images?.length) imagePath = item.dropproduct.images[0];
+      if (item.dropproduct?.images?.length) imagePath = item.dropproduct.images[0];
+      else if (item.dropproduct?.thumbnail) imagePath = item.dropproduct.thumbnail;
       else if (item.readymadeProduct?.thumbnail) imagePath = item.readymadeProduct.thumbnail;
       else if (item.readymadeProduct?.images?.length) imagePath = item.readymadeProduct.images[0];
     } else if (item.kind === "DESIGN") {

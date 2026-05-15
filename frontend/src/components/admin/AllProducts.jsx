@@ -10,6 +10,7 @@ import {
   setCurrentCategory,
   setCurrentSubCategory
 } from '../../redux/slices/productList.js';
+import { buildImageUrl } from '../../utils/responsiveImage.js';
 
 const AllProducts = ({ 
   filters, 
@@ -226,9 +227,7 @@ const AllProducts = ({
               <tbody className="divide-y divide-gray-200">
                 {products.map(product => {
                   const imageUrl = product.images && product.images.length > 0 
-                    ? (product.images[0].startsWith('http') 
-                        ? product.images[0] 
-                        : `${import.meta.env.VITE_IMAGE_URL}/${product.images[0]}`)
+                    ? buildImageUrl(product.images[0])
                     : null;
                   
                   const totalStock = product.variants?.reduce((sum, v) => sum + (v.stock || 0), 0) || product.stock || 0;

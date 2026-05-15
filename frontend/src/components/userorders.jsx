@@ -460,11 +460,11 @@ const UserOrders = () => {
         return resolveImageUrl(item.design.views[0]?.previewImage);
       }
     } else if (item.dropproduct) {
-      if (item.dropproduct.thumbnail) {
-        return resolveImageUrl(item.dropproduct.thumbnail);
-      }
       if (item.dropproduct.images && item.dropproduct.images.length > 0) {
         return resolveImageUrl(item.dropproduct.images[0]);
+      }
+      if (item.dropproduct.thumbnail) {
+        return resolveImageUrl(item.dropproduct.thumbnail);
       }
     } else if (item.product) {
       if (item.product.thumbnail) {

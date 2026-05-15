@@ -16,6 +16,14 @@ export const getRawImagePath = (image) => {
   return null;
 };
 
+export const getImageAltText = (image, fallback = "") => {
+  if (!image || typeof image !== "object") {
+    return fallback;
+  }
+
+  return String(image.altText || fallback || "").trim();
+};
+
 export const buildImageUrl = (image) => {
   const rawPath = getRawImagePath(image);
   if (!rawPath) return "";

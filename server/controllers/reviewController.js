@@ -29,7 +29,7 @@ const mapReviewDocument = (review) => ({
   verifiedPurchase: Boolean(review.verifiedPurchase),
   createdAt: review.createdAt,
   updatedAt: review.updatedAt,
-  userName: formatReviewerName(review.user?.name),
+  userName: formatReviewerName(review.user?.name || review.reviewerName),
 });
 
 const ensureAdmin = (req, res) => {
@@ -55,8 +55,8 @@ const mapAdminReviewDocument = (review) => {
     kind: review.kind,
     targetId: targetId ? String(targetId) : "",
     productName,
-    customerName: review.user?.name || "Unknown customer",
-    customerEmail: review.user?.email || "",
+    customerName: review.user?.name || review.reviewerName || "Unknown customer",
+    customerEmail: review.user?.email || review.reviewerEmail || "",
     orderId: review.order?._id ? String(review.order._id) : "",
     orderStatus: review.order?.orderStatus || "",
     paymentStatus: review.order?.status || "",
@@ -64,9 +64,21 @@ const mapAdminReviewDocument = (review) => {
     title: review.title || "",
     comment: review.comment || "",
     verifiedPurchase: Boolean(review.verifiedPurchase),
+    source: review.source || "CUSTOMER",
     createdAt: review.createdAt,
     updatedAt: review.updatedAt,
   };
+};
+
+const toNormalizedTarget = (target) => {
+  const kind = normalizeReviewKind(target?.kind);
+  const targetId = String(target?.targetId || "").trim();
+
+  if (!kind || !mongoose.Types.ObjectId.isValid(targetId)) {
+    return null;
+  }
+
+  return { kind, targetId };
 };
 
 const isPaidOrCodOrder = (order) =>
@@ -208,11 +220,15 @@ export const createOrUpdateMyReview = async (req, res) => {
       {
         $set: {
           order: orderId,
+          reviewerName: "",
+          reviewerEmail: "",
           rating,
           title,
           comment,
           verifiedPurchase: true,
           status: "ACTIVE",
+          source: "CUSTOMER",
+          createdByAdmin: null,
           [config.field]: targetId,
         },
       },
@@ -240,6 +256,112 @@ export const createOrUpdateMyReview = async (req, res) => {
     });
   } catch (error) {
     console.error("createOrUpdateMyReview error:", error);
+    return res.status(500).json({ message: error.message || "Server error" });
+  }
+};
+
+export const adminCreateReviews = async (req, res) => {
+  try {
+    if (!ensureAdmin(req, res)) return;
+
+    const reviewerName = String(req.body.reviewerName || "").trim();
+    const reviewerEmail = String(req.body.reviewerEmail || "").trim().toLowerCase();
+    const rating = Number(req.body.rating);
+    const title = String(req.body.title || "").trim();
+    const comment = String(req.body.comment || "").trim();
+    const verifiedPurchase = Boolean(req.body.verifiedPurchase);
+    const rawTargets = Array.isArray(req.body.targets) ? req.body.targets : [];
+
+    if (!reviewerName) {
+      return res.status(400).json({ message: "Reviewer name is required" });
+    }
+
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: "Rating must be between 1 and 5" });
+    }
+
+    const dedupedTargets = Array.from(
+      new Map(
+        rawTargets
+          .map(toNormalizedTarget)
+          .filter(Boolean)
+          .map((target) => [`${target.kind}:${target.targetId}`, target])
+      ).values()
+    );
+
+    if (!dedupedTargets.length) {
+      return res.status(400).json({ message: "Select at least one valid product" });
+    }
+
+    const targetsByKind = dedupedTargets.reduce(
+      (acc, target) => {
+        acc[target.kind].push(target.targetId);
+        return acc;
+      },
+      { READYMADE: [], DROPPRODUCT: [] }
+    );
+
+    const [readymadeDocs, dropDocs] = await Promise.all([
+      targetsByKind.READYMADE.length
+        ? getReviewKindConfig("READYMADE")
+            .model.find({ _id: { $in: targetsByKind.READYMADE } })
+            .select("_id")
+            .lean()
+        : [],
+      targetsByKind.DROPPRODUCT.length
+        ? getReviewKindConfig("DROPPRODUCT")
+            .model.find({ _id: { $in: targetsByKind.DROPPRODUCT } })
+            .select("_id")
+            .lean()
+        : [],
+    ]);
+
+    const validTargetKeys = new Set([
+      ...readymadeDocs.map((doc) => `READYMADE:${String(doc._id)}`),
+      ...dropDocs.map((doc) => `DROPPRODUCT:${String(doc._id)}`),
+    ]);
+
+    const validTargets = dedupedTargets.filter((target) =>
+      validTargetKeys.has(`${target.kind}:${target.targetId}`)
+    );
+
+    if (!validTargets.length) {
+      return res.status(404).json({ message: "Selected products were not found" });
+    }
+
+    const docs = validTargets.map((target) => {
+      const config = getReviewKindConfig(target.kind);
+      return {
+        user: null,
+        order: null,
+        reviewerName,
+        reviewerEmail,
+        source: "ADMIN",
+        createdByAdmin: req.user?._id || null,
+        kind: target.kind,
+        rating,
+        title,
+        comment,
+        verifiedPurchase,
+        status: "ACTIVE",
+        [config.field]: target.targetId,
+      };
+    });
+
+    const createdReviews = await Review.insertMany(docs, { ordered: true });
+
+    await Promise.all(validTargets.map((target) => updateReviewTargetStats(target.kind, target.targetId)));
+
+    return res.status(201).json({
+      success: true,
+      message:
+        createdReviews.length === 1
+          ? "Review added successfully"
+          : `${createdReviews.length} reviews added successfully`,
+      count: createdReviews.length,
+    });
+  } catch (error) {
+    console.error("adminCreateReviews error:", error);
     return res.status(500).json({ message: error.message || "Server error" });
   }
 };

@@ -46,7 +46,8 @@ import {
   deleteBrand,
   clearBrands
 } from '../redux/slices/brandSlice.js';
-import RichTextEditor from './RichTextEditor.jsx';
+import BlogRichTextEditor from './admin/BlogRichTextEditor.jsx';
+import { buildImageUrl } from '../utils/responsiveImage.js';
 
 const ProductFormModal = ({ 
   isOpen, 
@@ -146,9 +147,6 @@ const ProductFormModal = ({
 
   // Size options
   const sizeOptions = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-
-  // Base URL for image paths
-  const baseUrl = import.meta.env.VITE_IMAGE_URL || '';
 
   const resolveReferenceId = (value, list = []) => {
     if (!value) return '';
@@ -302,18 +300,7 @@ const ProductFormModal = ({
     if (product.images && product.images.length > 0) {
 
       const previews = product.images.map(image => {
-
-        const imageUrl =
-          typeof image === "string"
-            ? image
-            : image.url || "";
-
-        if (!imageUrl) return "";
-
-        if (imageUrl.startsWith("http")) return imageUrl;
-
-        return `${baseUrl}${imageUrl.startsWith("/") ? imageUrl : "/" + imageUrl}`;
-
+        return buildImageUrl(image);
       });
 
       setImagePreviews(previews);
@@ -329,27 +316,17 @@ const ProductFormModal = ({
 
     // ✅ Video preview
     if (product.video) {
-
-      const videoUrl = product.video.startsWith("http")
-        ? product.video
-        : `${baseUrl}${product.video.startsWith("/") ? product.video : "/" + product.video}`;
-
-      setVideoPreview(videoUrl);
+      setVideoPreview(buildImageUrl(product.video));
     }
 
     // ✅ NEW: Size Chart preview
     if (product.sizeChart) {
-
-      const sizeChartUrl = product.sizeChart.startsWith("http")
-        ? product.sizeChart
-        : `${baseUrl}${product.sizeChart.startsWith("/") ? product.sizeChart : "/" + product.sizeChart}`;
-
-      setSizeChartPreview(sizeChartUrl);
+      setSizeChartPreview(buildImageUrl(product.sizeChart));
 
     }
 
     setCurrentStep(4);
-  }, [product, isEdit, baseUrl, categories, subCategories, brands]);
+  }, [product, isEdit, categories, subCategories, brands]);
 
   useEffect(() => {
     if (!isEdit && isOpen) {
@@ -796,7 +773,7 @@ const removeSizeChart = () => {
     if (category.thumbnail) {
       const thumbnailUrl = category.thumbnail.startsWith('http') 
         ? category.thumbnail 
-        : `${baseUrl}${category.thumbnail.startsWith('/') ? category.thumbnail : '/' + category.thumbnail}`;
+        : buildImageUrl(category.thumbnail);
       setNewCategoryThumbnailPreview(thumbnailUrl);
     } else {
       setNewCategoryThumbnailPreview(null);
@@ -1004,7 +981,7 @@ const removeSizeChart = () => {
     if (subCategory.thumbnail) {
       const thumbnailUrl = subCategory.thumbnail.startsWith('http') 
         ? subCategory.thumbnail 
-        : `${baseUrl}${subCategory.thumbnail.startsWith('/') ? subCategory.thumbnail : '/' + subCategory.thumbnail}`;
+        : buildImageUrl(subCategory.thumbnail);
       setNewSubCategoryThumbnailPreview(thumbnailUrl);
     } else {
       setNewSubCategoryThumbnailPreview(null);
@@ -1986,7 +1963,7 @@ const validateForm = () => {
               <div className="flex-shrink-0 w-8 h-8 bg-gray-200 rounded-lg overflow-hidden">
                 {cat.thumbnail ? (
                   <img 
-                    src={`${baseUrl}${cat.thumbnail.startsWith('/') ? cat.thumbnail : '/' + cat.thumbnail}`}
+                    src={buildImageUrl(cat.thumbnail)}
                     alt={cat.name}
                     className="w-full h-full object-cover"
                   />
@@ -2032,7 +2009,7 @@ const validateForm = () => {
               <div className="flex-shrink-0 w-8 h-8 bg-gray-200 rounded-lg overflow-hidden">
                 {sub.thumbnail ? (
                   <img 
-                    src={`${baseUrl}${sub.thumbnail.startsWith('/') ? sub.thumbnail : '/' + sub.thumbnail}`}
+                    src={buildImageUrl(sub.thumbnail)}
                     alt={sub.name}
                     className="w-full h-full object-cover"
                   />
@@ -2339,7 +2316,7 @@ const validateForm = () => {
                               </label>
                             </div>
                             <img
-                              src={newCategoryThumbnailPreview || `${baseUrl}${editingCategory.thumbnail}`}
+                              src={newCategoryThumbnailPreview || buildImageUrl(editingCategory.thumbnail)}
                               alt="Current Category Thumbnail"
                               className="w-full h-32 object-cover rounded-lg"
                             />
@@ -2624,7 +2601,7 @@ const validateForm = () => {
                               </label>
                             </div>
                             <img
-                              src={newSubCategoryThumbnailPreview || `${baseUrl}${editingSubCategory.thumbnail}`}
+                              src={newSubCategoryThumbnailPreview || buildImageUrl(editingSubCategory.thumbnail)}
                               alt="Current Sub-category Thumbnail"
                               className="w-full h-32 object-cover rounded-lg"
                             />
@@ -2967,7 +2944,7 @@ const validateForm = () => {
     Description *
   </label>
 
-  <RichTextEditor
+  <BlogRichTextEditor
     value={formData.description}
     onChange={(html) => {
       setFormData((prev) => ({ ...prev, description: html }));

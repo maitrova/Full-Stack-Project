@@ -59,6 +59,8 @@ const baseEditorStyles = `
 `;
 
 export default function BlogRichTextEditor({ value, onChange, error, onImageUpload }) {
+  const supportsInlineUploads = typeof onImageUpload === "function";
+
   const handleEditorChange = useCallback(
     (nextValue) => {
       onChange(nextValue);
@@ -68,7 +70,7 @@ export default function BlogRichTextEditor({ value, onChange, error, onImageUplo
 
   const handleImageUpload = useCallback(
     async (blobInfo) => {
-      if (!onImageUpload) {
+      if (!supportsInlineUploads) {
         throw new Error("Inline image upload is not configured");
       }
 
@@ -81,7 +83,7 @@ export default function BlogRichTextEditor({ value, onChange, error, onImageUplo
 
       return uploadedUrl;
     },
-    [onImageUpload]
+    [onImageUpload, supportsInlineUploads]
   );
 
   const editorInit = useMemo(
@@ -99,17 +101,18 @@ export default function BlogRichTextEditor({ value, onChange, error, onImageUplo
         "code",
         "codesample",
         "emoticons",
-        "image",
         "link",
         "lists",
-        "media",
         "searchreplace",
         "table",
         "visualblocks",
         "wordcount",
+        ...(supportsInlineUploads ? ["image", "media"] : []),
       ],
       toolbar:
-        "undo redo | blocks | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | bullist numlist blockquote | link image media table codesample charmap emoticons | searchreplace visualblocks code | removeformat",
+        `undo redo | blocks | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | bullist numlist blockquote | link ${
+          supportsInlineUploads ? "image media " : ""
+        }table codesample charmap emoticons | searchreplace visualblocks code | removeformat`,
       block_formats: "Paragraph=p; Heading 2=h2; Heading 3=h3",
       style_formats: [
         { title: "Paragraph", block: "p" },
@@ -119,11 +122,15 @@ export default function BlogRichTextEditor({ value, onChange, error, onImageUplo
       content_style: baseEditorStyles,
       contextmenu: "link image table",
       paste_data_images: false,
-      automatic_uploads: true,
-      images_upload_handler: handleImageUpload,
-      image_advtab: true,
-      image_caption: true,
-      image_title: true,
+      automatic_uploads: supportsInlineUploads,
+      ...(supportsInlineUploads
+        ? {
+            images_upload_handler: handleImageUpload,
+            image_advtab: true,
+            image_caption: true,
+            image_title: true,
+          }
+        : {}),
       link_default_target: "_blank",
       link_assume_external_targets: true,
       statusbar: true,
@@ -155,13 +162,15 @@ export default function BlogRichTextEditor({ value, onChange, error, onImageUplo
       },
       toolbar_mode: "sliding",
     }),
-    [handleImageUpload]
+    [handleImageUpload, supportsInlineUploads]
   );
 
   return (
     <div className={`overflow-hidden rounded-[24px] border bg-white shadow-sm ${error ? "border-rose-300" : "border-slate-200"}`}>
       <div className="border-b border-slate-200 bg-[linear-gradient(180deg,_#f8fafc,_#f1f5f9)] px-4 py-3 text-xs text-slate-500">
-        Keep the blog title as the only H1. Use H2 and H3 inside content. Upload inline images directly from the TinyMCE toolbar.
+        {supportsInlineUploads
+          ? "Keep the blog title as the only H1. Use H2 and H3 inside content. Upload inline images directly from the TinyMCE toolbar."
+          : "Use H2 and H3 for structure. This editor stores formatted product descriptions with the same TinyMCE experience used in blogs."}
       </div>
       <Editor
         apiKey={TINY_API_KEY}
@@ -169,7 +178,9 @@ export default function BlogRichTextEditor({ value, onChange, error, onImageUplo
         onEditorChange={handleEditorChange}
         init={{
           ...editorInit,
-          toolbar: `undo redo | blocks | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | bullist numlist blockquote | link image media table codesample charmap emoticons | sectiontemplate faqtemplate | searchreplace visualblocks code | removeformat`,
+          toolbar: `undo redo | blocks | bold italic underline strikethrough | alignleft aligncenter alignright alignjustify | bullist numlist blockquote | link ${
+            supportsInlineUploads ? "image media " : ""
+          }table codesample charmap emoticons | sectiontemplate faqtemplate | searchreplace visualblocks code | removeformat`,
         }}
       />
       <div className="border-t border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
