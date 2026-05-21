@@ -269,7 +269,17 @@ const AdminOrders = () => {
   };
 
   const getDisplayPaymentStatus = (order) =>
-    order?.payment?.method === 'COD' ? 'COD' : (order?.status || 'PENDING_PAYMENT');
+    order?.status === 'CANCELLED'
+      ? 'CANCELLED'
+      : (order?.payment?.method === 'COD' ? 'COD' : (order?.status || 'PENDING_PAYMENT'));
+
+  const getPaymentStatusTextColor = (order) => {
+    const displayStatus = getDisplayPaymentStatus(order);
+    if (displayStatus === 'PAID') return 'text-green-600';
+    if (displayStatus === 'COD') return 'text-sky-600';
+    if (displayStatus === 'CANCELLED') return 'text-rose-600';
+    return 'text-yellow-600';
+  };
 
   const getItemName = (item) => {
     if (item.kind === "READYMADE" && item.readymadeProduct?.title) {
@@ -499,8 +509,8 @@ const AdminOrders = () => {
     total: orders.length,
     paid: orders.filter(o => o.status === 'PAID').length,
     pending: orders.filter(o => o.status === 'PENDING_PAYMENT' && o.payment?.method !== 'COD').length,
-    cod: orders.filter(o => o.payment?.method === 'COD').length,
-    processing: orders.filter(o => o.orderStatus === 'PROCESSING').length,
+    cod: orders.filter(o => o.payment?.method === 'COD' && o.status !== 'CANCELLED').length,
+    processing: orders.filter(o => o.orderStatus === 'PROCESSING' && o.status !== 'CANCELLED').length,
     ready: orders.filter(o => o.orderStatus === 'READY').length,
     shipped: orders.filter(o => o.orderStatus === 'SHIPPED').length,
     delivered: orders.filter(o => o.orderStatus === 'DELIVERED').length
@@ -1307,7 +1317,7 @@ const AdminOrders = () => {
                             </div>
                             <div className="flex justify-between">
                               <span className="text-gray-600">Payment Status:</span>
-                              <span className={`font-medium ${getDisplayPaymentStatus(selectedOrder) === 'PAID' ? 'text-green-600' : getDisplayPaymentStatus(selectedOrder) === 'COD' ? 'text-sky-600' : 'text-yellow-600'}`}>
+                              <span className={`font-medium ${getPaymentStatusTextColor(selectedOrder)}`}>
                                 {getDisplayPaymentStatus(selectedOrder)}
                               </span>
                             </div>
@@ -1506,7 +1516,7 @@ const AdminOrders = () => {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                               <p className="text-sm text-gray-600">Payment Status</p>
-                              <p className={`mt-1 text-sm font-semibold ${getDisplayPaymentStatus(selectedOrder) === 'PAID' ? 'text-green-600' : getDisplayPaymentStatus(selectedOrder) === 'COD' ? 'text-sky-600' : 'text-yellow-600'}`}>
+                              <p className={`mt-1 text-sm font-semibold ${getPaymentStatusTextColor(selectedOrder)}`}>
                                 {getDisplayPaymentStatus(selectedOrder)}
                               </p>
                             </div>

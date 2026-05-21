@@ -22,6 +22,7 @@ const ReturnManagement = () => {
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [decisionNote, setDecisionNote] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [refundAmounts, setRefundAmounts] = useState({});
 
   const API_BASE_URL = (
     import.meta.env.VITE_IMAGE_URL ||
@@ -87,8 +88,36 @@ const ReturnManagement = () => {
     setDecisionNote('');
   };
 
-  const handleRefundStatusUpdate = async (orderId, refundStatus) => {
-    await dispatch(adminUpdateReturnRefundStatus({ orderId, refundStatus })).unwrap();
+  const handleRefundStatusUpdate = async (orderId, refundStatus, refundAmount) => {
+    await dispatch(adminUpdateReturnRefundStatus({ orderId, refundStatus, refundAmount })).unwrap();
+  };
+
+  const updateRefundAmount = (orderId, value) => {
+    setRefundAmounts((prev) => ({
+      ...prev,
+      [orderId]: value,
+    }));
+  };
+
+  const getRefundStatusClasses = (status) => {
+    switch (status) {
+      case 'PAID':
+        return 'bg-emerald-100 text-emerald-700 border border-emerald-200';
+      case 'PROCESSING':
+        return 'bg-sky-100 text-sky-700 border border-sky-200';
+      case 'FAILED':
+        return 'bg-rose-100 text-rose-700 border border-rose-200';
+      default:
+        return 'bg-amber-100 text-amber-700 border border-amber-200';
+    }
+  };
+
+  const getRefundAmountInput = (order) => {
+    const configuredAmount = refundAmounts[order._id];
+    if (configuredAmount !== undefined) return configuredAmount;
+    const existingAmount = Number(order?.returnRequest?.refundAmount || 0);
+    if (existingAmount > 0) return existingAmount.toFixed(2);
+    return Number(order?.total || 0).toFixed(2);
   };
 
   const getStatusClasses = (status) => {
@@ -151,6 +180,23 @@ const ReturnManagement = () => {
             const returnRequest = order.returnRequest || {};
             const bankDetails = returnRequest.bankDetails || {};
             const isDecisionOpen = selectedOrderId === order._id;
+            const refundAmountInput = getRefundAmountInput(order);
+            const returnedItems =
+              Array.isArray(returnRequest.selectedItems) && returnRequest.selectedItems.length
+                ? returnRequest.selectedItems
+                : (order.items || []).map((item, index) => ({
+                    index,
+                    kind: item.kind,
+                    name: item.readymadeProduct?.title || item.design?.title || item.design?.productName || item.dropproduct?.name || item.product?.name || 'Product',
+                    qty: item.qty || 0,
+                    size: item.size || '',
+                    unitPrice: item.unitPrice || 0,
+                  }));
+            const isRazorpayOrder =
+              order.payment?.method === 'RAZORPAY' && Boolean(order.payment?.razorpayPaymentId);
+            const isRefundProcessed = returnRequest.refundStatus === 'PAID';
+            const isRefundPending = returnRequest.refundStatus === 'PROCESSING';
+            const isRefundFailed = returnRequest.refundStatus === 'FAILED';
 
             return (
               <div key={order._id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -173,12 +219,31 @@ const ReturnManagement = () => {
                   </div>
 
                   <div className="grid gap-2 text-sm text-slate-600">
+                    <p><span className="font-medium text-slate-900">Payment source:</span> {order.payment?.method === 'COD' ? 'Cash on Delivery' : 'Razorpay'}</p>
                     <p><span className="font-medium text-slate-900">Refund method:</span> {bankDetails.method || 'N/A'}</p>
                     <p>
-                      <span className="font-medium text-slate-900">Refund payout:</span> {returnRequest.refundStatus === 'PAID' ? 'Paid' : 'Not paid'}
+                      <span className="font-medium text-slate-900">Refund payout:</span>{' '}
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${getRefundStatusClasses(returnRequest.refundStatus)}`}>
+                        {returnRequest.refundStatus === 'NOT_PAID' ? 'Not Paid' : returnRequest.refundStatus}
+                      </span>
                     </p>
+                    {Number(returnRequest.refundAmount || 0) > 0 ? (
+                      <p><span className="font-medium text-slate-900">Refund amount:</span> Rs.{Number(returnRequest.refundAmount).toFixed(2)}</p>
+                    ) : null}
                     {returnRequest.refundPaidAt ? (
                       <p><span className="font-medium text-slate-900">Refund paid at:</span> {formatDate(returnRequest.refundPaidAt)}</p>
+                    ) : null}
+                    {returnRequest.refundInitiatedAt ? (
+                      <p><span className="font-medium text-slate-900">Refund initiated at:</span> {formatDate(returnRequest.refundInitiatedAt)}</p>
+                    ) : null}
+                    {returnRequest.refundId ? (
+                      <p><span className="font-medium text-slate-900">Razorpay refund ID:</span> {returnRequest.refundId}</p>
+                    ) : null}
+                    {returnRequest.refundReference ? (
+                      <p><span className="font-medium text-slate-900">Bank reference:</span> {returnRequest.refundReference}</p>
+                    ) : null}
+                    {returnRequest.refundFailureReason ? (
+                      <p className="text-rose-600"><span className="font-medium text-rose-700">Refund error:</span> {returnRequest.refundFailureReason}</p>
                     ) : null}
                     {bankDetails.method === 'UPI' ? (
                       <p><span className="font-medium text-slate-900">UPI:</span> {bankDetails.upiId || 'N/A'}</p>
@@ -234,12 +299,14 @@ const ReturnManagement = () => {
                   </div>
 
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-sm font-semibold text-slate-900">Returned Order Items</p>
+                    <p className="text-sm font-semibold text-slate-900">
+                      Selected Return Items ({returnedItems.length})
+                    </p>
                     <div className="mt-3 space-y-3">
-                      {(order.items || []).map((item, index) => (
-                        <div key={`${order._id}-${index}`} className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">
+                      {returnedItems.map((item, index) => (
+                        <div key={`${order._id}-${item.index ?? index}`} className="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">
                           <p className="font-medium text-slate-900">
-                            {item.readymadeProduct?.title || item.design?.title || item.design?.productName || item.dropproduct?.name || item.product?.name || 'Product'}
+                            {item.name || item.readymadeProduct?.title || item.design?.title || item.design?.productName || item.dropproduct?.name || item.product?.name || 'Product'}
                           </p>
                           <p className="mt-1 text-xs text-slate-500">
                             Qty: {item.qty || 0} {item.size ? `· Size: ${item.size}` : ''}
@@ -307,10 +374,31 @@ const ReturnManagement = () => {
                             <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
                               Return approved. Please keep the shipment ready for pickup. Refund will be initiated after warehouse inspection (3-5 business days).
                             </div>
+                            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                              <label className="block text-sm font-semibold text-slate-900" htmlFor={`refund-amount-${order._id}`}>
+                                Refund Amount
+                              </label>
+                              <p className="mt-1 text-xs text-slate-500">
+                                Enter the exact amount to refund. For Razorpay payments, this will trigger the gateway refund.
+                              </p>
+                              <div className="mt-3 flex items-center gap-3">
+                                <span className="text-sm font-medium text-slate-500">Rs.</span>
+                                <input
+                                  id={`refund-amount-${order._id}`}
+                                  type="number"
+                                  min="0.01"
+                                  step="0.01"
+                                  value={refundAmountInput}
+                                  onChange={(event) => updateRefundAmount(order._id, event.target.value)}
+                                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                                  placeholder="0.00"
+                                />
+                              </div>
+                            </div>
                             <div className="flex gap-3">
                               <button
                                 type="button"
-                                onClick={() => handleRefundStatusUpdate(order._id, 'NOT_PAID')}
+                                onClick={() => handleRefundStatusUpdate(order._id, 'NOT_PAID', refundAmountInput)}
                                 disabled={updateLoading}
                                 className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold ${
                                   returnRequest.refundStatus === 'NOT_PAID'
@@ -322,17 +410,19 @@ const ReturnManagement = () => {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleRefundStatusUpdate(order._id, 'PAID')}
+                                onClick={() => handleRefundStatusUpdate(order._id, 'PAID', refundAmountInput)}
                                 disabled={updateLoading}
                                 className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold text-white ${
                                   updateLoading ? 'cursor-not-allowed bg-emerald-300' : 'bg-emerald-600 hover:bg-emerald-700'
                                 }`}
                               >
-                                Mark Paid
+                                {isRazorpayOrder ? 'Initiate Razorpay Refund' : 'Mark Paid'}
                               </button>
                             </div>
                             <p className="text-xs text-slate-500">
-                              User will see refund status immediately in the order page.
+                              {isRazorpayOrder
+                                ? 'This will call Razorpay refund using the amount you entered.'
+                                : 'User will see refund status immediately in the order page.'}
                             </p>
                           </>
                         ) : (

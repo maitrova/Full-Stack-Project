@@ -6,6 +6,7 @@ import Address from "../models/address.js";
 import {
   sendAdminOrderNotification,
   sendOrderStatusEmail,
+  sendReturnRefundPaidEmail,
 } from "../services/orderEmailService.js";
 import { applyInventoryForOrder } from "../services/inventoryService.js";
 import {
@@ -291,6 +292,45 @@ const finalizePostOrderFlow = async ({ orderDoc, userId }) => {
   );
 };
 
+const getRazorpayWebhookSecret = () =>
+  process.env.RAZORPAY_WEBHOOK_SECRET || process.env.RAZORPAY_KEY_SECRET;
+
+const verifyRazorpayWebhookSignature = (rawBody, signature) => {
+  const webhookSecret = getRazorpayWebhookSecret();
+  if (!webhookSecret) {
+    const error = new Error("Razorpay webhook secret is not configured");
+    error.statusCode = 500;
+    throw error;
+  }
+
+  const expectedSignature = crypto
+    .createHmac("sha256", webhookSecret)
+    .update(rawBody)
+    .digest("hex");
+
+  return expectedSignature === signature;
+};
+
+const mapWebhookRefundStatus = (status = "") => {
+  switch (String(status).toLowerCase()) {
+    case "processed":
+      return "PAID";
+    case "pending":
+      return "PROCESSING";
+    case "failed":
+      return "FAILED";
+    default:
+      return "PROCESSING";
+  }
+};
+
+const getWebhookRefundFailureReason = (event = {}) =>
+  event?.payload?.payment?.entity?.error_description ||
+  event?.payload?.payment?.entity?.error_reason ||
+  event?.payload?.refund?.entity?.notes?.failure_reason ||
+  event?.payload?.refund?.entity?.notes?.reason ||
+  "";
+
 export const createRazorpayOrderFromCart = async (req, res) => {
   try {
     const userId = req.user?.id;
@@ -494,5 +534,101 @@ export const verifyRazorpayPayment = async (req, res) => {
   } catch (err) {
     console.error("verifyRazorpayPayment error:", err);
     return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const handleRazorpayWebhook = async (req, res) => {
+  try {
+    const signature = req.get("X-Razorpay-Signature") || req.get("x-razorpay-signature");
+    if (!signature) {
+      return res.status(400).json({ message: "Missing Razorpay signature" });
+    }
+
+    const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : "";
+    if (!rawBody) {
+      return res.status(400).json({ message: "Missing webhook body" });
+    }
+
+    if (!verifyRazorpayWebhookSignature(rawBody, signature)) {
+      return res.status(401).json({ message: "Invalid webhook signature" });
+    }
+
+    let event;
+    try {
+      event = JSON.parse(rawBody);
+    } catch {
+      return res.status(400).json({ message: "Invalid webhook JSON" });
+    }
+
+    const eventName = String(event?.event || "").toLowerCase();
+    if (!["refund.created", "refund.processed", "refund.failed"].includes(eventName)) {
+      return res.status(200).json({ message: "Webhook ignored" });
+    }
+
+    const refund = event?.payload?.refund?.entity || {};
+    const payment = event?.payload?.payment?.entity || {};
+    const paymentId = refund.payment_id || payment.id;
+
+    if (!paymentId) {
+      return res.status(200).json({ message: "Webhook missing payment reference" });
+    }
+
+    const order = await Order.findOne({ "payment.razorpayPaymentId": paymentId }).populate("user");
+    if (!order) {
+      console.warn("[razorpay-webhook] Order not found for payment:", paymentId);
+      return res.status(200).json({ message: "Order not found" });
+    }
+
+    order.returnRequest = order.returnRequest || {};
+    const nextRefundStatus = mapWebhookRefundStatus(refund.status || (eventName === "refund.failed" ? "failed" : "pending"));
+    const currentRefundStatus = order.returnRequest.refundStatus || "NOT_PAID";
+    const nextRefundAmount = Number(refund.amount || 0) > 0 ? Number(refund.amount) / 100 : Number(order.returnRequest.refundAmount || order.total || 0);
+    const nextRefundReference =
+      refund?.acquirer_data?.arn ||
+      refund?.acquirer_data?.rrn ||
+      refund?.acquirer_data?.utr ||
+      refund?.acquirer_data?.reference_number ||
+      "";
+    const previousRefundStatus = currentRefundStatus;
+
+    order.returnRequest.refundId = refund.id || order.returnRequest.refundId || "";
+    order.returnRequest.refundAmount = nextRefundAmount;
+    order.returnRequest.refundCurrency = refund.currency || order.currency || "INR";
+    order.returnRequest.refundInitiatedAt = refund.created_at
+      ? new Date(refund.created_at * 1000)
+      : order.returnRequest.refundInitiatedAt || new Date();
+    order.returnRequest.refundReference = nextRefundReference || order.returnRequest.refundReference || "";
+    order.returnRequest.refundStatus = nextRefundStatus;
+
+    if (nextRefundStatus === "PAID") {
+      order.returnRequest.refundPaidAt = refund.created_at
+        ? new Date(refund.created_at * 1000)
+        : new Date();
+      order.returnRequest.refundFailureReason = "";
+    } else if (nextRefundStatus === "FAILED") {
+      order.returnRequest.refundFailureReason = getWebhookRefundFailureReason(event) || "Refund failed in Razorpay";
+      order.returnRequest.refundPaidAt = null;
+    } else {
+      order.returnRequest.refundPaidAt = null;
+      order.returnRequest.refundFailureReason = "";
+    }
+
+    await order.save();
+
+    if (previousRefundStatus !== "PAID" && nextRefundStatus === "PAID") {
+      try {
+        await sendReturnRefundPaidEmail(order, order.user);
+      } catch (emailError) {
+        console.error(
+          "handleRazorpayWebhook email error:",
+          emailError.response?.body || emailError
+        );
+      }
+    }
+
+    return res.status(200).json({ message: "Webhook processed" });
+  } catch (err) {
+    console.error("handleRazorpayWebhook error:", err);
+    return res.status(err.statusCode || 500).json({ message: err.message || "Server error" });
   }
 };

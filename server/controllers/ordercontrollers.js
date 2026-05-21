@@ -9,6 +9,7 @@ import {
   sendReturnRequestSubmittedEmail,
 } from "../services/orderEmailService.js";
 import { rollbackInventoryForOrder } from "../services/inventoryService.js";
+import { razorpay } from "../utils/razorpay.js";
 import {
   buildReviewLookupKey,
   getReviewTargetFromOrderItem,
@@ -22,6 +23,7 @@ const RETURN_STATUSES = ["NONE", "PROCESSING", "APPROVED", "REJECTED"];
 const RETURN_WINDOW_DAYS = 3;
 const ABSOLUTE_URL_RE = /^(?:https?:)?\/\//i;
 const SPECIAL_URL_RE = /^(?:data:|blob:)/i;
+const REFUND_STATUSES = ["NOT_PAID", "PROCESSING", "PAID", "FAILED"];
 
 const ensureAdmin = (req, res) => {
   if (!req.user || req.user.role !== "admin") {
@@ -95,8 +97,119 @@ const getReturnDeadline = (order) => {
 };
 
 const toTrimmedString = (value) => String(value || "").trim();
+const toPaise = (value) => Math.round(Number(value || 0) * 100);
 const isPaidOrCodOrder = (order) =>
   order?.status === "PAID" || order?.payment?.method === "COD";
+
+const getOrderItemDisplayName = (item) => {
+  if (!item) return "Product";
+
+  if (item.kind === "READYMADE" && item.readymadeProduct?.title) {
+    return item.readymadeProduct.title;
+  }
+
+  if (item.kind === "DESIGN" && (item.design?.title || item.design?.productName)) {
+    return item.design.title || item.design.productName;
+  }
+
+  if (item.kind === "DROPPRODUCT" && item.dropproduct?.name) {
+    return item.dropproduct.name;
+  }
+
+  if (item.product?.name) {
+    return item.product.name;
+  }
+
+  return "Product";
+};
+
+const parseSelectedItemIndexes = (value) => {
+  if (value == null || value === "") return [];
+
+  let rawValue = value;
+  if (typeof rawValue === "string") {
+    const trimmed = rawValue.trim();
+    if (!trimmed) return [];
+
+    try {
+      rawValue = JSON.parse(trimmed);
+    } catch {
+      rawValue = trimmed.includes(",")
+        ? trimmed.split(",").map((entry) => entry.trim())
+        : [trimmed];
+    }
+  }
+
+  const indexes = Array.isArray(rawValue) ? rawValue : [rawValue];
+  return [...new Set(
+    indexes
+      .map((index) => Number.parseInt(index, 10))
+      .filter((index) => Number.isInteger(index) && index >= 0)
+  )].sort((a, b) => a - b);
+};
+
+const buildSelectedReturnItems = (order, selectedItemIndexes = []) => {
+  const items = Array.isArray(order?.items) ? order.items : [];
+
+  return selectedItemIndexes
+    .map((index) => {
+      const item = items[index];
+      if (!item) return null;
+
+      return {
+        index,
+        kind: item.kind || "",
+        name: getOrderItemDisplayName(item),
+        size: item.size || "",
+        qty: Number(item.qty || 0),
+        unitPrice: Number(item.unitPrice || 0),
+        basePrice: Number(item.basePrice || 0),
+        currency: item.currency || order.currency || "INR",
+        previewImage: item.previewImage || "",
+        signature: item.signature || "",
+      };
+    })
+    .filter(Boolean);
+};
+
+const parsePositiveAmount = (value) => {
+  const normalized = Number(value);
+  if (!Number.isFinite(normalized)) return null;
+  if (normalized <= 0) return null;
+  return Math.round(normalized * 100) / 100;
+};
+
+const resolveRefundReference = (acquirerData = {}) =>
+  acquirerData?.arn ||
+  acquirerData?.rrn ||
+  acquirerData?.utr ||
+  acquirerData?.reference_number ||
+  "";
+
+const mapRazorpayRefundStatus = (status) => {
+  switch (String(status || "").toLowerCase()) {
+    case "processed":
+      return "PAID";
+    case "pending":
+      return "PROCESSING";
+    case "failed":
+      return "FAILED";
+    default:
+      return "FAILED";
+  }
+};
+
+const resetRefundTracking = (returnRequest) => {
+  if (!returnRequest) return;
+  returnRequest.refundPaidAt = null;
+  returnRequest.refundInitiatedAt = null;
+  returnRequest.refundAmount = 0;
+  returnRequest.refundCurrency = "INR";
+  returnRequest.refundId = "";
+  returnRequest.refundReceipt = "";
+  returnRequest.refundReference = "";
+  returnRequest.refundFailureReason = "";
+};
 
 const normalizeBankDetails = (bankDetails = {}) => ({
   method: toTrimmedString(bankDetails.method).toUpperCase(),
@@ -145,19 +258,37 @@ const shapeReturnRequest = (req, returnRequest = {}) => {
   const status = RETURN_STATUSES.includes(returnRequest.status)
     ? returnRequest.status
     : "NONE";
+  const refundStatus = REFUND_STATUSES.includes(returnRequest.refundStatus)
+    ? returnRequest.refundStatus
+    : "NOT_PAID";
 
   return {
     status,
     requestedAt: returnRequest.requestedAt || null,
     decidedAt: returnRequest.decidedAt || null,
     refundPaidAt: returnRequest.refundPaidAt || null,
+    refundInitiatedAt: returnRequest.refundInitiatedAt || null,
     deadlineAt: returnRequest.deadlineAt || null,
     reason: returnRequest.reason || "",
     imageUrls: Array.isArray(returnRequest.imageUrls)
       ? returnRequest.imageUrls.map((url) => resolveOrderAssetUrl(req, url))
       : [],
     adminDecisionNote: returnRequest.adminDecisionNote || "",
-    refundStatus: returnRequest.refundStatus || "NOT_PAID",
+    refundStatus,
+    refundAmount: Number(returnRequest.refundAmount || 0),
+    refundCurrency: returnRequest.refundCurrency || "INR",
+    refundId: returnRequest.refundId || "",
+    refundReceipt: returnRequest.refundReceipt || "",
+    refundReference: returnRequest.refundReference || "",
+    refundFailureReason: returnRequest.refundFailureReason || "",
+    selectedItemIndexes: Array.isArray(returnRequest.selectedItemIndexes)
+      ? returnRequest.selectedItemIndexes
+          .map((index) => Number.parseInt(index, 10))
+          .filter((index) => Number.isInteger(index) && index >= 0)
+      : [],
+    selectedItems: Array.isArray(returnRequest.selectedItems)
+      ? returnRequest.selectedItems
+      : [],
     bankDetails: {
       method: returnRequest.bankDetails?.method || "",
       accountHolderName: returnRequest.bankDetails?.accountHolderName || "",
@@ -254,9 +385,9 @@ const attachReturnMetaToOrders = (req, orders) => {
   if (!Array.isArray(orders)) return [];
 
   return orders.map((order) => {
-    const hasCustomDesignItem = Array.isArray(order.items)
-      ? order.items.some((item) => item?.kind === "DESIGN")
-      : false;
+    const orderItems = Array.isArray(order.items) ? order.items : [];
+    const hasCustomDesignItem = orderItems.some((item) => item?.kind === "DESIGN");
+    const hasReturnableItem = orderItems.some((item) => item?.kind && item.kind !== "DESIGN");
     const deadlineAt =
       order.returnRequest?.deadlineAt ||
       getReturnDeadline(order);
@@ -264,7 +395,7 @@ const attachReturnMetaToOrders = (req, orders) => {
     const returnEligible =
       isPaidOrCodOrder(order) &&
       order.orderStatus === "DELIVERED" &&
-      !hasCustomDesignItem &&
+      hasReturnableItem &&
       returnStatus === "NONE" &&
       deadlineAt &&
       new Date(deadlineAt).getTime() >= Date.now();
@@ -277,7 +408,7 @@ const attachReturnMetaToOrders = (req, orders) => {
       }),
       returnEligible,
       returnDeadlineAt: deadlineAt || null,
-      returnRestrictedReason: hasCustomDesignItem
+      returnRestrictedReason: !hasReturnableItem && hasCustomDesignItem
         ? "Customized products are not eligible for return. Please contact the support team."
         : "",
     };
@@ -460,12 +591,6 @@ export const submitReturnRequest = async (req, res) => {
       });
     }
 
-    if (Array.isArray(order.items) && order.items.some((item) => item?.kind === "DESIGN")) {
-      return res.status(400).json({
-        message: "Customized products are not eligible for return. Please contact the support team.",
-      });
-    }
-
     const existingStatus = order.returnRequest?.status || "NONE";
     if (existingStatus !== "NONE") {
       return res.status(400).json({ message: "Return request already submitted for this order" });
@@ -482,6 +607,28 @@ export const submitReturnRequest = async (req, res) => {
     const reason = toTrimmedString(req.body?.reason);
     if (!reason) {
       return res.status(400).json({ message: "Return reason is required" });
+    }
+
+    const selectedItemIndexes = parseSelectedItemIndexes(req.body?.selectedItemIndexes);
+    if (!selectedItemIndexes.length) {
+      return res.status(400).json({ message: "Select at least one product to return" });
+    }
+
+    const items = Array.isArray(order.items) ? order.items : [];
+    if (selectedItemIndexes.some((index) => index >= items.length)) {
+      return res.status(400).json({ message: "One or more selected products are invalid" });
+    }
+
+    const selectedItems = buildSelectedReturnItems(order, selectedItemIndexes);
+    if (!selectedItems.length) {
+      return res.status(400).json({ message: "Select at least one valid product to return" });
+    }
+
+    const hasCustomDesignSelection = selectedItems.some((item) => item.kind === "DESIGN");
+    if (hasCustomDesignSelection) {
+      return res.status(400).json({
+        message: "Customized products are not eligible for return. Please exclude them from the selection.",
+      });
     }
 
     const { error: bankDetailsError, bankDetails } = validateReturnBankDetails(req.body || {});
@@ -502,11 +649,20 @@ export const submitReturnRequest = async (req, res) => {
       requestedAt: new Date(),
       decidedAt: null,
       refundPaidAt: null,
+      refundInitiatedAt: null,
       deadlineAt,
       reason,
       imageUrls,
       adminDecisionNote: "",
       refundStatus: "NOT_PAID",
+      refundAmount: 0,
+      refundCurrency: order.currency || "INR",
+      refundId: "",
+      refundReceipt: "",
+      refundReference: "",
+      refundFailureReason: "",
+      selectedItemIndexes,
+      selectedItems,
       bankDetails,
     };
 
@@ -1067,7 +1223,7 @@ export const adminUpdateReturnRequest = async (req, res) => {
     order.returnRequest.decidedAt = new Date();
     order.returnRequest.adminDecisionNote = adminDecisionNote;
     order.returnRequest.refundStatus = "NOT_PAID";
-    order.returnRequest.refundPaidAt = null;
+    resetRefundTracking(order.returnRequest);
 
     await order.save();
 
@@ -1115,6 +1271,8 @@ export const adminUpdateReturnRefundStatus = async (req, res) => {
       return res.status(400).json({ message: "Refund status must be NOT_PAID or PAID" });
     }
 
+    const refundAmount = parsePositiveAmount(req.body?.refundAmount);
+
     const order = await Order.findById(orderId)
       .populate("user", "name email")
       .populate("deliveryAddress")
@@ -1139,11 +1297,110 @@ export const adminUpdateReturnRefundStatus = async (req, res) => {
       return res.status(400).json({ message: "Refund status can only be updated for approved returns" });
     }
 
-    order.returnRequest.refundStatus = nextRefundStatus;
-    order.returnRequest.refundPaidAt = nextRefundStatus === "PAID" ? new Date() : null;
-    await order.save();
+    if (nextRefundStatus === "NOT_PAID") {
+      if (
+        order.payment?.method === "RAZORPAY" &&
+        ["PROCESSING", "PAID"].includes(order.returnRequest?.refundStatus || "NOT_PAID")
+      ) {
+        return res.status(400).json({
+          message: "Razorpay refund has already been initiated. It cannot be reset to NOT_PAID.",
+        });
+      }
 
-    if (nextRefundStatus === "PAID") {
+      order.returnRequest.refundStatus = "NOT_PAID";
+      resetRefundTracking(order.returnRequest);
+      await order.save();
+    } else if (order.payment?.method === "RAZORPAY") {
+      if (!order.payment?.razorpayPaymentId) {
+        return res.status(400).json({
+          message: "Razorpay payment ID is missing for this order. Refund cannot be initiated.",
+        });
+      }
+
+      if (!refundAmount) {
+        return res.status(400).json({ message: "Refund amount is required" });
+      }
+
+      if (toPaise(refundAmount) > toPaise(order.total)) {
+        return res.status(400).json({
+          message: "Refund amount cannot be greater than the original payment amount",
+        });
+      }
+
+      if (["PROCESSING", "PAID"].includes(order.returnRequest?.refundStatus || "NOT_PAID")) {
+        return res.status(400).json({
+          message: "Refund has already been initiated for this return request",
+        });
+      }
+
+      const receipt = `return_${String(order._id)}_${Date.now()}`;
+      let refund;
+
+      try {
+        refund = await razorpay.payments.refund(order.payment.razorpayPaymentId, {
+          amount: toPaise(refundAmount),
+          speed: "normal",
+          receipt,
+          notes: {
+            orderId: String(order._id),
+            returnStatus: order.returnRequest?.status || "APPROVED",
+            refundMethod: order.returnRequest?.bankDetails?.method || "",
+          },
+        });
+      } catch (refundError) {
+        order.returnRequest.refundStatus = "FAILED";
+        order.returnRequest.refundAmount = refundAmount;
+        order.returnRequest.refundCurrency = order.currency || "INR";
+        order.returnRequest.refundPaidAt = null;
+        order.returnRequest.refundInitiatedAt = new Date();
+        order.returnRequest.refundId = "";
+        order.returnRequest.refundReceipt = receipt;
+        order.returnRequest.refundReference = "";
+        order.returnRequest.refundFailureReason =
+          refundError?.error?.description ||
+          refundError?.description ||
+          refundError?.message ||
+          "Refund initiation failed";
+        await order.save();
+
+        return res.status(400).json({
+          message: order.returnRequest.refundFailureReason,
+        });
+      }
+
+      order.returnRequest.refundStatus = mapRazorpayRefundStatus(refund.status);
+      order.returnRequest.refundAmount = Number(refundAmount);
+      order.returnRequest.refundCurrency = refund.currency || order.currency || "INR";
+      order.returnRequest.refundInitiatedAt = refund.created_at
+        ? new Date(refund.created_at * 1000)
+        : new Date();
+      order.returnRequest.refundPaidAt =
+        refund.status === "processed"
+          ? (refund.created_at ? new Date(refund.created_at * 1000) : new Date())
+          : null;
+      order.returnRequest.refundId = refund.id || "";
+      order.returnRequest.refundReceipt = refund.receipt || receipt;
+      order.returnRequest.refundReference = resolveRefundReference(refund.acquirer_data);
+      order.returnRequest.refundFailureReason = "";
+      await order.save();
+    } else {
+      if (!refundAmount) {
+        return res.status(400).json({ message: "Refund amount is required" });
+      }
+
+      order.returnRequest.refundStatus = "PAID";
+      order.returnRequest.refundAmount = refundAmount;
+      order.returnRequest.refundCurrency = order.currency || "INR";
+      order.returnRequest.refundInitiatedAt = new Date();
+      order.returnRequest.refundPaidAt = new Date();
+      order.returnRequest.refundId = "";
+      order.returnRequest.refundReceipt = "";
+      order.returnRequest.refundReference = "";
+      order.returnRequest.refundFailureReason = "";
+      await order.save();
+    }
+
+    if (order.returnRequest.refundStatus === "PAID") {
       try {
         await sendReturnRefundPaidEmail(order, order.user);
       } catch (emailError) {
@@ -1165,7 +1422,14 @@ export const adminUpdateReturnRefundStatus = async (req, res) => {
     };
 
     return res.status(200).json({
-      message: `Refund status updated to ${nextRefundStatus}`,
+      message:
+        order.returnRequest.refundStatus === "PROCESSING"
+          ? "Refund initiated successfully and is being processed by Razorpay"
+          : order.returnRequest.refundStatus === "PAID"
+          ? "Refund marked as paid"
+          : order.returnRequest.refundStatus === "FAILED"
+          ? "Refund initiation failed"
+          : `Refund status updated to ${order.returnRequest.refundStatus}`,
       order: shaped,
     });
   } catch (err) {

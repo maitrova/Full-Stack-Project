@@ -259,7 +259,19 @@ const buildCustomerTemplateBaseParams = (order, user, orderDate) => {
   const billingAddress = buildAddressText(order.billingAddress);
   const returnRequest = order.returnRequest || {};
   const bankDetails = returnRequest.bankDetails || {};
+  const returnSelectedItems = Array.isArray(returnRequest.selectedItems)
+    ? returnRequest.selectedItems
+    : [];
+  const returnSelectedItemsSummary = returnSelectedItems.length
+    ? returnSelectedItems
+        .map((item) => `${item.name || "Product"}${Number(item.qty || 0) > 0 ? ` x${Number(item.qty)}` : ""}`)
+        .join(", ")
+    : "";
   const paymentMethod = resolvePaymentMethod(order);
+  const refundAmount =
+    Number(returnRequest.refundAmount || 0) > 0
+      ? Number(returnRequest.refundAmount || 0)
+      : Number(order.total || 0);
 
   const params = {
     customerName: user?.name || "",
@@ -294,7 +306,7 @@ const buildCustomerTemplateBaseParams = (order, user, orderDate) => {
     discount_amount: formatAmount(order.discount),
     total: formatAmount(order.total),
     total_amount: formatAmount(order.total),
-    total_refund_amount: formatAmount(order.total),
+    total_refund_amount: formatAmount(refundAmount),
     currency: order.currency || "INR",
     delivery_address: deliveryAddress,
     billing_address: billingAddress || deliveryAddress,
@@ -304,9 +316,15 @@ const buildCustomerTemplateBaseParams = (order, user, orderDate) => {
     return_decided_at: safeFormatDateTime(returnRequest.decidedAt),
     return_deadline_at: safeFormatDateTime(returnRequest.deadlineAt),
     return_reason: returnRequest.reason || "",
+    return_selected_items: returnSelectedItemsSummary,
+    return_selected_items_count: returnSelectedItems.length,
     admin_decision_note: returnRequest.adminDecisionNote || "",
     refund_status: returnRequest.refundStatus || "NOT_PAID",
     refund_paid_at: safeFormatDateTime(returnRequest.refundPaidAt),
+    refund_initiated_at: safeFormatDateTime(returnRequest.refundInitiatedAt),
+    refund_id: returnRequest.refundId || "",
+    refund_reference: returnRequest.refundReference || "",
+    refund_failure_reason: returnRequest.refundFailureReason || "",
     refund_method: bankDetails.method || "",
     refund_account_holder_name: bankDetails.accountHolderName || "",
     refund_account_number_masked: maskAccountNumber(bankDetails.accountNumber),
@@ -691,6 +709,7 @@ export const sendReturnRequestSubmittedEmail = async (order, user) =>
           <h2>${params.event_title}</h2>
           <p>Hello ${emailUser.name || "Customer"},</p>
           <p>Your return request for order #${params.order_id} has been submitted.</p>
+          <p>Selected Items: ${params.return_selected_items || "N/A"}</p>
           <p>Reason: ${params.return_reason}</p>
           <p>Requested At: ${params.return_requested_at}</p>
           <p>${params.event_message}</p>

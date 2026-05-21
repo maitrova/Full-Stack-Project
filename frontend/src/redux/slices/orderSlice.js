@@ -223,11 +223,11 @@ export const adminUpdateReturnRequest = createAsyncThunk(
 
 export const adminUpdateReturnRefundStatus = createAsyncThunk(
   "orders/adminUpdateReturnRefundStatus",
-  async ({ orderId, refundStatus }, { getState, rejectWithValue }) => {
+  async ({ orderId, refundStatus, refundAmount }, { getState, rejectWithValue }) => {
     try {
       const res = await axios.patch(
         `${API_URL}/admin/returns/${orderId}/refund-status`,
-        { refundStatus },
+        { refundStatus, refundAmount },
         {
           headers: { ...getAuthHeaders(getState) },
           withCredentials: true,

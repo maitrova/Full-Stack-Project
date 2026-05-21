@@ -101,6 +101,7 @@ const UserOrders = () => {
     branchName: '',
     upiId: '',
     images: [],
+    selectedItemIndexes: [],
   });
   const [reviewModalState, setReviewModalState] = useState({
     isOpen: false,
@@ -226,6 +227,7 @@ const UserOrders = () => {
       branchName: '',
       upiId: '',
       images: [],
+      selectedItemIndexes: [],
     });
   };
 
@@ -251,10 +253,30 @@ const UserOrders = () => {
     setReturnForm((prev) => ({ ...prev, images: files }));
   };
 
+  const toggleReturnItemSelection = (itemIndex, isSelectable) => {
+    if (!isSelectable) return;
+
+    setReturnForm((prev) => {
+      const current = prev.selectedItemIndexes || [];
+      const exists = current.includes(itemIndex);
+      return {
+        ...prev,
+        selectedItemIndexes: exists
+          ? current.filter((index) => index !== itemIndex)
+          : [...current, itemIndex],
+      };
+    });
+  };
+
   const selectedBankOption = BANK_OPTIONS.find((option) => option.value === returnForm.bankName) || null;
+  const isReturnItemSelectable = (item) => item?.kind !== 'DESIGN';
 
   const isReturnFormValid = () => {
     if (!returnForm.reason.trim() || returnForm.images.length === 0) {
+      return false;
+    }
+
+    if (!returnForm.selectedItemIndexes.length) {
       return false;
     }
 
@@ -281,6 +303,7 @@ const UserOrders = () => {
     formData.append('bankName', returnForm.bankName);
     formData.append('branchName', returnForm.branchName);
     formData.append('upiId', returnForm.upiId);
+    formData.append('selectedItemIndexes', JSON.stringify(returnForm.selectedItemIndexes));
     returnForm.images.forEach((file) => formData.append('images', file));
 
     const resultAction = await dispatch(submitReturnRequest({ orderId, formData }));
@@ -305,6 +328,7 @@ const UserOrders = () => {
 
   const getStatusColor = (status) => {
     const colors = {
+      CANCELLED: 'bg-rose-100 text-rose-800 border border-rose-200',
       PROCESSING: 'bg-blue-100 text-blue-800 border border-blue-200',
       READY: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
       SHIPPED: 'bg-purple-100 text-purple-800 border border-purple-200',
@@ -325,7 +349,12 @@ const UserOrders = () => {
   };
 
   const getDisplayPaymentStatus = (order) =>
-    order?.payment?.method === 'COD' ? 'COD' : (order?.status || 'PENDING_PAYMENT');
+    order?.status === 'CANCELLED'
+      ? 'CANCELLED'
+      : (order?.payment?.method === 'COD' ? 'COD' : (order?.status || 'PENDING_PAYMENT'));
+
+  const getDisplayOrderStatus = (order) =>
+    order?.status === 'CANCELLED' ? 'CANCELLED' : (order?.orderStatus || 'PROCESSING');
 
   const calculateTotal = (order) => {
     if (!order?.items) return '0.00';
@@ -480,14 +509,26 @@ const UserOrders = () => {
 
   const getFullImageUrl = (path) => resolveImageUrl(path);
 
-  const getOrderStatusProgress = (orderStatus) => {
+  const getOrderStatusProgress = (order) => {
+    if (order?.status === 'CANCELLED') {
+      return {
+        processing: false,
+        ready: false,
+        shipped: false,
+        delivered: false,
+        cancelled: true
+      };
+    }
+
+    const orderStatus = order?.orderStatus;
     const statusOrder = ['PROCESSING', 'READY', 'SHIPPED', 'DELIVERED'];
     const currentIndex = statusOrder.indexOf(orderStatus);
     return {
       processing: currentIndex >= 0,
       ready: currentIndex >= 1,
       shipped: currentIndex >= 2,
-      delivered: currentIndex >= 3
+      delivered: currentIndex >= 3,
+      cancelled: false
     };
   };
 
@@ -498,6 +539,10 @@ const UserOrders = () => {
 
   const getReturnStatusInfo = (order) => {
     const status = order?.returnRequest?.status || 'NONE';
+    const refundStatus = order?.returnRequest?.refundStatus || 'NOT_PAID';
+    const refundAmount = Number(order?.returnRequest?.refundAmount || 0);
+    const formattedRefundAmount =
+      refundAmount > 0 ? ` Rs.${refundAmount.toFixed(2)}` : '';
 
     if (status === 'PROCESSING') {
       return {
@@ -507,12 +552,28 @@ const UserOrders = () => {
     }
 
     if (status === 'APPROVED') {
-      if (order?.returnRequest?.refundStatus === 'PAID') {
+      if (refundStatus === 'PAID') {
         return {
           tone: 'emerald',
           message: order?.returnRequest?.refundPaidAt
-            ? `Refund paid on ${formatDate(order.returnRequest.refundPaidAt)}.`
-            : 'Refund paid successfully.',
+            ? `Refund of${formattedRefundAmount} was processed on ${formatDate(order.returnRequest.refundPaidAt)}. It may still take a few working days to reflect in your account.`
+            : `Refund of${formattedRefundAmount} was processed successfully. It may still take a few working days to reflect in your account.`,
+        };
+      }
+
+      if (refundStatus === 'PROCESSING') {
+        return {
+          tone: 'blue',
+          message: order?.returnRequest?.refundInitiatedAt
+            ? `Refund of${formattedRefundAmount} was initiated on ${formatDate(order.returnRequest.refundInitiatedAt)} and is waiting for Razorpay/bank settlement.`
+            : `Refund of${formattedRefundAmount} has been initiated and is waiting for Razorpay/bank settlement.`,
+        };
+      }
+
+      if (refundStatus === 'FAILED') {
+        return {
+          tone: 'rose',
+          message: order?.returnRequest?.refundFailureReason || 'Refund initiation failed. Our team will retry the refund shortly.',
         };
       }
 
@@ -747,7 +808,7 @@ const UserOrders = () => {
           ) : (
             <ul className="divide-y divide-gray-200">
               {orders.map((order) => {
-                const progress = getOrderStatusProgress(order.orderStatus);
+                const progress = getOrderStatusProgress(order);
                 const isDownloadingThisInvoice = downloadingOrderId === order._id;
                 const reviewableItems = (order.items || []).filter((item) => item.reviewMeta?.reviewable);
                 const reviewedItemsCount = (order.items || []).filter((item) => item.reviewMeta?.existingReview).length;
@@ -761,6 +822,7 @@ const UserOrders = () => {
                 const cancellationNote = getCancellationNote(order);
                 const returnStatusInfo = getReturnStatusInfo(order);
                 const returnAdminNote = getReturnAdminNote(order);
+                const displayOrderStatus = getDisplayOrderStatus(order);
                 return (
                   <li key={order._id} className="p-6 hover:bg-gray-50">
                     <div className="flex flex-col md:flex-row md:items-center justify-between">
@@ -778,20 +840,39 @@ const UserOrders = () => {
                         
                         {/* Order Progress */}
                         <div className="mt-4">
-                          <div className="flex items-center">
-                            <div className={`w-3 h-3 rounded-full ${progress.processing ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                            <div className={`flex-1 h-1 mx-2 ${progress.ready ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                            <div className={`w-3 h-3 rounded-full ${progress.ready ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                            <div className={`flex-1 h-1 mx-2 ${progress.shipped ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                            <div className={`w-3 h-3 rounded-full ${progress.shipped ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                            <div className={`flex-1 h-1 mx-2 ${progress.delivered ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                            <div className={`w-3 h-3 rounded-full ${progress.delivered ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                          <div className="mb-3 flex flex-wrap items-center gap-3">
+                            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusColor(displayOrderStatus)}`}>
+                              {displayOrderStatus}
+                            </span>
+                            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getPaymentStatusColor(getDisplayPaymentStatus(order))}`}>
+                              {getDisplayPaymentStatus(order).replace('_', ' ')}
+                            </span>
                           </div>
-                          <div className="flex justify-between text-xs text-gray-500 mt-2">
-                            <span>Processing</span>
-                            <span>Ready</span>
-                            <span>Shipped</span>
-                            <span>Delivered</span>
+                          <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                            <div className={progress.cancelled ? 'pointer-events-none blur-[1.5px] opacity-45' : ''}>
+                              <div className="flex items-center">
+                                <div className={`w-3 h-3 rounded-full ${progress.processing ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                                <div className={`flex-1 h-1 mx-2 ${progress.ready ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                                <div className={`w-3 h-3 rounded-full ${progress.ready ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                                <div className={`flex-1 h-1 mx-2 ${progress.shipped ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                                <div className={`w-3 h-3 rounded-full ${progress.shipped ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                                <div className={`flex-1 h-1 mx-2 ${progress.delivered ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                                <div className={`w-3 h-3 rounded-full ${progress.delivered ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                              </div>
+                              <div className="mt-2 flex justify-between text-xs text-gray-500">
+                                <span>Processing</span>
+                                <span>Ready</span>
+                                <span>Shipped</span>
+                                <span>Delivered</span>
+                              </div>
+                            </div>
+                            {progress.cancelled ? (
+                              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                                <span className="rounded-full border border-rose-200 bg-white/95 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-rose-700 shadow-sm">
+                                  Cancelled
+                                </span>
+                              </div>
+                            ) : null}
                           </div>
                           {cancellationNote ? (
                             <div className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
@@ -1086,8 +1167,8 @@ const UserOrders = () => {
                       <div>
                         <h4 className="text-lg font-medium text-gray-900">Order Status</h4>
                         <div className="flex items-center space-x-4 mt-2">
-                          <span className={`px-4 py-2 rounded-full text-sm font-semibold ${getStatusColor(selectedOrder.orderStatus)}`}>
-                            {selectedOrder.orderStatus}
+                          <span className={`px-4 py-2 rounded-full text-sm font-semibold ${getStatusColor(getDisplayOrderStatus(selectedOrder))}`}>
+                            {getDisplayOrderStatus(selectedOrder)}
                           </span>
                           <span className={`px-4 py-2 rounded-full text-sm font-semibold ${getPaymentStatusColor(getDisplayPaymentStatus(selectedOrder))}`}>
                             {getDisplayPaymentStatus(selectedOrder).replace('_', ' ')}
@@ -1101,33 +1182,49 @@ const UserOrders = () => {
                     
                     {/* Progress Bar */}
                     <div className="mt-6">
-                      <div className="flex items-center">
-                        <div className={`w-4 h-4 rounded-full ${selectedOrder.orderStatus === 'PROCESSING' || selectedOrder.orderStatus === 'READY' || selectedOrder.orderStatus === 'SHIPPED' || selectedOrder.orderStatus === 'DELIVERED' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                        <div className={`flex-1 h-2 mx-4 ${selectedOrder.orderStatus === 'READY' || selectedOrder.orderStatus === 'SHIPPED' || selectedOrder.orderStatus === 'DELIVERED' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                        <div className={`w-4 h-4 rounded-full ${selectedOrder.orderStatus === 'READY' || selectedOrder.orderStatus === 'SHIPPED' || selectedOrder.orderStatus === 'DELIVERED' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                        <div className={`flex-1 h-2 mx-4 ${selectedOrder.orderStatus === 'SHIPPED' || selectedOrder.orderStatus === 'DELIVERED' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                        <div className={`w-4 h-4 rounded-full ${selectedOrder.orderStatus === 'SHIPPED' || selectedOrder.orderStatus === 'DELIVERED' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                        <div className={`flex-1 h-2 mx-4 ${selectedOrder.orderStatus === 'DELIVERED' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                        <div className={`w-4 h-4 rounded-full ${selectedOrder.orderStatus === 'DELIVERED' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                      </div>
-                      <div className="flex justify-between text-sm text-gray-600 mt-2">
-                        <div className="text-center">
-                          <div className="font-medium">Processing</div>
-                          <div className="text-xs">Order confirmed</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="font-medium">Ready</div>
-                          <div className="text-xs">Preparing to ship</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="font-medium">Shipped</div>
-                          <div className="text-xs">On the way</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="font-medium">Delivered</div>
-                          <div className="text-xs">Order received</div>
-                        </div>
-                      </div>
+                      {(() => {
+                        const progress = getOrderStatusProgress(selectedOrder);
+                        return (
+                          <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white px-5 py-5">
+                            <div className={progress.cancelled ? 'pointer-events-none blur-[2px] opacity-45' : ''}>
+                              <div className="flex items-center">
+                                <div className={`w-4 h-4 rounded-full ${progress.processing ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                                <div className={`flex-1 h-2 mx-4 ${progress.ready ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                                <div className={`w-4 h-4 rounded-full ${progress.ready ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                                <div className={`flex-1 h-2 mx-4 ${progress.shipped ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                                <div className={`w-4 h-4 rounded-full ${progress.shipped ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                                <div className={`flex-1 h-2 mx-4 ${progress.delivered ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                                <div className={`w-4 h-4 rounded-full ${progress.delivered ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                              </div>
+                              <div className="mt-2 flex justify-between text-sm text-gray-600">
+                                <div className="text-center">
+                                  <div className="font-medium">Processing</div>
+                                  <div className="text-xs">Order confirmed</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="font-medium">Ready</div>
+                                  <div className="text-xs">Preparing to ship</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="font-medium">Shipped</div>
+                                  <div className="text-xs">On the way</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="font-medium">Delivered</div>
+                                  <div className="text-xs">Order received</div>
+                                </div>
+                              </div>
+                            </div>
+                            {progress.cancelled ? (
+                              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                                <span className="rounded-full border border-rose-200 bg-white/95 px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-rose-700 shadow-sm">
+                                  Cancelled
+                                </span>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })()}
                     </div>
                       </div>
                     );
@@ -1546,6 +1643,80 @@ const UserOrders = () => {
             <div className="space-y-6 px-6 py-6">
               <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">
                 Return deadline: {formatDate(returnModalOrder.returnDeadlineAt)}
+              </div>
+
+              <div>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <label className="block text-sm font-medium text-slate-700">
+                    Select product(s) to return
+                  </label>
+                  <span className="text-xs font-medium text-slate-500">
+                    {returnForm.selectedItemIndexes.length} selected
+                  </span>
+                </div>
+                <p className="mb-3 text-xs text-slate-500">
+                  Choose one damaged product or multiple items from this order. Customized products are not eligible for return.
+                </p>
+                <div className="space-y-3">
+                  {(returnModalOrder.items || []).map((item, index) => {
+                    const isSelectable = isReturnItemSelectable(item);
+                    const isSelected = returnForm.selectedItemIndexes.includes(index);
+                    return (
+                      <button
+                        key={`${item.kind || 'item'}-${index}`}
+                        type="button"
+                        onClick={() => toggleReturnItemSelection(index, isSelectable)}
+                        className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition ${
+                          isSelected
+                            ? 'border-sky-400 bg-sky-50'
+                            : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                        } ${!isSelectable ? 'cursor-not-allowed opacity-60' : ''}`}
+                      >
+                        <div className="relative h-16 w-16 flex-none overflow-hidden rounded-lg bg-slate-100">
+                          <img
+                            src={getItemImage(item)}
+                            alt={getItemName(item)}
+                            className="h-full w-full object-cover"
+                            onError={(e) => {
+                              handleImageError(e);
+                            }}
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="truncate text-sm font-semibold text-slate-900">
+                                {getItemName(item)}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                Qty: {item.qty || 0} · ₹{Number(item.unitPrice || 0).toFixed(2)} each
+                              </p>
+                              {item.size ? (
+                                <p className="mt-1 text-xs text-slate-500">Size: {item.size}</p>
+                              ) : null}
+                            </div>
+                            <div className="flex flex-col items-end gap-2">
+                              <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                                {getItemType(item)}
+                              </span>
+                              <span
+                                className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                  isSelectable
+                                    ? isSelected
+                                      ? 'bg-sky-100 text-sky-700'
+                                      : 'bg-emerald-50 text-emerald-700'
+                                    : 'bg-rose-50 text-rose-700'
+                                }`}
+                              >
+                                {isSelectable ? (isSelected ? 'Selected' : 'Returnable') : 'Not eligible'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div>

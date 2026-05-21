@@ -25,6 +25,7 @@ import designsizeselection from './routes/designsizeselectionroute.js';
 import addressroute from './routes/addressroutes.js';
 import paymentrouter from './routes/paymentRoutes.js';
 import orderroutes from './routes/orderRoutes.js';
+import { handleRazorpayWebhook } from './controllers/paymentController.js';
 import admincategory from './routes/adminCategoryRoutes.js';
 import exportrouter from './routes/exportRoutes.js';
 import emailrouter from './routes/emailroute.js';
@@ -62,6 +63,11 @@ const allowedOrigins = configuredCorsOrigins.length
   : defaultCorsOrigins;
 
 // Middleware
+app.post(
+  "/api/payment/webhooks/razorpay",
+  express.raw({ type: "application/json" }),
+  handleRazorpayWebhook
+);
 app.use(express.json({ limit: "200mb" }));
 app.use(express.urlencoded({ extended: true, limit: "200mb" }));
 app.use(

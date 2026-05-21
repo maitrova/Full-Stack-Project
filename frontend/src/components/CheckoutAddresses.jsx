@@ -296,6 +296,8 @@ export default function CheckoutAddresses() {
   const [codLoading, setCodLoading] = useState(false);
   const [codError, setCodError] = useState("");
   const [codMinimumOrderAmount, setCodMinimumOrderAmount] = useState(0);
+  const [openDeliverySection, setOpenDeliverySection] = useState(false);
+  const [openBillingSection, setOpenBillingSection] = useState(false);
   const isEditing = useMemo(() => mode.startsWith("edit"), [mode]);
   const normalizedCouponCode = useMemo(() => String(couponCode || "").trim().toUpperCase(), [couponCode]);
   const isCouponApplied = couponState.status === "applied" && couponState.code === normalizedCouponCode;
@@ -331,6 +333,15 @@ export default function CheckoutAddresses() {
     if (deliverySaved) setDelivery((prev) => ({ ...prev, fullName: deliverySaved.fullName || "", mobileNumber: deliverySaved.mobileNumber || "", completeAddress: deliverySaved.completeAddress || "", landmark: deliverySaved.landmark || "", pincode: deliverySaved.pincode || "", city: deliverySaved.city || "", state: deliverySaved.state || "" }));
     if (billingSaved) setBilling((prev) => ({ ...prev, fullName: billingSaved.fullName || "", mobileNumber: billingSaved.mobileNumber || "", completeAddress: billingSaved.completeAddress || "", landmark: billingSaved.landmark || "", pincode: billingSaved.pincode || "", city: billingSaved.city || "", state: billingSaved.state || "" }));
   }, [deliverySaved, billingSaved]);
+
+  useEffect(() => {
+    if (mode === "edit-delivery") {
+      setOpenDeliverySection(true);
+    }
+    if (mode === "edit-billing") {
+      setOpenBillingSection(true);
+    }
+  }, [mode]);
 
   useEffect(() => {
     if (sameAsDelivery) setBilling((prev) => ({ ...prev, ...delivery }));
@@ -582,203 +593,351 @@ export default function CheckoutAddresses() {
   const headerTitle = mode === "edit-delivery" ? "Edit Delivery Address" : mode === "edit-billing" ? "Edit Billing Address" : "Delivery & Billing Address";
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,_#eef6ff_0%,_#f8fafc_24%,_#ffffff_100%)]">
-      <div className="mx-auto max-w-7xl px-4 py-6 md:px-8 md:py-10">
-        <div className="relative overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.18),_transparent_26%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.15),_transparent_24%),linear-gradient(135deg,_#0f172a,_#1e293b_48%,_#0f766e)] px-6 py-8 text-white shadow-[0_36px_90px_-44px_rgba(15,23,42,0.55)] md:px-10 md:py-10">
-          <div className="relative grid gap-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
-            <div>
-              <div className="mb-3 inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-slate-100">Secure Checkout</div>
-              <h1 className="max-w-3xl text-3xl font-semibold tracking-tight md:text-4xl">Finish your order with a checkout that actually feels premium.</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-200 md:text-base">Save addresses, unlock offers, and pay from a backend-verified total. The page is organized to make the final step feel confident, not cluttered.</p>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 backdrop-blur"><div className="text-[11px] uppercase tracking-[0.24em] text-slate-300">Items</div><div className="mt-1 text-2xl font-semibold">{cartItems.length}</div></div>
-              <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 backdrop-blur"><div className="text-[11px] uppercase tracking-[0.24em] text-slate-300">Saved</div><div className="mt-1 text-2xl font-semibold text-emerald-300">Rs. {effectiveDiscount.toFixed(0)}</div></div>
-              <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-4 backdrop-blur"><div className="text-[11px] uppercase tracking-[0.24em] text-slate-300">Total</div><div className="mt-1 text-2xl font-semibold">Rs. {effectiveTotal.toFixed(0)}</div></div>
-            </div>
+    <div className="min-h-screen bg-slate-100">
+      <div className="mx-auto max-w-6xl px-4 py-6 md:px-6 lg:py-8">
+        <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Checkout</div>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Review your order</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+              A cleaner checkout flow focused on shipping, payment, and final review.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate("/cart")}
+            className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            Back to cart
+          </button>
+        </div>
+
+        {error ? (
+          <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {error}
+          </div>
+        ) : null}
+        {success && message ? (
+          <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {message}
+          </div>
+        ) : null}
+
+        <div className="mb-6 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-slate-900">1.</span> Shipping address
+            <span className="text-slate-300">|</span>
+            <span className="font-semibold text-slate-900">2.</span> Payment method
+            <span className="text-slate-300">|</span>
+            <span className="font-semibold text-slate-900">3.</span> Review and place order
           </div>
         </div>
 
-        <div className="mt-8 grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
-          <div className="space-y-8">
-            <SectionHeader eyebrow="Address Center" title={headerTitle} description="Add your delivery and billing addresses here. Keep them the same for speed, or edit them independently when you need more control." />
-            {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div> : null}
-            {success && message ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</div> : null}
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <AddressSummary title="Delivery" addr={deliverySaved} loading={loading} onEdit={() => setMode("edit-delivery")} onMakeDefault={() => onMakeDefault(deliverySaved._id)} />
-              <AddressSummary title="Billing" addr={billingSaved} loading={loading} onEdit={() => setMode("edit-billing")} onMakeDefault={() => onMakeDefault(billingSaved._id)} />
+        <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <AddressSummary
+                title="Delivery"
+                addr={deliverySaved}
+                loading={loading}
+                onEdit={() => setMode("edit-delivery")}
+                onMakeDefault={() => onMakeDefault(deliverySaved._id)}
+              />
+              <AddressSummary
+                title="Billing"
+                addr={billingSaved}
+                loading={loading}
+                onEdit={() => setMode("edit-billing")}
+                onMakeDefault={() => onMakeDefault(billingSaved._id)}
+              />
             </div>
 
-            <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.45)] md:p-7">
-              <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+              <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <SectionHeader eyebrow="Delivery" title="Delivery Information" description="Use the address where the order should actually reach." />
-                  <div className="mt-5 grid grid-cols-1 gap-4">
-                    <Input label="Full Name" value={delivery.fullName} onChange={(value) => handleChange("delivery", "fullName", value)} placeholder="Enter full name" />
-                    <Input label="Mobile Number" value={delivery.mobileNumber} onChange={(value) => handleChange("delivery", "mobileNumber", value)} placeholder="Enter mobile number" type="tel" />
-                    <TextArea label="Complete Address" value={delivery.completeAddress} onChange={(value) => handleChange("delivery", "completeAddress", value)} placeholder="House no, street, area..." />
-                    <Input label="Landmark (optional)" value={delivery.landmark} onChange={(value) => handleChange("delivery", "landmark", value)} placeholder="Near ..." />
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <Input label="Pincode" value={delivery.pincode} onChange={(value) => handleChange("delivery", "pincode", value)} placeholder="6-digit pincode" />
-                      <Input label="City" value={delivery.city} onChange={(value) => handleChange("delivery", "city", value)} placeholder="City" />
-                    </div>
-                    <Input label="State" value={delivery.state} onChange={(value) => handleChange("delivery", "state", value)} placeholder="State" />
-                  </div>
+                  <h2 className="text-lg font-semibold text-slate-900">Shipping details</h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Update your delivery and billing information before paying.
+                  </p>
                 </div>
-
-                <div>
-                  <SectionHeader eyebrow="Billing" title="Billing Information" description="Use this if billing details differ from delivery." />
-                  <label className="mt-5 flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                    <input type="checkbox" className="h-4 w-4" checked={sameAsDelivery} onChange={(e) => setSameAsDelivery(e.target.checked)} disabled={mode === "edit-billing"} />
-                    Same as delivery address
-                  </label>
-                  <div className={`mt-4 grid grid-cols-1 gap-4 ${sameAsDelivery ? "opacity-60" : ""}`}>
-                    <Input label="Full Name" value={billing.fullName} onChange={(value) => handleChange("billing", "fullName", value)} placeholder="Enter full name" />
-                    <Input label="Mobile Number" value={billing.mobileNumber} onChange={(value) => handleChange("billing", "mobileNumber", value)} placeholder="Enter mobile number" type="tel" />
-                    <TextArea label="Complete Address" value={billing.completeAddress} onChange={(value) => handleChange("billing", "completeAddress", value)} placeholder="House no, street, area..." />
-                    <Input label="Landmark (optional)" value={billing.landmark} onChange={(value) => handleChange("billing", "landmark", value)} placeholder="Near ..." />
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <Input label="Pincode" value={billing.pincode} onChange={(value) => handleChange("billing", "pincode", value)} placeholder="6-digit pincode" />
-                      <Input label="City" value={billing.city} onChange={(value) => handleChange("billing", "city", value)} placeholder="City" />
-                    </div>
-                    <Input label="State" value={billing.state} onChange={(value) => handleChange("billing", "state", value)} placeholder="State" />
-                  </div>
-                  <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm text-slate-700">
-                    <input type="checkbox" className="h-4 w-4" checked={setAsDefault} onChange={(e) => setSetAsDefault(e.target.checked)} />
-                    Set as default address
-                  </label>
+                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  {isEditing ? "Editing" : "Create / Save"}
                 </div>
               </div>
 
-              <div className="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-500">{isEditing ? "Updating an existing address" : "You can save both delivery and billing together"}</div>
+              <div className="mt-5 grid gap-6 md:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50">
+                  <button
+                    type="button"
+                    onClick={() => setOpenDeliverySection((prev) => !prev)}
+                    className="flex w-full items-center justify-between px-4 py-4 text-left"
+                  >
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">Delivery address</div>
+                      <div className="mt-1 text-xs text-slate-500">Click to open or close</div>
+                    </div>
+                    <span className="text-slate-500">{openDeliverySection ? "−" : "+"}</span>
+                  </button>
+                  {openDeliverySection ? (
+                    <div className="border-t border-slate-200 bg-white p-4">
+                      <div className="space-y-4">
+                        <Input label="Full Name" value={delivery.fullName} onChange={(value) => handleChange("delivery", "fullName", value)} placeholder="Full name" />
+                        <Input label="Mobile Number" value={delivery.mobileNumber} onChange={(value) => handleChange("delivery", "mobileNumber", value)} placeholder="Mobile number" type="tel" />
+                        <TextArea label="Complete Address" value={delivery.completeAddress} onChange={(value) => handleChange("delivery", "completeAddress", value)} placeholder="House no, street, area" />
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <Input label="Pincode" value={delivery.pincode} onChange={(value) => handleChange("delivery", "pincode", value)} placeholder="Pincode" />
+                          <Input label="City" value={delivery.city} onChange={(value) => handleChange("delivery", "city", value)} placeholder="City" />
+                        </div>
+                        <Input label="State" value={delivery.state} onChange={(value) => handleChange("delivery", "state", value)} placeholder="State" />
+                        <Input label="Landmark" value={delivery.landmark} onChange={(value) => handleChange("delivery", "landmark", value)} placeholder="Landmark (optional)" />
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50">
+                  <button
+                    type="button"
+                    onClick={() => setOpenBillingSection((prev) => !prev)}
+                    className="flex w-full items-center justify-between px-4 py-4 text-left"
+                  >
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">Billing address</div>
+                      <div className="mt-1 text-xs text-slate-500">Click to open or close</div>
+                    </div>
+                    <span className="text-slate-500">{openBillingSection ? "−" : "+"}</span>
+                  </button>
+                  {openBillingSection ? (
+                    <div className="border-t border-slate-200 bg-white p-4">
+                      <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={sameAsDelivery}
+                          onChange={(e) => setSameAsDelivery(e.target.checked)}
+                          disabled={mode === "edit-billing"}
+                        />
+                        Same as delivery address
+                      </label>
+                      <div className={`mt-4 space-y-4 ${sameAsDelivery ? "opacity-60" : ""}`}>
+                        <Input label="Full Name" value={billing.fullName} onChange={(value) => handleChange("billing", "fullName", value)} placeholder="Full name" />
+                        <Input label="Mobile Number" value={billing.mobileNumber} onChange={(value) => handleChange("billing", "mobileNumber", value)} placeholder="Mobile number" type="tel" />
+                        <TextArea label="Complete Address" value={billing.completeAddress} onChange={(value) => handleChange("billing", "completeAddress", value)} placeholder="House no, street, area" />
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <Input label="Pincode" value={billing.pincode} onChange={(value) => handleChange("billing", "pincode", value)} placeholder="Pincode" />
+                          <Input label="City" value={billing.city} onChange={(value) => handleChange("billing", "city", value)} placeholder="City" />
+                        </div>
+                        <Input label="State" value={billing.state} onChange={(value) => handleChange("billing", "state", value)} placeholder="State" />
+                        <Input label="Landmark" value={billing.landmark} onChange={(value) => handleChange("billing", "landmark", value)} placeholder="Landmark (optional)" />
+                      </div>
+                      <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={setAsDefault}
+                          onChange={(e) => setSetAsDefault(e.target.checked)}
+                        />
+                        Set as default address
+                      </label>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                  {isEditing ? "Updating saved address" : "Save your address before payment"}
+                </div>
                 <div className="flex gap-2">
                   {isEditing ? (
                     <>
-                      <button onClick={() => setMode("create")} className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">Cancel</button>
-                      <button disabled={loading} onClick={onUpdate} className="rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60">{loading ? "Updating..." : "Update"}</button>
+                      <button
+                        type="button"
+                        onClick={() => setMode("create")}
+                        className="rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={onUpdate}
+                        className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+                      >
+                        {loading ? "Updating..." : "Update address"}
+                      </button>
                     </>
                   ) : (
-                    <button disabled={loading} onClick={onSave} className="rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60">{loading ? "Saving..." : "Save Addresses"}</button>
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={onSave}
+                      className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+                    >
+                      {loading ? "Saving..." : "Save address"}
+                    </button>
                   )}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="xl:sticky xl:top-6 xl:self-start">
-            <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white/90 shadow-[0_30px_80px_-44px_rgba(15,23,42,0.45)] backdrop-blur">
-              <div className="border-b border-slate-200 bg-[linear-gradient(135deg,_#0f172a,_#1e293b_48%,_#0f766e)] px-6 py-8 text-white">
-                <div className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-300">Final Step</div>
-                <h3 className="mt-2 text-2xl font-semibold tracking-tight">Offers, totals, and payment</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-200">Apply your coupon, review the total, and pay from a secure backend-generated order. Sale-item eligibility depends on the selected coupon rule.</p>
+          <div className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Order summary</div>
+                  <h2 className="mt-1 text-lg font-semibold text-slate-900">Review items</h2>
+                </div>
+                <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                  {cartItems.length} items
+                </div>
               </div>
 
-              <div className="space-y-5 px-6 py-6">
-                <CouponCelebration visible={showCouponCelebration || (isCouponApplied && effectiveDiscount > 0)} code={normalizedCouponCode} discount={effectiveDiscount} />
+              <div className="mt-4 max-h-72 space-y-3 overflow-auto pr-1">
+                {cartItems.length ? cartItems.map((item, index) => {
+                  const name =
+                    item?.dropproduct?.name ||
+                    item?.readymadeProduct?.title ||
+                    item?.design?.title ||
+                    item?.product?.name ||
+                    "Product";
+                  const qty = Number(item?.qty || 1);
+                  const price = Number(item?.unitPrice || 0) * qty;
+                  return (
+                    <div key={`${item?._id || index}-${index}`} className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-medium text-slate-900">{name}</div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          Qty: {qty}{item?.size ? ` · Size: ${item.size}` : ""}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-sm font-semibold text-slate-900">
+                        Rs. {price.toFixed(2)}
+                      </div>
+                    </div>
+                  );
+                }) : (
+                  <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+                    Your cart is empty.
+                  </div>
+                )}
+              </div>
 
-                <AvailableCoupons
-                  coupons={availableCoupons}
-                  loading={loadingCoupons}
-                  copiedCouponCode={copiedCouponCode}
-                  onCopy={handleCopyCoupon}
+              <div className="mt-5 space-y-2 border-t border-slate-200 pt-4">
+                <PriceRow label="Subtotal" value={`Rs. ${effectiveSubtotal.toFixed(2)}`} />
+                <PriceRow label="Shipping" value={effectiveShipping === 0 ? "FREE" : `Rs. ${effectiveShipping.toFixed(2)}`} />
+                <PriceRow label="Coupon discount" value={effectiveDiscount > 0 ? `- Rs. ${effectiveDiscount.toFixed(2)}` : "Rs. 0.00"} valueClassName="font-semibold text-emerald-700" />
+                <div className="flex items-center justify-between border-t border-dashed border-slate-200 pt-3 text-base font-semibold text-slate-900">
+                  <span>Total</span>
+                  <span>Rs. {effectiveTotal.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Coupon</div>
+                  <h3 className="mt-1 text-lg font-semibold text-slate-900">Apply code</h3>
+                </div>
+                {isCouponApplied ? (
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    Applied
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-4 flex gap-2">
+                <input
+                  type="text"
+                  value={couponCode}
+                  onChange={(e) => {
+                    setCouponCode(e.target.value.toUpperCase());
+                    if (couponState.status !== "idle") resetCouponFeedback();
+                  }}
+                  placeholder="Enter coupon code"
+                  className="min-w-0 flex-1 rounded-full border border-slate-300 bg-white px-4 py-3 text-sm font-medium uppercase tracking-[0.18em] text-slate-900 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+                />
+                <button
+                  type="button"
+                  onClick={handleValidateCoupon}
+                  disabled={!normalizedCouponCode || couponState.status === "validating"}
+                  className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+                >
+                  {couponState.status === "validating" ? "Checking..." : "Apply"}
+                </button>
+              </div>
+              {(normalizedCouponCode || isCouponApplied) ? (
+                <button
+                  type="button"
+                  onClick={handleRemoveCoupon}
+                  className="mt-3 text-sm font-semibold text-slate-700 underline-offset-4 hover:underline"
+                >
+                  Remove coupon
+                </button>
+              ) : null}
+              {couponState.message && couponState.status !== "applied" ? (
+                <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {couponState.message}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Payment</div>
+              <h3 className="mt-1 text-lg font-semibold text-slate-900">Choose how to pay</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Complete payment with Razorpay or place a cash on delivery order if it is available.
+              </p>
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center justify-between text-sm text-slate-600">
+                  <span>Payable total</span>
+                  <span className="text-base font-semibold text-slate-900">Rs. {effectiveTotal.toFixed(2)}</span>
+                </div>
+                {isCouponApplied ? (
+                  <div className="mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                    {normalizedCouponCode} applied. You saved Rs. {effectiveDiscount.toFixed(2)}.
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="mt-5 space-y-3">
+                <RazorpayPayNow
+                  token={token}
+                  couponCode={isCouponApplied ? normalizedCouponCode : ""}
+                  onSuccess={({ orderId }) => {
+                    handleOrderSuccess({
+                      orderId,
+                      paymentLabel: "Online payment",
+                      totalAmount: effectiveTotal,
+                    });
+                  }}
+                  onOrderCreated={handleOrderCreated}
+                  disabled={checkoutDisabled || codLoading}
                 />
 
-                <div className="rounded-[24px] border border-slate-200 bg-[radial-gradient(circle_at_top_right,_rgba(14,165,233,0.10),_transparent_28%),linear-gradient(180deg,_#ffffff,_#f8fafc)] p-5">
-                  <div className="mb-4 flex items-center justify-between gap-3">
-                    <div><div className="text-xs font-semibold uppercase tracking-[0.26em] text-sky-700">Coupon</div><h4 className="mt-1 text-lg font-semibold text-slate-900">Enter a promo code</h4></div>
-                    {isCouponApplied ? <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"><span className="h-2 w-2 rounded-full bg-emerald-500" />Applied</div> : null}
-                  </div>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Coupon Code</label>
-                      <input type="text" value={couponCode} onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); if (couponState.status !== "idle") resetCouponFeedback(); }} placeholder="ENTER CODE" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium uppercase tracking-[0.22em] text-slate-900 outline-none transition duration-200 focus:border-sky-400 focus:ring-4 focus:ring-sky-100" />
-                    </div>
-                    <div className="flex gap-2">
-                      <button type="button" onClick={handleValidateCoupon} disabled={!normalizedCouponCode || couponState.status === "validating"} className="flex-1 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-200 transition hover:bg-slate-800 disabled:opacity-60">{couponState.status === "validating" ? "Checking..." : "Apply"}</button>
-                      {(normalizedCouponCode || isCouponApplied) ? <button type="button" onClick={handleRemoveCoupon} className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50">Remove</button> : null}
-                    </div>
-                  </div>
-                  {couponState.message && couponState.status !== "applied" ? <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{couponState.message}</div> : null}
-                </div>
+                <button
+                  type="button"
+                  onClick={handleCashOnDelivery}
+                  disabled={codDisabled}
+                  className="w-full rounded-full border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:opacity-60"
+                >
+                  {codLoading ? "Placing COD Order..." : "Place cash on delivery order"}
+                </button>
+              </div>
 
-                <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="mb-4 flex items-center justify-between">
-                    <div><div className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">Summary</div><h4 className="mt-1 text-lg font-semibold text-slate-900">Payment breakdown</h4></div>
-                    <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Backend synced</div>
-                  </div>
-                  <div className="space-y-3">
-                    <PriceRow label="Cart Items" value={String(cartItems.length)} />
-                    <PriceRow label="Subtotal" value={`Rs. ${effectiveSubtotal.toFixed(2)}`} />
-                    <PriceRow label="Shipping" value={effectiveShipping === 0 ? "FREE" : `Rs. ${effectiveShipping.toFixed(2)}`} />
-                    <PriceRow label="Coupon Discount" value={effectiveDiscount > 0 ? `- Rs. ${effectiveDiscount.toFixed(2)}` : "Rs. 0.00"} valueClassName="font-semibold text-emerald-700" />
-                    <div className="border-t border-dashed border-slate-200 pt-3">
-                      <div className="flex items-center justify-between text-lg font-semibold text-slate-900"><span>Payable Total</span><span>Rs. {effectiveTotal.toFixed(2)}</span></div>
-                      <p className="mt-1 text-xs text-slate-500">Final amount is revalidated by the server before payment starts.</p>
-                    </div>
-                  </div>
+              {codHelperMessage ? (
+                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  {codHelperMessage}
                 </div>
-
-                <div className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,_#ffffff,_#f8fafc)] p-5 shadow-sm">
-                  <div className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Secure payment</div>
-                  <h3 className="mt-3 text-xl font-semibold text-slate-900">Complete your order</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">Choose Razorpay for online payment or place the order with cash on delivery after saving your addresses. Applied offers are locked into the server-side order amount.</p>
-                  <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="flex items-center justify-between text-sm text-slate-600"><span>Order total</span><span className="text-base font-semibold text-slate-900">Rs. {effectiveTotal.toFixed(2)}</span></div>
-                    {isCouponApplied ? <div className="mt-3 flex items-center justify-between rounded-2xl bg-emerald-50 px-3 py-2 text-sm"><span className="font-medium text-emerald-700">{normalizedCouponCode}</span><span className="font-semibold text-emerald-700">Saved Rs. {effectiveDiscount.toFixed(2)}</span></div> : null}
-                  </div>
-                  <div className="mt-5 space-y-3">
-                    <div>
-                      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Pay Online</div>
-                      <RazorpayPayNow
-                        token={token}
-                        couponCode={isCouponApplied ? normalizedCouponCode : ""}
-                        onSuccess={({ orderId }) => {
-                          console.log("Paid order:", orderId);
-                          handleOrderSuccess({
-                            orderId,
-                            paymentLabel: "Online payment",
-                            totalAmount: effectiveTotal,
-                          });
-                        }}
-                        onOrderCreated={handleOrderCreated}
-                        disabled={checkoutDisabled || codLoading}
-                      />
-                    </div>
-                    <div>
-                      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Cash On Delivery</div>
-                      <button
-                        type="button"
-                        onClick={handleCashOnDelivery}
-                        disabled={codDisabled}
-                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:opacity-60"
-                      >
-                        {codLoading ? "Placing COD Order..." : "Place Cash On Delivery Order"}
-                      </button>
-                      {codHelperMessage ? (
-                        <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                          {codHelperMessage}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                  {codError ? (
-                    <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-800">
-                      {codError}
-                    </div>
-                  ) : null}
-                  <div className="mt-5 space-y-3 text-xs text-slate-500">
-                    <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500" />Razorpay-secured checkout</div>
-                    <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-slate-500" />Cash on delivery follows product and minimum-order rules</div>
-                    <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-sky-500" />Coupon logic never runs on the client</div>
-                    <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500" />Payment total is locked from the backend</div>
-                  </div>
+              ) : null}
+              {codError ? (
+                <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-800">
+                  {codError}
                 </div>
-
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                  Tip: Save your addresses first, then apply a coupon and complete payment from the locked total shown above.
-                </div>
+              ) : null}
+              <div className="mt-4 text-xs text-slate-500">
+                Razorpay-secured checkout and server-verified totals.
               </div>
             </div>
           </div>
