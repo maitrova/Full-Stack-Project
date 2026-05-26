@@ -17,15 +17,15 @@ const formatDate = (value) => {
 const BlogCard = ({ blog, index }) => (
   <article className="group relative w-[230px] min-w-[230px] snap-start overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_44px_-34px_rgba(15,23,42,0.22)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_46px_-30px_rgba(15,23,42,0.26)] sm:w-[248px] sm:min-w-[248px]">
     <Link to={`/blogs/${blog.slug}`} className="grid h-full">
-      <div className="relative flex aspect-[16/10] items-center justify-center overflow-hidden bg-slate-50 p-3">
+      <div className="relative flex min-h-[220px] items-center justify-center overflow-hidden bg-slate-50 p-3">
         {blog.coverImage ? (
           <img
             src={buildImageUrl(blog.coverImage)}
             alt={blog.title}
-            className="h-full w-full rounded-[18px] object-contain transition duration-300 group-hover:scale-[1.02]"
+            className="max-h-[260px] w-full rounded-[18px] object-contain transition duration-300 group-hover:scale-[1.02]"
           />
         ) : (
-          <div className="h-full w-full rounded-[18px] bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.12),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.14),_transparent_28%),linear-gradient(135deg,_#e2e8f0,_#f8fafc_45%,_#e2e8f0)]" />
+          <div className="h-[220px] w-full rounded-[18px] bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.12),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.14),_transparent_28%),linear-gradient(135deg,_#e2e8f0,_#f8fafc_45%,_#e2e8f0)]" />
         )}
 
         <div className="absolute left-3 top-3 flex flex-wrap items-center gap-2">

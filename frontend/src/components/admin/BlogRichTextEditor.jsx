@@ -58,7 +58,7 @@ const baseEditorStyles = `
   }
 `;
 
-export default function BlogRichTextEditor({ value, onChange, error, onImageUpload }) {
+export default function BlogRichTextEditor({ value, onChange, error, onImageUpload, documentBaseUrl }) {
   const supportsInlineUploads = typeof onImageUpload === "function";
 
   const handleEditorChange = useCallback(
@@ -136,6 +136,7 @@ export default function BlogRichTextEditor({ value, onChange, error, onImageUplo
       convert_urls: false,
       relative_urls: false,
       remove_script_host: false,
+      document_base_url: documentBaseUrl,
       statusbar: true,
       rel_list: [
         { title: "No rel", value: "" },

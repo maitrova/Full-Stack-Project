@@ -31,6 +31,7 @@ const normalizeApiUrl = (value) => {
 
 const API_URL = normalizeApiUrl(import.meta.env.VITE_API_URL || DEFAULT_API_URL);
 const API_ORIGIN = API_URL.replace(/\/api$/i, "");
+const SITE_ORIGIN = API_ORIGIN.replace(/\/backend$/i, "");
 
 const normalizeContentAssetUrlsForEditor = (value) => {
   const html = String(value || "").trim();
@@ -44,6 +45,15 @@ const normalizeContentAssetUrlsForEditor = (value) => {
     const rawSrc = image.getAttribute("src") || image.getAttribute("data-src") || "";
     if (!rawSrc) return;
     image.setAttribute("src", buildImageUrl(rawSrc));
+  });
+
+  root?.querySelectorAll("a[href]").forEach((anchor) => {
+    const rawHref = String(anchor.getAttribute("href") || "").trim();
+    if (!rawHref || /^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i.test(rawHref)) return;
+
+    try {
+      anchor.setAttribute("href", new URL(rawHref, `${SITE_ORIGIN}/`).toString());
+    } catch {}
   });
 
   return root?.innerHTML || html;
@@ -481,6 +491,7 @@ const BlogManagement = () => {
                 value={form.content}
                 onChange={(value) => handleChange("content", value)}
                 onImageUpload={handleInlineImageUpload}
+                documentBaseUrl={`${SITE_ORIGIN}/`}
               />
             </div>
 
