@@ -23,6 +23,7 @@ const ReturnManagement = () => {
   const [decisionNote, setDecisionNote] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [refundAmounts, setRefundAmounts] = useState({});
+  const [refundReferences, setRefundReferences] = useState({});
 
   const API_BASE_URL = (
     import.meta.env.VITE_IMAGE_URL ||
@@ -88,12 +89,21 @@ const ReturnManagement = () => {
     setDecisionNote('');
   };
 
-  const handleRefundStatusUpdate = async (orderId, refundStatus, refundAmount) => {
-    await dispatch(adminUpdateReturnRefundStatus({ orderId, refundStatus, refundAmount })).unwrap();
+  const handleRefundStatusUpdate = async (orderId, refundStatus, refundAmount, refundReference) => {
+    await dispatch(
+      adminUpdateReturnRefundStatus({ orderId, refundStatus, refundAmount, refundReference })
+    ).unwrap();
   };
 
   const updateRefundAmount = (orderId, value) => {
     setRefundAmounts((prev) => ({
+      ...prev,
+      [orderId]: value,
+    }));
+  };
+
+  const updateRefundReference = (orderId, value) => {
+    setRefundReferences((prev) => ({
       ...prev,
       [orderId]: value,
     }));
@@ -118,6 +128,12 @@ const ReturnManagement = () => {
     const existingAmount = Number(order?.returnRequest?.refundAmount || 0);
     if (existingAmount > 0) return existingAmount.toFixed(2);
     return Number(order?.total || 0).toFixed(2);
+  };
+
+  const getRefundReferenceInput = (order) => {
+    const configuredReference = refundReferences[order._id];
+    if (configuredReference !== undefined) return configuredReference;
+    return order?.returnRequest?.refundReference || '';
   };
 
   const getStatusClasses = (status) => {
@@ -197,6 +213,7 @@ const ReturnManagement = () => {
             const isRefundProcessed = returnRequest.refundStatus === 'PAID';
             const isRefundPending = returnRequest.refundStatus === 'PROCESSING';
             const isRefundFailed = returnRequest.refundStatus === 'FAILED';
+            const refundReferenceInput = getRefundReferenceInput(order);
 
             return (
               <div key={order._id} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -240,7 +257,7 @@ const ReturnManagement = () => {
                       <p><span className="font-medium text-slate-900">Razorpay refund ID:</span> {returnRequest.refundId}</p>
                     ) : null}
                     {returnRequest.refundReference ? (
-                      <p><span className="font-medium text-slate-900">Bank reference:</span> {returnRequest.refundReference}</p>
+                      <p><span className="font-medium text-slate-900">{isRazorpayOrder ? 'Bank reference' : 'Manual transfer reference'}:</span> {returnRequest.refundReference}</p>
                     ) : null}
                     {returnRequest.refundFailureReason ? (
                       <p className="text-rose-600"><span className="font-medium text-rose-700">Refund error:</span> {returnRequest.refundFailureReason}</p>
@@ -395,10 +412,28 @@ const ReturnManagement = () => {
                                 />
                               </div>
                             </div>
+                            {!isRazorpayOrder ? (
+                              <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                                <label className="block text-sm font-semibold text-slate-900" htmlFor={`refund-reference-${order._id}`}>
+                                  UPI / Bank Reference
+                                </label>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  Optional transaction ID, UTR, or UPI reference for manual COD refunds. Manual refunds do not appear in Razorpay.
+                                </p>
+                                <input
+                                  id={`refund-reference-${order._id}`}
+                                  type="text"
+                                  value={refundReferenceInput}
+                                  onChange={(event) => updateRefundReference(order._id, event.target.value)}
+                                  className="mt-3 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                                  placeholder="Enter UTR / UPI reference"
+                                />
+                              </div>
+                            ) : null}
                             <div className="flex gap-3">
                               <button
                                 type="button"
-                                onClick={() => handleRefundStatusUpdate(order._id, 'NOT_PAID', refundAmountInput)}
+                                onClick={() => handleRefundStatusUpdate(order._id, 'NOT_PAID', refundAmountInput, refundReferenceInput)}
                                 disabled={updateLoading}
                                 className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold ${
                                   returnRequest.refundStatus === 'NOT_PAID'
@@ -408,9 +443,23 @@ const ReturnManagement = () => {
                               >
                                 Mark Not Paid
                               </button>
+                              {!isRazorpayOrder ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRefundStatusUpdate(order._id, 'PROCESSING', refundAmountInput, refundReferenceInput)}
+                                  disabled={updateLoading}
+                                  className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold ${
+                                    returnRequest.refundStatus === 'PROCESSING'
+                                      ? 'border border-sky-300 bg-sky-50 text-sky-700'
+                                      : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                                  } ${updateLoading ? 'cursor-not-allowed opacity-60' : ''}`}
+                                >
+                                  Mark Processing
+                                </button>
+                              ) : null}
                               <button
                                 type="button"
-                                onClick={() => handleRefundStatusUpdate(order._id, 'PAID', refundAmountInput)}
+                                onClick={() => handleRefundStatusUpdate(order._id, 'PAID', refundAmountInput, refundReferenceInput)}
                                 disabled={updateLoading}
                                 className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold text-white ${
                                   updateLoading ? 'cursor-not-allowed bg-emerald-300' : 'bg-emerald-600 hover:bg-emerald-700'
@@ -422,7 +471,7 @@ const ReturnManagement = () => {
                             <p className="text-xs text-slate-500">
                               {isRazorpayOrder
                                 ? 'This will call Razorpay refund using the amount you entered.'
-                                : 'User will see refund status immediately in the order page.'}
+                                : 'This tracks a manual COD refund to the customer bank account or UPI ID. It will not appear in Razorpay.'}
                             </p>
                           </>
                         ) : (

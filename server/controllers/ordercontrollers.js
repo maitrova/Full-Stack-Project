@@ -1267,11 +1267,12 @@ export const adminUpdateReturnRefundStatus = async (req, res) => {
     }
 
     const nextRefundStatus = toTrimmedString(req.body?.refundStatus).toUpperCase();
-    if (!["NOT_PAID", "PAID"].includes(nextRefundStatus)) {
-      return res.status(400).json({ message: "Refund status must be NOT_PAID or PAID" });
+    if (!["NOT_PAID", "PROCESSING", "PAID"].includes(nextRefundStatus)) {
+      return res.status(400).json({ message: "Refund status must be NOT_PAID, PROCESSING or PAID" });
     }
 
     const refundAmount = parsePositiveAmount(req.body?.refundAmount);
+    const refundReference = toTrimmedString(req.body?.refundReference);
 
     const order = await Order.findById(orderId)
       .populate("user", "name email")
@@ -1388,14 +1389,23 @@ export const adminUpdateReturnRefundStatus = async (req, res) => {
         return res.status(400).json({ message: "Refund amount is required" });
       }
 
-      order.returnRequest.refundStatus = "PAID";
+      order.returnRequest.refundStatus = nextRefundStatus;
       order.returnRequest.refundAmount = refundAmount;
       order.returnRequest.refundCurrency = order.currency || "INR";
-      order.returnRequest.refundInitiatedAt = new Date();
-      order.returnRequest.refundPaidAt = new Date();
+      order.returnRequest.refundInitiatedAt =
+        nextRefundStatus === "NOT_PAID"
+          ? null
+          : order.returnRequest.refundInitiatedAt || new Date();
+      order.returnRequest.refundPaidAt =
+        nextRefundStatus === "PAID"
+          ? new Date()
+          : null;
       order.returnRequest.refundId = "";
       order.returnRequest.refundReceipt = "";
-      order.returnRequest.refundReference = "";
+      order.returnRequest.refundReference =
+        nextRefundStatus === "NOT_PAID"
+          ? ""
+          : refundReference || order.returnRequest.refundReference || "";
       order.returnRequest.refundFailureReason = "";
       await order.save();
     }

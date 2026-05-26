@@ -132,7 +132,10 @@ export default function BlogRichTextEditor({ value, onChange, error, onImageUplo
           }
         : {}),
       link_default_target: "_blank",
-      link_assume_external_targets: true,
+      link_assume_external_targets: false,
+      convert_urls: false,
+      relative_urls: false,
+      remove_script_host: false,
       statusbar: true,
       rel_list: [
         { title: "No rel", value: "" },

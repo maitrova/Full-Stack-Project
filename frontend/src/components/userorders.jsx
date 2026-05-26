@@ -541,6 +541,8 @@ const UserOrders = () => {
     const status = order?.returnRequest?.status || 'NONE';
     const refundStatus = order?.returnRequest?.refundStatus || 'NOT_PAID';
     const refundAmount = Number(order?.returnRequest?.refundAmount || 0);
+    const isRazorpayRefund = order?.payment?.method === 'RAZORPAY';
+    const refundReference = order?.returnRequest?.refundReference || '';
     const formattedRefundAmount =
       refundAmount > 0 ? ` Rs.${refundAmount.toFixed(2)}` : '';
 
@@ -555,31 +557,51 @@ const UserOrders = () => {
       if (refundStatus === 'PAID') {
         return {
           tone: 'emerald',
-          message: order?.returnRequest?.refundPaidAt
-            ? `Refund of${formattedRefundAmount} was processed on ${formatDate(order.returnRequest.refundPaidAt)}. It may still take a few working days to reflect in your account.`
-            : `Refund of${formattedRefundAmount} was processed successfully. It may still take a few working days to reflect in your account.`,
+          message: isRazorpayRefund
+            ? (
+              order?.returnRequest?.refundPaidAt
+                ? `Razorpay refund of${formattedRefundAmount} was processed on ${formatDate(order.returnRequest.refundPaidAt)}. It should reflect in the original payment source shortly.`
+                : `Razorpay refund of${formattedRefundAmount} was processed successfully. It should reflect in the original payment source shortly.`
+            )
+            : (
+              order?.returnRequest?.refundPaidAt
+                ? `Your manual refund of${formattedRefundAmount} was marked paid on ${formatDate(order.returnRequest.refundPaidAt)}${refundReference ? ` with reference ${refundReference}` : ''}.`
+                : `Your manual refund of${formattedRefundAmount} was marked paid${refundReference ? ` with reference ${refundReference}` : ''}.`
+            ),
         };
       }
 
       if (refundStatus === 'PROCESSING') {
         return {
           tone: 'blue',
-          message: order?.returnRequest?.refundInitiatedAt
-            ? `Refund of${formattedRefundAmount} was initiated on ${formatDate(order.returnRequest.refundInitiatedAt)} and is waiting for Razorpay/bank settlement.`
-            : `Refund of${formattedRefundAmount} has been initiated and is waiting for Razorpay/bank settlement.`,
+          message: isRazorpayRefund
+            ? (
+              order?.returnRequest?.refundInitiatedAt
+                ? `Razorpay refund of${formattedRefundAmount} was initiated on ${formatDate(order.returnRequest.refundInitiatedAt)} and is being processed.`
+                : `Razorpay refund of${formattedRefundAmount} has been initiated and is being processed.`
+            )
+            : (
+              order?.returnRequest?.refundInitiatedAt
+                ? `Your manual refund of${formattedRefundAmount} was started on ${formatDate(order.returnRequest.refundInitiatedAt)}${refundReference ? ` with reference ${refundReference}` : ''}.`
+                : `Your manual refund of${formattedRefundAmount} is being processed${refundReference ? ` with reference ${refundReference}` : ''}.`
+            ),
         };
       }
 
       if (refundStatus === 'FAILED') {
         return {
           tone: 'rose',
-          message: order?.returnRequest?.refundFailureReason || 'Refund initiation failed. Our team will retry the refund shortly.',
+          message: order?.returnRequest?.refundFailureReason || (isRazorpayRefund
+            ? 'Razorpay refund failed. Our team will retry it shortly.'
+            : 'Manual refund processing failed. Our team will retry it shortly.'),
         };
       }
 
       return {
         tone: 'emerald',
-        message: 'Return approved. Please keep the shipment ready for pickup. Refund will be initiated after warehouse inspection (3-5 business days).',
+        message: isRazorpayRefund
+          ? 'Return approved. Your refund will be sent back through Razorpay after inspection.'
+          : 'Return approved. Your refund will be sent manually to your bank account or UPI ID after inspection.',
       };
     }
 

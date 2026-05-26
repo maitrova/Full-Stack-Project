@@ -22,7 +22,7 @@ const BlogCard = ({ blog, index }) => (
           <img
             src={buildImageUrl(blog.coverImage)}
             alt={blog.title}
-            className="max-h-full w-auto max-w-full object-contain transition duration-300 group-hover:scale-[1.02]"
+            className="h-full w-full rounded-[18px] object-contain transition duration-300 group-hover:scale-[1.02]"
           />
         ) : (
           <div className="h-full w-full rounded-[18px] bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.12),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.14),_transparent_28%),linear-gradient(135deg,_#e2e8f0,_#f8fafc_45%,_#e2e8f0)]" />
