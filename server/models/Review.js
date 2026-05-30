@@ -90,7 +90,7 @@ const reviewSchema = new mongoose.Schema(
 reviewSchema.index(
   { user: 1, kind: 1, readymadeProduct: 1 },
   {
-    unique: true,
+    
     partialFilterExpression: {
       user: { $exists: true, $type: "objectId" },
       kind: "READYMADE",
@@ -102,7 +102,7 @@ reviewSchema.index(
 reviewSchema.index(
   { user: 1, kind: 1, dropproduct: 1 },
   {
-    unique: true,
+    
     partialFilterExpression: {
       user: { $exists: true, $type: "objectId" },
       kind: "DROPPRODUCT",

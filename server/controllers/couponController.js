@@ -166,6 +166,68 @@ export const listActiveCoupons = async (_req, res) => {
   }
 };
 
+export const listEligibleCoupons = async (req, res) => {
+  try {
+    const userId = req.user?.id || req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const cart = await Cart.findOne({ user: userId, status: "ACTIVE" })
+      .populate("items.readymadeProduct")
+      .populate("items.dropproduct")
+      .populate("items.product")
+      .populate({
+        path: "items.readymadeProduct",
+        populate: [
+          { path: "category", select: "name" },
+          { path: "subCategory", select: "name category" },
+        ],
+      });
+
+    if (!cart || !Array.isArray(cart.items) || cart.items.length === 0) {
+      return res.status(200).json({ coupons: [] });
+    }
+
+    const now = new Date();
+    const activeCoupons = await Coupon.find(
+      {
+        status: "ACTIVE",
+        startDate: { $lte: now },
+        endDate: { $gte: now },
+      },
+      couponPublicProjection
+    )
+      .sort({ autoApply: -1, discountValue: -1, createdAt: -1 })
+      .lean();
+
+    const checkedCoupons = await Promise.all(
+      activeCoupons.map(async (coupon) => {
+        const result = await validateCouponForCart({
+          couponCode: coupon.code,
+          cart,
+          userId,
+        });
+
+        if (!result.valid) return null;
+
+        return {
+          ...coupon,
+          discountApplied: result.discount,
+          eligibleSubtotal: result.eligibleSubtotal,
+        };
+      })
+    );
+
+    return res.status(200).json({
+      coupons: checkedCoupons.filter(Boolean),
+    });
+  } catch (error) {
+    console.error("listEligibleCoupons error:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
 export const getCouponById = async (req, res) => {
   try {
     if (!ensureAdmin(req, res)) return;

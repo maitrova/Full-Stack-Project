@@ -147,7 +147,7 @@ const BlogDetailPage = () => {
         const image = doc.createElement("img");
         image.setAttribute("src", buildImageUrl(imageConfig.imageUrl));
         image.setAttribute("alt", imageConfig.altText || text);
-        image.className = "h-full w-full rounded-[24px] object-contain";
+        image.className = "w-full rounded-[24px] object-contain";
         figure.appendChild(image);
         heading.insertAdjacentElement("afterend", figure);
         usedSectionImages.add(imageConfig.targetHeading);
@@ -179,7 +179,7 @@ const BlogDetailPage = () => {
     });
 
     root?.querySelectorAll("figure").forEach((figure) => {
-      figure.setAttribute("class", "my-8 overflow-hidden rounded-[24px]");
+      figure.setAttribute("class", "my-8 overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50 p-2");
 
       const href = figure.getAttribute("data-href") || "";
       const image = figure.querySelector("img");
@@ -200,7 +200,7 @@ const BlogDetailPage = () => {
     root?.querySelectorAll("img").forEach((image) => {
       const rawSrc = image.getAttribute("data-src") || image.getAttribute("src") || "";
       image.setAttribute("src", buildImageUrl(rawSrc));
-      image.setAttribute("class", "h-full w-full rounded-[24px] object-contain");
+      image.setAttribute("class", "w-full rounded-[24px] object-contain");
       image.setAttribute("loading", "lazy");
     });
 
@@ -323,15 +323,15 @@ const BlogDetailPage = () => {
 
           <div className="mt-7 overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50">
             {blog.coverImage ? (
-              <div className="flex aspect-[16/10] items-center justify-center px-4 py-4 sm:aspect-[16/9] sm:px-6 sm:py-5">
+              <div className="aspect-[3/2]">
                 <img
                   src={buildImageUrl(blog.coverImage)}
                   alt={blog.coverImageAlt || blog.title}
-                  className="h-full w-full rounded-[18px] object-contain shadow-sm"
+                  className="h-full w-full object-cover"
                 />
               </div>
             ) : (
-              <div className="h-[160px] w-full bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.16),_transparent_34%),linear-gradient(135deg,_#e2e8f0,_#f8fafc_48%,_#e2e8f0)]" />
+              <div className="aspect-[3/2] w-full bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.16),_transparent_34%),linear-gradient(135deg,_#e2e8f0,_#f8fafc_48%,_#e2e8f0)]" />
             )}
           </div>
 

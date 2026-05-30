@@ -5,6 +5,7 @@ import {
   deleteCoupon,
   getCouponById,
   listActiveCoupons,
+  listEligibleCoupons,
   listCoupons,
   updateCoupon,
   validateCoupon,
@@ -13,6 +14,7 @@ import {
 const couponRouter = express.Router();
 
 couponRouter.get("/active", listActiveCoupons);
+couponRouter.get("/eligible", protect, listEligibleCoupons);
 couponRouter.post("/validate", protect, validateCoupon);
 
 couponRouter.post("/admin", protect, createCoupon);

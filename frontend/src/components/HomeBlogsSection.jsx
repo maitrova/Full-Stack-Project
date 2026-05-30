@@ -14,51 +14,30 @@ const formatDate = (value) => {
   });
 };
 
-const BlogCard = ({ blog, index }) => (
-  <article className="group relative w-[230px] min-w-[230px] snap-start overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_44px_-34px_rgba(15,23,42,0.22)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_46px_-30px_rgba(15,23,42,0.26)] sm:w-[248px] sm:min-w-[248px]">
+const BlogCard = ({ blog }) => (
+  <article className="group relative w-[260px] min-w-[260px] snap-start overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_44px_-34px_rgba(15,23,42,0.22)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_46px_-30px_rgba(15,23,42,0.26)] sm:w-[312px] sm:min-w-[312px]">
     <Link to={`/blogs/${blog.slug}`} className="grid h-full">
-      <div className="relative flex min-h-[220px] items-center justify-center overflow-hidden bg-slate-50 p-3">
+      <div className="aspect-[3/2] overflow-hidden bg-slate-100">
         {blog.coverImage ? (
           <img
             src={buildImageUrl(blog.coverImage)}
             alt={blog.title}
-            className="max-h-[260px] w-full rounded-[18px] object-contain transition duration-300 group-hover:scale-[1.02]"
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
           />
         ) : (
-          <div className="h-[220px] w-full rounded-[18px] bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.12),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.14),_transparent_28%),linear-gradient(135deg,_#e2e8f0,_#f8fafc_45%,_#e2e8f0)]" />
+          <div className="h-full w-full bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.12),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.14),_transparent_28%),linear-gradient(135deg,_#e2e8f0,_#f8fafc_45%,_#e2e8f0)]" />
         )}
-
-        <div className="absolute left-3 top-3 flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-slate-200 bg-white/95 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-700">
-            {blog.category}
-          </span>
-          {blog.isFeatured ? (
-            <span className="rounded-full border border-amber-200/70 bg-amber-50/95 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-amber-700">
-              Featured
-            </span>
-          ) : null}
-        </div>
-
-        <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between gap-3 px-4 pb-3">
-          <div className="min-w-0">
-            <p className="text-[9px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-              Issue {String(index + 1).padStart(2, "0")}
-            </p>
-            <h3 className="mt-1.5 line-clamp-2 text-base font-semibold leading-tight tracking-[-0.02em] text-slate-900">
-              {blog.title}
-            </h3>
-          </div>
-          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-sm text-slate-700 transition group-hover:translate-x-1">
-            {">"}
-          </span>
-        </div>
       </div>
 
-      <div className="relative flex h-full flex-col justify-between px-4 pb-4 pt-3">
-        <div className="flex flex-wrap items-center gap-2 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-500">
-          <span className="text-slate-700 line-clamp-1">{blog.authorName}</span>
-          <span className="h-1 w-1 rounded-full bg-slate-300" />
-          <span>{formatDate(blog.publishedAt)}</span>
+      <div className="relative flex h-full flex-col justify-between px-4 pb-4 pt-4">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">
+            {blog.category}
+          </div>
+
+          <h3 className="mt-2 line-clamp-2 text-lg font-semibold leading-tight tracking-[-0.01em] text-slate-900">
+            {blog.title}
+          </h3>
         </div>
 
         <p className="mt-2 line-clamp-2 text-[13px] leading-5 text-slate-600">
@@ -66,12 +45,11 @@ const BlogCard = ({ blog, index }) => (
         </p>
 
         <div className="mt-3 flex items-center justify-between border-t border-slate-200/80 pt-3">
-          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-800">
-            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-            {blog.readTimeMinutes} min read
+          <div className="text-xs font-medium text-slate-500">
+            {formatDate(blog.publishedAt)}
           </div>
-          <span className="text-xs font-semibold text-sky-700 transition group-hover:text-sky-800">
-            Read
+          <span className="text-sm font-semibold text-sky-700 transition group-hover:text-sky-800">
+            Read article
           </span>
         </div>
       </div>
@@ -202,7 +180,7 @@ const HomeBlogsSection = () => {
         <div className="mb-2 flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-700">Blog</p>
-            <h2 className="mt-0.5 text-lg font-semibold text-slate-900 sm:text-xl">Latest Reads</h2>
+            <h2 className="mt-0.5 text-lg font-semibold text-slate-900 sm:text-xl">Latest from the blog</h2>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -235,9 +213,9 @@ const HomeBlogsSection = () => {
             {[0, 1, 2].map((item) => (
               <div
                 key={item}
-                className="w-[230px] min-w-[230px] overflow-hidden rounded-[24px] border border-slate-200/70 bg-white p-4 shadow-[0_18px_44px_-34px_rgba(15,23,42,0.22)] sm:w-[248px] sm:min-w-[248px]"
+                className="w-[260px] min-w-[260px] overflow-hidden rounded-[24px] border border-slate-200/70 bg-white p-4 shadow-[0_18px_44px_-34px_rgba(15,23,42,0.22)] sm:w-[312px] sm:min-w-[312px]"
               >
-                <div className="aspect-[16/10] animate-pulse rounded-[18px] bg-slate-200" />
+                <div className="aspect-[3/2] animate-pulse rounded-[18px] bg-slate-200" />
                 <div className="mt-4 h-3 w-24 animate-pulse rounded bg-slate-200" />
                 <div className="mt-3 h-7 w-4/5 animate-pulse rounded bg-slate-200" />
                 <div className="mt-3 h-12 animate-pulse rounded bg-slate-100" />
@@ -255,8 +233,8 @@ const HomeBlogsSection = () => {
               onMouseLeave={() => setIsPaused(false)}
               className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
-              {blogs.map((blog, index) => (
-                <BlogCard key={blog._id} blog={blog} index={index} />
+              {blogs.map((blog) => (
+                <BlogCard key={blog._id} blog={blog} />
               ))}
             </div>
           </div>
