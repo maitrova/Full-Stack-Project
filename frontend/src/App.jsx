@@ -49,10 +49,10 @@ import OrderSuccessPage from "./pages/OrderSuccessPage.jsx";
 // Layout component with header for all pages except auth
 const MainLayout = ({ children }) => {
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    <div className="flex min-h-screen w-full max-w-full flex-col overflow-x-hidden bg-gray-50">
       <Header />
       <Breadcrumbs />
-      <main className="flex-1">{children}</main>
+      <main className="min-w-0 flex-1">{children}</main>
       <Footer />
     </div>
   );

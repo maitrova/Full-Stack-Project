@@ -86,7 +86,7 @@ function TextArea({ label, value, onChange, placeholder }) {
 
 function AddressSummary({ title, addr, onEdit, onMakeDefault, loading }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,_#ffffff,_#f8fafc)] p-4 shadow-[0_20px_55px_-38px_rgba(15,23,42,0.45)] sm:rounded-[24px] sm:p-5">
+    <div className="w-full min-w-0 rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,_#ffffff,_#f8fafc)] p-4 shadow-[0_20px_55px_-38px_rgba(15,23,42,0.45)] sm:rounded-[24px] sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -191,7 +191,7 @@ const formatCouponExpiry = (coupon) => {
 
 function AvailableCoupons({ coupons, loading, copiedCouponCode, onCopy }) {
   return (
-    <div className="rounded-2xl border border-emerald-100 bg-[radial-gradient(circle_at_top_right,_rgba(16,185,129,0.18),_transparent_30%),linear-gradient(180deg,_#ffffff,_#f0fdf4)] p-4 shadow-sm sm:rounded-[24px] sm:p-5">
+    <div className="w-full min-w-0 rounded-2xl border border-emerald-100 bg-[radial-gradient(circle_at_top_right,_rgba(16,185,129,0.18),_transparent_30%),linear-gradient(180deg,_#ffffff,_#f0fdf4)] p-4 shadow-sm sm:rounded-[24px] sm:p-5">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700 sm:tracking-[0.26em]">
@@ -602,13 +602,13 @@ export default function CheckoutAddresses() {
   const headerTitle = mode === "edit-delivery" ? "Edit Delivery Address" : mode === "edit-billing" ? "Edit Billing Address" : "Delivery & Billing Address";
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <div className="mx-auto max-w-6xl px-3 py-4 sm:px-4 sm:py-6 md:px-6 lg:py-8">
-        <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 sm:tracking-[0.28em]">Checkout</div>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Review your order</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-slate-100">
+      <div className="mx-auto w-full max-w-6xl px-3 py-4 sm:px-4 sm:py-6 md:px-6 lg:py-8">
+        <div className="mb-4 flex min-w-0 flex-col gap-3 sm:mb-6 md:flex-row md:items-end md:justify-between">
+          <div className="min-w-0">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:text-xs sm:tracking-[0.28em]">Checkout</div>
+            <h1 className="mt-1.5 text-xl font-semibold tracking-tight text-slate-900 sm:mt-2 sm:text-3xl">Review your order</h1>
+            <p className="mt-2 max-w-2xl text-xs leading-5 text-slate-600 sm:text-sm sm:leading-6">
               A cleaner checkout flow focused on shipping, payment, and final review.
             </p>
           </div>
@@ -632,19 +632,19 @@ export default function CheckoutAddresses() {
           </div>
         ) : null}
 
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-600 sm:px-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-semibold text-slate-900">1.</span> Shipping address
+        <div className="mb-4 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-xs text-slate-600 sm:mb-6 sm:px-4 sm:text-sm">
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
+            <span><span className="font-semibold text-slate-900">1.</span> Shipping address</span>
             <span className="hidden text-slate-300 sm:inline">|</span>
-            <span className="font-semibold text-slate-900">2.</span> Payment method
+            <span><span className="font-semibold text-slate-900">2.</span> Payment method</span>
             <span className="hidden text-slate-300 sm:inline">|</span>
-            <span className="font-semibold text-slate-900">3.</span> Review and place order
+            <span><span className="font-semibold text-slate-900">3.</span> Review and place order</span>
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-          <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] lg:gap-6">
+          <div className="min-w-0 space-y-4 sm:space-y-6">
+            <div className="grid min-w-0 grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
               <AddressSummary
                 title="Delivery"
                 addr={deliverySaved}
@@ -661,7 +661,7 @@ export default function CheckoutAddresses() {
               />
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+            <div className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
               <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 md:flex-row md:items-start md:justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">Shipping details</h2>
@@ -669,13 +669,13 @@ export default function CheckoutAddresses() {
                     Update your delivery and billing information before paying.
                   </p>
                 </div>
-                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:text-xs sm:tracking-[0.2em]">
                   {isEditing ? "Editing" : "Create / Save"}
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-6 md:grid-cols-2">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50">
+              <div className="mt-5 grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
+                <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50">
                   <button
                     type="button"
                     onClick={() => setOpenDeliverySection((prev) => !prev)}
@@ -704,7 +704,7 @@ export default function CheckoutAddresses() {
                   ) : null}
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-50">
+                <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50">
                   <button
                     type="button"
                     onClick={() => setOpenBillingSection((prev) => !prev)}
@@ -754,7 +754,7 @@ export default function CheckoutAddresses() {
               </div>
 
               <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                <div className="text-[10px] uppercase tracking-[0.12em] text-slate-500 sm:text-xs sm:tracking-[0.18em]">
                   {isEditing ? "Updating saved address" : "Save your address before payment"}
                 </div>
                 <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
@@ -763,7 +763,7 @@ export default function CheckoutAddresses() {
                       <button
                         type="button"
                         onClick={() => setMode("create")}
-                        className="rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                        className="w-full rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
                       >
                         Cancel
                       </button>
@@ -771,7 +771,7 @@ export default function CheckoutAddresses() {
                         type="button"
                         disabled={loading}
                         onClick={onUpdate}
-                        className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+                        className="w-full rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60 sm:w-auto"
                       >
                         {loading ? "Updating..." : "Update address"}
                       </button>
@@ -781,7 +781,7 @@ export default function CheckoutAddresses() {
                       type="button"
                       disabled={loading}
                       onClick={onSave}
-                      className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+                      className="w-full rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60 sm:w-auto"
                     >
                       {loading ? "Saving..." : "Save address"}
                     </button>
@@ -791,11 +791,11 @@ export default function CheckoutAddresses() {
             </div>
           </div>
 
-          <div className="space-y-6 lg:sticky lg:top-6 lg:self-start">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="min-w-0 space-y-4 sm:space-y-6 lg:sticky lg:top-6 lg:self-start">
+            <div className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
               <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Order summary</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:text-xs sm:tracking-[0.24em]">Order summary</div>
                   <h2 className="mt-1 text-lg font-semibold text-slate-900">Review items</h2>
                 </div>
                 <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
@@ -818,7 +818,7 @@ export default function CheckoutAddresses() {
                       <div className="min-w-0">
                         <div className="truncate text-sm font-medium text-slate-900">{name}</div>
                         <div className="mt-1 text-xs text-slate-500">
-                          Qty: {qty}{item?.size ? ` · Size: ${item.size}` : ""}
+                          Qty: {qty}{item?.size ? ` | Size: ${item.size}` : ""}
                         </div>
                       </div>
                       <div className="shrink-0 text-sm font-semibold text-slate-900 sm:text-right">
@@ -844,10 +844,10 @@ export default function CheckoutAddresses() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Coupon</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:text-xs sm:tracking-[0.24em]">Coupon</div>
                   <h3 className="mt-1 text-lg font-semibold text-slate-900">Apply code</h3>
                 </div>
                 {isCouponApplied ? (
@@ -905,8 +905,8 @@ export default function CheckoutAddresses() {
               discount={effectiveDiscount}
             />
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Payment</div>
+            <div className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:text-xs sm:tracking-[0.24em]">Payment</div>
               <h3 className="mt-1 text-lg font-semibold text-slate-900">Choose how to pay</h3>
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 Complete payment with Razorpay or place a cash on delivery order if it is available.
