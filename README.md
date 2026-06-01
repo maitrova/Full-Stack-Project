@@ -29,3 +29,20 @@ to run the server : npm start
 visit the localhost found in the terminal
 
 uodatred 
+
+### local try-on test
+
+To test the AI try-on feature locally:
+
+1. Copy `server/.env.example` to `server/.env`
+2. Add your `REPLICATE_API_TOKEN`
+3. Start the backend on port `5000`
+4. Expose the backend with a public tunnel like `ngrok http 5000`
+5. Point the frontend to that tunnel URL with:
+
+```env
+VITE_API_URL=https://your-tunnel-url
+VITE_IMAGE_URL=https://your-tunnel-url
+```
+
+The backend is preconfigured for Replicate `cuuupid/idm-vton` using version `0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985`.

@@ -83,6 +83,28 @@ const slugifyDesignSegment = (value = "") =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
+const normalizeTryOnPayload = (tryOnPayload) => {
+  if (!tryOnPayload || typeof tryOnPayload !== "object") {
+    return null;
+  }
+
+  return {
+    status: tryOnPayload.status || null,
+    provider: tryOnPayload.provider || null,
+    mode: tryOnPayload.mode || null,
+    providerJobId: tryOnPayload.providerJobId || null,
+    previewImage: tryOnPayload.previewImage || null,
+    userImage: tryOnPayload.userImage || null,
+    garmentImage: tryOnPayload.garmentImage || null,
+    warning: tryOnPayload.warning || null,
+    generatedAt: tryOnPayload.generatedAt ? new Date(tryOnPayload.generatedAt) : null,
+    metadata:
+      tryOnPayload.metadata && typeof tryOnPayload.metadata === "object"
+        ? tryOnPayload.metadata
+        : {},
+  };
+};
+
 const resolveImagePriceRule = (widthInches, heightInches, rules = DEFAULT_IMAGE_PRICE_RULES) => {
   const largestSide = Math.max(Number(widthInches || 0), Number(heightInches || 0));
   if (!largestSide) return null;
@@ -333,6 +355,7 @@ export const saveDesign = async (req, res) => {
       views = [],
       previewImage,
       selectedSize,
+      tryOn,
     } = req.body;
 
     if (!productId || !productSlug) {
@@ -506,6 +529,8 @@ export const saveDesign = async (req, res) => {
       mainPreview = frontView?.previewImage || normalizedViews[0]?.previewImage || null;
     }
 
+    const normalizedTryOn = normalizeTryOnPayload(tryOn);
+
     const design = await Design.create({
       user: req.user._id,
       product: product._id,
@@ -514,6 +539,7 @@ export const saveDesign = async (req, res) => {
       productColor: productColor || "#FFFFFF",
       productColorName: productColorName || productColor || "White",
       previewImage: mainPreview,
+      tryOn: normalizedTryOn,
       views: normalizedViews,
 
       selectedSize: selectedSize || null,
@@ -588,6 +614,7 @@ export const updateDesign = async (req, res) => {
       views = [],
       previewImage,
       selectedSize,
+      tryOn,
     } = req.body;
 
     if (!productId || !productSlug) {
@@ -706,6 +733,8 @@ export const updateDesign = async (req, res) => {
       mainPreview = frontView?.previewImage || updatedViews[0]?.previewImage || null;
     }
 
+    const normalizedTryOn = normalizeTryOnPayload(tryOn);
+
     // ✅ update design doc
     design.user = design.user || req.user._id;
     design.product = product._id;
@@ -714,6 +743,7 @@ export const updateDesign = async (req, res) => {
     design.productColor = productColor || "#FFFFFF";
     design.productColorName = productColorName || productColor || "White";
     design.previewImage = mainPreview;
+    design.tryOn = normalizedTryOn;
     design.views = updatedViews;
 
     design.selectedSize = finalSelectedSize;

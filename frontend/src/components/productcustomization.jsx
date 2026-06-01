@@ -74,6 +74,7 @@ const SUPPORTED_DESIGN_FORMATS_LABEL = "PNG, JPG, JPEG, WEBP, GIF, BMP, TIFF, SV
 const SUPPORTED_DESIGN_ACCEPT = "image/*,.heic,.heif,.svg,.tif,.tiff";
 const REMOVE_BG_RECOMMENDATION =
   "PNG usually gives the cleanest edges, but you can upload other common image formats too.";
+const TRY_ON_ACCEPT = "image/*,.heic,.heif";
 
 const trackMetaAddToCart = ({
   productId,
@@ -320,6 +321,39 @@ const withCacheBust = (url = "") => {
 };
 
 const stripApiSuffix = (url = "") => String(url || "").replace(/\/$/, "").replace(/\/api$/, "");
+
+const deriveGarmentCategory = (product = {}, fallbackSlug = "") => {
+  const slugValue = String(product?.slug || fallbackSlug || "").trim().toLowerCase();
+  const nameValue = String(product?.name || product?.title || "").trim().toLowerCase();
+  const combined = `${slugValue} ${nameValue}`;
+
+  if (/(dress|jumpsuit|overall)/.test(combined)) {
+    return "overall";
+  }
+
+  if (/(shorts|pants|trouser|jogger|lower|bottom|skirt)/.test(combined)) {
+    return "lower_body";
+  }
+
+  return "upper_body";
+};
+
+const buildGarmentDescription = ({
+  product = {},
+  productColorName = "",
+  productColor = "",
+  viewCode = "front",
+} = {}) => {
+  const productName = String(product?.name || product?.title || "customized garment").trim();
+  const colorName = String(productColorName || productColor || "").trim();
+  const readableView = String(viewCode || "front")
+    .replace(/[_-]+/g, " ")
+    .trim();
+
+  return [colorName, productName, readableView && `${readableView} view customized preview`]
+    .filter(Boolean)
+    .join(" ");
+};
 
 const resolveOutputAssetUrl = (relativePath = "") => {
   if (!relativePath) return "";
@@ -745,6 +779,11 @@ const getSizeBasePrice = (prod, size) => {
 
   const [savedDesignId, setSavedDesignId] = useState(null);
   const [lastSavedPreview, setLastSavedPreview] = useState(null);
+  const [tryOnUserFile, setTryOnUserFile] = useState(null);
+  const [tryOnUserPreviewUrl, setTryOnUserPreviewUrl] = useState("");
+  const [tryOnResult, setTryOnResult] = useState(null);
+  const [tryOnLoading, setTryOnLoading] = useState(false);
+  const [tryOnError, setTryOnError] = useState("");
   const [addingToCart, setAddingToCart] = useState(false);
 
   const productColorOptions =
@@ -823,6 +862,20 @@ const getSizeBasePrice = (prod, size) => {
   const supportsPocketZone = String(slug || product?.slug || "")
     .trim()
     .toLowerCase() === "hoodie";
+
+  const getCheckoutPreviewImage = (candidateTryOn = tryOnResult, fallbackPreview = lastSavedPreview) =>
+    candidateTryOn?.previewImage || fallbackPreview || null;
+  const toAbsoluteImageUrl = (imageUrl) => {
+    if (!imageUrl) return "";
+    if (
+      imageUrl.startsWith("http") ||
+      imageUrl.startsWith("blob:") ||
+      imageUrl.startsWith("data:")
+    ) {
+      return imageUrl;
+    }
+    return resolveOutputAssetUrl(imageUrl);
+  };
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
@@ -1357,6 +1410,10 @@ const finalUrl = rawUrl.startsWith("http")
         console.log("Design loaded successfully:", design);
         
         setOriginalDesign(design);
+        setSavedDesignId(design?._id || null);
+        setLastSavedPreview(design?.tryOn?.previewImage || design?.previewImage || null);
+        setTryOnResult(design?.tryOn?.previewImage ? design.tryOn : null);
+        setTryOnUserPreviewUrl(design?.tryOn?.userImage ? toAbsoluteImageUrl(design.tryOn.userImage) : "");
         if (design.selectedSize) {
           setSelectedSize(design.selectedSize);
         }
@@ -1448,6 +1505,17 @@ setPriceBreakdown((prev) => ({
     }
 
     console.log("Initializing new design for product:", product.name);
+    setSavedDesignId(null);
+    setLastSavedPreview(null);
+    setTryOnResult(null);
+    setTryOnError("");
+    setTryOnUserFile(null);
+    setTryOnUserPreviewUrl((currentUrl) => {
+      if (currentUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(currentUrl);
+      }
+      return "";
+    });
     
     const initialViews = getCustomizableViews(product.views);
     const initial = {};
@@ -1468,6 +1536,12 @@ setPriceBreakdown((prev) => ({
     setEditModeInitialized(false);
     
   }, [product, isEditMode, editModeInitialized]);
+
+  useEffect(() => () => {
+    if (tryOnUserPreviewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(tryOnUserPreviewUrl);
+    }
+  }, [tryOnUserPreviewUrl]);
 
   useEffect(() => {
     if (!product?.views?.length) return;
@@ -2322,6 +2396,154 @@ const startCropPreviewPan = (event, mode = "move") => {
     return previewsByCode;
   };
 
+  const capturePreviewForView = async (targetViewCode) => {
+    if (!editorRef.current?.capturePreview) {
+      return null;
+    }
+
+    const fallbackViewCode = getCustomizableViews(product?.views)[0]?.code || viewCode;
+    const requestedViewCode = targetViewCode || fallbackViewCode;
+    const previousViewCode = viewCode;
+
+    if (requestedViewCode && requestedViewCode !== previousViewCode) {
+      setViewCode(requestedViewCode);
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+    }
+
+    const previewImage = (await editorRef.current.capturePreview()) || null;
+
+    if (requestedViewCode && requestedViewCode !== previousViewCode) {
+      setViewCode(previousViewCode || fallbackViewCode);
+    }
+
+    return previewImage;
+  };
+
+  const dataUrlToFile = async (dataUrl, fileName) => {
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+    return new File([blob], fileName, {
+      type: blob.type || "image/png",
+    });
+  };
+
+  const handleTryOnUserImageChange = (event) => {
+    const file = event.target.files?.[0] || null;
+    setTryOnError("");
+
+    if (tryOnUserPreviewUrl) {
+      URL.revokeObjectURL(tryOnUserPreviewUrl);
+    }
+
+    if (!file) {
+      setTryOnUserFile(null);
+      setTryOnUserPreviewUrl("");
+      return;
+    }
+
+    setTryOnUserFile(file);
+    setTryOnUserPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleGenerateTryOn = async () => {
+    if (!product) return;
+
+    if (!tryOnUserFile) {
+      setTryOnError("Upload a selfie or full-body image before generating the try-on preview.");
+      return;
+    }
+
+    try {
+      setTryOnLoading(true);
+      setTryOnError("");
+      setError("");
+
+      const preferredViewCode =
+        getCustomizableViews(product?.views).find((view) => view.code === "front")?.code ||
+        getCustomizableViews(product?.views)[0]?.code ||
+        viewCode;
+
+      const garmentPreviewDataUrl = await (async () => {
+        if (!editorRef.current?.captureGarmentForTryOn) {
+          return capturePreviewForView(preferredViewCode);
+        }
+
+        const previousViewCode = viewCode;
+        if (preferredViewCode && preferredViewCode !== previousViewCode) {
+          setViewCode(preferredViewCode);
+          await new Promise((resolve) => setTimeout(resolve, 1200));
+        }
+
+        const garmentOnlyPreview = await editorRef.current.captureGarmentForTryOn();
+
+        if (preferredViewCode && preferredViewCode !== previousViewCode) {
+          setViewCode(previousViewCode);
+        }
+
+        return garmentOnlyPreview || capturePreviewForView(preferredViewCode);
+      })();
+      if (!garmentPreviewDataUrl) {
+        throw new Error("Unable to capture the garment-only try-on image.");
+      }
+
+      const garmentPreviewFile = await dataUrlToFile(
+        garmentPreviewDataUrl,
+        `${product?.slug || "custom-shirt"}-tryon.png`
+      );
+
+      const metadata = {
+        productId: product?._id || product?.id || null,
+        productSlug: product?.slug || slug || null,
+        productName: product?.name || product?.title || "Customized T-Shirt",
+        productColor,
+        productColorName,
+        selectedSize,
+        selectedQuantity,
+        garmentCategory: deriveGarmentCategory(product, slug),
+        garmentDescription: buildGarmentDescription({
+          product,
+          productColorName,
+          productColor,
+          viewCode: preferredViewCode,
+        }),
+        views: Object.keys(viewStates || {}),
+        customization: {
+          designLayerCount: Object.values(viewStates || {}).reduce(
+            (count, state) => count + (state?.designLayers?.length || 0),
+            0
+          ),
+          textLayerCount: Object.values(viewStates || {}).reduce(
+            (count, state) => count + (state?.textLayers?.length || 0),
+            0
+          ),
+          activeView: preferredViewCode,
+        },
+      };
+
+      const formData = new FormData();
+      formData.append("userImage", tryOnUserFile);
+      formData.append("garmentImage", garmentPreviewFile);
+      formData.append("metadata", JSON.stringify(metadata));
+
+      const response = await fetch(`${API_URL}/virtual-tryon/generate`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || "Failed to generate try-on preview");
+      }
+
+      setTryOnResult(payload);
+    } catch (err) {
+      console.error("Try-on generation error:", err);
+      setTryOnError(err.message || "Failed to generate try-on preview");
+    } finally {
+      setTryOnLoading(false);
+    }
+  };
+
   const handleSaveDesign = async () => {
     if (!product) return;
 
@@ -2531,6 +2753,7 @@ const startCropPreviewPan = (event, mode = "move") => {
 
       const primaryView = getCustomizableViews(product.views)[0];
       const mainPreview = previewsByCode["front"] || (primaryView && previewsByCode[primaryView.code]) || null;
+      const checkoutPreview = getCheckoutPreviewImage(tryOnResult, mainPreview);
 
       const body = {
         productId: product._id || product.id,
@@ -2538,6 +2761,17 @@ const startCropPreviewPan = (event, mode = "move") => {
         productColor,
         productColorName,
         previewImage: mainPreview,
+        tryOn: tryOnResult
+          ? {
+              ...tryOnResult,
+              metadata: {
+                ...(tryOnResult.metadata || {}),
+                productId: product._id || product.id,
+                productSlug: product.slug || slug,
+                selectedSize,
+              },
+            }
+          : null,
         views: viewsPayload,
         basePrice: BASE_PRICE,
         selectedSize,
@@ -2575,13 +2809,13 @@ const startCropPreviewPan = (event, mode = "move") => {
           null;
 
         setSavedDesignId(newDesignId);
-        setLastSavedPreview(mainPreview);
+        setLastSavedPreview(checkoutPreview);
 
         setSaveSuccess(true);
         alert(isEditMode ? "Design updated successfully!" : "Design saved successfully!");
         return {
           designId: newDesignId,
-          previewImage: mainPreview,
+          previewImage: checkoutPreview,
         };
       // ✅ keep these after successful save
 
@@ -2636,7 +2870,7 @@ const startCropPreviewPan = (event, mode = "move") => {
       productColor,
       productColorName,
       designId: designIdToUse,
-      previewImage: lastSavedPreview || null,
+      previewImage: getCheckoutPreviewImage(),
       unitPrice: price, // total calculated price shown on UI
       signature: `${product?._id || product?.id}|${selectedSize}|${productColor}|${designIdToUse}`,
     };
@@ -3623,6 +3857,98 @@ const startCropPreviewPan = (event, mode = "move") => {
               </section>
             )}
           </div>
+
+          <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">AI Try-On Preview</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Upload a selfie or front-facing body photo to preview the customized T-shirt on a real person before checkout.
+                </p>
+              </div>
+              {tryOnResult?.mode === "mock" ? (
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-700">
+                  Mock
+                </span>
+              ) : null}
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <div className="space-y-3">
+                <input
+                  type="file"
+                  accept={TRY_ON_ACCEPT}
+                  onChange={handleTryOnUserImageChange}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-700"
+                />
+                <p className="text-[11px] text-slate-500">
+                  Best results come from a clear front-facing upper-body or full-body photo with good lighting.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={handleGenerateTryOn}
+                  disabled={tryOnLoading || saving}
+                  className="w-full rounded-xl border border-sky-600 bg-sky-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  {tryOnLoading ? "Generating Preview..." : "Generate AI Try-On"}
+                </button>
+
+                {tryOnError ? (
+                  <div className="rounded border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                    {tryOnError}
+                  </div>
+                ) : null}
+
+                {tryOnResult?.warning ? (
+                  <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    {tryOnResult.warning}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">User Photo</p>
+                  <div className="overflow-hidden rounded-xl bg-white">
+                    {tryOnUserPreviewUrl ? (
+                      <img
+                        src={tryOnUserPreviewUrl}
+                        alt="Uploaded user"
+                        className="h-72 w-full object-contain"
+                      />
+                    ) : (
+                      <div className="flex h-72 items-center justify-center px-4 text-center text-xs text-slate-400">
+                        Upload a photo to start the try-on preview.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Generated Preview</p>
+                  <div className="overflow-hidden rounded-xl bg-white">
+                    {tryOnResult?.previewImage ? (
+                      <img
+                        src={toAbsoluteImageUrl(tryOnResult.previewImage)}
+                        alt="AI try-on preview"
+                        className="h-72 w-full object-contain"
+                      />
+                    ) : (
+                      <div className="flex h-72 items-center justify-center px-4 text-center text-xs text-slate-400">
+                        Generate a try-on preview to review the final look before checkout.
+                      </div>
+                    )}
+                  </div>
+                  {tryOnResult?.provider ? (
+                    <p className="mt-2 text-[11px] text-slate-500">
+                      Provider: <span className="font-medium text-slate-700">{tryOnResult.provider}</span>
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </section>
 
           {/* Error messages */}
         {(error || saveError || saveSuccess) && (

@@ -95,6 +95,7 @@ reviewSchema.index(
       user: { $exists: true, $type: "objectId" },
       kind: "READYMADE",
       readymadeProduct: { $exists: true, $type: "objectId" },
+      source: "CUSTOMER",
     },
   }
 );
@@ -107,6 +108,7 @@ reviewSchema.index(
       user: { $exists: true, $type: "objectId" },
       kind: "DROPPRODUCT",
       dropproduct: { $exists: true, $type: "objectId" },
+      source: "CUSTOMER",
     },
   }
 );

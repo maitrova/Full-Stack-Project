@@ -14,9 +14,7 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // 🔐 Generate JWT
 const generateToken = (userId) => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
-    expiresIn: "30d",
-  });
+  return jwt.sign({ id: userId }, process.env.JWT_SECRET);
 };
 
 const ensureAdmin = (req, res) => {

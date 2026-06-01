@@ -198,6 +198,11 @@ const getCustomizationColorStock = (product, colorValue) => {
   return Number.isFinite(numericStock) ? numericStock : null;
 };
 
+const resolveDesignPreviewImage = (design) =>
+  sanitizePreviewImage(design?.tryOn?.previewImage) ||
+  sanitizePreviewImage(design?.previewImage) ||
+  null;
+
 const buildCartItemSignature = (item = {}) => {
   const normalizedSize = String(item.size || "M").trim().toUpperCase() || "M";
 
@@ -604,7 +609,7 @@ export const addToCart = async (req, res) => {
         basePrice: finalDesignBasePrice,
         priceDetails: priceDetailsPayload,
         currency: "INR",
-        previewImage: sanitizePreviewImage(design.previewImage),
+        previewImage: resolveDesignPreviewImage(design),
         signature,
       };
     }
@@ -866,7 +871,7 @@ export const updateCartItemQty = async (req, res) => {
       }
 
       item.currency = "INR";
-      item.previewImage = sanitizePreviewImage(d.previewImage) || item.previewImage;
+      item.previewImage = resolveDesignPreviewImage(d) || item.previewImage;
       item.product = d.product || item.product;
       item.size = cartSize;
     }

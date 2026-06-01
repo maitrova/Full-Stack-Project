@@ -172,6 +172,23 @@ const designSchema = new mongoose.Schema(
     bestSellers: { type: Boolean, default: false },  // If the product is a best seller
     stock: { type: Number, default: 0 },             // Number of items in stock
 
+    tryOn: {
+      status: { type: String, default: null },
+      provider: { type: String, default: null },
+      mode: { type: String, default: null },
+      providerJobId: { type: String, default: null },
+      previewImage: { type: String, default: null },
+      userImage: { type: String, default: null },
+      garmentImage: { type: String, default: null },
+      warning: { type: String, default: null },
+      generatedAt: { type: Date, default: null },
+      metadata: {
+        type: Map,
+        of: mongoose.Schema.Types.Mixed,
+        default: {},
+      },
+    },
+
     views: [designViewSchema],
   },
   { timestamps: true }

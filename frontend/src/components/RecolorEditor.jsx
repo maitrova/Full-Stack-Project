@@ -588,6 +588,40 @@ function loadImage(src) {
   return promise;
 }
 
+function findMaskBoundingBox(maskImageData, width, height, threshold = 20) {
+  const { data } = maskImageData;
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = (y * width + x) * 4;
+      const value = Math.max(data[index], data[index + 1], data[index + 2], data[index + 3]);
+      if (value <= threshold) continue;
+
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
+  }
+
+  if (maxX < minX || maxY < minY) {
+    return null;
+  }
+
+  return {
+    minX,
+    minY,
+    maxX,
+    maxY,
+    width: maxX - minX + 1,
+    height: maxY - minY + 1,
+  };
+}
+
 
 /* =========================
    LocalStorage persistence
@@ -1732,8 +1766,8 @@ const zonesForActiveView = useMemo(() => {
 
   useImperativeHandle(
     ref,
-    () => ({
-      async capturePreview() {
+    () => {
+      const captureCompositePreviewCanvas = async () => {
         if (!renderer?.canvas) return null;
         try {
           const glCanvas = renderer.canvas;
@@ -1743,7 +1777,7 @@ const zonesForActiveView = useMemo(() => {
 
           const ctx = previewCanvas.getContext("2d");
           if (!ctx) {
-            return glCanvas.toDataURL("image/jpeg", 0.7);
+            return null;
           }
 
           ctx.drawImage(glCanvas, 0, 0, previewCanvas.width, previewCanvas.height);
@@ -1809,14 +1843,104 @@ const zonesForActiveView = useMemo(() => {
             });
           }
 
-          return previewCanvas.toDataURL("image/jpeg", 0.82);
+          return previewCanvas;
         } catch (e) {
           console.error("Failed to capture preview", e);
           return null;
         }
+      };
+
+      return {
+      captureCompositePreviewCanvas,
+      async capturePreview() {
+        const previewCanvas = await captureCompositePreviewCanvas();
+        if (!previewCanvas) return null;
+        return previewCanvas.toDataURL("image/jpeg", 0.82);
       },
-    }),
-    [renderer, textLayers, designLayers]
+      async captureGarmentForTryOn() {
+        try {
+          const previewCanvas = await captureCompositePreviewCanvas();
+          if (!previewCanvas) return null;
+          if (!maskUrl) {
+            return previewCanvas.toDataURL("image/png");
+          }
+
+          const maskImage = await loadImage(normalizeImageUrl(maskUrl));
+          const workingCanvas = document.createElement("canvas");
+          workingCanvas.width = previewCanvas.width;
+          workingCanvas.height = previewCanvas.height;
+          const workingCtx = workingCanvas.getContext("2d");
+          if (!workingCtx) return null;
+
+          workingCtx.drawImage(previewCanvas, 0, 0, workingCanvas.width, workingCanvas.height);
+
+          const maskCanvas = document.createElement("canvas");
+          maskCanvas.width = workingCanvas.width;
+          maskCanvas.height = workingCanvas.height;
+          const maskCtx = maskCanvas.getContext("2d");
+          if (!maskCtx) return null;
+
+          maskCtx.drawImage(maskImage, 0, 0, maskCanvas.width, maskCanvas.height);
+          const maskImageData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+          const previewImageData = workingCtx.getImageData(0, 0, workingCanvas.width, workingCanvas.height);
+
+          for (let index = 0; index < previewImageData.data.length; index += 4) {
+            const maskValue = Math.max(
+              maskImageData.data[index],
+              maskImageData.data[index + 1],
+              maskImageData.data[index + 2],
+              maskImageData.data[index + 3]
+            );
+
+            if (maskValue <= 20) {
+              previewImageData.data[index + 3] = 0;
+            }
+          }
+
+          workingCtx.clearRect(0, 0, workingCanvas.width, workingCanvas.height);
+          workingCtx.putImageData(previewImageData, 0, 0);
+
+          const bounds = findMaskBoundingBox(maskImageData, workingCanvas.width, workingCanvas.height);
+          if (!bounds) {
+            return previewCanvas.toDataURL("image/png");
+          }
+
+          const paddingX = Math.round(bounds.width * 0.08);
+          const paddingY = Math.round(bounds.height * 0.08);
+          const cropX = Math.max(0, bounds.minX - paddingX);
+          const cropY = Math.max(0, bounds.minY - paddingY);
+          const cropWidth = Math.min(workingCanvas.width - cropX, bounds.width + paddingX * 2);
+          const cropHeight = Math.min(workingCanvas.height - cropY, bounds.height + paddingY * 2);
+
+          const outputCanvas = document.createElement("canvas");
+          outputCanvas.width = cropWidth;
+          outputCanvas.height = cropHeight;
+          const outputCtx = outputCanvas.getContext("2d");
+          if (!outputCtx) return null;
+
+          outputCtx.fillStyle = "#ffffff";
+          outputCtx.fillRect(0, 0, cropWidth, cropHeight);
+          outputCtx.drawImage(
+            workingCanvas,
+            cropX,
+            cropY,
+            cropWidth,
+            cropHeight,
+            0,
+            0,
+            cropWidth,
+            cropHeight
+          );
+
+          return outputCanvas.toDataURL("image/png");
+        } catch (error) {
+          console.error("Failed to capture garment-only try-on image", error);
+          return null;
+        }
+      },
+    };
+    },
+    [renderer, textLayers, designLayers, maskUrl]
   );
 
   useEffect(() => {

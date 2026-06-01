@@ -37,15 +37,17 @@ import headerBannerRouter from "./routes/headerBannerRoutes.js";
 import reviewRouter from "./routes/reviewRoutes.js";
 import blogsRouter from "./routes/blogsRoutes.js";
 import sitemapRouter from "./routes/sitemapRoutes.js";
+import virtualTryOnRouter from "./routes/virtualTryOnRoutes.js";
+import Review from "./models/Review.js";
 
 import colorselection from './routes/adminColorRoutes.js';
 import companypdfs from './routes/companyPdfRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-connectDB();
 
 const app = express();
+app.set("trust proxy", true);
 const outputsDir = path.join(__dirname, "outputs");
 const defaultCorsOrigins = [
   "http://localhost:5173",
@@ -146,6 +148,7 @@ app.use("/api/coupons", couponRouter);
 app.use("/api/header-banner", headerBannerRouter);
 app.use("/api/reviews", reviewRouter);
 app.use("/api/blogs", blogsRouter);
+app.use("/api/virtual-tryon", virtualTryOnRouter);
 // Error handling
 app.use((err, req, res, next) => {
   console.error("Server error:", err);
@@ -169,6 +172,8 @@ app.use((req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
+await connectDB();
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 
@@ -193,7 +198,14 @@ app.listen(PORT, () => {
   const pythonCmd = process.env.PYTHON_EXECUTABLE?.trim() ||
     (process.platform === "win32" ? "python" : "python3");
 
-  const proc = spawnProcess(pythonCmd, [scriptPath, warmupInput, warmupOutput]);
+  let proc;
+  try {
+    proc = spawnProcess(pythonCmd, [scriptPath, warmupInput, warmupOutput]);
+  } catch {
+    console.warn("rembg warm-up process error (non-critical)");
+    return;
+  }
+
   proc.on("close", (code) => {
     if (code === 0) {
       console.log("rembg warm-up complete — model is ready");
