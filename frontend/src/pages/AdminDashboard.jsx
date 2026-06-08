@@ -52,7 +52,6 @@ import {
   clearError,
   deleteProduct,
   toggleProductStatus,
-  searchProducts,
   getBestSellerProducts,
   getNewArrivalProducts,
 } from '../redux/slices/productList.js';
@@ -260,10 +259,27 @@ const AdminDashboard = () => {
         filter: '',
         category: currentCategory,
         subCategory: currentSubCategory,
+        search: searchTerm.trim(),
         page: pagination.page,
         limit: pagination.limit,
       }));
     }
+  };
+
+  const loadFilteredProducts = ({
+    category = currentCategory,
+    subCategory = currentSubCategory,
+    search = searchTerm,
+    page = 1,
+  } = {}) => {
+    dispatch(fetchProducts({
+      filter: '',
+      category,
+      subCategory,
+      search: search.trim(),
+      page,
+      limit: pagination.limit,
+    }));
   };
 
   const loadDesigns = () => {
@@ -373,6 +389,32 @@ const AdminDashboard = () => {
         limit: 100,
       }));
     }
+  };
+
+  const handleAllProductsCategoryChange = (category) => {
+    dispatch(setCurrentCategory(category));
+    dispatch(setCurrentSubCategory(''));
+    dispatch(setSelectedProductIds([]));
+    setLocalCategory(category);
+    setLocalSubCategory('');
+    loadFilteredProducts({ category, subCategory: '', page: 1 });
+  };
+
+  const handleAllProductsSubCategoryChange = (subCategory) => {
+    dispatch(setCurrentSubCategory(subCategory));
+    dispatch(setSelectedProductIds([]));
+    setLocalSubCategory(subCategory);
+    loadFilteredProducts({ category: localCategory, subCategory, page: 1 });
+  };
+
+  const handleClearAllProductsFilters = () => {
+    setSearchTerm('');
+    setLocalCategory('');
+    setLocalSubCategory('');
+    dispatch(setCurrentCategory(''));
+    dispatch(setCurrentSubCategory(''));
+    dispatch(setSelectedProductIds([]));
+    loadFilteredProducts({ category: '', subCategory: '', search: '', page: 1 });
   };
 
   const handleSubCategoryChange = (subCategory) => {
@@ -555,15 +597,17 @@ const AdminDashboard = () => {
   };
 
   const handleSearch = () => {
-    if (searchTerm.trim()) {
-      dispatch(searchProducts({
-        searchTerm,
+    if (activeSidebarItem === 'allProducts') {
+      loadFilteredProducts({
+        category: currentCategory,
+        subCategory: currentSubCategory,
+        search: searchTerm,
         page: 1,
-        limit: pagination.limit,
-      }));
-    } else {
-      loadProducts();
+      });
+      return;
     }
+
+    loadProducts();
   };
 
   const handleDesignSearch = () => {
@@ -587,6 +631,7 @@ const AdminDashboard = () => {
           filter: currentFilter,
           category: currentCategory,
           subCategory: currentSubCategory,
+          search: activeSidebarItem === 'allProducts' ? searchTerm.trim() : '',
           page: newPage,
           limit: pagination.limit,
         }));
@@ -1143,45 +1188,68 @@ const AdminDashboard = () => {
           )}
 
           {/* Search and Filters for Products */}
-          {(activeSidebarItem === 'allProducts' || activeSidebarItem === 'newArrival' || activeSidebarItem === 'bestSeller') && !isEditing && viewMode === 'products' && (
+          {activeSidebarItem === 'allProducts' && !isEditing && viewMode === 'products' && (
             <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0">
-                <div className="flex-1 max-w-md">
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(260px,1fr)_220px_220px_auto_auto] lg:items-center">
+                <div>
                   <div className="relative">
                     <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <input
                       type="text"
-                      placeholder="Search products..."
+                      placeholder="Search by product name..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
                 </div>
-                
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <Filter className="text-gray-400 w-5 h-5" />
-                    <select
-                      value={currentCategory}
-                      onChange={(e) => dispatch(setCurrentCategory(e.target.value))}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="">All Categories</option>
-                      {filters.categories && filters.categories.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <button
-                    onClick={handleSearch}
-                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+
+                <div className="flex items-center gap-2">
+                  <Filter className="text-gray-400 w-5 h-5" />
+                  <select
+                    value={localCategory}
+                    onChange={(e) => handleAllProductsCategoryChange(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
-                    Search
-                  </button>
+                    <option value="">All Categories</option>
+                    {filters.categories && filters.categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
                 </div>
+
+                <div>
+                  <select
+                    value={localSubCategory}
+                    onChange={(e) => handleAllProductsSubCategoryChange(e.target.value)}
+                    disabled={!localCategory}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                  >
+                    <option value="">All Sub Categories</option>
+                    {getFilteredSubCategories().map(sub => (
+                      <option key={sub} value={sub}>{sub}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  onClick={handleSearch}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                >
+                  Search
+                </button>
+
+                <button
+                  onClick={handleClearAllProductsFilters}
+                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+                >
+                  Clear
+                </button>
+              </div>
+
+              <div className="mt-3 text-sm text-gray-500">
+                Showing {pagination.total || products.length} product{(pagination.total || products.length) === 1 ? '' : 's'}
               </div>
             </div>
           )}

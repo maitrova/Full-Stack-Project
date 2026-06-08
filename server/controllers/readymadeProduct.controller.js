@@ -1,4 +1,6 @@
 import ReadymadeProduct from "../models/readymadeproducts.js";
+import Category from "../models/Category.js";
+import SubCategory from "../models/SubCategory.js";
 import { attachReadymadePricing } from "../utils/readymadePricing.js";
 import {
   createReadymadeThumbnail,
@@ -589,9 +591,45 @@ export const getFilteredProducts = async (req, res) => {
       query.bestSeller = true;
     }
 
-    // Apply category filters
-    if (category) query.category = category;
-    if (subCategory) query.subCategory = subCategory;
+    // Apply category filters by display name or id.
+    let categoryId = null;
+    if (category) {
+      const categoryValue = String(category).trim();
+      const categoryDoc = await Category.findOne({
+        $or: [
+          { _id: categoryValue.match(/^[0-9a-fA-F]{24}$/) ? categoryValue : undefined },
+          { name: { $regex: `^${categoryValue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" } },
+        ].filter((condition) => condition._id !== undefined || condition.name),
+      }).select("_id");
+
+      if (!categoryDoc) {
+        query._id = { $exists: false };
+      } else {
+        categoryId = categoryDoc._id;
+        query.category = categoryId;
+      }
+    }
+
+    if (subCategory) {
+      const subCategoryValue = String(subCategory).trim();
+      const subCategoryQuery = {
+        $or: [
+          { _id: subCategoryValue.match(/^[0-9a-fA-F]{24}$/) ? subCategoryValue : undefined },
+          { name: { $regex: `^${subCategoryValue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" } },
+        ].filter((condition) => condition._id !== undefined || condition.name),
+      };
+
+      if (categoryId) {
+        subCategoryQuery.category = categoryId;
+      }
+
+      const subCategoryDoc = await SubCategory.findOne(subCategoryQuery).select("_id");
+      if (!subCategoryDoc) {
+        query._id = { $exists: false };
+      } else {
+        query.subCategory = subCategoryDoc._id;
+      }
+    }
 
     // Search functionality
     if (search) {
@@ -647,34 +685,40 @@ export const getFilteredProducts = async (req, res) => {
 // Get distinct categories and subcategories
 export const getProductFilters = async (req, res) => {
   try {
-    const categories = await ReadymadeProduct.distinct("category");
+    const products = await ReadymadeProduct.find({})
+      .select("category subCategory")
+      .populate("category", "name")
+      .populate("subCategory", "name")
+      .lean();
 
-    // Build "Category:SubCategory" pairs
-    const pairs = await ReadymadeProduct.aggregate([
-      { $match: { category: { $ne: "" }, subCategory: { $ne: "" } } },
-      {
-        $group: {
-          _id: {
-            category: { $trim: { input: "$category" } },
-            subCategory: { $trim: { input: "$subCategory" } },
-          },
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          pair: { $concat: ["$_id.category", ":", "$_id.subCategory"] },
-        },
-      },
-    ]);
+    const categories = [];
+    const subCategories = [];
+    const categorySet = new Set();
+    const subCategorySet = new Set();
 
-    const subCategories = pairs.map((p) => p.pair);
+    products.forEach((product) => {
+      const categoryName = product.category?.name || "";
+      const subCategoryName = product.subCategory?.name || "";
+
+      if (categoryName && !categorySet.has(categoryName)) {
+        categorySet.add(categoryName);
+        categories.push(categoryName);
+      }
+
+      if (categoryName && subCategoryName) {
+        const pair = `${categoryName}:${subCategoryName}`;
+        if (!subCategorySet.has(pair)) {
+          subCategorySet.add(pair);
+          subCategories.push(pair);
+        }
+      }
+    });
 
     res.status(200).json({
       success: true,
       data: {
-        categories: categories.filter(Boolean).map((c) => c.trim()),
-        subCategories: subCategories.filter(Boolean),
+        categories: categories.sort((a, b) => a.localeCompare(b)),
+        subCategories: subCategories.sort((a, b) => a.localeCompare(b)),
       },
     });
   } catch (error) {
