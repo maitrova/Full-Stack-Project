@@ -3,6 +3,7 @@ import { protect } from "../middleware/authMiddleware.js";
 import { returnUpload } from "../middleware/returnUpload.js";
 import { getMyPaidOrders,adminGetAllOrders,
   adminGetOrderById,
+  adminGetDashboardSummary,
   adminUpdateOrderStatus,
   adminBulkUpdateOrderStatus, 
   getMyPaidOrderById,
@@ -28,6 +29,7 @@ orderroutes.post(
 );
 
 /** ADMIN */
+orderroutes.get("/admin/dashboard-summary", protect, adminGetDashboardSummary);
 orderroutes.get("/admin/orders", protect, adminGetAllOrders);
 orderroutes.get("/admin/orders/:orderId", protect, adminGetOrderById);
 orderroutes.get("/admin/returns", protect, adminGetReturnRequests);

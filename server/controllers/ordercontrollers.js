@@ -1,6 +1,9 @@
 import mongoose from "mongoose";
 import Order from "../models/Order.js";
 import Review from "../models/Review.js";
+import { Product } from "../models/Product.js";
+import ReadymadeProduct from "../models/readymadeproducts.js";
+import Dropproduct from "../models/dropproduct.model.js";
 import {
   sendOrderCancelledEmail,
   sendOrderStatusEmail,
@@ -24,6 +27,7 @@ const RETURN_WINDOW_DAYS = 3;
 const ABSOLUTE_URL_RE = /^(?:https?:)?\/\//i;
 const SPECIAL_URL_RE = /^(?:data:|blob:)/i;
 const REFUND_STATUSES = ["NOT_PAID", "PROCESSING", "PAID", "FAILED"];
+const LOW_STOCK_LIMIT = 5;
 
 const ensureAdmin = (req, res) => {
   if (!req.user || req.user.role !== "admin") {
@@ -252,6 +256,101 @@ const validateReturnBankDetails = (bankDetails = {}) => {
   }
 
   return { error: null, bankDetails: normalized };
+};
+
+const startOfDay = (date = new Date()) => {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+};
+
+const endOfDay = (date = new Date()) => {
+  const next = new Date(date);
+  next.setHours(23, 59, 59, 999);
+  return next;
+};
+
+const addDashboardDays = (date, days) => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+};
+
+const paidSalesQuery = (dateRange = {}) => ({
+  $or: [{ status: "PAID" }, { "payment.method": "COD" }],
+  status: { $ne: "CANCELLED" },
+  ...dateRange,
+});
+
+const runSalesSummary = async (dateRange = {}) => {
+  const [result] = await Order.aggregate([
+    { $match: paidSalesQuery(dateRange) },
+    {
+      $project: {
+        total: { $ifNull: ["$total", 0] },
+        itemQty: {
+          $sum: {
+            $map: {
+              input: { $ifNull: ["$items", []] },
+              as: "item",
+              in: { $ifNull: ["$$item.qty", 0] },
+            },
+          },
+        },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        orders: { $sum: 1 },
+        revenue: { $sum: "$total" },
+        items: { $sum: "$itemQty" },
+      },
+    },
+  ]);
+
+  return {
+    orders: result?.orders || 0,
+    revenue: Math.round((result?.revenue || 0) * 100) / 100,
+    items: result?.items || 0,
+  };
+};
+
+const sumStock = (values = []) =>
+  values.reduce((sum, value) => sum + Math.max(0, Number(value || 0)), 0);
+
+const getReadymadeStock = (product = {}) => {
+  const variantStock = sumStock((product.variants || []).map((variant) => variant.stock));
+  return variantStock || Number(product.stock || 0);
+};
+
+const getCustomProductStock = (product = {}) => {
+  const sizeStock = sumStock((product.sizePricing || []).map((size) => size.stock));
+  const colorStock = sumStock(
+    (product.colors || [])
+      .map((color) => color.stock)
+      .filter((stock) => stock !== null && stock !== undefined)
+  );
+  return sizeStock || colorStock;
+};
+
+const normalizeCategoryName = (value) => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  return value.name || value.title || "";
+};
+
+const formatRecentTime = (date) => {
+  const timestamp = new Date(date).getTime();
+  if (!timestamp) return "";
+  const diffMs = Date.now() - timestamp;
+  const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
+  if (diffMinutes < 1) return "Just now";
+  if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes === 1 ? "" : "s"} ago`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
 };
 
 const shapeReturnRequest = (req, returnRequest = {}) => {
@@ -700,6 +799,205 @@ export const submitReturnRequest = async (req, res) => {
 
 const DESIGN_SELECT =
   "previewImage views product productSlug productName productColor productColorName calculatedPrice priceBreakdown title description salePrice";
+
+export const adminGetDashboardSummary = async (req, res) => {
+  try {
+    if (!ensureAdmin(req, res)) return;
+
+    const now = new Date();
+    const todayStart = startOfDay(now);
+    const todayEnd = endOfDay(now);
+    const lastWeekStart = startOfDay(addDashboardDays(now, -6));
+    const lastMonthStart = startOfDay(addDashboardDays(now, -29));
+    const offerWindowEnd = endOfDay(addDashboardDays(now, 2));
+
+    const [
+      customProductCount,
+      readymadeProductCount,
+      dropProductCount,
+      totalRevenue,
+      todaySales,
+      lastWeekSales,
+      lastMonthSales,
+      pendingOrders,
+      todayReturns,
+      readymadeProducts,
+      dropProducts,
+      customProducts,
+      recentOrders,
+      recentReturnOrders,
+      offerReadymadeProducts,
+      offerDropProducts,
+    ] = await Promise.all([
+      Product.countDocuments(),
+      ReadymadeProduct.countDocuments(),
+      Dropproduct.countDocuments(),
+      runSalesSummary(),
+      runSalesSummary({ createdAt: { $gte: todayStart, $lte: todayEnd } }),
+      runSalesSummary({ createdAt: { $gte: lastWeekStart, $lte: todayEnd } }),
+      runSalesSummary({ createdAt: { $gte: lastMonthStart, $lte: todayEnd } }),
+      Order.countDocuments({
+        orderStatus: "PROCESSING",
+        status: { $ne: "CANCELLED" },
+      }),
+      Order.countDocuments({
+        "returnRequest.requestedAt": { $gte: todayStart, $lte: todayEnd },
+        "returnRequest.status": { $ne: "NONE" },
+      }),
+      ReadymadeProduct.find({})
+        .select("title price salePrice saleEndAt stock variants category subCategory isActive updatedAt createdAt")
+        .populate("category", "name")
+        .populate("subCategory", "name")
+        .lean(),
+      Dropproduct.find({})
+        .select("name salePrice saleEndAt totalStock minPrice maxPrice variants category subCategory isActive updatedAt createdAt")
+        .lean(),
+      Product.find({})
+        .select("name basePrice category subCategory sizePricing colors updatedAt createdAt")
+        .lean(),
+      Order.find({})
+        .select("total status payment orderStatus returnRequest createdAt")
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .lean(),
+      Order.find({
+        "returnRequest.status": { $ne: "NONE" },
+        "returnRequest.requestedAt": { $ne: null },
+      })
+        .select("returnRequest total createdAt")
+        .sort({ "returnRequest.requestedAt": -1 })
+        .limit(5)
+        .lean(),
+      ReadymadeProduct.find({
+        salePrice: { $ne: null },
+        saleEndAt: { $gte: now, $lte: offerWindowEnd },
+      })
+        .select("title price salePrice saleEndAt category subCategory")
+        .populate("category", "name")
+        .populate("subCategory", "name")
+        .sort({ saleEndAt: 1 })
+        .limit(10)
+        .lean(),
+      Dropproduct.find({
+        salePrice: { $ne: null },
+        saleEndAt: { $gte: now, $lte: offerWindowEnd },
+      })
+        .select("name salePrice saleEndAt minPrice maxPrice category subCategory")
+        .sort({ saleEndAt: 1 })
+        .limit(10)
+        .lean(),
+    ]);
+
+    const lowStockProducts = [
+      ...readymadeProducts.map((product) => ({
+        id: product._id,
+        type: "Ready-made",
+        name: product.title,
+        category: normalizeCategoryName(product.category),
+        subCategory: normalizeCategoryName(product.subCategory),
+        price: product.salePrice || product.price || 0,
+        stock: getReadymadeStock(product),
+        active: product.isActive !== false,
+      })),
+      ...dropProducts.map((product) => ({
+        id: product._id,
+        type: "Drop",
+        name: product.name,
+        category: product.category || "",
+        subCategory: product.subCategory || "",
+        price: product.salePrice || product.minPrice || 0,
+        stock: Number(product.totalStock || sumStock((product.variants || []).map((variant) => variant.stock))),
+        active: product.isActive !== false,
+      })),
+      ...customProducts.map((product) => ({
+        id: product._id,
+        type: "Custom",
+        name: product.name,
+        category: product.category || "",
+        subCategory: product.subCategory || "",
+        price: product.basePrice || 0,
+        stock: getCustomProductStock(product),
+        active: true,
+      })),
+    ]
+      .filter((product) => product.stock <= LOW_STOCK_LIMIT)
+      .sort((a, b) => a.stock - b.stock)
+      .slice(0, 12);
+
+    const recentActivity = [
+      ...recentOrders.map((order) => ({
+        id: order._id,
+        type: "order",
+        title:
+          order.status === "PAID" || order.payment?.method === "COD"
+            ? "Order placed"
+            : "Order updated",
+        detail: `${order.orderStatus || "PROCESSING"} - Rs. ${Number(order.total || 0).toLocaleString("en-IN")}`,
+        at: order.createdAt,
+        time: formatRecentTime(order.createdAt),
+      })),
+      ...recentReturnOrders.map((order) => ({
+        id: `${order._id}-return`,
+        type: "return",
+        title: "Return requested",
+        detail: `${order.returnRequest?.status || "PROCESSING"} - Rs. ${Number(order.total || 0).toLocaleString("en-IN")}`,
+        at: order.returnRequest?.requestedAt || order.createdAt,
+        time: formatRecentTime(order.returnRequest?.requestedAt || order.createdAt),
+      })),
+    ]
+      .sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0))
+      .slice(0, 6);
+
+    const offerEndingProducts = [
+      ...offerReadymadeProducts.map((product) => ({
+        id: product._id,
+        type: "Ready-made",
+        name: product.title,
+        category: normalizeCategoryName(product.category),
+        subCategory: normalizeCategoryName(product.subCategory),
+        price: product.price || 0,
+        salePrice: product.salePrice || 0,
+        saleEndAt: product.saleEndAt,
+      })),
+      ...offerDropProducts.map((product) => ({
+        id: product._id,
+        type: "Drop",
+        name: product.name,
+        category: product.category || "",
+        subCategory: product.subCategory || "",
+        price: product.minPrice || product.maxPrice || 0,
+        salePrice: product.salePrice || 0,
+        saleEndAt: product.saleEndAt,
+      })),
+    ].sort((a, b) => new Date(a.saleEndAt || 0) - new Date(b.saleEndAt || 0));
+
+    return res.status(200).json({
+      generatedAt: now,
+      totals: {
+        products: customProductCount + readymadeProductCount + dropProductCount,
+        customProducts: customProductCount,
+        readymadeProducts: readymadeProductCount,
+        dropProducts: dropProductCount,
+        revenue: totalRevenue.revenue,
+      },
+      sales: {
+        today: todaySales,
+        lastWeek: lastWeekSales,
+        lastMonth: lastMonthSales,
+      },
+      pendingOrders,
+      lowStockProducts,
+      recentActivity,
+      todayReturns: {
+        count: todayReturns,
+      },
+      offerEndingProducts,
+    });
+  } catch (err) {
+    console.error("adminGetDashboardSummary error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
 
 export const adminGetAllOrders = async (req, res) => {
   try {

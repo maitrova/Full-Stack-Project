@@ -99,6 +99,7 @@ import CompanyDocumentManager from '../components/admin/CompanyDocumentManager.j
 import ReviewManagement from '../components/admin/ReviewManagement.jsx';
 import ReturnManagement from '../components/admin/ReturnManagement.jsx';
 import BlogManagement from '../components/admin/BlogManagement.jsx';
+import StoreDashboard from '../components/admin/Dashboard.jsx';
 
 const AdminDashboard = () => {
   const dispatch = useDispatch();
@@ -642,14 +643,6 @@ const AdminDashboard = () => {
     { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
   ];
 
-  // Dashboard Statistics
-  const dashboardStats = [
-    { label: 'Total Products', value: '1,245', change: '+12%', color: 'blue' },
-    { label: 'Designs', value: designs?.length || '0', change: '+8%', color: 'green' },
-    { label: 'Best Sellers', value: '89', change: '+23%', color: 'purple' },
-    { label: 'Revenue', value: '$24,580', change: '+15%', color: 'orange' },
-  ];
-
   // Helper function to extract sub-category name
   const extractSubCategoryName = (subCategory) => {
     if (typeof subCategory === 'string') {
@@ -1085,42 +1078,7 @@ const AdminDashboard = () => {
             )}
           </div>
 
-          {/* Dashboard Stats */}
-          {activeSidebarItem === 'dashboard' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {dashboardStats.map((stat, index) => (
-                <div key={index} className="bg-white rounded-xl p-6 shadow-lg">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-gray-500 text-sm">{stat.label}</p>
-                      <p className="text-2xl font-bold text-gray-900 mt-2">{stat.value}</p>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      stat.color === 'blue' ? 'bg-blue-100 text-blue-800' :
-                      stat.color === 'green' ? 'bg-green-100 text-green-800' :
-                      stat.color === 'purple' ? 'bg-purple-100 text-purple-800' :
-                      'bg-orange-100 text-orange-800'
-                    }`}>
-                      {stat.change}
-                    </span>
-                  </div>
-                  <div className="mt-4">
-                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full ${
-                          stat.color === 'blue' ? 'bg-blue-500' :
-                          stat.color === 'green' ? 'bg-green-500' :
-                          stat.color === 'purple' ? 'bg-purple-500' :
-                          'bg-orange-500'
-                        }`}
-                        style={{ width: '75%' }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {activeSidebarItem === 'dashboard' && <StoreDashboard />}
 
           {/* Drop Products Component */}
           {activeSidebarItem === 'dropproducts' && (
@@ -1472,45 +1430,7 @@ const AdminDashboard = () => {
               )}
             </div>
           ) : activeSidebarItem === 'dashboard' ? (
-            /* Dashboard Content */
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Recent Activity */}
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
-                <div className="space-y-4">
-                  {[1, 2, 3].map((item) => (
-                    <div key={item} className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <Package className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900">New product added</p>
-                        <p className="text-sm text-gray-500">2 hours ago</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Quick Stats */}
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Stats</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Low Stock Products</span>
-                    <span className="font-bold text-red-600">12</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Pending Orders</span>
-                    <span className="font-bold text-yellow-600">8</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Today's Revenue</span>
-                    <span className="font-bold text-green-600">$2,450</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            null
           ) : activeSidebarItem === 'designs' ? (
             /* Designs View Mode */
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
