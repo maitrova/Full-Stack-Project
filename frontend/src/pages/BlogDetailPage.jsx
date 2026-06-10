@@ -131,12 +131,12 @@ const BlogDetailPage = () => {
       if (level === 2) {
         heading.setAttribute(
           "class",
-          "mt-12 mb-4 text-3xl font-semibold tracking-tight text-slate-900"
+          "mt-10 mb-4 text-2xl font-semibold tracking-tight text-slate-900 sm:mt-12 sm:text-3xl"
         );
       } else {
         heading.setAttribute(
           "class",
-          "mt-8 mb-3 text-2xl font-semibold tracking-tight text-slate-800"
+          "mt-7 mb-3 text-xl font-semibold tracking-tight text-slate-800 sm:mt-8 sm:text-2xl"
         );
       }
       headings.push({ id, label: text, level });
@@ -147,7 +147,7 @@ const BlogDetailPage = () => {
         const image = doc.createElement("img");
         image.setAttribute("src", buildImageUrl(imageConfig.imageUrl));
         image.setAttribute("alt", imageConfig.altText || text);
-        image.className = "w-full rounded-[24px] object-contain";
+        image.className = "h-auto max-w-full rounded-2xl object-contain sm:rounded-[24px]";
         figure.appendChild(image);
         heading.insertAdjacentElement("afterend", figure);
         usedSectionImages.add(imageConfig.targetHeading);
@@ -156,9 +156,9 @@ const BlogDetailPage = () => {
 
     root?.querySelectorAll("a").forEach((anchor) => {
       if (anchor.querySelector("img")) {
-        anchor.setAttribute("class", "block overflow-hidden rounded-[24px] transition hover:opacity-95");
+        anchor.setAttribute("class", "block max-w-full overflow-hidden rounded-2xl transition hover:opacity-95 sm:rounded-[24px]");
       } else {
-        anchor.setAttribute("class", "font-semibold text-sky-700 underline decoration-sky-300 underline-offset-4");
+        anchor.setAttribute("class", "break-words font-semibold text-sky-700 underline decoration-sky-300 underline-offset-4");
       }
       if (/^https?:\/\//i.test(anchor.getAttribute("href") || "")) {
         anchor.setAttribute("target", "_blank");
@@ -167,7 +167,11 @@ const BlogDetailPage = () => {
     });
 
     root?.querySelectorAll("table").forEach((table) => {
-      table.setAttribute("class", "w-full border-collapse overflow-hidden rounded-2xl text-sm");
+      const wrapper = doc.createElement("div");
+      wrapper.setAttribute("class", "my-6 max-w-full overflow-x-auto rounded-2xl border border-slate-200");
+      table.setAttribute("class", "min-w-full border-collapse text-sm");
+      table.parentNode?.insertBefore(wrapper, table);
+      wrapper.appendChild(table);
     });
 
     root?.querySelectorAll("th, td").forEach((cell) => {
@@ -175,11 +179,11 @@ const BlogDetailPage = () => {
     });
 
     root?.querySelectorAll("blockquote").forEach((quote) => {
-      quote.setAttribute("class", "border-l-4 border-sky-400 bg-sky-50/70 px-5 py-3 italic text-slate-700");
+      quote.setAttribute("class", "break-words border-l-4 border-sky-400 bg-sky-50/70 px-4 py-3 italic text-slate-700 sm:px-5");
     });
 
     root?.querySelectorAll("figure").forEach((figure) => {
-      figure.setAttribute("class", "my-8 overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50 p-2");
+      figure.setAttribute("class", "my-6 max-w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 p-2 sm:my-8 sm:rounded-[24px]");
 
       const href = figure.getAttribute("data-href") || "";
       const image = figure.querySelector("img");
@@ -187,7 +191,7 @@ const BlogDetailPage = () => {
       if (href && image && !figure.querySelector("a")) {
         const anchor = doc.createElement("a");
         anchor.setAttribute("href", href);
-        anchor.setAttribute("class", "block overflow-hidden rounded-[24px] transition hover:opacity-95");
+        anchor.setAttribute("class", "block max-w-full overflow-hidden rounded-2xl transition hover:opacity-95 sm:rounded-[24px]");
         if (/^https?:\/\//i.test(href)) {
           anchor.setAttribute("target", "_blank");
           anchor.setAttribute("rel", "noreferrer");
@@ -200,8 +204,17 @@ const BlogDetailPage = () => {
     root?.querySelectorAll("img").forEach((image) => {
       const rawSrc = image.getAttribute("data-src") || image.getAttribute("src") || "";
       image.setAttribute("src", buildImageUrl(rawSrc));
-      image.setAttribute("class", "w-full rounded-[24px] object-contain");
+      image.setAttribute("class", "h-auto max-w-full rounded-2xl object-contain sm:rounded-[24px]");
       image.setAttribute("loading", "lazy");
+    });
+
+    root?.querySelectorAll("iframe").forEach((iframe) => {
+      const wrapper = doc.createElement("div");
+      wrapper.setAttribute("class", "my-6 aspect-video max-w-full overflow-hidden rounded-2xl bg-slate-100");
+      iframe.setAttribute("class", "h-full w-full");
+      iframe.setAttribute("loading", "lazy");
+      iframe.parentNode?.insertBefore(wrapper, iframe);
+      wrapper.appendChild(iframe);
     });
 
     return {
@@ -288,18 +301,18 @@ const BlogDetailPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,_#f8fafc_0%,_#ffffff_100%)] px-4 py-10 sm:px-6 lg:px-8">
+    <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,_#f8fafc_0%,_#ffffff_100%)] px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
       {articleSchema ? <script type="application/ld+json">{JSON.stringify(articleSchema)}</script> : null}
       {faqSchema ? <script type="application/ld+json">{JSON.stringify(faqSchema)}</script> : null}
 
-      <article className="mx-auto max-w-6xl">
+      <article className="mx-auto max-w-6xl min-w-0">
         <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-sky-700 transition hover:text-sky-800">
           <span>&larr;</span>
           <span>Back to Homepage</span>
         </Link>
 
-        <header className="mt-6 rounded-[32px] border border-slate-200 bg-white p-8 shadow-[0_34px_90px_-48px_rgba(15,23,42,0.42)] sm:p-10 lg:p-12">
-          <div className="flex flex-wrap items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+        <header className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_24px_70px_-48px_rgba(15,23,42,0.42)] sm:mt-6 sm:rounded-[32px] sm:p-10 lg:p-12">
+          <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 sm:gap-3 sm:text-[11px] sm:tracking-[0.22em]">
             <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sky-700">{blog.category}</span>
             {blog.isFeatured ? (
               <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-amber-700">Featured</span>
@@ -309,11 +322,11 @@ const BlogDetailPage = () => {
             ) : null}
           </div>
 
-          <h1 className="mt-6 max-w-4xl text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
+          <h1 className="mt-5 max-w-4xl break-words text-3xl font-semibold tracking-tight text-slate-900 sm:mt-6 sm:text-5xl">
             {blog.title}
           </h1>
 
-          <div className="mt-6 flex flex-wrap items-center gap-3 text-sm text-slate-500">
+          <div className="mt-5 flex flex-wrap items-center gap-2 text-sm text-slate-500 sm:mt-6 sm:gap-3">
             <span className="font-semibold text-slate-700">{blog.authorName}</span>
             <span className="h-1 w-1 rounded-full bg-slate-300" />
             <span>{formatDate(blog.publishedAt)}</span>
@@ -321,7 +334,7 @@ const BlogDetailPage = () => {
             <span>{blog.readTimeMinutes} min read</span>
           </div>
 
-          <div className="mt-7 overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50">
+          <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 sm:mt-7 sm:rounded-[24px]">
             {blog.coverImage ? (
               <div className="aspect-[3/2]">
                 <img
@@ -335,13 +348,13 @@ const BlogDetailPage = () => {
             )}
           </div>
 
-          <p className="mt-8 max-w-3xl text-base leading-8 text-slate-600">
+          <p className="mt-6 max-w-3xl break-words text-base leading-7 text-slate-600 sm:mt-8 sm:leading-8">
             {blog.excerpt}
           </p>
         </header>
 
-        <div className="mt-10 grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="h-fit rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm lg:sticky lg:top-24">
+        <div className="mt-6 grid min-w-0 gap-6 sm:mt-10 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-8">
+        <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:rounded-[28px] sm:p-6 lg:sticky lg:top-24">
   <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
     Contents
   </h2>
@@ -366,20 +379,20 @@ const BlogDetailPage = () => {
   )}
 </aside>
 
-          <div className="space-y-8">
-            <div className="rounded-[28px] border border-slate-200 bg-white px-6 py-8 shadow-sm sm:px-10 sm:py-10">
+          <div className="min-w-0 space-y-6 sm:space-y-8">
+            <div className="min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-6 shadow-sm sm:rounded-[28px] sm:px-10 sm:py-10">
               <div
-                className="prose prose-slate max-w-none prose-headings:scroll-mt-28 prose-p:leading-8 prose-li:leading-8 prose-img:rounded-[24px]"
+                className="prose prose-sm prose-slate max-w-none break-words prose-headings:scroll-mt-28 prose-p:leading-7 prose-li:leading-7 prose-img:rounded-2xl prose-pre:max-w-full prose-pre:overflow-x-auto sm:prose-base sm:prose-p:leading-8 sm:prose-li:leading-8 sm:prose-img:rounded-[24px]"
                 dangerouslySetInnerHTML={{ __html: contentData.html }}
               />
             </div>
 
             {blog.faqItems?.length ? (
-              <section className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
-                <h2 className="text-2xl font-semibold text-slate-900">FAQs</h2>
-                <div className="mt-6 space-y-4">
+              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:rounded-[28px] sm:p-8">
+                <h2 className="text-xl font-semibold text-slate-900 sm:text-2xl">FAQs</h2>
+                <div className="mt-5 space-y-4 sm:mt-6">
                   {blog.faqItems.map((item, index) => (
-                    <div key={`${item.question}-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                    <div key={`${item.question}-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
                       <h3 className="text-base font-semibold text-slate-900">{item.question}</h3>
                       <p className="mt-2 text-sm leading-7 text-slate-600">{item.answer}</p>
                     </div>

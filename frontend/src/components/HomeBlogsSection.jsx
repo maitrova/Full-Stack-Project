@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { buildImageUrl } from "../utils/responsiveImage.js";
 
@@ -60,13 +60,6 @@ const BlogCard = ({ blog }) => (
 const HomeBlogsSection = () => {
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isPaused, setIsPaused] = useState(false);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-  const [autoScrollEnabled, setAutoScrollEnabled] = useState(false);
-  const railRef = useRef(null);
-  const directionRef = useRef(1);
-  const resumeTimerRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,126 +93,17 @@ const HomeBlogsSection = () => {
     };
   }, []);
 
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
-    const updateAutoScroll = () => setAutoScrollEnabled(mediaQuery.matches);
-
-    updateAutoScroll();
-    mediaQuery.addEventListener("change", updateAutoScroll);
-
-    return () => mediaQuery.removeEventListener("change", updateAutoScroll);
-  }, []);
-
-  useEffect(() => {
-    if (loading || blogs.length < 2 || !autoScrollEnabled) return undefined;
-
-    const rail = railRef.current;
-    if (!rail) return undefined;
-
-    const timer = window.setInterval(() => {
-      if (isPaused) return;
-
-      const maxScrollLeft = rail.scrollWidth - rail.clientWidth;
-      if (maxScrollLeft <= 0) return;
-
-      if (rail.scrollLeft <= 0) {
-        directionRef.current = 1;
-      } else if (rail.scrollLeft >= maxScrollLeft) {
-        directionRef.current = -1;
-      }
-
-      rail.scrollLeft += directionRef.current * 1.1;
-    }, 16);
-
-    return () => window.clearInterval(timer);
-  }, [autoScrollEnabled, blogs, isPaused, loading]);
-
-  useEffect(() => {
-    const rail = railRef.current;
-    if (!rail) return undefined;
-
-    const updateScrollState = () => {
-      const maxScrollLeft = Math.max(0, rail.scrollWidth - rail.clientWidth);
-      setCanScrollLeft(rail.scrollLeft > 4);
-      setCanScrollRight(rail.scrollLeft < maxScrollLeft - 4);
-    };
-
-    updateScrollState();
-    rail.addEventListener("scroll", updateScrollState, { passive: true });
-    window.addEventListener("resize", updateScrollState);
-
-    return () => {
-      rail.removeEventListener("scroll", updateScrollState);
-      window.removeEventListener("resize", updateScrollState);
-    };
-  }, [blogs, loading]);
-
-  useEffect(() => {
-    return () => window.clearTimeout(resumeTimerRef.current);
-  }, []);
-
   if (!loading && blogs.length === 0) return null;
-
-  const getScrollStep = () => {
-    const rail = railRef.current;
-    const firstCard = rail?.firstElementChild;
-    if (!rail || !firstCard) return 320;
-
-    const cardWidth = firstCard.getBoundingClientRect().width;
-    const styles = window.getComputedStyle(rail);
-    const gap = parseFloat(styles.columnGap || styles.gap || "16") || 16;
-    return cardWidth + gap;
-  };
-
-  const pauseAutoScrollTemporarily = () => {
-    setIsPaused(true);
-    window.clearTimeout(resumeTimerRef.current);
-    resumeTimerRef.current = window.setTimeout(() => {
-      setIsPaused(false);
-    }, 1800);
-  };
-
-  const scrollRail = (direction) => {
-    directionRef.current = direction;
-    const rail = railRef.current;
-    if (!rail) return;
-    pauseAutoScrollTemporarily();
-    rail.scrollBy({ left: getScrollStep() * direction, behavior: "smooth" });
-  };
 
   return (
     <section className="relative overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_42%,#f8fafc_100%)] px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.16),transparent_38%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.12),transparent_34%)]" />
 
       <div className="relative mx-auto max-w-7xl">
-        <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="mb-2">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-700">Blog</p>
             <h2 className="mt-0.5 text-lg font-semibold text-slate-900 sm:text-xl">Latest from the blog</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => scrollRail(-1)}
-              disabled={!canScrollLeft}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Scroll blogs left"
-            >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              onClick={() => scrollRail(1)}
-              disabled={!canScrollRight}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Scroll blogs right"
-            >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
           </div>
         </div>
 
@@ -243,12 +127,7 @@ const HomeBlogsSection = () => {
             <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-[#f8fafc] to-transparent" />
             <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-[#f8fafc] to-transparent" />
             <div
-              ref={railRef}
-              onMouseEnter={() => setIsPaused(true)}
-              onMouseLeave={() => setIsPaused(false)}
-              onTouchStart={() => setIsPaused(true)}
-              onTouchEnd={() => setIsPaused(false)}
-              className="flex touch-pan-y gap-4 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:none] sm:snap-x sm:snap-mandatory [&::-webkit-scrollbar]:hidden"
+              className="flex touch-auto gap-4 overflow-x-auto overscroll-x-contain pb-3 sm:snap-x sm:snap-mandatory"
             >
               {blogs.map((blog) => (
                 <BlogCard key={blog._id} blog={blog} />
