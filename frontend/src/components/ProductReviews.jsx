@@ -13,6 +13,28 @@ const KIND_TO_PATH = {
 
 const emptyBreakdown = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
 
+const resolveReviewPhotoUrl = (path) => {
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path)) return path;
+
+  const apiBase = (API_URL || window.location.origin).replace(/\/$/, "");
+  const normalizedPath = String(path).replace(/\\/g, "/");
+
+  if (normalizedPath.startsWith("/api/outputs/")) {
+    return `${apiBase.replace(/\/api$/i, "")}${normalizedPath}`;
+  }
+
+  if (normalizedPath.startsWith("/outputs/")) {
+    return `${apiBase}/outputs/${normalizedPath.replace(/^\/outputs\//, "")}`;
+  }
+
+  if (normalizedPath.startsWith("outputs/")) {
+    return `${apiBase}/${normalizedPath}`;
+  }
+
+  return `${apiBase}/${normalizedPath.replace(/^\/+/, "")}`;
+};
+
 const renderStars = (rating, className = "h-4 w-4") =>
   [...Array(5)].map((_, index) => {
     const filled = index < Math.round(Number(rating || 0));
@@ -254,7 +276,7 @@ export default function ProductReviews({
                           {review.title || "Verified purchase review"}
                         </h3>
                         <div className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">
-                          {review.userName} • {new Date(review.createdAt).toLocaleDateString("en-IN")}
+                          {review.userName} • {new Date(review.reviewDate || review.createdAt).toLocaleDateString("en-IN")}
                         </div>
                       </div>
                       {review.verifiedPurchase ? (
@@ -267,6 +289,25 @@ export default function ProductReviews({
                     <p className="mt-3 text-sm leading-6 text-slate-700">
                       {review.comment || "No written comment provided."}
                     </p>
+                    {review.photos?.length ? (
+                      <div className="mt-4 flex flex-wrap gap-3">
+                        {review.photos.map((photo, photoIndex) => (
+                          <a
+                            key={`${photo}-${photoIndex}`}
+                            href={resolveReviewPhotoUrl(photo)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block h-24 w-24 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100"
+                          >
+                            <img
+                              src={resolveReviewPhotoUrl(photo)}
+                              alt={`Review photo ${photoIndex + 1}`}
+                              className="h-full w-full object-cover"
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
                   </article>
                 ))}
               </div>

@@ -6,6 +6,7 @@ import { getMyPaidOrders,adminGetAllOrders,
   adminGetDashboardSummary,
   adminUpdateOrderStatus,
   adminBulkUpdateOrderStatus, 
+  adminCancelOrder,
   getMyPaidOrderById,
   cancelMyOrder,
   submitReturnRequest,
@@ -32,6 +33,7 @@ orderroutes.post(
 orderroutes.get("/admin/dashboard-summary", protect, adminGetDashboardSummary);
 orderroutes.get("/admin/orders", protect, adminGetAllOrders);
 orderroutes.get("/admin/orders/:orderId", protect, adminGetOrderById);
+orderroutes.patch("/admin/orders/:orderId/cancel", protect, adminCancelOrder);
 orderroutes.get("/admin/returns", protect, adminGetReturnRequests);
 orderroutes.patch("/admin/returns/:orderId", protect, adminUpdateReturnRequest);
 orderroutes.patch("/admin/returns/:orderId/refund-status", protect, adminUpdateReturnRefundStatus);

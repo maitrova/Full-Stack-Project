@@ -534,7 +534,15 @@ const UserOrders = () => {
 
   const getCancellationNote = (order) => {
     if (!order || order.status !== 'CANCELLED') return null;
-    return 'This order was cancelled before it reached ready status.';
+    if (order.cancelledByRole === 'ADMIN') {
+      const reason = order.cancellationReason ? ` Reason: ${order.cancellationReason}` : '';
+      const refundNote =
+        order.payment?.method === 'RAZORPAY' && Number(order.payment?.refundAmount || 0) > 0
+          ? ` A full refund of Rs.${Number(order.payment.refundAmount || 0).toFixed(2)} has been initiated to your original payment method.`
+          : '';
+      return `This order was cancelled by our team.${reason}${refundNote}`;
+    }
+    return 'This order was cancelled by you before it reached ready status.';
   };
 
   const getReturnStatusInfo = (order) => {

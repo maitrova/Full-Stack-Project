@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   adminFetchOrders,
   adminUpdateOrderStatus,
+  adminCancelOrder,
   adminBulkUpdateOrderStatus,
   adminFetchOrderById,
   selectAdminOrders,
@@ -11,6 +12,10 @@ import {
   selectAdminOrder,
   selectAdminOrderLoading,
   selectUpdateStatusLoading,
+  selectAdminCancelOrderLoading,
+  selectAdminCancelOrderError,
+  selectAdminCancelOrderMessage,
+  selectAdminCancellingOrderId,
   selectBulkUpdateLoading,
   selectLastBulkResult,
   clearOrderErrors,
@@ -27,6 +32,10 @@ const AdminOrders = () => {
   const selectedOrder = useSelector(selectAdminOrder);
   const selectedOrderLoading = useSelector(selectAdminOrderLoading);
   const updateLoading = useSelector(selectUpdateStatusLoading);
+  const cancelOrderLoading = useSelector(selectAdminCancelOrderLoading);
+  const cancelOrderError = useSelector(selectAdminCancelOrderError);
+  const cancelOrderMessage = useSelector(selectAdminCancelOrderMessage);
+  const cancellingOrderId = useSelector(selectAdminCancellingOrderId);
   const bulkUpdateLoading = useSelector(selectBulkUpdateLoading);
   const lastBulkResult = useSelector(selectLastBulkResult);
   
@@ -63,6 +72,7 @@ const AdminOrders = () => {
   const [selectedViewIndex, setSelectedViewIndex] = useState(0);
   const [showSuccessNotification, setShowSuccessNotification] = useState(false);
   const [showExportNotification, setShowExportNotification] = useState(false);
+  const [showCancelNotification, setShowCancelNotification] = useState(false);
 
   // Get base URL from environment variables
   const API_BASE_URL = (
@@ -123,6 +133,20 @@ const AdminOrders = () => {
       return () => clearTimeout(timer);
     }
   }, [exportSuccess, dispatch]);
+
+  useEffect(() => {
+    if (cancelOrderMessage) {
+      dispatch(adminFetchOrders(filters));
+      if (editOrderId) {
+        dispatch(adminFetchOrderById(editOrderId));
+      }
+      setShowCancelNotification(true);
+      const timer = setTimeout(() => {
+        setShowCancelNotification(false);
+      }, 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [cancelOrderMessage, dispatch, editOrderId, filters]);
 
   // Close modals when order status update is successful
   useEffect(() => {
@@ -268,10 +292,55 @@ const AdminOrders = () => {
     return colors[status] || 'bg-gray-100 text-gray-800 border border-gray-200';
   };
 
+  const canCancelOrder = (order) =>
+    order &&
+    order.status !== 'CANCELLED' &&
+    order.orderStatus !== 'DELIVERED';
+
+  const getCancelRefundText = (order) => {
+    if (order?.status === 'PAID' && order?.payment?.method === 'RAZORPAY') {
+      return 'This will cancel the order and trigger a full Razorpay refund automatically.';
+    }
+    if (order?.payment?.method === 'COD') {
+      return 'This will cancel the COD order. No online refund is required.';
+    }
+    return 'This will cancel the order.';
+  };
+
+  const handleCancelOrder = async (order) => {
+    if (!canCancelOrder(order)) return;
+
+    const reason = window.prompt(
+      `${getCancelRefundText(order)}\n\nEnter cancellation reason:`,
+      'Cancelled by admin'
+    );
+
+    if (reason === null) return;
+
+    const confirmed = window.confirm(
+      `${getCancelRefundText(order)}\n\nDo you want to continue?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await dispatch(adminCancelOrder({
+        orderId: order._id,
+        reason: reason.trim() || 'Cancelled by admin',
+      })).unwrap();
+      dispatch(adminFetchOrders(filters));
+    } catch (err) {
+      console.error('Failed to cancel order:', err);
+    }
+  };
+
   const getDisplayPaymentStatus = (order) =>
     order?.status === 'CANCELLED'
       ? 'CANCELLED'
       : (order?.payment?.method === 'COD' ? 'COD' : (order?.status || 'PENDING_PAYMENT'));
+
+  const getDisplayOrderStatus = (order) =>
+    order?.status === 'CANCELLED' ? 'CANCELLED' : (order?.orderStatus || 'PROCESSING');
 
   const getPaymentStatusTextColor = (order) => {
     const displayStatus = getDisplayPaymentStatus(order);
@@ -513,7 +582,8 @@ const AdminOrders = () => {
     processing: orders.filter(o => o.orderStatus === 'PROCESSING' && o.status !== 'CANCELLED').length,
     ready: orders.filter(o => o.orderStatus === 'READY').length,
     shipped: orders.filter(o => o.orderStatus === 'SHIPPED').length,
-    delivered: orders.filter(o => o.orderStatus === 'DELIVERED').length
+    delivered: orders.filter(o => o.orderStatus === 'DELIVERED').length,
+    cancelled: orders.filter(o => o.status === 'CANCELLED').length
   };
 
   const getProductId = (item) => {
@@ -667,6 +737,31 @@ const AdminOrders = () => {
                     setShowExportNotification(false);
                     dispatch(resetExportState());
                   }}
+                  className="text-green-700 hover:text-green-800"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showCancelNotification && cancelOrderMessage && (
+          <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-green-700">{cancelOrderMessage}</p>
+              </div>
+              <div className="ml-auto pl-3">
+                <button
+                  onClick={() => setShowCancelNotification(false)}
                   className="text-green-700 hover:text-green-800"
                 >
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -931,6 +1026,21 @@ const AdminOrders = () => {
           </div>
         )}
 
+        {cancelOrderError && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700">{cancelOrderError}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Legacy Bulk Result Notification */}
         {lastBulkResult && (
           <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
@@ -1038,8 +1148,8 @@ const AdminOrders = () => {
                       ₹{order.total?.toFixed(2) || calculateTotal(order)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.orderStatus)}`}>
-                        {order.orderStatus}
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(getDisplayOrderStatus(order))}`}>
+                        {getDisplayOrderStatus(order)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -1047,7 +1157,7 @@ const AdminOrders = () => {
                         <select
                           value={order.orderStatus}
                           onChange={(e) => handleStatusUpdate(order._id, e.target.value)}
-                          disabled={orderStatusLoading || updateLoading}
+                          disabled={orderStatusLoading || updateLoading || cancelOrderLoading || order.status === 'CANCELLED'}
                           className="block w-32 pl-3 pr-8 py-1 text-xs border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 rounded-md disabled:opacity-50"
                         >
                           <option value="PROCESSING">Processing</option>
@@ -1060,6 +1170,13 @@ const AdminOrders = () => {
                           className="text-indigo-600 hover:text-indigo-900 text-sm"
                         >
                           Details
+                        </button>
+                        <button
+                          onClick={() => handleCancelOrder(order)}
+                          disabled={!canCancelOrder(order) || cancelOrderLoading || orderStatusLoading}
+                          className="text-rose-600 hover:text-rose-900 text-sm disabled:cursor-not-allowed disabled:text-gray-400"
+                        >
+                          {cancellingOrderId === order._id ? 'Cancelling...' : 'Cancel'}
                         </button>
                       </div>
                     </td>
@@ -1266,8 +1383,8 @@ const AdminOrders = () => {
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                               Current Status
                             </label>
-                            <div className={`px-3 py-2 rounded-md ${getStatusColor(selectedOrder.orderStatus)}`}>
-                              {selectedOrder.orderStatus}
+                            <div className={`px-3 py-2 rounded-md ${getStatusColor(getDisplayOrderStatus(selectedOrder))}`}>
+                              {getDisplayOrderStatus(selectedOrder)}
                             </div>
                           </div>
                           <div>
@@ -1277,6 +1394,7 @@ const AdminOrders = () => {
                             <select
                               value={editOrderStatus}
                               onChange={(e) => setEditOrderStatus(e.target.value)}
+                              disabled={selectedOrder.status === 'CANCELLED' || cancelOrderLoading}
                               className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                             >
                               <option value="">Select status</option>
@@ -1287,10 +1405,17 @@ const AdminOrders = () => {
                             </select>
                           </div>
                         </div>
-                        <div className="mt-4 flex justify-end">
+                        <div className="mt-4 flex flex-wrap justify-end gap-3">
+                          <button
+                            onClick={() => handleCancelOrder(selectedOrder)}
+                            disabled={!canCancelOrder(selectedOrder) || cancelOrderLoading || orderStatusLoading}
+                            className="px-4 py-2 border border-rose-200 rounded-md shadow-sm text-sm font-medium text-rose-700 bg-white hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {cancellingOrderId === selectedOrder._id ? 'Cancelling...' : 'Cancel Order'}
+                          </button>
                           <button
                             onClick={handleSaveIndividualEdit}
-                            disabled={!editOrderStatus || orderStatusLoading || updateLoading}
+                            disabled={!editOrderStatus || orderStatusLoading || updateLoading || cancelOrderLoading || selectedOrder.status === 'CANCELLED'}
                             className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
                           >
                             {orderStatusLoading || updateLoading ? 'Updating...' : 'Update Status'}
@@ -1547,6 +1672,46 @@ const AdminOrders = () => {
                                   {selectedOrder.payment.razorpaySignature}
                                 </p>
                               </div>
+                            )}
+                            {selectedOrder.payment.refundStatus && selectedOrder.payment.refundStatus !== 'NOT_REQUIRED' && (
+                              <>
+                                <div>
+                                  <p className="text-sm text-gray-600">Cancellation Refund Status</p>
+                                  <p className="mt-1 text-sm font-semibold text-indigo-700">
+                                    {selectedOrder.payment.refundStatus}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-gray-600">Refund Amount</p>
+                                  <p className="mt-1 text-sm font-medium text-gray-900">
+                                    â‚¹{Number(selectedOrder.payment.refundAmount || 0).toFixed(2)}
+                                  </p>
+                                </div>
+                                {selectedOrder.payment.refundId && (
+                                  <div>
+                                    <p className="text-sm text-gray-600">Razorpay Refund ID</p>
+                                    <p className="mt-1 text-sm font-medium text-gray-900 break-all">
+                                      {selectedOrder.payment.refundId}
+                                    </p>
+                                  </div>
+                                )}
+                                {selectedOrder.payment.refundReference && (
+                                  <div>
+                                    <p className="text-sm text-gray-600">Refund Reference</p>
+                                    <p className="mt-1 text-sm font-medium text-gray-900 break-all">
+                                      {selectedOrder.payment.refundReference}
+                                    </p>
+                                  </div>
+                                )}
+                                {selectedOrder.payment.refundFailureReason && (
+                                  <div className="col-span-2">
+                                    <p className="text-sm text-gray-600">Refund Error</p>
+                                    <p className="mt-1 text-sm font-medium text-rose-700">
+                                      {selectedOrder.payment.refundFailureReason}
+                                    </p>
+                                  </div>
+                                )}
+                              </>
                             )}
                           </div>
                         </div>

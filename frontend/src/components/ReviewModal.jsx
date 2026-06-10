@@ -1,7 +1,29 @@
 import React, { useEffect, useState } from "react";
-import { Loader2, Star, X } from "lucide-react";
+import { Image, Loader2, Star, X } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
+const resolveReviewPhotoUrl = (path) => {
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path)) return path;
+
+  const apiBase = (API_URL || window.location.origin).replace(/\/$/, "");
+  const normalizedPath = String(path).replace(/\\/g, "/");
+
+  if (normalizedPath.startsWith("/api/outputs/")) {
+    return `${apiBase.replace(/\/api$/i, "")}${normalizedPath}`;
+  }
+
+  if (normalizedPath.startsWith("/outputs/")) {
+    return `${apiBase}/outputs/${normalizedPath.replace(/^\/outputs\//, "")}`;
+  }
+
+  if (normalizedPath.startsWith("outputs/")) {
+    return `${apiBase}/${normalizedPath}`;
+  }
+
+  return `${apiBase}/${normalizedPath.replace(/^\/+/, "")}`;
+};
 
 const renderStarButton = (value, active, onClick) => (
   <button
@@ -18,8 +40,11 @@ const renderStarButton = (value, active, onClick) => (
 
 export default function ReviewModal({ isOpen, onClose, item, orderId, token, productName, onSubmitted }) {
   const [rating, setRating] = useState(0);
+  const [users, setUsers] = useState("1");
   const [title, setTitle] = useState("");
   const [comment, setComment] = useState("");
+  const [existingPhotos, setExistingPhotos] = useState([]);
+  const [photos, setPhotos] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -28,8 +53,11 @@ export default function ReviewModal({ isOpen, onClose, item, orderId, token, pro
 
     const existing = item?.reviewMeta?.existingReview;
     setRating(Number(existing?.rating || 0));
+    setUsers(String(existing?.users || 1));
     setTitle(existing?.title || "");
     setComment(existing?.comment || "");
+    setExistingPhotos(Array.isArray(existing?.photos) ? existing.photos : []);
+    setPhotos([]);
     setError("");
   }, [isOpen, item]);
 
@@ -54,20 +82,24 @@ export default function ReviewModal({ isOpen, onClose, item, orderId, token, pro
       setSaving(true);
       setError("");
 
+      const payload = new FormData();
+      payload.append("orderId", orderId);
+      payload.append("kind", item.reviewMeta.kind);
+      payload.append("targetId", item.reviewMeta.targetId);
+      payload.append("rating", String(rating));
+      payload.append("users", String(users || 1));
+      payload.append("title", title);
+      payload.append("comment", comment);
+      photos.forEach((file) => {
+        payload.append("photos", file);
+      });
+
       const response = await fetch(`${API_URL}/reviews`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          orderId,
-          kind: item.reviewMeta.kind,
-          targetId: item.reviewMeta.targetId,
-          rating,
-          title,
-          comment,
-        }),
+        body: payload,
       });
       const data = await response.json();
 
@@ -86,7 +118,7 @@ export default function ReviewModal({ isOpen, onClose, item, orderId, token, pro
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/55 px-4 py-6">
-      <div className="w-full max-w-2xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
@@ -106,12 +138,24 @@ export default function ReviewModal({ isOpen, onClose, item, orderId, token, pro
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5 px-6 py-6">
+        <form onSubmit={handleSubmit} className="max-h-[calc(92vh-132px)] space-y-5 overflow-y-auto px-6 py-6">
           <div>
             <label className="block text-sm font-medium text-slate-700">Your rating</label>
             <div className="mt-2 flex items-center gap-1">
               {[1, 2, 3, 4, 5].map((value) => renderStarButton(value, rating, setRating))}
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700">Users</label>
+            <input
+              type="number"
+              min="1"
+              value={users}
+              onChange={(event) => setUsers(event.target.value)}
+              placeholder="1"
+              className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+            />
           </div>
 
           <div>
@@ -136,6 +180,49 @@ export default function ReviewModal({ isOpen, onClose, item, orderId, token, pro
               placeholder="Share what you liked, sizing experience, material quality, delivery condition, and anything that helps other shoppers."
               className="mt-2 w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-slate-400"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700">Review photos</label>
+            <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
+              <Image className="h-4 w-4" />
+              Upload photos
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                multiple
+                onChange={(event) => setPhotos(Array.from(event.target.files || []))}
+                className="hidden"
+              />
+            </label>
+            {photos.length ? (
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                {photos.map((file, index) => (
+                  <span key={`${file.name}-${index}`} className="rounded-full bg-slate-100 px-3 py-1">
+                    {file.name}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            {existingPhotos.length ? (
+              <div className="mt-3 flex flex-wrap gap-3">
+                {existingPhotos.map((photo, index) => (
+                  <a
+                    key={`${photo}-${index}`}
+                    href={resolveReviewPhotoUrl(photo)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block h-20 w-20 overflow-hidden rounded-xl border border-slate-200 bg-slate-100"
+                  >
+                    <img
+                      src={resolveReviewPhotoUrl(photo)}
+                      alt={`Review photo ${index + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                  </a>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           {error ? (

@@ -61,6 +61,20 @@ const reviewSchema = new mongoose.Schema(
       min: 1,
       max: 5,
     },
+    users: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
+    reviewDate: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    photos: {
+      type: [String],
+      default: [],
+    },
     title: {
       type: String,
       default: "",

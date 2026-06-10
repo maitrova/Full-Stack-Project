@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   CalendarClock,
   DollarSign,
+  IndianRupee,
   Package,
   RefreshCw,
   RotateCcw,
@@ -20,6 +21,7 @@ const SALES_OPTIONS = [
   { value: "today", label: "Today sales" },
   { value: "lastWeek", label: "Last week sales" },
   { value: "lastMonth", label: "Last month sales" },
+  { value: "custom", label: "Custom date sales" },
 ];
 
 const numberFormat = new Intl.NumberFormat("en-IN");
@@ -72,12 +74,15 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [salesRange, setSalesRange] = useState("today");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
-  const fetchSummary = async () => {
+  const fetchSummary = async (params = {}) => {
     try {
       setLoading(true);
       setError("");
       const response = await axios.get(`${API_BASE_URL}/orders/admin/dashboard-summary`, {
+        params,
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         withCredentials: true,
       });
@@ -103,6 +108,32 @@ const Dashboard = () => {
     [summary, salesRange]
   );
 
+  const customDateLabel = useMemo(() => {
+    const range = summary?.sales?.customRange;
+    if (!range?.dateFrom && !range?.dateTo) return "Select dates to filter sales.";
+    if (range.dateFrom && range.dateTo) return `${range.dateFrom} to ${range.dateTo}`;
+    if (range.dateFrom) return `From ${range.dateFrom}`;
+    return `Until ${range.dateTo}`;
+  }, [summary]);
+
+  const applyCustomSalesFilter = () => {
+    if (!dateFrom && !dateTo) {
+      return;
+    }
+    setSalesRange("custom");
+    fetchSummary({
+      ...(dateFrom ? { dateFrom } : {}),
+      ...(dateTo ? { dateTo } : {}),
+    });
+  };
+
+  const clearCustomSalesFilter = () => {
+    setDateFrom("");
+    setDateTo("");
+    setSalesRange("today");
+    fetchSummary();
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[360px] items-center justify-center rounded-xl border border-gray-100 bg-white">
@@ -124,7 +155,7 @@ const Dashboard = () => {
             <p className="mt-1 text-sm text-red-700">{error}</p>
             <button
               type="button"
-              onClick={fetchSummary}
+              onClick={() => fetchSummary()}
               className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
             >
               Retry
@@ -152,6 +183,13 @@ const Dashboard = () => {
           tone="green"
         />
         <StatCard
+          icon={<IndianRupee className="h-6 w-6" />}
+          label="Total worth of all products"
+          value={formatMoney(summary?.totals?.productWorth)}
+          detail="Current inventory value"
+          tone="green"
+        />
+        <StatCard
           icon={<ShoppingBag className="h-6 w-6" />}
           label="Pending orders"
           value={formatNumber(summary?.pendingOrders)}
@@ -171,20 +209,74 @@ const Dashboard = () => {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">Sales</h3>
-            <p className="text-sm text-gray-500">Choose today, last week, or last month.</p>
+            <p className="text-sm text-gray-500">Choose a preset or filter sales by date.</p>
           </div>
-          <select
-            value={salesRange}
-            onChange={(event) => setSalesRange(event.target.value)}
-            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 sm:w-56"
-          >
-            {SALES_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+            <select
+              value={salesRange}
+              onChange={(event) => setSalesRange(event.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 sm:w-56"
+            >
+              {SALES_OPTIONS.map((option) => (
+                <option
+                  key={option.value}
+                  value={option.value}
+                  disabled={option.value === "custom" && !summary?.sales?.custom}
+                >
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => fetchSummary()}
+              className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Refresh
+            </button>
+          </div>
         </div>
+
+        <div className="mt-5 grid grid-cols-1 gap-3 rounded-lg border border-gray-100 bg-gray-50 p-4 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
+          <label className="text-sm font-medium text-gray-700">
+            From date
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(event) => setDateFrom(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+          </label>
+          <label className="text-sm font-medium text-gray-700">
+            To date
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(event) => setDateTo(event.target.value)}
+              className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={applyCustomSalesFilter}
+            disabled={!dateFrom && !dateTo}
+            className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+          >
+            Apply
+          </button>
+          <button
+            type="button"
+            onClick={clearCustomSalesFilter}
+            className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Clear
+          </button>
+        </div>
+
+        {salesRange === "custom" ? (
+          <p className="mt-3 text-sm text-gray-500">{customDateLabel}</p>
+        ) : null}
 
         <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="rounded-lg bg-gray-50 p-4">

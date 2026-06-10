@@ -1,19 +1,48 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Search, Star, Trash2 } from "lucide-react";
+import { Image, Plus, Search, Star, Trash2, X } from "lucide-react";
 import { useSelector } from "react-redux";
 import { selectCurrentToken } from "../../redux/slices/Userslice.js";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-const createReviewForm = () => ({
+const createReviewEntry = () => ({
   reviewerName: "",
   reviewerEmail: "",
   rating: "5",
+  users: "1",
+  reviewDate: new Date().toISOString().slice(0, 10),
   title: "",
   comment: "",
   verifiedPurchase: false,
+  photos: [],
+});
+
+const createReviewForm = () => ({
+  reviews: [createReviewEntry()],
   targets: [],
 });
+
+const resolveReviewPhotoUrl = (path) => {
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path)) return path;
+
+  const apiBase = (API_URL || window.location.origin).replace(/\/$/, "");
+  const normalizedPath = String(path).replace(/\\/g, "/");
+
+  if (normalizedPath.startsWith("/api/outputs/")) {
+    return `${apiBase.replace(/\/api$/i, "")}${normalizedPath}`;
+  }
+
+  if (normalizedPath.startsWith("/outputs/")) {
+    return `${apiBase}/outputs/${normalizedPath.replace(/^\/outputs\//, "")}`;
+  }
+
+  if (normalizedPath.startsWith("outputs/")) {
+    return `${apiBase}/${normalizedPath}`;
+  }
+
+  return `${apiBase}/${normalizedPath.replace(/^\/+/, "")}`;
+};
 
 const renderStars = (rating) =>
   [...Array(5)].map((_, index) => (
@@ -193,6 +222,36 @@ export default function ReviewManagement() {
     setReviewForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const updateReviewEntry = (index, key, value) => {
+    setReviewForm((prev) => ({
+      ...prev,
+      reviews: prev.reviews.map((review, reviewIndex) =>
+        reviewIndex === index ? { ...review, [key]: value } : review
+      ),
+    }));
+  };
+
+  const addReviewEntry = () => {
+    setReviewForm((prev) => ({
+      ...prev,
+      reviews: [...prev.reviews, createReviewEntry()],
+    }));
+  };
+
+  const removeReviewEntry = (index) => {
+    setReviewForm((prev) => ({
+      ...prev,
+      reviews:
+        prev.reviews.length > 1
+          ? prev.reviews.filter((_, reviewIndex) => reviewIndex !== index)
+          : prev.reviews,
+    }));
+  };
+
+  const updateReviewPhotos = (index, files) => {
+    updateReviewEntry(index, "photos", Array.from(files || []));
+  };
+
   const toggleTarget = (product) => {
     const targetKey = `${product.kind}:${product.id}`;
 
@@ -248,23 +307,32 @@ export default function ReviewManagement() {
 
     setSaving(true);
     try {
-      const payload = {
-        reviewerName: reviewForm.reviewerName,
-        reviewerEmail: reviewForm.reviewerEmail,
-        rating: Number(reviewForm.rating),
-        title: reviewForm.title,
-        comment: reviewForm.comment,
-        verifiedPurchase: reviewForm.verifiedPurchase,
-        targets: reviewForm.targets,
-      };
+      const payloadReviews = reviewForm.reviews.map((review) => ({
+        reviewerName: review.reviewerName,
+        reviewerEmail: review.reviewerEmail,
+        rating: Number(review.rating),
+        users: Number(review.users || 1),
+        reviewDate: review.reviewDate,
+        title: review.title,
+        comment: review.comment,
+        verifiedPurchase: review.verifiedPurchase,
+      }));
+
+      const formData = new FormData();
+      formData.append("targets", JSON.stringify(reviewForm.targets));
+      formData.append("reviews", JSON.stringify(payloadReviews));
+      reviewForm.reviews.forEach((review, reviewIndex) => {
+        (review.photos || []).forEach((file) => {
+          formData.append(`photos_${reviewIndex}`, file);
+        });
+      });
 
       const res = await fetch(`${API_URL}/reviews/admin`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(payload),
+        body: formData,
       });
 
       const data = await res.json();
@@ -320,81 +388,166 @@ export default function ReviewManagement() {
         </div>
 
         <form onSubmit={handleCreateReviews} className="space-y-5">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-700">Reviewer name</span>
-              <input
-                type="text"
-                value={reviewForm.reviewerName}
-                onChange={(event) => updateReviewForm("reviewerName", event.target.value)}
-                placeholder="Customer name"
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400"
-                required
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-700">Reviewer email</span>
-              <input
-                type="email"
-                value={reviewForm.reviewerEmail}
-                onChange={(event) => updateReviewForm("reviewerEmail", event.target.value)}
-                placeholder="customer@example.com"
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-700">Rating</span>
-              <select
-                value={reviewForm.rating}
-                onChange={(event) => updateReviewForm("rating", event.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400"
-              >
-                <option value="5">5 stars</option>
-                <option value="4">4 stars</option>
-                <option value="3">3 stars</option>
-                <option value="2">2 stars</option>
-                <option value="1">1 star</option>
-              </select>
-            </label>
-
-            <label className="flex items-end">
-              <span className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={reviewForm.verifiedPurchase}
-                  onChange={(event) => updateReviewForm("verifiedPurchase", event.target.checked)}
-                  className="h-4 w-4"
-                />
-                Mark as verified purchase
-              </span>
-            </label>
-          </div>
-
           <div className="grid gap-4 xl:grid-cols-[1fr_1.4fr]">
             <div className="space-y-4">
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Review title</span>
-                <input
-                  type="text"
-                  value={reviewForm.title}
-                  onChange={(event) => updateReviewForm("title", event.target.value)}
-                  placeholder="Short headline"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400"
-                />
-              </label>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-slate-900">Review entries</div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    Add different names and calendar dates for the selected product.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={addReviewEntry}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add review
+                </button>
+              </div>
 
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Review comment</span>
-                <textarea
-                  value={reviewForm.comment}
-                  onChange={(event) => updateReviewForm("comment", event.target.value)}
-                  rows={6}
-                  placeholder="Write the review once. It will be added to every selected product."
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400"
-                />
-              </label>
+              {reviewForm.reviews.map((review, reviewIndex) => (
+                <div key={reviewIndex} className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-slate-900">
+                      Review #{reviewIndex + 1}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeReviewEntry(reviewIndex)}
+                      disabled={reviewForm.reviews.length === 1}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Remove
+                    </button>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-medium text-slate-700">Reviewer name</span>
+                      <input
+                        type="text"
+                        value={review.reviewerName}
+                        onChange={(event) => updateReviewEntry(reviewIndex, "reviewerName", event.target.value)}
+                        placeholder="Customer name"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400"
+                        required
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-medium text-slate-700">Reviewer email</span>
+                      <input
+                        type="email"
+                        value={review.reviewerEmail}
+                        onChange={(event) => updateReviewEntry(reviewIndex, "reviewerEmail", event.target.value)}
+                        placeholder="customer@example.com"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400"
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-medium text-slate-700">Rating</span>
+                      <select
+                        value={review.rating}
+                        onChange={(event) => updateReviewEntry(reviewIndex, "rating", event.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400"
+                      >
+                        <option value="5">5 stars</option>
+                        <option value="4">4 stars</option>
+                        <option value="3">3 stars</option>
+                        <option value="2">2 stars</option>
+                        <option value="1">1 star</option>
+                      </select>
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-medium text-slate-700">Review date</span>
+                      <input
+                        type="date"
+                        value={review.reviewDate}
+                        onChange={(event) => updateReviewEntry(reviewIndex, "reviewDate", event.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400"
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-medium text-slate-700">Users</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={review.users}
+                        onChange={(event) => updateReviewEntry(reviewIndex, "users", event.target.value)}
+                        placeholder="1"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400"
+                      />
+                    </label>
+
+                    <label className="flex items-end">
+                      <span className="flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={review.verifiedPurchase}
+                          onChange={(event) =>
+                            updateReviewEntry(reviewIndex, "verifiedPurchase", event.target.checked)
+                          }
+                          className="h-4 w-4"
+                        />
+                        Mark as verified purchase
+                      </span>
+                    </label>
+                  </div>
+
+                  <label className="mt-4 block">
+                    <span className="mb-2 block text-sm font-medium text-slate-700">Review title</span>
+                    <input
+                      type="text"
+                      value={review.title}
+                      onChange={(event) => updateReviewEntry(reviewIndex, "title", event.target.value)}
+                      placeholder="Short headline"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400"
+                    />
+                  </label>
+
+                  <label className="mt-4 block">
+                    <span className="mb-2 block text-sm font-medium text-slate-700">Review comment</span>
+                    <textarea
+                      value={review.comment}
+                      onChange={(event) => updateReviewEntry(reviewIndex, "comment", event.target.value)}
+                      rows={4}
+                      placeholder="Write this customer's review."
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-slate-400"
+                    />
+                  </label>
+
+                  <label className="mt-4 block">
+                    <span className="mb-2 block text-sm font-medium text-slate-700">Review photos</span>
+                    <span className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
+                      <Image className="h-4 w-4" />
+                      Upload photos
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp"
+                        multiple
+                        onChange={(event) => updateReviewPhotos(reviewIndex, event.target.files)}
+                        className="hidden"
+                      />
+                    </span>
+                  </label>
+
+                  {review.photos?.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                      {review.photos.map((file, fileIndex) => (
+                        <span key={`${file.name}-${fileIndex}`} className="rounded-full bg-slate-100 px-3 py-1">
+                          {file.name}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -489,8 +642,8 @@ export default function ReviewManagement() {
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-slate-500">
-              One review submission will create {reviewForm.targets.length || 0} review
-              {reviewForm.targets.length === 1 ? "" : "s"}.
+              This will create {(reviewForm.targets.length || 0) * reviewForm.reviews.length} review
+              {(reviewForm.targets.length || 0) * reviewForm.reviews.length === 1 ? "" : "s"}.
             </div>
             <button
               type="submit"
@@ -616,7 +769,7 @@ export default function ReviewManagement() {
                         </span>
                       ) : null}
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
-                        {new Date(review.createdAt).toLocaleDateString("en-IN")}
+                        {new Date(review.reviewDate || review.createdAt).toLocaleDateString("en-IN")}
                       </span>
                     </div>
 
@@ -631,6 +784,9 @@ export default function ReviewManagement() {
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-1">{renderStars(review.rating)}</div>
                       <span className="text-sm font-semibold text-slate-700">{review.rating}/5</span>
+                      {review.users ? (
+                        <span className="text-sm font-medium text-slate-500">Users: {review.users}</span>
+                      ) : null}
                     </div>
 
                     {review.title ? (
@@ -639,6 +795,25 @@ export default function ReviewManagement() {
                     <p className="max-w-4xl whitespace-pre-wrap text-sm leading-6 text-slate-600">
                       {review.comment || "No written comment provided."}
                     </p>
+                    {review.photos?.length ? (
+                      <div className="mt-3 flex flex-wrap gap-3">
+                        {review.photos.map((photo, photoIndex) => (
+                          <a
+                            key={`${photo}-${photoIndex}`}
+                            href={resolveReviewPhotoUrl(photo)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block h-20 w-20 overflow-hidden rounded-xl border border-slate-200 bg-slate-100"
+                          >
+                            <img
+                              src={resolveReviewPhotoUrl(photo)}
+                              alt={`Review photo ${photoIndex + 1}`}
+                              className="h-full w-full object-cover"
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="flex flex-col items-stretch gap-2 xl:min-w-[170px]">

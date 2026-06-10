@@ -661,7 +661,10 @@ export const sendOrderCancelledEmail = async (order, user) =>
   sendCustomerTemplateEmail({
     order,
     user,
-    subject: "Your Order Has Been Cancelled",
+    subject:
+      order?.cancelledByRole === "ADMIN"
+        ? "Your Order Was Cancelled by Our Team"
+        : "Your Order Has Been Cancelled",
     templateIdKeys: [
       "BREVO_ORDER_CANCELLED_TEMPLATE_ID",
       "BREVO_CANCEL_ORDER_TEMPLATE_ID",
@@ -670,18 +673,50 @@ export const sendOrderCancelledEmail = async (order, user) =>
       ...buildCustomerTemplateBaseParams(emailOrder, emailUser, orderDate),
       order_status: "CANCELLED",
       orderStatus: "CANCELLED",
+      cancellation_reason: emailOrder.cancellationReason || "",
+      refund_status: emailOrder.payment?.refundStatus || "NOT_REQUIRED",
+      refund_amount: formatAmount(emailOrder.payment?.refundAmount || 0),
+      refund_id: emailOrder.payment?.refundId || "",
+      refund_reference: emailOrder.payment?.refundReference || "",
       cancellation_message:
-        "Your order has been cancelled successfully. If any payment was captured, our team will process it according to the payment method.",
+        emailOrder.cancelledByRole === "ADMIN"
+          ? emailOrder.payment?.method === "RAZORPAY" && Number(emailOrder.payment?.refundAmount || 0) > 0
+            ? `Your order was cancelled by our team. A full refund of ${formatMoneyLabel(emailOrder.payment.refundAmount, emailOrder.payment.refundCurrency || emailOrder.currency)} has been initiated to your original Razorpay payment method.`
+            : emailOrder.payment?.method === "COD"
+            ? "Your cash on delivery order was cancelled by our team. No online refund is required."
+            : "Your order was cancelled by our team."
+          : emailOrder.payment?.method === "RAZORPAY" && Number(emailOrder.payment?.refundAmount || 0) > 0
+          ? `Your order has been cancelled successfully. A full refund of ${formatMoneyLabel(emailOrder.payment.refundAmount, emailOrder.payment.refundCurrency || emailOrder.currency)} has been initiated to your original Razorpay payment method.`
+          : emailOrder.payment?.method === "COD"
+          ? "Your cash on delivery order has been cancelled successfully. No online refund is required."
+          : "Your order has been cancelled successfully.",
     }),
     htmlContentBuilder: (emailOrder, emailUser, params) => `
       <div style="font-family:Arial,sans-serif;background:#f5f5f5;padding:20px;">
         <div style="max-width:600px;margin:auto;background:#ffffff;border-radius:8px;padding:24px;">
-          <h2>Your Order Has Been Cancelled</h2>
+          <h2>${emailOrder.cancelledByRole === "ADMIN" ? "Your Order Was Cancelled by Our Team" : "Your Order Has Been Cancelled"}</h2>
           <p>Hello ${emailUser.name || "Customer"},</p>
-          <p>Your order #${emailOrder._id} has been cancelled.</p>
+          <p>${
+            emailOrder.cancelledByRole === "ADMIN"
+              ? `Your order #${emailOrder._id} was cancelled by our team.`
+              : `Your order #${emailOrder._id} has been cancelled.`
+          }</p>
           <p>Order Date: ${params.order_date}</p>
           <p>Total: ${formatMoneyLabel(emailOrder.total, emailOrder.currency)}</p>
           <p>${params.cancellation_message}</p>
+          ${
+            emailOrder.cancelledByRole === "ADMIN" && params.cancellation_reason
+              ? `<p>Reason: ${escapeHtml(params.cancellation_reason)}</p>`
+              : ""
+          }
+          ${
+            emailOrder.payment?.method === "RAZORPAY" && Number(emailOrder.payment?.refundAmount || 0) > 0
+              ? `<p>Refund Status: ${params.refund_status}</p>
+                 <p>Refund Amount: ${formatMoneyLabel(emailOrder.payment.refundAmount, emailOrder.payment.refundCurrency || emailOrder.currency)}</p>
+                 ${params.refund_id ? `<p>Refund ID: ${params.refund_id}</p>` : ""}
+                 ${params.refund_reference ? `<p>Refund Reference: ${params.refund_reference}</p>` : ""}`
+              : ""
+          }
         </div>
       </div>
     `,

@@ -167,6 +167,25 @@ export const adminUpdateOrderStatus = createAsyncThunk(
   }
 );
 
+export const adminCancelOrder = createAsyncThunk(
+  "orders/adminCancelOrder",
+  async ({ orderId, reason }, { getState, rejectWithValue }) => {
+    try {
+      const res = await axios.patch(
+        `${API_URL}/admin/orders/${orderId}/cancel`,
+        { reason },
+        {
+          headers: { ...getAuthHeaders(getState) },
+          withCredentials: true,
+        }
+      );
+      return res.data;
+    } catch (err) {
+      return rejectWithValue(normalizeAxiosError(err));
+    }
+  }
+);
+
 export const adminBulkUpdateOrderStatus = createAsyncThunk(
   "orders/adminBulkUpdateOrderStatus",
   async ({ orderIds, orderStatus }, { getState, rejectWithValue }) => {
@@ -275,6 +294,10 @@ const initialState = {
   // status updates
   updateStatusLoading: false,
   updateStatusError: null,
+  adminCancelOrderLoading: false,
+  adminCancelOrderError: null,
+  adminCancelOrderMessage: "",
+  adminCancellingOrderId: null,
 
   bulkUpdateLoading: false,
   bulkUpdateError: null,
@@ -305,6 +328,8 @@ const orderSlice = createSlice({
       state.adminOrderError = null;
       state.adminReturnsError = null;
       state.updateStatusError = null;
+      state.adminCancelOrderError = null;
+      state.adminCancelOrderMessage = "";
       state.bulkUpdateError = null;
       state.updateReturnError = null;
     },
@@ -492,6 +517,39 @@ const orderSlice = createSlice({
       .addCase(adminUpdateOrderStatus.rejected, (state, action) => {
         state.updateStatusLoading = false;
         state.updateStatusError = action.payload || "Failed to update status";
+      })
+      .addCase(adminCancelOrder.pending, (state, action) => {
+        state.adminCancelOrderLoading = true;
+        state.adminCancelOrderError = null;
+        state.adminCancelOrderMessage = "";
+        state.adminCancellingOrderId = action.meta.arg?.orderId || null;
+      })
+      .addCase(adminCancelOrder.fulfilled, (state, action) => {
+        state.adminCancelOrderLoading = false;
+        state.adminCancellingOrderId = null;
+        state.adminCancelOrderMessage = action.payload?.message || "Order cancelled successfully";
+
+        const updated = action.payload?.order;
+        if (!updated?._id) return;
+
+        const idx = state.adminOrders.findIndex((o) => String(o._id) === String(updated._id));
+        if (idx >= 0) state.adminOrders[idx] = { ...state.adminOrders[idx], ...updated };
+
+        if (state.adminOrder && String(state.adminOrder._id) === String(updated._id)) {
+          state.adminOrder = { ...state.adminOrder, ...updated };
+        }
+
+        const uIdx = state.myPaidOrders.findIndex((o) => String(o._id) === String(updated._id));
+        if (uIdx >= 0) state.myPaidOrders[uIdx] = { ...state.myPaidOrders[uIdx], ...updated };
+
+        if (state.myPaidOrder && String(state.myPaidOrder._id) === String(updated._id)) {
+          state.myPaidOrder = { ...state.myPaidOrder, ...updated };
+        }
+      })
+      .addCase(adminCancelOrder.rejected, (state, action) => {
+        state.adminCancelOrderLoading = false;
+        state.adminCancellingOrderId = null;
+        state.adminCancelOrderError = action.payload || "Failed to cancel order";
       });
 
     // ----- ADMIN: bulk update fulfillment status -----
@@ -647,6 +705,10 @@ export const selectAdminOrderError = (state) => state.orders.adminOrderError;
 
 export const selectUpdateStatusLoading = (state) => state.orders.updateStatusLoading;
 export const selectUpdateStatusError = (state) => state.orders.updateStatusError;
+export const selectAdminCancelOrderLoading = (state) => state.orders.adminCancelOrderLoading;
+export const selectAdminCancelOrderError = (state) => state.orders.adminCancelOrderError;
+export const selectAdminCancelOrderMessage = (state) => state.orders.adminCancelOrderMessage;
+export const selectAdminCancellingOrderId = (state) => state.orders.adminCancellingOrderId;
 
 export const selectBulkUpdateLoading = (state) => state.orders.bulkUpdateLoading;
 export const selectBulkUpdateError = (state) => state.orders.bulkUpdateError;

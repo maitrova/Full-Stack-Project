@@ -79,8 +79,10 @@ const pickExistingReview = (review) => {
   return {
     _id: review._id,
     rating: Number(review.rating || 0),
+    users: Number(review.users || 1),
     title: review.title || "",
     comment: review.comment || "",
+    photos: Array.isArray(review.photos) ? review.photos : [],
     createdAt: review.createdAt,
     updatedAt: review.updatedAt,
   };
@@ -215,6 +217,101 @@ const resetRefundTracking = (returnRequest) => {
   returnRequest.refundFailureReason = "";
 };
 
+const resetPaymentRefundTracking = (payment, currency = "INR") => {
+  if (!payment) return;
+  payment.refundStatus = "NOT_REQUIRED";
+  payment.refundAmount = 0;
+  payment.refundCurrency = currency;
+  payment.refundId = "";
+  payment.refundReceipt = "";
+  payment.refundReference = "";
+  payment.refundFailureReason = "";
+  payment.refundInitiatedAt = null;
+  payment.refundPaidAt = null;
+  payment.refundReason = "";
+};
+
+const applyRazorpayCancellationRefund = async (order, reason = "") => {
+  if (order.payment?.refundStatus === "PAID" || order.payment?.refundStatus === "PROCESSING") {
+    return {
+      alreadyInitiated: true,
+      message: "Refund has already been initiated for this order",
+    };
+  }
+
+  if (!order.payment?.razorpayPaymentId) {
+    const error = new Error("Razorpay payment ID is missing. Refund cannot be initiated.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const refundAmount = parsePositiveAmount(order.total);
+  if (!refundAmount) {
+    const error = new Error("Order total is missing. Refund cannot be initiated.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const receipt = `cancel_${String(order._id)}_${Date.now()}`;
+
+  try {
+    const refund = await razorpay.payments.refund(order.payment.razorpayPaymentId, {
+      amount: toPaise(refundAmount),
+      speed: "normal",
+      receipt,
+      notes: {
+        orderId: String(order._id),
+        reason: reason || "Admin order cancellation",
+        refundType: "ORDER_CANCELLATION",
+      },
+    });
+
+    order.payment.refundStatus = mapRazorpayRefundStatus(refund.status);
+    order.payment.refundAmount = refundAmount;
+    order.payment.refundCurrency = refund.currency || order.currency || "INR";
+    order.payment.refundInitiatedAt = refund.created_at
+      ? new Date(refund.created_at * 1000)
+      : new Date();
+    order.payment.refundPaidAt =
+      refund.status === "processed"
+        ? (refund.created_at ? new Date(refund.created_at * 1000) : new Date())
+        : null;
+    order.payment.refundId = refund.id || "";
+    order.payment.refundReceipt = refund.receipt || receipt;
+    order.payment.refundReference = resolveRefundReference(refund.acquirer_data);
+    order.payment.refundFailureReason = "";
+    order.payment.refundReason = reason || "Admin order cancellation";
+
+    return {
+      refund,
+      message:
+        order.payment.refundStatus === "PROCESSING"
+          ? "Full Razorpay refund initiated and is being processed"
+          : "Full Razorpay refund processed",
+    };
+  } catch (refundError) {
+    order.payment.refundStatus = "FAILED";
+    order.payment.refundAmount = refundAmount;
+    order.payment.refundCurrency = order.currency || "INR";
+    order.payment.refundInitiatedAt = new Date();
+    order.payment.refundPaidAt = null;
+    order.payment.refundId = "";
+    order.payment.refundReceipt = receipt;
+    order.payment.refundReference = "";
+    order.payment.refundFailureReason =
+      refundError?.error?.description ||
+      refundError?.description ||
+      refundError?.message ||
+      "Refund initiation failed";
+    order.payment.refundReason = reason || "Admin order cancellation";
+    await order.save();
+
+    const error = new Error(order.payment.refundFailureReason);
+    error.statusCode = 400;
+    throw error;
+  }
+};
+
 const normalizeBankDetails = (bankDetails = {}) => ({
   method: toTrimmedString(bankDetails.method).toUpperCase(),
   accountHolderName: toTrimmedString(bankDetails.accountHolderName),
@@ -332,6 +429,62 @@ const getCustomProductStock = (product = {}) => {
       .filter((stock) => stock !== null && stock !== undefined)
   );
   return sizeStock || colorStock;
+};
+
+const roundCurrency = (value) => Math.round(Number(value || 0) * 100) / 100;
+
+const getVariantInventoryWorth = (variants = [], fallbackPrice = 0) =>
+  roundCurrency(
+    variants.reduce(
+      (sum, variant) =>
+        sum + Math.max(0, Number(variant?.stock || 0)) * Math.max(0, Number(variant?.price || fallbackPrice || 0)),
+      0
+    )
+  );
+
+const getReadymadeInventoryWorth = (product = {}) => {
+  const variantWorth = getVariantInventoryWorth(product.variants || [], product.price);
+  if (variantWorth > 0) return variantWorth;
+  return roundCurrency(Math.max(0, Number(product.stock || 0)) * Math.max(0, Number(product.price || 0)));
+};
+
+const getDropInventoryWorth = (product = {}) => {
+  const variantWorth = getVariantInventoryWorth(product.variants || [], product.minPrice);
+  if (variantWorth > 0) return variantWorth;
+  return roundCurrency(Math.max(0, Number(product.totalStock || 0)) * Math.max(0, Number(product.minPrice || 0)));
+};
+
+const getCustomInventoryWorth = (product = {}) => {
+  const sizePricingWorth = getVariantInventoryWorth(product.sizePricing || [], product.basePrice);
+  if (sizePricingWorth > 0) return sizePricingWorth;
+  return roundCurrency(getCustomProductStock(product) * Math.max(0, Number(product.basePrice || 0)));
+};
+
+const parseDashboardDateRange = (query = {}) => {
+  const { dateFrom, dateTo } = query;
+  if (!dateFrom && !dateTo) {
+    return { dateRange: null };
+  }
+
+  const createdAt = {};
+
+  if (dateFrom) {
+    const fromDate = startOfDay(new Date(dateFrom));
+    if (Number.isNaN(fromDate.getTime())) {
+      return { error: "Invalid dateFrom" };
+    }
+    createdAt.$gte = fromDate;
+  }
+
+  if (dateTo) {
+    const toDate = endOfDay(new Date(dateTo));
+    if (Number.isNaN(toDate.getTime())) {
+      return { error: "Invalid dateTo" };
+    }
+    createdAt.$lte = toDate;
+  }
+
+  return { dateRange: { createdAt } };
 };
 
 const normalizeCategoryName = (value) => {
@@ -637,6 +790,11 @@ export const cancelMyOrder = async (req, res) => {
     order.status = "CANCELLED";
     order.payment = order.payment || {};
     order.payment.status = "CANCELLED";
+    resetPaymentRefundTracking(order.payment, order.currency || "INR");
+    order.cancelledAt = new Date();
+    order.cancelledBy = userId;
+    order.cancelledByRole = "CUSTOMER";
+    order.cancellationReason = "Cancelled by customer";
     await order.save();
 
     try {
@@ -655,6 +813,114 @@ export const cancelMyOrder = async (req, res) => {
   } catch (err) {
     console.error("cancelMyOrder error:", err);
     return res.status(500).json({ message: "Server error" });
+  }
+};
+
+/**
+ * ADMIN: Cancel an order. Razorpay paid orders receive a full automatic refund.
+ * PATCH /api/orders/admin/orders/:orderId/cancel
+ */
+export const adminCancelOrder = async (req, res) => {
+  try {
+    if (!ensureAdmin(req, res)) return;
+
+    const { orderId } = req.params;
+    if (!isValidObjectId(orderId)) {
+      return res.status(400).json({ message: "Invalid orderId" });
+    }
+
+    const reason = toTrimmedString(req.body?.reason) || "Cancelled by admin";
+
+    const order = await Order.findById(orderId)
+      .populate("user", "name email")
+      .populate("deliveryAddress")
+      .populate("billingAddress")
+      .populate({
+        path: "items.readymadeProduct",
+        populate: [
+          { path: "category", select: "name" },
+          { path: "subCategory", select: "name" },
+          { path: "brand", select: "name" },
+        ],
+      })
+      .populate("items.dropproduct")
+      .populate({ path: "items.design", select: DESIGN_SELECT })
+      .populate("items.product");
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    if (order.status === "CANCELLED") {
+      return res.status(400).json({ message: "Order is already cancelled" });
+    }
+
+    if (order.orderStatus === "DELIVERED") {
+      return res.status(400).json({ message: "Delivered orders cannot be cancelled. Use the return flow instead." });
+    }
+
+    order.payment = order.payment || {};
+
+    let refundMessage = "No online refund was required for this order.";
+    const shouldRefundRazorpay =
+      order.status === "PAID" &&
+      order.payment?.method === "RAZORPAY";
+
+    if (shouldRefundRazorpay) {
+      const refundResult = await applyRazorpayCancellationRefund(order, reason);
+      refundMessage = refundResult.message;
+    } else {
+      resetPaymentRefundTracking(order.payment, order.currency || "INR");
+    }
+
+    let inventoryRollbackMessage = "";
+    if (order.inventoryAdjustedAt) {
+      try {
+        await rollbackInventoryForOrder(order);
+        inventoryRollbackMessage = " Inventory was restored.";
+      } catch (inventoryError) {
+        console.error("adminCancelOrder inventory rollback error:", inventoryError);
+        inventoryRollbackMessage =
+          " Inventory could not be restored automatically. Please review stock manually.";
+      }
+    }
+
+    order.status = "CANCELLED";
+    order.orderStatus = "PROCESSING";
+    order.deliveredAt = null;
+    order.payment.status = "CANCELLED";
+    order.cancelledAt = new Date();
+    order.cancelledBy = req.user?._id || req.user?.id || null;
+    order.cancelledByRole = "ADMIN";
+    order.cancellationReason = reason;
+
+    await order.save();
+
+    try {
+      await sendOrderCancelledEmail(order, order.user);
+    } catch (emailError) {
+      console.error("adminCancelOrder email error:", emailError.response?.body || emailError);
+    }
+
+    const shaped = {
+      ...order.toObject(),
+      returnRequest: shapeReturnRequest(req, {
+        ...(order.returnRequest?.toObject?.() || order.returnRequest || {}),
+        deadlineAt: order.returnRequest?.deadlineAt || getReturnDeadline(order),
+      }),
+      returnEligible: false,
+      returnDeadlineAt: order.returnRequest?.deadlineAt || getReturnDeadline(order) || null,
+    };
+
+    return res.status(200).json({
+      message: `Order cancelled successfully. ${refundMessage}${inventoryRollbackMessage}`,
+      order: shaped,
+    });
+  } catch (err) {
+    console.error("adminCancelOrder error:", err);
+    return res.status(err.statusCode || 500).json({
+      message: err.statusCode ? err.message : "Server error",
+    });
   }
 };
 
@@ -804,6 +1070,12 @@ export const adminGetDashboardSummary = async (req, res) => {
   try {
     if (!ensureAdmin(req, res)) return;
 
+    const { dateRange: customSalesDateRange, error: customSalesDateError } =
+      parseDashboardDateRange(req.query);
+    if (customSalesDateError) {
+      return res.status(400).json({ message: customSalesDateError });
+    }
+
     const now = new Date();
     const todayStart = startOfDay(now);
     const todayEnd = endOfDay(now);
@@ -828,6 +1100,7 @@ export const adminGetDashboardSummary = async (req, res) => {
       recentReturnOrders,
       offerReadymadeProducts,
       offerDropProducts,
+      customSales,
     ] = await Promise.all([
       Product.countDocuments(),
       ReadymadeProduct.countDocuments(),
@@ -886,7 +1159,14 @@ export const adminGetDashboardSummary = async (req, res) => {
         .sort({ saleEndAt: 1 })
         .limit(10)
         .lean(),
+      customSalesDateRange ? runSalesSummary(customSalesDateRange) : Promise.resolve(null),
     ]);
+
+    const totalProductWorth = roundCurrency(
+      readymadeProducts.reduce((sum, product) => sum + getReadymadeInventoryWorth(product), 0) +
+        dropProducts.reduce((sum, product) => sum + getDropInventoryWorth(product), 0) +
+        customProducts.reduce((sum, product) => sum + getCustomInventoryWorth(product), 0)
+    );
 
     const lowStockProducts = [
       ...readymadeProducts.map((product) => ({
@@ -979,11 +1259,21 @@ export const adminGetDashboardSummary = async (req, res) => {
         readymadeProducts: readymadeProductCount,
         dropProducts: dropProductCount,
         revenue: totalRevenue.revenue,
+        productWorth: totalProductWorth,
       },
       sales: {
         today: todaySales,
         lastWeek: lastWeekSales,
         lastMonth: lastMonthSales,
+        ...(customSales
+          ? {
+              custom: customSales,
+              customRange: {
+                dateFrom: req.query.dateFrom || "",
+                dateTo: req.query.dateTo || "",
+              },
+            }
+          : {}),
       },
       pendingOrders,
       lowStockProducts,

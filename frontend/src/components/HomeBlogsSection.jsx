@@ -15,7 +15,7 @@ const formatDate = (value) => {
 };
 
 const BlogCard = ({ blog }) => (
-  <article className="group relative w-[260px] min-w-[260px] snap-start overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_44px_-34px_rgba(15,23,42,0.22)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_46px_-30px_rgba(15,23,42,0.26)] sm:w-[312px] sm:min-w-[312px]">
+  <article className="group relative w-[260px] min-w-[260px] overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_44px_-34px_rgba(15,23,42,0.22)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_46px_-30px_rgba(15,23,42,0.26)] sm:w-[312px] sm:min-w-[312px] sm:snap-start">
     <Link to={`/blogs/${blog.slug}`} className="grid h-full">
       <div className="aspect-[3/2] overflow-hidden bg-slate-100">
         {blog.coverImage ? (
@@ -63,6 +63,7 @@ const HomeBlogsSection = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(false);
   const railRef = useRef(null);
   const directionRef = useRef(1);
   const resumeTimerRef = useRef(null);
@@ -100,7 +101,17 @@ const HomeBlogsSection = () => {
   }, []);
 
   useEffect(() => {
-    if (loading || blogs.length < 2) return undefined;
+    const mediaQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const updateAutoScroll = () => setAutoScrollEnabled(mediaQuery.matches);
+
+    updateAutoScroll();
+    mediaQuery.addEventListener("change", updateAutoScroll);
+
+    return () => mediaQuery.removeEventListener("change", updateAutoScroll);
+  }, []);
+
+  useEffect(() => {
+    if (loading || blogs.length < 2 || !autoScrollEnabled) return undefined;
 
     const rail = railRef.current;
     if (!rail) return undefined;
@@ -121,7 +132,7 @@ const HomeBlogsSection = () => {
     }, 16);
 
     return () => window.clearInterval(timer);
-  }, [blogs, isPaused, loading]);
+  }, [autoScrollEnabled, blogs, isPaused, loading]);
 
   useEffect(() => {
     const rail = railRef.current;
@@ -142,6 +153,10 @@ const HomeBlogsSection = () => {
       window.removeEventListener("resize", updateScrollState);
     };
   }, [blogs, loading]);
+
+  useEffect(() => {
+    return () => window.clearTimeout(resumeTimerRef.current);
+  }, []);
 
   if (!loading && blogs.length === 0) return null;
 
@@ -231,7 +246,9 @@ const HomeBlogsSection = () => {
               ref={railRef}
               onMouseEnter={() => setIsPaused(true)}
               onMouseLeave={() => setIsPaused(false)}
-              className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              onTouchStart={() => setIsPaused(true)}
+              onTouchEnd={() => setIsPaused(false)}
+              className="flex touch-pan-y gap-4 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:none] sm:snap-x sm:snap-mandatory [&::-webkit-scrollbar]:hidden"
             >
               {blogs.map((blog) => (
                 <BlogCard key={blog._id} blog={blog} />

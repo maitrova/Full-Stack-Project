@@ -24,9 +24,12 @@ const formatReviewerName = (name) => {
 const mapReviewDocument = (review) => ({
   _id: review._id,
   rating: Number(review.rating || 0),
+  users: Number(review.users || 1),
   title: review.title || "",
   comment: review.comment || "",
+  photos: Array.isArray(review.photos) ? review.photos : [],
   verifiedPurchase: Boolean(review.verifiedPurchase),
+  reviewDate: review.reviewDate || review.createdAt,
   createdAt: review.createdAt,
   updatedAt: review.updatedAt,
   userName: formatReviewerName(review.user?.name || review.reviewerName),
@@ -61,12 +64,56 @@ const mapAdminReviewDocument = (review) => {
     orderStatus: review.order?.orderStatus || "",
     paymentStatus: review.order?.status || "",
     rating: Number(review.rating || 0),
+    users: Number(review.users || 1),
     title: review.title || "",
     comment: review.comment || "",
+    photos: Array.isArray(review.photos) ? review.photos : [],
     verifiedPurchase: Boolean(review.verifiedPurchase),
     source: review.source || "CUSTOMER",
+    reviewDate: review.reviewDate || review.createdAt,
     createdAt: review.createdAt,
     updatedAt: review.updatedAt,
+  };
+};
+
+const parseJsonBodyField = (value, fallback) => {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (typeof value !== "string") return value;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+};
+
+const parseBoolean = (value) => {
+  if (typeof value === "boolean") return value;
+  return ["true", "1", "yes", "on"].includes(String(value || "").trim().toLowerCase());
+};
+
+const normalizeAdminReviewEntry = (entry, fallbackBody = {}) => {
+  const reviewerName = String(entry?.reviewerName ?? fallbackBody.reviewerName ?? "").trim();
+  const reviewerEmail = String(entry?.reviewerEmail ?? fallbackBody.reviewerEmail ?? "")
+    .trim()
+    .toLowerCase();
+  const rating = Number(entry?.rating ?? fallbackBody.rating);
+  const users = Math.max(1, parseInt(entry?.users ?? fallbackBody.users ?? "1", 10) || 1);
+  const title = String(entry?.title ?? fallbackBody.title ?? "").trim();
+  const comment = String(entry?.comment ?? fallbackBody.comment ?? "").trim();
+  const verifiedPurchase = parseBoolean(entry?.verifiedPurchase ?? fallbackBody.verifiedPurchase);
+  const rawReviewDate = String(entry?.reviewDate ?? fallbackBody.reviewDate ?? "").trim();
+  const reviewDate = rawReviewDate ? new Date(rawReviewDate) : null;
+
+  return {
+    reviewerName,
+    reviewerEmail,
+    rating,
+    users,
+    title,
+    comment,
+    verifiedPurchase,
+    reviewDate: reviewDate && !Number.isNaN(reviewDate.getTime()) ? reviewDate : null,
   };
 };
 
@@ -87,13 +134,13 @@ const isPaidOrCodOrder = (order) =>
 const buildPublicReviewSort = (sort) => {
   switch (String(sort || "").trim().toLowerCase()) {
     case "highest":
-      return { rating: -1, createdAt: -1 };
+      return { rating: -1, reviewDate: -1, createdAt: -1 };
     case "lowest":
-      return { rating: 1, createdAt: -1 };
+      return { rating: 1, reviewDate: -1, createdAt: -1 };
     case "oldest":
-      return { createdAt: 1 };
+      return { reviewDate: 1, createdAt: 1 };
     default:
-      return { createdAt: -1 };
+      return { reviewDate: -1, createdAt: -1 };
   }
 };
 
@@ -176,6 +223,7 @@ export const createOrUpdateMyReview = async (req, res) => {
     const targetId = String(req.body.targetId || "").trim();
     const orderId = String(req.body.orderId || "").trim();
     const rating = Number(req.body.rating);
+    const users = Math.max(1, parseInt(req.body.users || "1", 10) || 1);
     const title = String(req.body.title || "").trim();
     const comment = String(req.body.comment || "").trim();
 
@@ -215,6 +263,16 @@ export const createOrUpdateMyReview = async (req, res) => {
     }
 
     const config = getReviewKindConfig(kind);
+    const existingReview = await Review.findOne({ user: userId, kind, [config.field]: targetId })
+      .select("photos")
+      .lean();
+    const uploadedPhotos = (req.files || []).map((file) => `/outputs/reviews/${file.filename}`);
+    const photos = uploadedPhotos.length
+      ? [...(Array.isArray(existingReview?.photos) ? existingReview.photos : []), ...uploadedPhotos]
+      : Array.isArray(existingReview?.photos)
+      ? existingReview.photos
+      : [];
+
     const review = await Review.findOneAndUpdate(
       { user: userId, kind, [config.field]: targetId },
       {
@@ -223,8 +281,10 @@ export const createOrUpdateMyReview = async (req, res) => {
           reviewerName: "",
           reviewerEmail: "",
           rating,
+          users,
           title,
           comment,
+          photos,
           verifiedPurchase: true,
           status: "ACTIVE",
           source: "CUSTOMER",
@@ -264,25 +324,33 @@ export const adminCreateReviews = async (req, res) => {
   try {
     if (!ensureAdmin(req, res)) return;
 
-    const reviewerName = String(req.body.reviewerName || "").trim();
-    const reviewerEmail = String(req.body.reviewerEmail || "").trim().toLowerCase();
-    const rating = Number(req.body.rating);
-    const title = String(req.body.title || "").trim();
-    const comment = String(req.body.comment || "").trim();
-    const verifiedPurchase = Boolean(req.body.verifiedPurchase);
-    const rawTargets = Array.isArray(req.body.targets) ? req.body.targets : [];
+    const reviewEntries = parseJsonBodyField(req.body.reviews, null);
+    const entries = Array.isArray(reviewEntries) && reviewEntries.length
+      ? reviewEntries
+      : [req.body];
+    const normalizedEntries = entries.map((entry) => normalizeAdminReviewEntry(entry, req.body));
+    const filesByEntryIndex = (req.files || []).reduce((acc, file) => {
+      const match = String(file.fieldname || "").match(/^photos_(\d+)$/);
+      const entryIndex = match ? Number(match[1]) : 0;
+      if (!acc[entryIndex]) acc[entryIndex] = [];
+      acc[entryIndex].push(`/outputs/reviews/${file.filename}`);
+      return acc;
+    }, {});
 
-    if (!reviewerName) {
-      return res.status(400).json({ message: "Reviewer name is required" });
+    for (const entry of normalizedEntries) {
+      if (!entry.reviewerName) {
+        return res.status(400).json({ message: "Reviewer name is required for every review" });
+      }
+
+      if (!Number.isInteger(entry.rating) || entry.rating < 1 || entry.rating > 5) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5 for every review" });
+      }
     }
 
-    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
-      return res.status(400).json({ message: "Rating must be between 1 and 5" });
-    }
-
+    const rawTargets = parseJsonBodyField(req.body.targets, []);
     const dedupedTargets = Array.from(
       new Map(
-        rawTargets
+        (Array.isArray(rawTargets) ? rawTargets : [])
           .map(toNormalizedTarget)
           .filter(Boolean)
           .map((target) => [`${target.kind}:${target.targetId}`, target])
@@ -331,22 +399,26 @@ export const adminCreateReviews = async (req, res) => {
 
     const docs = validTargets.map((target) => {
       const config = getReviewKindConfig(target.kind);
-      return {
-        user: null,
-        order: null,
-        reviewerName,
-        reviewerEmail,
-        source: "ADMIN",
-        createdByAdmin: req.user?._id || null,
-        kind: target.kind,
-        rating,
-        title,
-        comment,
-        verifiedPurchase,
-        status: "ACTIVE",
-        [config.field]: target.targetId,
-      };
-    });
+      return normalizedEntries.map((entry, entryIndex) => ({
+          user: null,
+          order: null,
+          reviewerName: entry.reviewerName,
+          reviewerEmail: entry.reviewerEmail,
+          source: "ADMIN",
+          createdByAdmin: req.user?._id || null,
+          kind: target.kind,
+          rating: entry.rating,
+          users: entry.users,
+          title: entry.title,
+          comment: entry.comment,
+          photos: filesByEntryIndex[entryIndex] || [],
+          verifiedPurchase: entry.verifiedPurchase,
+          reviewDate: entry.reviewDate,
+          createdAt: entry.reviewDate || undefined,
+          status: "ACTIVE",
+          [config.field]: target.targetId,
+        }));
+    }).flat();
 
     const createdReviews = await Review.insertMany(docs, { ordered: true });
 
@@ -392,7 +464,7 @@ export const adminListReviews = async (req, res) => {
       .populate("order", "_id orderStatus status")
       .populate("readymadeProduct", "title")
       .populate("dropproduct", "name")
-      .sort({ createdAt: -1 })
+      .sort({ reviewDate: -1, createdAt: -1 })
       .lean();
 
     const normalizedReviews = reviews
