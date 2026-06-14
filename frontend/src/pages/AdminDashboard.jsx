@@ -32,7 +32,8 @@ import {
   Home,
   Search,
   FileText,
-  MessageSquareText
+  MessageSquareText,
+  Star
 } from 'lucide-react';
 
 // Import Redux actions
@@ -151,6 +152,7 @@ const AdminDashboard = () => {
   const [localCategory, setLocalCategory] = useState('');
   const [localSubCategory, setLocalSubCategory] = useState('');
   const [viewMode, setViewMode] = useState('products'); // 'products', 'designs', 'dropproducts', 'orders', 'homepage', 'search', 'adminDesigns'
+  const [topOrderTags, setTopOrderTags] = useState({});
   
   // Helper function to get full image URL
   const getImageUrl = (image) => {
@@ -254,6 +256,15 @@ const AdminDashboard = () => {
         page: pagination.page,
         limit: pagination.limit,
       }));
+    } else if (activeTab === 'topOrder') {
+      dispatch(fetchProducts({
+        filter: 'topOrder',
+        category: currentCategory,
+        subCategory: currentSubCategory,
+        search: '',
+        page: pagination.page,
+        limit: pagination.limit,
+      }));
     } else if (activeTab === 'allProducts') {
       dispatch(fetchProducts({
         filter: '',
@@ -332,7 +343,7 @@ const AdminDashboard = () => {
   }
 };
 
-  const handleEditClick = () => {
+  const handleEditClick = async () => {
     dispatch(setIsEditing(true));
     dispatch(setCurrentCategory(''));
     dispatch(setCurrentSubCategory(''));
@@ -340,11 +351,31 @@ const AdminDashboard = () => {
     setLocalCategory('');
     setLocalSubCategory('');
     
-    dispatch(fetchAllProducts({
-      category: '',
-      subCategory: '',
-      limit: 100,
-    }));
+    try {
+      const fetchedProducts = await dispatch(fetchAllProducts({
+        category: '',
+        subCategory: '',
+        limit: 1000,
+      })).unwrap();
+
+      if (activeTab === 'topOrder') {
+        const existingTopOrderProducts = (fetchedProducts || []).filter((product) => product.topOrder);
+        dispatch(setSelectedProductIds(existingTopOrderProducts.map((product) => product._id)));
+        setTopOrderTags(
+          existingTopOrderProducts.reduce((tags, product) => {
+            tags[product._id] = product.topOrderTag || 'Most Popular';
+            return tags;
+          }, {})
+        );
+      } else {
+        setTopOrderTags({});
+      }
+    } catch (error) {
+      dispatch(addNotification({
+        type: 'error',
+        message: error || 'Failed to load products',
+      }));
+    }
   };
 
   const handleAddProduct = () => {
@@ -378,7 +409,9 @@ const AdminDashboard = () => {
   const handleCategoryChange = (category) => {
     dispatch(setCurrentCategory(category));
     dispatch(setCurrentSubCategory(''));
-    dispatch(setSelectedProductIds([]));
+    if (activeTab !== 'topOrder') {
+      dispatch(setSelectedProductIds([]));
+    }
     setLocalCategory(category);
     setLocalSubCategory('');
     
@@ -386,7 +419,7 @@ const AdminDashboard = () => {
       dispatch(fetchAllProducts({
         category,
         subCategory: '',
-        limit: 100,
+        limit: 1000,
       }));
     }
   };
@@ -419,26 +452,53 @@ const AdminDashboard = () => {
 
   const handleSubCategoryChange = (subCategory) => {
     dispatch(setCurrentSubCategory(subCategory));
-    dispatch(setSelectedProductIds([]));
+    if (activeTab !== 'topOrder') {
+      dispatch(setSelectedProductIds([]));
+    }
     setLocalSubCategory(subCategory);
     
     if (viewMode === 'products') {
       dispatch(fetchAllProducts({
         category: localCategory,
         subCategory,
-        limit: 100,
+        limit: 1000,
       }));
     }
   };
 
   const handleProductSelect = (productId) => {
+    if (activeTab === 'topOrder') {
+      const isSelected = selectedProductIds.includes(productId);
+      setTopOrderTags((prev) => {
+        if (isSelected) {
+          const next = { ...prev };
+          delete next[productId];
+          return next;
+        }
+        return {
+          ...prev,
+          [productId]: prev[productId] || 'Most Popular',
+        };
+      });
+    }
     dispatch(toggleProductSelection(productId));
   };
 
   const handleSelectAll = () => {
     if (selectedProductIds.length === availableProducts.length) {
+      if (activeTab === 'topOrder') {
+        setTopOrderTags({});
+      }
       dispatch(deselectAllProducts());
     } else {
+      if (activeTab === 'topOrder') {
+        setTopOrderTags((prev) =>
+          availableProducts.reduce((tags, product) => {
+            tags[product._id] = prev[product._id] || product.topOrderTag || 'Most Popular';
+            return tags;
+          }, { ...prev })
+        );
+      }
       dispatch(selectAllProducts());
     }
   };
@@ -462,6 +522,9 @@ const AdminDashboard = () => {
       } else if (activeTab === 'bestSeller') {
         action = 'setBestSeller';
         successMessage = `${selectedProductIds.length} products added to Best Sellers successfully!`;
+      } else if (activeTab === 'topOrder') {
+        action = 'setTopOrder';
+        successMessage = `${selectedProductIds.length} products added to Top Order successfully!`;
       } else {
         action = 'setNewArrival';
         successMessage = `${selectedProductIds.length} products updated successfully!`;
@@ -471,6 +534,15 @@ const AdminDashboard = () => {
         productIds: selectedProductIds,
         action: action,
         value: true,
+        tags: activeTab === 'topOrder'
+          ? selectedProductIds.reduce((tags, productId) => {
+              const tagValue = topOrderTags[productId];
+              tags[productId] = typeof tagValue === 'string' && tagValue.trim()
+                ? tagValue.trim()
+                : 'Most Popular';
+              return tags;
+            }, {})
+          : undefined,
       })).unwrap();
 
       dispatch(addNotification({
@@ -490,7 +562,12 @@ const AdminDashboard = () => {
 
   const handleRemoveProduct = async (productId) => {
     try {
-      const action = currentFilter === 'newArrival' ? 'removeNewArrival' : 'removeBestSeller';
+      const action =
+        currentFilter === 'newArrival'
+          ? 'removeNewArrival'
+          : currentFilter === 'topOrder'
+          ? 'removeTopOrder'
+          : 'removeBestSeller';
       
       await dispatch(removeProductFromList({
         productId,
@@ -680,6 +757,7 @@ const AdminDashboard = () => {
     { id: 'companyPolicies', label: 'Company Policies', icon: <FileText className="w-5 h-5" /> },
     { id: 'coupons', label: 'Coupon Management', icon: <DollarSign className="w-5 h-5" /> },
     { id: 'reviews', label: 'Review Management', icon: <MessageSquareText className="w-5 h-5" /> },
+    { id: 'topOrder', label: 'Top Order Selection', icon: <Star className="w-5 h-5" /> },
     { id: 'newArrival', label: 'New Arrivals', icon: <TrendingUp className="w-5 h-5" /> },
     { id: 'bestSeller', label: 'Best Sellers', icon: <BarChart3 className="w-5 h-5" /> },
     { id: 'prices', label: 'Price Management', icon: <DollarSign className="w-5 h-5" /> },
@@ -925,6 +1003,11 @@ const AdminDashboard = () => {
                       Best Seller
                     </span>
                   )}
+                  {selectedProduct.topOrder && (
+                    <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                      {selectedProduct.topOrderTag || 'Top Order'}
+                    </span>
+                  )}
                   {selectedProduct.isActive ? (
                     <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
                       Active
@@ -1045,6 +1128,7 @@ const AdminDashboard = () => {
                 {activeSidebarItem === 'homepage' && 'Homepage Management'}
                 {activeSidebarItem === 'blogs' && 'Blog Management'}
                 {activeSidebarItem === 'search' && 'Product Search'}
+                {activeSidebarItem === 'topOrder' && 'Top Order Selection'}
                 {activeSidebarItem === 'newArrival' && 'New Arrivals'}
                 {activeSidebarItem === 'bestSeller' && 'Best Sellers'}
                 {activeSidebarItem === 'prices' && 'Price Management'}
@@ -1067,6 +1151,7 @@ const AdminDashboard = () => {
                 {activeSidebarItem === 'homepage' && 'Manage featured content displayed on the homepage'}
                 {activeSidebarItem === 'blogs' && 'Create, publish, and refine homepage blog content'}
                 {activeSidebarItem === 'search' && 'Search for products by their unique ID'}
+                {activeSidebarItem === 'topOrder' && 'Select products that appear first on the products page'}
                 {activeSidebarItem === 'newArrival' && 'Manage new arrival products'}
                 {activeSidebarItem === 'bestSeller' && 'Manage best selling products'}
                 {activeSidebarItem === 'prices' && 'Manage product pricing and discounts'}
@@ -1087,7 +1172,7 @@ const AdminDashboard = () => {
                   <span>Export Designs</span>
                 </button>
               </div>
-            ) : activeSidebarItem === 'newArrival' || activeSidebarItem === 'bestSeller' ? (
+            ) : activeSidebarItem === 'newArrival' || activeSidebarItem === 'bestSeller' || activeSidebarItem === 'topOrder' ? (
               !isEditing ? (
                 <div className="flex space-x-3">
                   <button
@@ -1285,13 +1370,13 @@ const AdminDashboard = () => {
           )}
 
           {/* Main Content Area */}
-          {isEditing && (activeSidebarItem === 'newArrival' || activeSidebarItem === 'bestSeller') && viewMode === 'products' ? (
+          {isEditing && (activeSidebarItem === 'newArrival' || activeSidebarItem === 'bestSeller' || activeSidebarItem === 'topOrder') && viewMode === 'products' ? (
             /* Edit Mode for Products */
             <div className="bg-white rounded-xl shadow-lg p-6">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">
-                    Add to {activeTab === 'newArrival' ? 'New Arrivals' : 'Best Sellers'}
+                    Add to {activeTab === 'newArrival' ? 'New Arrivals' : activeTab === 'topOrder' ? 'Top Order' : 'Best Sellers'}
                   </h2>
                   <p className="text-gray-600">Select products from your catalog</p>
                 </div>
@@ -1304,7 +1389,7 @@ const AdminDashboard = () => {
               </div>
 
               {/* Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 p-4 bg-gray-50 rounded-lg">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 p-4 bg-gray-50 rounded-lg">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Category
@@ -1425,6 +1510,26 @@ const AdminDashboard = () => {
                         <h4 className="font-medium text-gray-900 mb-2 line-clamp-1">
                           {product.title}
                         </h4>
+
+                        {activeTab === 'topOrder' && selectedProductIds.includes(product._id) && (
+                          <div className="mb-3" onClick={(event) => event.stopPropagation()}>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              Product Tag
+                            </label>
+                            <input
+                              type="text"
+                              value={topOrderTags[product._id] || ''}
+                              onChange={(event) =>
+                                setTopOrderTags((prev) => ({
+                                  ...prev,
+                                  [product._id]: event.target.value,
+                                }))
+                              }
+                              placeholder="Most Popular"
+                              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        )}
                         
                         {/* Variants Info */}
                         {product.variants && product.variants.length > 0 ? (
@@ -1486,7 +1591,7 @@ const AdminDashboard = () => {
                           : 'bg-blue-600 hover:bg-blue-700 text-white'
                       }`}
                     >
-                      Set as {activeTab === 'newArrival' ? 'New Arrivals' : 'Best Sellers'}
+                      Set as {activeTab === 'newArrival' ? 'New Arrivals' : activeTab === 'topOrder' ? 'Top Order' : 'Best Sellers'}
                       {selectedProductIds.length > 0 && (
                         <span className="ml-2 bg-white/20 px-2 py-1 rounded text-sm">
                           {selectedProductIds.length}
@@ -1765,11 +1870,11 @@ const AdminDashboard = () => {
                     No products found
                   </h3>
                   <p className="text-gray-600 mb-6">
-                    {activeSidebarItem === 'newArrival' || activeSidebarItem === 'bestSeller'
-                      ? `Click "Edit List" to add products to ${activeSidebarItem === 'newArrival' ? 'New Arrivals' : 'Best Sellers'}`
+                    {activeSidebarItem === 'newArrival' || activeSidebarItem === 'bestSeller' || activeSidebarItem === 'topOrder'
+                      ? `Click "Edit List" to add products to ${activeSidebarItem === 'newArrival' ? 'New Arrivals' : activeSidebarItem === 'topOrder' ? 'Top Order' : 'Best Sellers'}`
                       : 'Add your first product to get started'}
                   </p>
-                  {activeSidebarItem === 'newArrival' || activeSidebarItem === 'bestSeller' ? (
+                  {activeSidebarItem === 'newArrival' || activeSidebarItem === 'bestSeller' || activeSidebarItem === 'topOrder' ? (
                     <button
                       onClick={handleEditClick}
                       className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
@@ -1850,6 +1955,11 @@ const AdminDashboard = () => {
                                       {product.bestSeller && (
                                         <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
                                           Best Seller
+                                        </span>
+                                      )}
+                                      {product.topOrder && (
+                                        <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
+                                          {product.topOrderTag || 'Top Order'}
                                         </span>
                                       )}
                                     </div>
@@ -1971,7 +2081,8 @@ const AdminDashboard = () => {
                                   </button>
 
                                   {activeSidebarItem === "newArrival" ||
-                                  activeSidebarItem === "bestSeller" ? (
+                                  activeSidebarItem === "bestSeller" ||
+                                  activeSidebarItem === "topOrder" ? (
                                     <button
                                       onClick={() => handleRemoveProduct(product._id)}
                                       className="text-red-600 hover:text-red-900"

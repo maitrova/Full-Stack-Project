@@ -185,7 +185,7 @@ export const getAllReadymadeProductsPublic = async (req, res) => {
     if (subCategory) query.subCategory = subCategory;
 
     const pageNum = Math.max(parseInt(page, 10), 1);
-    const limitNum = Math.min(parseInt(limit, 10), 200);
+    const limitNum = Math.min(parseInt(limit, 10), 1000);
     const skip = (pageNum - 1) * limitNum;
 
     const products = await ReadymadeProduct.find(query)
@@ -589,6 +589,8 @@ export const getFilteredProducts = async (req, res) => {
       query.newArrival = true;
     } else if (filter === 'bestSeller') {
       query.bestSeller = true;
+    } else if (filter === 'topOrder') {
+      query.topOrder = true;
     }
 
     // Apply category filters by display name or id.
@@ -644,7 +646,7 @@ export const getFilteredProducts = async (req, res) => {
     const products = await ReadymadeProduct.find(query)
       .populate('category', 'name')       // ✅ populate category
       .populate('subCategory', 'name')    // ✅ populate subCategory
-      .sort({ createdAt: -1 })
+      .sort(filter === 'topOrder' ? { topOrderAt: -1, createdAt: -1 } : { createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
       .select('-__v');
@@ -1076,7 +1078,7 @@ export const updateReadymadeProduct = async (req, res) => {
 // Update multiple products for newArrival/bestSeller
 export const updateProductList = async (req, res) => {
   try {
-    const { productIds, action, value } = req.body;
+    const { productIds, action, value, tag, tags } = req.body;
     
     if (!productIds || !action) {
       return res.status(400).json({
@@ -1094,12 +1096,66 @@ export const updateProductList = async (req, res) => {
     } else if (action === 'setBestSeller') {
       updateField = 'bestSeller';
       updateValue = value !== undefined ? value : true;
+    } else if (action === 'setTopOrder') {
+      const topOrderValue = value !== undefined ? Boolean(value) : true;
+      let modifiedCount = 0;
+
+      if (topOrderValue) {
+        const defaultTag = "Most Popular";
+        const tagByProductId = tags && typeof tags === "object" ? tags : {};
+        const fallbackTag = typeof tag === "string" && tag.trim() ? tag.trim() : defaultTag;
+
+        const results = await Promise.all(
+          productIds.map((productId) => {
+            const rawTag = tagByProductId[String(productId)];
+            const productTag =
+              typeof rawTag === "string" && rawTag.trim() ? rawTag.trim() : fallbackTag;
+
+            return ReadymadeProduct.updateOne(
+              { _id: productId },
+              { topOrder: true, topOrderTag: productTag, topOrderAt: new Date() }
+            );
+          })
+        );
+
+        modifiedCount = results.reduce(
+          (total, result) => total + (result.modifiedCount || 0),
+          0
+        );
+      } else {
+        const result = await ReadymadeProduct.updateMany(
+          { _id: { $in: productIds } },
+          { topOrder: false, topOrderTag: "", topOrderAt: null }
+        );
+        modifiedCount = result.modifiedCount;
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: `Updated ${modifiedCount} products`,
+        data: {
+          modifiedCount
+        }
+      });
     } else if (action === 'removeNewArrival') {
       updateField = 'newArrival';
       updateValue = false;
     } else if (action === 'removeBestSeller') {
       updateField = 'bestSeller';
       updateValue = false;
+    } else if (action === 'removeTopOrder') {
+      const result = await ReadymadeProduct.updateMany(
+        { _id: { $in: productIds } },
+        { topOrder: false, topOrderTag: "", topOrderAt: null }
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: `Updated ${result.modifiedCount} products`,
+        data: {
+          modifiedCount: result.modifiedCount
+        }
+      });
     } else {
       return res.status(400).json({
         success: false,

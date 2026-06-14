@@ -50,7 +50,7 @@ export const getCommonSavedData = async (req, res) => {
         .populate("subCategory", "name thumbnail")
         .populate("brand", "name") // POPULATE BRAND NAME ONLY
         .select(
-          "_id title description price salePrice saleStartAt saleEndAt currency category subCategory brand stock variants bestSeller newArrival images thumbnail rating reviewCount createdAt"
+          "_id title description price salePrice saleStartAt saleEndAt currency category subCategory brand stock variants bestSeller newArrival topOrder topOrderTag topOrderAt images thumbnail rating reviewCount createdAt"
         )
         .sort({ createdAt: -1 })
         .lean(),
@@ -130,17 +130,35 @@ export const getCommonSavedData = async (req, res) => {
         price: pricedProduct.effectivePrice ?? pricedProduct.price ?? 0,
         rating: Number(pricedProduct.rating || 0),
         reviewCount: Number(pricedProduct.reviewCount || 0),
+        bestSeller: Boolean(pricedProduct.bestSeller),
+        newArrival: Boolean(pricedProduct.newArrival),
+        topOrder: Boolean(pricedProduct.topOrder),
+        topOrderTag: pricedProduct.topOrderTag || "",
+        topOrderAt: pricedProduct.topOrderAt || null,
         currency: pricedProduct.currency || "INR",
         createdAt: pricedProduct.createdAt,
         raw: pricedProduct,
       };
     });
 
-    // Merge and sort newest first
+    // Merge and sort admin top-order products first, then newest first.
     const merged = [...normalizedDesigns, ...normalizedReadymades].sort(
-      (a, b) =>
-        new Date(b.createdAt || 0).getTime() -
-        new Date(a.createdAt || 0).getTime()
+      (a, b) => {
+        const topOrderDiff = Number(Boolean(b.topOrder)) - Number(Boolean(a.topOrder));
+        if (topOrderDiff !== 0) return topOrderDiff;
+
+        if (a.topOrder && b.topOrder) {
+          const topOrderDateDiff =
+            new Date(b.topOrderAt || 0).getTime() -
+            new Date(a.topOrderAt || 0).getTime();
+          if (topOrderDateDiff !== 0) return topOrderDateDiff;
+        }
+
+        return (
+          new Date(b.createdAt || 0).getTime() -
+          new Date(a.createdAt || 0).getTime()
+        );
+      }
     );
 
     // Apply pagination only when a limit is explicitly requested.

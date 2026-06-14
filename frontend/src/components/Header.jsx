@@ -424,6 +424,25 @@ const Header = () => {
                   </div>
                 </div>
               </Link>
+              <nav className="flex items-center gap-1.5 md:hidden">
+                {navItems.map((item) => {
+                  const isActive = isRouteActive(item.path);
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className={`flex h-8 items-center justify-center rounded-xl border px-2 text-center text-[11px] font-semibold leading-none transition ${
+                        isActive
+                          ? 'border-transparent bg-[linear-gradient(135deg,_#2563eb,_#7c3aed)] text-white shadow-sm'
+                          : 'border-slate-200 bg-white/90 text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      {item.path === '/customproducts' ? 'Custom' : item.label}
+                    </Link>
+                  );
+                })}
+              </nav>
             </div>
 
             <nav className="hidden md:flex">

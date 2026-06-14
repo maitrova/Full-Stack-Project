@@ -81,6 +81,7 @@ export default function ProductDetailPage() {
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [relatedLoading, setRelatedLoading] = useState(false);
   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
+  const [isMobileDescriptionExpanded, setIsMobileDescriptionExpanded] = useState(false);
 
   // Redux state
   const token = useSelector(selectCurrentToken);
@@ -308,6 +309,10 @@ export default function ProductDetailPage() {
       controller.abort();
     };
   }, [isReadymade, itemData?._id, itemData?.category, itemData?.subCategory]);
+
+  useEffect(() => {
+    setIsMobileDescriptionExpanded(false);
+  }, [itemData?._id]);
 
   // Handle notifications
   useEffect(() => {
@@ -1732,12 +1737,32 @@ export default function ProductDetailPage() {
           {/* Description (Mobile) */}
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Description</h3>
-            <div
-              className="text-gray-600 text-sm leading-relaxed"
-              dangerouslySetInnerHTML={{
-                __html: DOMPurify.sanitize(displayData.description || ""),
-              }}
-            />
+            <div className="relative">
+              <div
+                className={`text-gray-600 text-sm leading-relaxed transition-all duration-200
+                  [&_p]:mb-3
+                  [&_strong]:font-semibold [&_strong]:text-gray-800
+                  [&_ul]:list-disc [&_ul]:pl-5
+                  [&_ol]:list-decimal [&_ol]:pl-5
+                  [&_li]:mb-1
+                  ${isMobileDescriptionExpanded ? "" : "max-h-24 overflow-hidden"}`}
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(displayData.description || ""),
+                }}
+              />
+              {!isMobileDescriptionExpanded && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent" />
+              )}
+            </div>
+            {(displayData.description || "").length > 120 && (
+              <button
+                type="button"
+                onClick={() => setIsMobileDescriptionExpanded((expanded) => !expanded)}
+                className="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700"
+              >
+                {isMobileDescriptionExpanded ? "View less" : "View more"}
+              </button>
+            )}
           </div>
 
           {/* Size Chart (Mobile) - Positioned After Description */}

@@ -77,6 +77,8 @@ const ALL_PRODUCTS_PRICE_RANGES = [
   { label: '₹5000+', min: 5000, max: 10000 }
 ];
 
+const PRODUCTS_PER_PAGE = 24;
+
 export default function AllProductsHub() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -122,20 +124,12 @@ export default function AllProductsHub() {
   const [addedProductName, setAddedProductName] = useState('');
   const [addingToCartId, setAddingToCartId] = useState(null);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-  const [visibleProductCount, setVisibleProductCount] = useState(24);
+  const [currentPage, setCurrentPage] = useState(1);
   
   // Determine what to show
-  const showCategoryTiles = 
-    selectedCommonCategory === "all" &&
-    selectedCommonSubCategory === "all" &&
-    !searchQuery?.trim() &&
-    !urlFilter;
+  const showCategoryTiles = false;
 
-  const showSubCategoryTiles =
-    selectedCommonCategory !== "all" &&
-    selectedCommonSubCategory === "all" &&
-    !searchQuery?.trim() &&
-    !urlFilter;
+  const showSubCategoryTiles = false;
 
   // Redux state
   const commonSavedData = useSelector(selectCommonSavedData);
@@ -435,6 +429,20 @@ export default function AllProductsHub() {
       
       const isTrendingA = a.trending || a.raw?.trending || false;
       const isTrendingB = b.trending || b.raw?.trending || false;
+      const isTopOrderA = a.topOrder || a.raw?.topOrder || false;
+      const isTopOrderB = b.topOrder || b.raw?.topOrder || false;
+      const dateA = new Date(a.createdAt || 0);
+      const dateB = new Date(b.createdAt || 0);
+
+      if (isTopOrderA !== isTopOrderB) {
+        return isTopOrderB ? 1 : -1;
+      }
+
+      if (isTopOrderA && isTopOrderB) {
+        const topOrderDateA = new Date(a.topOrderAt || a.raw?.topOrderAt || a.createdAt || 0);
+        const topOrderDateB = new Date(b.topOrderAt || b.raw?.topOrderAt || b.createdAt || 0);
+        return topOrderDateB - topOrderDateA;
+      }
       
       switch (sortOption) {
         case 'price-low':
@@ -446,7 +454,7 @@ export default function AllProductsHub() {
         case 'newest':
           if (isNewArrivalA && !isNewArrivalB) return -1;
           if (!isNewArrivalA && isNewArrivalB) return 1;
-          return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+          return dateB - dateA;
         case 'best-sellers':
           if (isBestSellerA && !isBestSellerB) return -1;
           if (!isBestSellerA && isBestSellerB) return 1;
@@ -457,9 +465,7 @@ export default function AllProductsHub() {
           return trendScoreB - trendScoreA;
         case 'featured':
         default:
-          const featuredA = (isFeaturedA ? 5 : 0) + (isNewArrivalA ? 3 : 0) + (isBestSellerA ? 2 : 0);
-          const featuredB = (isFeaturedB ? 5 : 0) + (isNewArrivalB ? 3 : 0) + (isBestSellerB ? 2 : 0);
-          return featuredB - featuredA;
+          return dateB - dateA;
       }
     });
     
@@ -620,7 +626,7 @@ export default function AllProductsHub() {
   }, [commonSavedData, selectedCommonCategory]);
 
   useEffect(() => {
-    setVisibleProductCount(24);
+    setCurrentPage(1);
   }, [
     searchQuery,
     sortOption,
@@ -632,7 +638,38 @@ export default function AllProductsHub() {
     urlFilter,
   ]);
 
-  const visibleProducts = filteredProducts.slice(0, visibleProductCount);
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStartIndex = (safeCurrentPage - 1) * PRODUCTS_PER_PAGE;
+  const visibleProducts = filteredProducts.slice(pageStartIndex, pageStartIndex + PRODUCTS_PER_PAGE);
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+
+    const pages = new Set([1, totalPages]);
+    for (let page = safeCurrentPage - 1; page <= safeCurrentPage + 1; page += 1) {
+      if (page > 1 && page < totalPages) pages.add(page);
+    }
+
+    return Array.from(pages)
+      .sort((a, b) => a - b)
+      .reduce((items, page, index, sortedPages) => {
+        if (index > 0 && page - sortedPages[index - 1] > 1) {
+          items.push("ellipsis");
+        }
+        items.push(page);
+        return items;
+      }, []);
+  }, [safeCurrentPage, totalPages]);
+
+  const handlePageChange = (page) => {
+    if (page < 1 || page > totalPages || page === safeCurrentPage) return;
+    setCurrentPage(page);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
   
   const applyQuickPriceRange = (range) => {
     setQuickPriceRange(range.label);
@@ -1311,7 +1348,7 @@ export default function AllProductsHub() {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-3 lg:gap-4 xl:grid-cols-4">
                   {visibleProducts.map((product) => {
                     const isInCart = getCartQuantityForCommon(product) > 0;
                     const currentPrice =
@@ -1375,6 +1412,12 @@ export default function AllProductsHub() {
                             <div className="absolute inset-0 ring-1 ring-gray-200" />
 
                             <div className="absolute top-2 left-2 flex flex-col gap-2 z-10">
+                              {product.topOrder && (
+                                <span className="px-2 py-1 text-[11px] font-semibold bg-blue-600 text-white rounded-md">
+                                  {product.topOrderTag || "Top Order"}
+                                </span>
+                              )}
+
                               {product.bestSeller && (
                                 <span className="px-2 py-1 text-[11px] font-semibold bg-orange-500 text-white rounded-md">
                                   Best Seller
@@ -1459,13 +1502,50 @@ export default function AllProductsHub() {
                     );
                   })}
                   </div>
-                  {filteredProducts.length > visibleProducts.length && (
-                    <div className="mt-6 flex justify-center">
+                  {totalPages > 1 && (
+                    <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
                       <button
-                        onClick={() => setVisibleProductCount((count) => count + 24)}
-                        className="rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                        type="button"
+                        onClick={() => handlePageChange(safeCurrentPage - 1)}
+                        disabled={safeCurrentPage === 1}
+                        className="inline-flex h-9 items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        Load More Products
+                        <ChevronLeft className="h-4 w-4" />
+                        Prev
+                      </button>
+
+                      {pageNumbers.map((page, index) =>
+                        page === "ellipsis" ? (
+                          <span
+                            key={`ellipsis-${index}`}
+                            className="inline-flex h-9 min-w-9 items-center justify-center px-2 text-sm text-gray-500"
+                          >
+                            ...
+                          </span>
+                        ) : (
+                          <button
+                            key={page}
+                            type="button"
+                            onClick={() => handlePageChange(page)}
+                            className={`inline-flex h-9 min-w-9 items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors ${
+                              safeCurrentPage === page
+                                ? "border-gray-900 bg-gray-900 text-white"
+                                : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        )
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => handlePageChange(safeCurrentPage + 1)}
+                        disabled={safeCurrentPage === totalPages}
+                        className="inline-flex h-9 items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Next
+                        <ChevronRight className="h-4 w-4" />
                       </button>
                     </div>
                   )}

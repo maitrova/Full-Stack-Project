@@ -81,6 +81,9 @@ const readymadeProductSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
     bestSeller: { type: Boolean, default: false },
     newArrival: { type: Boolean, default: false },
+    topOrder: { type: Boolean, default: false, index: true },
+    topOrderTag: { type: String, default: "", trim: true },
+    topOrderAt: { type: Date, default: null },
     rating: { type: Number, default: 0, min: 0, max: 5 },
     reviewCount: { type: Number, default: 0, min: 0 },
     ratingBreakdown: {

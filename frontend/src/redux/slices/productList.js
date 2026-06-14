@@ -42,12 +42,14 @@ export const fetchAllProducts = createAsyncThunk(
 
 export const updateProductList = createAsyncThunk(
   'productList/updateProductList',
-  async ({ productIds, action, value }, { rejectWithValue }) => {
+  async ({ productIds, action, value, tag, tags }, { rejectWithValue }) => {
     try {
       const response = await axios.patch(`${API_BASE}/admin/bulk/update-flags`, {
         productIds,
         action,
-        value
+        value,
+        tag,
+        tags
       });
       return response.data;
     } catch (error) {
