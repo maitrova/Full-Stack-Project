@@ -156,11 +156,12 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
             set -e
-            helm upgrade --install fontend /tmp/frontend \
+            helm upgrade --install frontend /tmp/frontend \
               --namespace production \
               --create-namespace \
               --history-max 3 \
               --set image.tag=${{ needs.build_and_push.outputs.frontend_tag }} \
+              --set ingress.enabled=false \
               --wait \
               --atomic
             
