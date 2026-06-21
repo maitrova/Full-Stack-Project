@@ -1,7 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logoutUser, selectCurrentToken } from '../redux/slices/Userslice.js';
+import {
+  fetchCommonSavedData,
+  selectCommonSavedData,
+} from '../redux/slices/commonproducts.js';
 import {
   getCart,
   selectCart,
@@ -16,6 +20,8 @@ const DEFAULT_BANNER_MESSAGES = [
   'Custom Designs in 48 Hours',
   'Premium Quality Guaranteed',
 ];
+const RECENT_SEARCHES_KEY = 'maitrova_recent_searches';
+const MAX_RECENT_SEARCHES = 6;
 
 const socialLinks = [
   {
@@ -106,7 +112,7 @@ const SocialMediaIcons = ({ mobile = false }) => (
         className={
           mobile
             ? 'inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50'
-            : `inline-flex h-10 w-10 items-center justify-center rounded-full border shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${item.desktopClass}`
+            : `inline-flex h-9 w-9 items-center justify-center rounded-full border shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${item.desktopClass}`
         }
       >
         {mobile ? (
@@ -125,10 +131,17 @@ const SocialMediaIcons = ({ mobile = false }) => (
 const Header = () => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [recentSearches, setRecentSearches] = useState([]);
   const [bannerMessages, setBannerMessages] = useState(DEFAULT_BANNER_MESSAGES);
   const [bannerCouponCode, setBannerCouponCode] = useState('');
+  const desktopSearchRef = useRef(null);
+  const mobileSearchRef = useRef(null);
 
   const location = useLocation();
+  const navigate = useNavigate();
   const dispatch = useDispatch();
   const user = useSelector((state) => state.user.userInfo);
   const token = useSelector(selectCurrentToken);
@@ -136,11 +149,27 @@ const Header = () => {
   const cart = useSelector(selectCart);
   const cartSummary = useSelector(selectCartSummary);
   const cartLoading = useSelector(selectCartLoading);
+  const commonSavedData = useSelector(selectCommonSavedData);
   const isAuthenticated = !!token;
 
   useEffect(() => {
     dispatch(getCart());
   }, [dispatch, token]);
+
+  useEffect(() => {
+    if (!Array.isArray(commonSavedData) || commonSavedData.length === 0) {
+      dispatch(fetchCommonSavedData({ page: 1 }));
+    }
+  }, [commonSavedData, dispatch]);
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY) || '[]');
+      setRecentSearches(Array.isArray(stored) ? stored.filter(Boolean).slice(0, MAX_RECENT_SEARCHES) : []);
+    } catch (error) {
+      setRecentSearches([]);
+    }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -177,6 +206,8 @@ const Header = () => {
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
+    setIsMobileSearchOpen(false);
+    setIsSearchFocused(false);
     setShowDropdown(false);
   }, [location.pathname, location.search]);
 
@@ -184,11 +215,26 @@ const Header = () => {
     const handleResize = () => {
       if (window.innerWidth >= 768) {
         setIsMobileMenuOpen(false);
+        setIsMobileSearchOpen(false);
       }
     };
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      const target = event.target;
+      const clickedDesktopSearch = desktopSearchRef.current?.contains(target);
+      const clickedMobileSearch = mobileSearchRef.current?.contains(target);
+      if (!clickedDesktopSearch && !clickedMobileSearch) {
+        setIsSearchFocused(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
   }, []);
 
   const cartSubtotal = useMemo(() => Number(cartSummary?.subtotal || 0), [cartSummary?.subtotal]);
@@ -218,6 +264,30 @@ const Header = () => {
     () => [...bannerItems, ...bannerItems],
     [bannerItems]
   );
+  const searchSuggestions = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query || !Array.isArray(commonSavedData)) return [];
+
+    const suggestions = new Map();
+    const addSuggestion = (value, meta = 'Product') => {
+      const label = String(value || '').trim();
+      if (!label) return;
+      const key = label.toLowerCase();
+      if (!key.includes(query) || suggestions.has(key)) return;
+      suggestions.set(key, { label, meta });
+    };
+
+    commonSavedData.forEach((item) => {
+      addSuggestion(item.title || item.name || item.productName, item.type === 'design' ? 'Design' : 'Product');
+      addSuggestion(item.category, 'Category');
+      addSuggestion(item.subCategory, 'Subcategory');
+    });
+
+    return Array.from(suggestions.values()).slice(0, 8);
+  }, [commonSavedData, searchQuery]);
+  const shouldShowSearchDropdown =
+    isSearchFocused &&
+    (searchSuggestions.length > 0 || (!searchQuery.trim() && recentSearches.length > 0));
 
   const isRouteActive = (path) => {
     if (path === '/') return location.pathname === '/';
@@ -229,13 +299,189 @@ const Header = () => {
     setIsMobileMenuOpen(false);
   };
 
+  const persistRecentSearches = (items) => {
+    setRecentSearches(items);
+    try {
+      localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(items));
+    } catch (error) {
+      // Recent searches are a progressive enhancement.
+    }
+  };
+
+  const addRecentSearch = (term) => {
+    const searchTerm = term.trim();
+    if (!searchTerm) return;
+
+    const nextSearches = [
+      searchTerm,
+      ...recentSearches.filter((item) => item.toLowerCase() !== searchTerm.toLowerCase()),
+    ].slice(0, MAX_RECENT_SEARCHES);
+
+    persistRecentSearches(nextSearches);
+  };
+
+  const deleteRecentSearch = (term) => {
+    persistRecentSearches(
+      recentSearches.filter((item) => item.toLowerCase() !== term.toLowerCase())
+    );
+  };
+
+  const runSearch = (term) => {
+    const searchTerm = term.trim();
+    if (!searchTerm) {
+      navigate('/products');
+    } else {
+      addRecentSearch(searchTerm);
+      navigate(`/products?${new URLSearchParams({ search: searchTerm }).toString()}`);
+    }
+    setSearchQuery(searchTerm);
+    setIsMobileSearchOpen(false);
+    setIsSearchFocused(false);
+  };
+
+  const handleSearchSubmit = (event) => {
+    event.preventDefault();
+    runSearch(searchQuery);
+  };
+
+  const renderSearchBox = ({ mobile = false } = {}) => (
+    <div
+      ref={mobile ? mobileSearchRef : desktopSearchRef}
+      className={mobile ? 'relative w-full' : 'relative w-52 xl:w-72'}
+    >
+      <form
+        onSubmit={handleSearchSubmit}
+        className={`flex items-center gap-2 border bg-white shadow-sm transition focus-within:border-slate-400 ${
+          mobile
+            ? 'rounded-2xl border-slate-200 p-2'
+            : 'h-9 rounded-xl border-slate-200 px-3'
+        }`}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.1} d="m21 21-4.35-4.35M10.75 18a7.25 7.25 0 1 1 0-14.5 7.25 7.25 0 0 1 0 14.5z" />
+        </svg>
+        <input
+          type="text"
+          inputMode="search"
+          value={searchQuery}
+          onFocus={() => setIsSearchFocused(true)}
+          onChange={(event) => {
+            setSearchQuery(event.target.value);
+            setIsSearchFocused(true);
+          }}
+          placeholder={mobile ? 'Search products' : 'Search products'}
+          className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold text-slate-900 outline-none placeholder:text-slate-500"
+          aria-label="Search products"
+          autoFocus={mobile}
+        />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearchQuery('');
+              setIsSearchFocused(true);
+            }}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+            aria-label="Clear search"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.25} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+        {mobile && (
+          <button
+            type="submit"
+            className="h-8 shrink-0 rounded-xl bg-slate-900 px-3 text-xs font-semibold text-white transition hover:bg-slate-800"
+          >
+            Go
+          </button>
+        )}
+      </form>
+
+      {shouldShowSearchDropdown && (
+        <div
+          className={`absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_60px_-30px_rgba(15,23,42,0.45)] ${
+            mobile ? '' : 'min-w-80'
+          }`}
+        >
+          {searchQuery.trim() ? (
+            <div className="p-2">
+              <p className="px-3 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                Suggestions
+              </p>
+              {searchSuggestions.map((item) => (
+                <button
+                  key={`${item.meta}-${item.label}`}
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => runSearch(item.label)}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-slate-50"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.1} d="m21 21-4.35-4.35M10.75 18a7.25 7.25 0 1 1 0-14.5 7.25 7.25 0 0 1 0 14.5z" />
+                    </svg>
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-slate-800">{item.label}</span>
+                    <span className="block text-xs text-slate-500">{item.meta}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="p-2">
+              <div className="flex items-center justify-between px-3 pb-2 pt-1">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                  Recent Searches
+                </p>
+              </div>
+              {recentSearches.map((item) => (
+                <div
+                  key={item}
+                  className="flex items-center gap-2 rounded-xl px-3 py-2 transition hover:bg-slate-50"
+                >
+                  <button
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => runSearch(item)}
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m5-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
+                      </svg>
+                    </span>
+                    <span className="truncate text-sm font-semibold text-slate-800">{item}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => deleteRecentSearch(item)}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                    aria-label={`Delete ${item} from recent searches`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 7h12m-9 0V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7m-7 0 .7 12A2 2 0 0 0 10.7 21h2.6a2 2 0 0 0 2-1.9L16 7" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   const CartIcon = () => (
     <Link
       to="/cart"
-      className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 hover:shadow-md"
+      className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 hover:shadow-md"
       onClick={() => setIsMobileMenuOpen(false)}
     >
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -334,22 +580,22 @@ const Header = () => {
   const UserProfile = () => (
     <Link
       to="/profile"
-      className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-2 py-2 pr-4 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
+      className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2 py-1.5 pr-3 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
     >
       <div className="relative">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[linear-gradient(135deg,_#0f172a,_#334155)] text-sm font-semibold text-white">
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[linear-gradient(135deg,_#0f172a,_#334155)] text-sm font-semibold text-white">
           {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
         </div>
         <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500" />
       </div>
       <div className="hidden lg:block">
-        <p className="text-sm font-semibold text-slate-800">{user?.name?.split(' ')[0] || 'User'}</p>
+        <p className="text-[13px] font-semibold text-slate-800">{user?.name?.split(' ')[0] || 'User'}</p>
       </div>
     </Link>
   );
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-[rgba(248,250,252,0.88)] shadow-[0_10px_35px_-24px_rgba(15,23,42,0.35)] backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-[rgba(248,250,252,0.9)] shadow-[0_8px_28px_-24px_rgba(15,23,42,0.35)] backdrop-blur-xl">
       {bannerItems.length > 0 && (
         <div className="overflow-hidden border-b border-slate-200/80 bg-[linear-gradient(90deg,_#eff6ff,_#f8fafc,_#fff7ed)] py-1.5">
           <style>{`
@@ -379,11 +625,11 @@ const Header = () => {
         </div>
       )}
 
-      <div className="container mx-auto px-2 py-1.5 sm:px-3">
-        <div className="relative overflow-visible rounded-[1.5rem] border border-white/70 bg-[linear-gradient(135deg,_rgba(255,255,255,0.96),_rgba(248,250,252,0.94))] px-2.5 py-2 shadow-[0_26px_60px_-36px_rgba(15,23,42,0.35)] md:px-4">
-          <div className="absolute inset-0 rounded-[1.75rem] bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.08),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(249,115,22,0.08),_transparent_28%)]" />
-          <div className="relative flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 sm:gap-5">
+      <div className="container mx-auto px-2 py-1 sm:px-3">
+        <div className="relative overflow-visible rounded-2xl border border-white/80 bg-white/95 px-2 py-1.5 shadow-[0_18px_48px_-34px_rgba(15,23,42,0.45)] md:px-3">
+          <div className="absolute inset-0 rounded-2xl bg-[linear-gradient(135deg,_rgba(37,99,235,0.04),_transparent_38%,_rgba(249,115,22,0.05))]" />
+          <div className="relative flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-4">
               <button
                 className="rounded-2xl border border-slate-200 bg-white p-2.5 text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-md md:hidden"
                 onClick={() => setIsMobileMenuOpen((open) => !open)}
@@ -398,8 +644,8 @@ const Header = () => {
                 </svg>
               </button>
 
-              <Link to="/" className="group flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-white/80 bg-white shadow-md transition group-hover:-translate-y-0.5 group-hover:shadow-lg">
+              <Link to="/" className="group flex items-center gap-2.5">
+                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-white/80 bg-white shadow-sm transition group-hover:-translate-y-0.5 group-hover:shadow-md">
                   <img
                     src="/logo/logo.jpeg"
                     alt="MAITROVA"
@@ -415,10 +661,10 @@ const Header = () => {
                   />
                 </div>
                 <div className="hidden sm:block">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Maitrova</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">Maitrova</p>
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-slate-900">Premium custom wear</p>
-                    <span className="hidden rounded-full border border-orange-100 bg-orange-50 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-orange-700 lg:inline-flex">
+                    <p className="text-[13px] font-semibold leading-tight text-slate-900">Premium custom wear</p>
+                    <span className="hidden rounded-full border border-orange-100 bg-orange-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-orange-700 xl:inline-flex">
                       Fresh drops
                     </span>
                   </div>
@@ -442,18 +688,41 @@ const Header = () => {
                     </Link>
                   );
                 })}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileSearchOpen((open) => !open);
+                    setIsSearchFocused(true);
+                  }}
+                  className={`flex h-8 w-8 items-center justify-center rounded-xl border text-slate-700 shadow-sm transition ${
+                    isMobileSearchOpen
+                      ? 'border-transparent bg-slate-900 text-white'
+                      : 'border-slate-200 bg-white/90 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                  aria-label={isMobileSearchOpen ? 'Close product search' : 'Open product search'}
+                >
+                  {isMobileSearchOpen ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.25} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.1} d="m21 21-4.35-4.35M10.75 18a7.25 7.25 0 1 1 0-14.5 7.25 7.25 0 0 1 0 14.5z" />
+                    </svg>
+                  )}
+                </button>
               </nav>
             </div>
 
             <nav className="hidden md:flex">
-              <div className="flex items-center gap-1 rounded-full border border-slate-200/80 bg-white/80 p-1 shadow-sm">
+              <div className="flex items-center gap-1 rounded-2xl border border-slate-200/80 bg-white/90 p-1 shadow-sm">
                 {navItems.map((item) => {
                   const isActive = isRouteActive(item.path);
                   return (
                     <Link
                       key={item.path}
                       to={item.path}
-                      className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                      className={`rounded-xl px-3 py-1.5 text-[13px] font-semibold transition ${
                         isActive
                           ? 'bg-[linear-gradient(135deg,_#2563eb,_#7c3aed)] text-white shadow-sm'
                           : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -463,10 +732,11 @@ const Header = () => {
                     </Link>
                   );
                 })}
+                {renderSearchBox()}
               </div>
             </nav>
 
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-2">
               <div className="hidden items-center gap-3 xl:flex">
                 <SocialMediaIcons />
               </div>
@@ -479,14 +749,14 @@ const Header = () => {
                       <Link
                         key={item.path}
                         to={item.path}
-                        className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
                       >
                         {item.label}
                       </Link>
                     ))}
                     <button
                       onClick={handleLogout}
-                      className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-600 transition hover:bg-rose-100"
+                      className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] font-semibold text-rose-600 transition hover:bg-rose-100"
                     >
                       Logout
                     </button>
@@ -495,13 +765,13 @@ const Header = () => {
                   <>
                     <Link
                       to="/login"
-                      className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
                     >
                       Sign In
                     </Link>
                     <Link
                       to="/register"
-                      className="rounded-2xl bg-[linear-gradient(135deg,_#0f172a,_#1e293b)] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:opacity-95 hover:shadow-md"
+                      className="rounded-xl bg-[linear-gradient(135deg,_#0f172a,_#1e293b)] px-3 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:opacity-95 hover:shadow-md"
                     >
                       Get Started
                     </Link>
@@ -514,17 +784,21 @@ const Header = () => {
                 onMouseEnter={() => window.innerWidth > 768 && setShowDropdown(true)}
                 onMouseLeave={() => window.innerWidth > 768 && setShowDropdown(false)}
               >
-                <div className="flex items-center gap-2 rounded-2xl border border-sky-100 bg-[linear-gradient(135deg,_rgba(255,255,255,0.96),_rgba(239,246,255,0.9))] px-2 py-2 shadow-sm md:pl-2 md:pr-3">
+                <div className="flex items-center gap-2 rounded-xl border border-sky-100 bg-[linear-gradient(135deg,_rgba(255,255,255,0.98),_rgba(239,246,255,0.9))] px-1.5 py-1.5 shadow-sm md:pl-1.5 md:pr-3">
                   <CartIcon />
                   <div className="hidden md:block">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-500">Cart Total</div>
-                    <div className="text-sm font-semibold text-slate-900">{formatCurrency(cartSubtotal)}</div>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-500">Cart Total</div>
+                    <div className="text-[13px] font-semibold text-slate-900">{formatCurrency(cartSubtotal)}</div>
                   </div>
                 </div>
                 {showDropdown && window.innerWidth > 768 && <CartDropdown />}
               </div>
             </div>
           </div>
+
+          {isMobileSearchOpen && (
+            <div className="mt-3 md:hidden">{renderSearchBox({ mobile: true })}</div>
+          )}
         </div>
       </div>
 

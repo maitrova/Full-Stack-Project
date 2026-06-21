@@ -7,7 +7,6 @@ import {
   Search,
   X,
   ChevronRight,
-  ChevronLeft,
   Sparkles,
   TrendingUp,
   Star,
@@ -124,7 +123,7 @@ export default function AllProductsHub() {
   const [addedProductName, setAddedProductName] = useState('');
   const [addingToCartId, setAddingToCartId] = useState(null);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [visibleCount, setVisibleCount] = useState(PRODUCTS_PER_PAGE);
   
   // Determine what to show
   const showCategoryTiles = false;
@@ -626,7 +625,7 @@ export default function AllProductsHub() {
   }, [commonSavedData, selectedCommonCategory]);
 
   useEffect(() => {
-    setCurrentPage(1);
+    setVisibleCount(PRODUCTS_PER_PAGE);
   }, [
     searchQuery,
     sortOption,
@@ -638,37 +637,13 @@ export default function AllProductsHub() {
     urlFilter,
   ]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE));
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-  const pageStartIndex = (safeCurrentPage - 1) * PRODUCTS_PER_PAGE;
-  const visibleProducts = filteredProducts.slice(pageStartIndex, pageStartIndex + PRODUCTS_PER_PAGE);
-  const pageNumbers = useMemo(() => {
-    if (totalPages <= 7) {
-      return Array.from({ length: totalPages }, (_, index) => index + 1);
-    }
+  const visibleProducts = filteredProducts.slice(0, visibleCount);
+  const hasMoreProducts = visibleProducts.length < filteredProducts.length;
 
-    const pages = new Set([1, totalPages]);
-    for (let page = safeCurrentPage - 1; page <= safeCurrentPage + 1; page += 1) {
-      if (page > 1 && page < totalPages) pages.add(page);
-    }
-
-    return Array.from(pages)
-      .sort((a, b) => a - b)
-      .reduce((items, page, index, sortedPages) => {
-        if (index > 0 && page - sortedPages[index - 1] > 1) {
-          items.push("ellipsis");
-        }
-        items.push(page);
-        return items;
-      }, []);
-  }, [safeCurrentPage, totalPages]);
-
-  const handlePageChange = (page) => {
-    if (page < 1 || page > totalPages || page === safeCurrentPage) return;
-    setCurrentPage(page);
-    if (typeof window !== "undefined") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
+  const handleLoadMore = () => {
+    setVisibleCount((count) =>
+      Math.min(count + PRODUCTS_PER_PAGE, filteredProducts.length)
+    );
   };
   
   const applyQuickPriceRange = (range) => {
@@ -1502,51 +1477,19 @@ export default function AllProductsHub() {
                     );
                   })}
                   </div>
-                  {totalPages > 1 && (
-                    <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                  {hasMoreProducts && (
+                    <div className="mt-7 flex flex-col items-center gap-3">
                       <button
                         type="button"
-                        onClick={() => handlePageChange(safeCurrentPage - 1)}
-                        disabled={safeCurrentPage === 1}
-                        className="inline-flex h-9 items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={handleLoadMore}
+                        className="inline-flex h-11 items-center gap-2 rounded-lg border border-gray-900 bg-gray-900 px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-black"
                       >
-                        <ChevronLeft className="h-4 w-4" />
-                        Prev
+                        Load More
+                        <ChevronDown className="h-4 w-4" />
                       </button>
-
-                      {pageNumbers.map((page, index) =>
-                        page === "ellipsis" ? (
-                          <span
-                            key={`ellipsis-${index}`}
-                            className="inline-flex h-9 min-w-9 items-center justify-center px-2 text-sm text-gray-500"
-                          >
-                            ...
-                          </span>
-                        ) : (
-                          <button
-                            key={page}
-                            type="button"
-                            onClick={() => handlePageChange(page)}
-                            className={`inline-flex h-9 min-w-9 items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors ${
-                              safeCurrentPage === page
-                                ? "border-gray-900 bg-gray-900 text-white"
-                                : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                            }`}
-                          >
-                            {page}
-                          </button>
-                        )
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => handlePageChange(safeCurrentPage + 1)}
-                        disabled={safeCurrentPage === totalPages}
-                        className="inline-flex h-9 items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Next
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
+                      <p className="text-xs font-medium text-gray-500">
+                        Showing {visibleProducts.length} of {filteredProducts.length} products
+                      </p>
                     </div>
                   )}
                 </>
