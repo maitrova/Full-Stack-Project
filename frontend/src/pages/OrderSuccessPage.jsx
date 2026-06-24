@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { trackPurchase } from "../utils/analytics.js";
 
 const getSuccessPayload = (locationState) => {
   const payload = locationState?.orderSuccess;
@@ -25,6 +26,15 @@ export default function OrderSuccessPage() {
     if (!successPayload || hasTrackedPurchaseRef.current) {
       return;
     }
+
+    trackPurchase({
+      transactionId: successPayload.orderId,
+      items: Array.isArray(successPayload.items) ? successPayload.items : [],
+      value: Number(successPayload.totalAmount || 0),
+      currency: "INR",
+      paymentType: successPayload.paymentLabel || "",
+    });
+    hasTrackedPurchaseRef.current = true;
 
     if (typeof window !== "undefined" && typeof window.fbq === "function") {
       const trackedItems = Array.isArray(successPayload.items) ? successPayload.items : [];

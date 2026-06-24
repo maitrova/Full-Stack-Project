@@ -38,6 +38,7 @@ import {
   selectCartItems,
   selectCartLoading 
 } from "../redux/slices/Cartslice.js";
+import { trackSearch } from "../utils/analytics.js";
 import { selectCurrentToken } from "../redux/slices/Userslice.js";
 import { buildImageUrl, getResponsiveImageProps } from "../utils/responsiveImage.js";
 import {
@@ -289,6 +290,14 @@ export default function AllProductsHub() {
     setSearchQuery(value);
     updateURLParams({ search: value });
   };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      trackSearch({ searchTerm: searchQuery, source: 'all_products' });
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
   
   const handleSortChange = (value) => {
     setSortOption(value);

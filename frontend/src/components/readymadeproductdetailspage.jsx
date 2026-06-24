@@ -1,5 +1,5 @@
 // src/pages/ProductDetailPage.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { getProductById as fetchReadymadeProductById, getProductByPath as fetchReadymadeProductByPath } from '../redux/slices/productList.js';
@@ -17,6 +17,7 @@ import {
 import { selectCurrentToken } from '../redux/slices/Userslice.js';
 import { buildImageUrl, getRawImagePath, getResponsiveImageProps } from "../utils/responsiveImage.js";
 import { buildProductsListingPath, buildReadymadeProductPath } from "../utils/readymadeRoutes.js";
+import { trackAddToCart, trackViewItem } from "../utils/analytics.js";
 import ProductImageLightbox from "./ProductImageLightbox.jsx";
 import ProductReviews from "./ProductReviews.jsx";
 
@@ -82,6 +83,7 @@ export default function ProductDetailPage() {
   const [relatedLoading, setRelatedLoading] = useState(false);
   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
   const [isMobileDescriptionExpanded, setIsMobileDescriptionExpanded] = useState(false);
+  const viewTrackedRef = useRef('');
 
   // Redux state
   const token = useSelector(selectCurrentToken);
@@ -485,6 +487,16 @@ export default function ProductDetailPage() {
 
       console.log('Adding to cart:', cartData);
       await dispatch(addToCart(cartData)).unwrap();
+      trackAddToCart({
+        item: {
+          ...itemData,
+          qty: isReadymade ? quantity : 1,
+          unitPrice: displayData?.price,
+          size: hasVariants ? selectedSize : selectedColor,
+        },
+        value: Number(displayData?.price || 0) * Number(isReadymade ? quantity : 1),
+        currency: displayData?.currency || 'INR',
+      });
       trackMetaAddToCart({
         productId: itemData?._id,
         productName: itemData?.title || itemData?.name,
@@ -755,6 +767,25 @@ export default function ProductDetailPage() {
   });
   const sizeChartUrl = sizeChartImageProps.src;
   const shouldShowRelatedProducts = isReadymade && (relatedLoading || relatedProducts.length > 0);
+
+  useEffect(() => {
+    if (!itemData?._id || !displayData) return;
+
+    const viewKey = String(itemData._id);
+    if (viewTrackedRef.current === viewKey) return;
+
+    viewTrackedRef.current = viewKey;
+    trackViewItem({
+      item: {
+        ...itemData,
+        unitPrice: displayData.price,
+        currency: displayData.currency || 'INR',
+        size: selectedSize,
+      },
+      value: displayData.price,
+      currency: displayData.currency || 'INR',
+    });
+  }, [itemData?._id, displayData?.price, displayData?.currency, selectedSize]);
   
   if (loading) {
     return (

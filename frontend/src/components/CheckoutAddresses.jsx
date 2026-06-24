@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -17,6 +17,7 @@ import {
 import { getCart, selectCartItems, selectCartSummary } from "../redux/slices/Cartslice.js";
 import { selectCurrentToken } from "../redux/slices/Userslice.js";
 import RazorpayPayNow from "../components/RazorpayPayNow.jsx";
+import { trackBeginCheckout } from "../utils/analytics.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/api";
 
@@ -303,6 +304,7 @@ export default function CheckoutAddresses() {
   const [codMinimumOrderAmount, setCodMinimumOrderAmount] = useState(0);
   const [openDeliverySection, setOpenDeliverySection] = useState(false);
   const [openBillingSection, setOpenBillingSection] = useState(false);
+  const hasTrackedBeginCheckoutRef = useRef(false);
   const isEditing = useMemo(() => mode.startsWith("edit"), [mode]);
   const normalizedCouponCode = useMemo(() => String(couponCode || "").trim().toUpperCase(), [couponCode]);
   const isCouponApplied = couponState.status === "applied" && couponState.code === normalizedCouponCode;
@@ -347,6 +349,18 @@ export default function CheckoutAddresses() {
       setOpenBillingSection(true);
     }
   }, [mode]);
+
+  useEffect(() => {
+    if (hasTrackedBeginCheckoutRef.current || !cartItems.length) return;
+
+    hasTrackedBeginCheckoutRef.current = true;
+    trackBeginCheckout({
+      items: cartItems,
+      value: cartSummary.total,
+      currency: "INR",
+      coupon: normalizedCouponCode,
+    });
+  }, [cartItems.length, cartSummary.total, normalizedCouponCode]);
 
   useEffect(() => {
     if (sameAsDelivery) setBilling((prev) => ({ ...prev, ...delivery }));

@@ -13,6 +13,7 @@ import {
   selectCartSummary,
   selectCartLoading,
 } from '../redux/slices/Cartslice.js';
+import { trackSearch } from '../utils/analytics.js';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://maitrova.in/backend/api';
 const DEFAULT_BANNER_MESSAGES = [
@@ -331,6 +332,7 @@ const Header = () => {
     if (!searchTerm) {
       navigate('/products');
     } else {
+      trackSearch({ searchTerm, source: 'header' });
       addRecentSearch(searchTerm);
       navigate(`/products?${new URLSearchParams({ search: searchTerm }).toString()}`);
     }

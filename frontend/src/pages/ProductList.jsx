@@ -66,6 +66,7 @@ import { selectCurrentToken } from "../redux/slices/Userslice.js";
 import { buildImageUrl, getResponsiveImageProps } from "../utils/responsiveImage.js";
 import { buildReadymadeProductPath } from "../utils/readymadeRoutes.js";
 import { buildCatalogueDesignPath } from "../utils/catalogueDesignRoutes.js";
+import { trackSearch } from "../utils/analytics.js";
 
 // Modern professional color palette
 const MODERN_COLORS = {
@@ -541,6 +542,7 @@ export default function UnifiedProductHub() {
   useEffect(() => {
     const timer = setTimeout(() => {
       updateURLParams({ search: searchQuery });
+      trackSearch({ searchTerm: searchQuery, source: 'product_list' });
     }, 500); // Debounce search
     
     return () => clearTimeout(timer);
