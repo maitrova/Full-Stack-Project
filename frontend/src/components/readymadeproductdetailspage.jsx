@@ -20,6 +20,7 @@ import { buildProductsListingPath, buildReadymadeProductPath } from "../utils/re
 import { trackAddToCart, trackViewItem } from "../utils/analytics.js";
 import ProductImageLightbox from "./ProductImageLightbox.jsx";
 import ProductReviews from "./ProductReviews.jsx";
+import ExpandableDescription from "./ExpandableDescription.jsx";
 
 // Lucide React icons
 import { 
@@ -1439,18 +1440,11 @@ export default function ProductDetailPage() {
               {/* Description */}
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">Description</h3>
-                <div
-                  className="text-gray-600 leading-relaxed text-sm
-                    [&_p]:mb-3
-                    [&_strong]:font-semibold
-                    [&_em]:italic
-                    [&_blockquote]:border-l-4 [&_blockquote]:border-gray-300 [&_blockquote]:pl-4 [&_blockquote]:text-gray-700
-                    [&_ul]:list-disc [&_ul]:pl-6
-                    [&_ol]:list-decimal [&_ol]:pl-6
-                    [&_li]:mb-1"
-                  dangerouslySetInnerHTML={{
-                    __html: DOMPurify.sanitize(displayData.description || ""),
-                  }}
+                <ExpandableDescription
+                  description={displayData.description}
+                  html
+                  limit={180}
+                  className="text-sm leading-relaxed text-gray-600 [&_p]:mb-3 [&_strong]:font-semibold [&_em]:italic [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:mb-1"
                 />
               </div>
 

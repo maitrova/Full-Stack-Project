@@ -808,6 +808,10 @@ const getSizeBasePrice = (prod, size) => {
   const editorRef = useRef(null);
   const viewStatesRef = useRef({});
   const removeBgRequestSeqRef = useRef(0);
+  // Track the exact product object that received the homepage handoff. The
+  // customizer fetch replaces the product after navigation, so a boolean would
+  // incorrectly block re-applying the design after view initialization resets.
+  const homepageCustomizationAppliedRef = useRef(null);
   const cropPreviewFrameRef = useRef(null);
   const cropDragStateRef = useRef(null);
   const customizerReturnPath = `${location.pathname}${location.search}`;
@@ -1838,6 +1842,94 @@ const handleDesignUpload = async (e) => {
       setError("Failed to load design from library: " + err.message);
     }
   };
+
+  useEffect(() => {
+    const homepageCustomization = location.state?.homepageCustomization;
+    if (
+      !product ||
+      !homepageCustomization ||
+      homepageCustomizationAppliedRef.current === product
+    ) return;
+
+    homepageCustomizationAppliedRef.current = product;
+
+    if (homepageCustomization.color) {
+      handleColorChange(homepageCustomization.color, homepageCustomization.colorName);
+    }
+
+    const previewDesign = homepageCustomization.design;
+    if (!previewDesign?.imageUrl) {
+      if (homepageCustomization.openLibrary) {
+        setActiveTab(TABS.DESIGN_LIBRARY);
+        setIsLibraryModalOpen(true);
+      }
+      return;
+    }
+    const productForApplication = product;
+
+    const applyPreviewDesign = async () => {
+      try {
+        setError("");
+        const { width, height } = await getImageNaturalSize(previewDesign.imageUrl);
+        if (homepageCustomizationAppliedRef.current !== productForApplication) return;
+        const id = `design-${crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+        const targetViewCode = previewDesign.viewCode === "back" ? "back" : "front";
+        const baseLayer = createDesignLayer(
+          id,
+          previewDesign.imageUrl,
+          null,
+          width,
+          height,
+          {
+            isFromLibrary: true,
+            viewCode: targetViewCode,
+            zone: getInitialZoneKey(targetViewCode),
+            priceRules: productImagePriceRules,
+          }
+        );
+        const homepageLayer = previewDesign.layer || {};
+        const newLayer = {
+          ...baseLayer,
+          ...homepageLayer,
+          id,
+          imageUrl: previewDesign.imageUrl,
+          filename: previewDesign.filename || baseLayer.filename,
+          file: null,
+          sourceFile: null,
+          isFromLibrary: true,
+          viewCode: targetViewCode,
+          zone: targetViewCode === "back"
+            ? "back-full"
+            : (homepageLayer.zone === "pocket" ? "pocket" : "front-full"),
+          priceRules: productImagePriceRules,
+        };
+
+        setViewCode(targetViewCode);
+        setViewStates((prev) => ({
+          ...prev,
+          [targetViewCode]: {
+            ...(prev[targetViewCode] || {}),
+            textLayers: prev[targetViewCode]?.textLayers || [],
+            activeTextId: prev[targetViewCode]?.activeTextId || null,
+            designLayers: [...(prev[targetViewCode]?.designLayers || []), newLayer],
+            activeDesignId: id,
+          },
+        }));
+        setSelectedLibraryImage(previewDesign.filename || "Homepage selection");
+        if (homepageCustomization.openLibrary) {
+          setActiveTab(TABS.DESIGN_LIBRARY);
+          setIsLibraryModalOpen(true);
+        } else {
+          setActiveTab(TABS.DESIGNS);
+        }
+      } catch (previewError) {
+        console.error("Failed to apply homepage customization:", previewError);
+        setError("The selected homepage design could not be loaded. You can choose it again from the design library.");
+      }
+    };
+
+    applyPreviewDesign();
+  }, [location.state, product]);
 
   const handleRemoveBackground = async () => {
     const targetDesign = selectedOrLatestDesign;
@@ -3008,34 +3100,34 @@ const startCropPreviewPan = (event, mode = "move") => {
           <div className="hidden sm:block" />
 
           {/* Tab navigation */}
-          <div className="hidden gap-1 overflow-x-auto border-b border-slate-200 pb-2 text-[10px] sm:flex sm:gap-2">
+          <div className="grid grid-cols-2 gap-1.5 border-b border-slate-200 pb-2 sm:grid-cols-3 lg:grid-cols-5">
             <button
               onClick={() => handleToolTabChange(TABS.PRODUCT_COLORS)}
-              className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium ${activeTab === TABS.PRODUCT_COLORS ? 'bg-sky-50 text-sky-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
+              className={`w-full rounded-xl px-2 py-2 text-[11px] font-medium ${activeTab === TABS.PRODUCT_COLORS ? 'bg-sky-50 text-sky-600' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}
             >
               Product Colors
             </button>
             <button
               onClick={() => handleToolTabChange(TABS.DESIGNS)}
-              className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium ${activeTab === TABS.DESIGNS ? 'bg-sky-50 text-sky-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
+              className={`w-full rounded-xl px-2 py-2 text-[11px] font-medium ${activeTab === TABS.DESIGNS ? 'bg-sky-50 text-sky-600' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}
             >
               Designs
             </button>
             <button
               onClick={() => handleToolTabChange(TABS.TEXT)}
-              className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium ${activeTab === TABS.TEXT ? 'bg-sky-50 text-sky-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
+              className={`w-full rounded-xl px-2 py-2 text-[11px] font-medium ${activeTab === TABS.TEXT ? 'bg-sky-50 text-sky-600' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}
             >
               Text
             </button>
             <button
               onClick={() => handleToolTabChange(TABS.VIEWS)}
-              className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium ${activeTab === TABS.VIEWS ? 'bg-sky-50 text-sky-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
+              className={`w-full rounded-xl px-2 py-2 text-[11px] font-medium ${activeTab === TABS.VIEWS ? 'bg-sky-50 text-sky-600' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}
             >
               Views
             </button>
             <button
               onClick={() => handleToolTabChange(TABS.DESIGN_LIBRARY)}
-              className={`flex-shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-xs font-medium ${activeTab === TABS.DESIGN_LIBRARY ? 'bg-sky-50 text-sky-600' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}
+              className={`w-full rounded-xl px-2 py-2 text-[11px] font-medium sm:col-span-2 lg:col-span-1 ${activeTab === TABS.DESIGN_LIBRARY ? 'bg-sky-50 text-sky-600' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}
             >
               Design Library
             </button>

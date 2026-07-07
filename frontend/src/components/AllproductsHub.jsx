@@ -1332,7 +1332,7 @@ export default function AllProductsHub() {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-3 lg:gap-4 xl:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
                   {visibleProducts.map((product) => {
                     const isInCart = getCartQuantityForCommon(product) > 0;
                     const currentPrice =
@@ -1366,9 +1366,9 @@ export default function AllProductsHub() {
                               ? (buildReadymadeProductPath(product) || `/readymade/${product._id}`)
                               : (buildCatalogueDesignPath(product) || `/catalogue/${product._id}`)
                           }
-                          className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                          className="block text-gray-700 transition-colors hover:text-gray-900"
                         >
-                          <div className="relative aspect-square bg-white flex items-center justify-center overflow-hidden rounded-t-xl">
+                          <div className="relative aspect-[4/3] bg-white flex items-center justify-center overflow-hidden rounded-t-lg">
                             <img
                               src={imageProps.src || getImageUrl(previewImage)}
                               srcSet={imageProps.srcSet}
@@ -1381,7 +1381,7 @@ export default function AllProductsHub() {
                               loading={imageProps.loading}
                               decoding={imageProps.decoding}
                               fetchPriority={imageProps.fetchPriority}
-                              className="max-h-[85%] max-w-[85%] object-contain"
+                              className="max-h-[92%] max-w-[92%] object-contain"
                               style={
                                 imageProps.placeholder
                                   ? {

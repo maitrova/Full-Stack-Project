@@ -268,7 +268,7 @@ const getItemImages = (item) => {
             <div className="h-4 w-64 bg-gray-200 rounded mx-auto animate-pulse"></div>
           </div>
 
-          <div className="flex overflow-x-auto scrollbar-hide gap-4 pb-4">
+          <div className="flex overflow-x-auto scrollbar-hide gap-1 pb-4">
             {[...Array(8)].map((_, i) => (
               <div key={i} className="min-w-[240px] max-w-[240px] flex-shrink-0 bg-white border border-gray-200 rounded-lg overflow-hidden animate-pulse">
                 <div className="h-52 bg-gray-200"></div>
@@ -367,7 +367,7 @@ const getItemImages = (item) => {
           {/* Products Grid - Mobile shows 2 items, Horizontal scroll */}
           <div
             ref={containerRef}
-            className="flex overflow-x-auto scrollbar-hide pb-4 gap-3 sm:gap-4 px-10 sm:px-0"
+            className="flex overflow-x-auto scrollbar-hide gap-1 pb-4 px-2 sm:px-0"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
             {items.map((item) => (

@@ -46,7 +46,7 @@ const HomepageCustomizationCategoriesList = () => {
             <div className="h-4 w-64 bg-gray-200 rounded mx-auto animate-pulse"></div>
           </div>
 
-          <div className="flex overflow-x-auto scrollbar-hide gap-4 pb-4">
+          <div className="flex overflow-x-auto scrollbar-hide gap-1 pb-4">
             {[...Array(4)].map((_, i) => (
               <div
                 key={i}
@@ -112,8 +112,8 @@ const HomepageCustomizationCategoriesList = () => {
 <div
   ref={containerRef}
   className="
-    grid grid-cols-2 gap-4
-    sm:flex sm:overflow-x-auto sm:gap-4 sm:pb-4
+    grid grid-cols-2 gap-1
+    sm:flex sm:overflow-x-auto sm:gap-1 sm:pb-4
     scrollbar-hide
   "
   style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}

@@ -1,6 +1,7 @@
 import React from 'react'
 // import Header from '../components/Header'
 import Hero from '../components/Hero'
+import HomepageVideoBanner from '../components/HomepageVideoBanner'
 
 // import HomepageFeatured from '../components/Newarrivals'
 import Dropproduct from '../components/DropproductUserView'
@@ -15,6 +16,7 @@ const Homepage = () => {
   return (
     <>
     {/* <Header/> */}
+    <HomepageVideoBanner/>
     <Hero/>
     <Dropproduct/>
     

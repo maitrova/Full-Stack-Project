@@ -53,7 +53,7 @@ const CategoryTilesHorizontal = ({ limit = 12, onlyActive = true }) => {
             <div className="h-4 w-32 bg-gray-200 rounded-lg animate-pulse"></div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
             {[...Array(6)].map((_, index) => (
               <div key={index} className="animate-pulse">
                 <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
@@ -82,7 +82,7 @@ const CategoryTilesHorizontal = ({ limit = 12, onlyActive = true }) => {
         </div>
 
         {/* Categories Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {categories.map((category) => {
             const imageUrl = formatImageUrl(category.thumbnail);
             console.log("Formatted image URL for category", categories);

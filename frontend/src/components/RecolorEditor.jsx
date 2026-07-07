@@ -1511,6 +1511,7 @@ const RecolorEditor = forwardRef(function RecolorEditor(
     // OPTIONAL: you can pass your tested front boundaries here if you want to force them
     // Example: { "front-full": {minX, minY, maxX, maxY} }
     calibrationOverride = null,
+    showMeasurementsByDefault = true,
   },
   ref
 ) {
@@ -1525,8 +1526,6 @@ const RecolorEditor = forwardRef(function RecolorEditor(
   const [designInteractionActive, setDesignInteractionActive] = useState(false);
   const effectiveCanvasWidth = canvasSize?.width || previewWidth || 800;
   const isCompactUI = effectiveCanvasWidth < 460;
-  const showMeasurementsByDefault = true;
-
   const [showMeasurements, setShowMeasurements] = useState(showMeasurementsByDefault);
   const [calibrationMode, setCalibrationMode] = useState(false);
 

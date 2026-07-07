@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { Link } from "react-router-dom";
 import { buildImageUrl, getRawImagePath, getResponsiveImageProps } from "../utils/responsiveImage.js";
+import ExpandableDescription from "./ExpandableDescription.jsx";
 
 // Shared components
 const ImageSlider = ({ images = [], alt = "", autoScrollInterval = 4000 }) => {
@@ -199,11 +200,7 @@ const ProductCard = ({ item, getItemImages }) => {
           {item.name || item.title}
         </h3>
         
-        {item.description && (
-          <p className="text-gray-600 text-sm line-clamp-2 mb-4">
-            {item.description}
-          </p>
-        )}
+        <ExpandableDescription description={item.description} limit={90} className="mb-1 text-sm text-gray-600" />
 
         {/* Price and Type */}
         <div className="flex items-center justify-between mb-3">

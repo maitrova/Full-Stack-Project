@@ -1,5 +1,6 @@
 // src/pages/CatalogueDetailPage.jsx
 import React, { useEffect, useState } from "react";
+import ExpandableDescription from "../components/ExpandableDescription.jsx";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { 
@@ -1179,9 +1180,11 @@ export default function CatalogueDetailPage() {
 
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Description</h3>
-            <p className="text-sm leading-relaxed text-gray-600">
-              {design.description || `Custom design for ${design.productName}`}
-            </p>
+            <ExpandableDescription
+              description={design.description || `Custom design for ${design.productName}`}
+              limit={150}
+              className="text-sm leading-relaxed text-gray-600"
+            />
             <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
               Customized products are not eligible for return
             </div>

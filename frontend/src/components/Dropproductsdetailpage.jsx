@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import DOMPurify from "dompurify";
+import ExpandableDescription from "./ExpandableDescription.jsx";
 import {
   getDropproductById,
   getDropproductBySlug,
@@ -1014,9 +1015,11 @@ const DropProductDetailsPage = () => {
             {/* Description */}
             <div className="prose max-w-none border-t pt-8">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Description</h3>
-              <div
-                className="text-gray-700 leading-relaxed text-base mb-6"
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(product.description || "") }}
+              <ExpandableDescription
+                description={product.description}
+                html
+                limit={180}
+                className="mb-2 text-base leading-relaxed text-gray-700"
               />
               {productHighlights.length > 0 && (
                 <div className="space-y-3">
