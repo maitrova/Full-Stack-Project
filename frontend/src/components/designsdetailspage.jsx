@@ -186,17 +186,6 @@ export default function Designdetailspage() {
 
   // Handle add to cart
   const handleAddToCart = async () => {
-    if (!token) {
-      setNotification({
-        show: true,
-        message: 'Please login to add designs to cart',
-        type: 'warning'
-      });
-      setTimeout(() => {
-        navigate('/login', { state: { from: `/admin/designs/${id}` } });
-      }, 1500);
-      return;
-    }
     if (!selectedSize) {
   setNotification({
     show: true,
@@ -241,9 +230,8 @@ export default function Designdetailspage() {
       console.error("Failed to add to cart:", error);
       // Revert optimistic update on error
       setLocalCartQuantity(0);
-      
-      // Handle 401 errors
-      if (error.status === 401) {
+
+      if (error.status === 401 && token) {
         setNotification({
           show: true,
           message: 'Session expired. Please login again.',
@@ -258,15 +246,6 @@ export default function Designdetailspage() {
 
   // Handle increment quantity
   const handleIncrement = async () => {
-    if (!token) {
-      setNotification({
-        show: true,
-        message: 'Please login to update cart',
-        type: 'warning'
-      });
-      return;
-    }
-
     if (!design) return;
 
     const currentQty = quantity;
@@ -301,15 +280,6 @@ export default function Designdetailspage() {
 
   // Handle decrement quantity
   const handleDecrement = async () => {
-    if (!token) {
-      setNotification({
-        show: true,
-        message: 'Please login to update cart',
-        type: 'warning'
-      });
-      return;
-    }
-
     if (!design) return;
 
     const currentQty = quantity;
@@ -343,15 +313,6 @@ export default function Designdetailspage() {
 
   // Handle remove from cart
   const handleRemoveFromCart = async () => {
-    if (!token) {
-      setNotification({
-        show: true,
-        message: 'Please login to update cart',
-        type: 'warning'
-      });
-      return;
-    }
-
     if (!design) return;
 
     const cartItem = cartItems.find(item => 
@@ -377,14 +338,6 @@ export default function Designdetailspage() {
 
   // Handle buy now
   const handleBuyNow = async () => {
-    if (!token) {
-      setNotification({
-        show: true,
-        message: 'Please login to proceed',
-        type: 'warning'
-      });
-      return;
-    }
     if (!selectedSize) {
   setNotification({
     show: true,
@@ -398,9 +351,7 @@ export default function Designdetailspage() {
       navigate('/cart');
     } else {
       await handleAddToCart();
-      if (token) {
-        setTimeout(() => navigate('/cart'), 500);
-      }
+      setTimeout(() => navigate('/cart'), 500);
     }
   };
 
@@ -847,12 +798,12 @@ export default function Designdetailspage() {
               ) : (
                 <button
                   onClick={handleAddToCart}
-                  disabled={isUpdating || !token || !selectedSize}
+                  disabled={isUpdating || !selectedSize}
 
                   className={`h-14 rounded-xl font-semibold transition-all flex items-center justify-center gap-3 group ${
-                    token 
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-90' 
-                      : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    !selectedSize
+                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-90'
                   } ${isUpdating ? 'opacity-50' : ''}`}
                 >
                   {isUpdating ? (
@@ -860,23 +811,23 @@ export default function Designdetailspage() {
                   ) : (
                     <ShoppingCart className="w-5 h-5" />
                   )}
-                  {token ? (!selectedSize ? "Select Size" : "Add to Cart") : "Login to Cart"}
+                  {!selectedSize ? "Select Size" : "Add to Cart"}
 
                 </button>
               )}
               
               <button
                 onClick={handleBuyNow}
-                disabled={isUpdating || !token || !selectedSize}
+                disabled={isUpdating || !selectedSize}
 
                 className={`h-14 rounded-xl font-semibold transition-all flex items-center justify-center gap-3 ${
-                  token 
-                    ? 'bg-gradient-to-r from-green-600 to-teal-600 text-white hover:opacity-90' 
-                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  !selectedSize
+                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-green-600 to-teal-600 text-white hover:opacity-90'
                 } ${isUpdating ? 'opacity-50' : ''}`}
               >
                 <CreditCard className="w-5 h-5" />
-                {token ? (!selectedSize ? "Select Size" : "Buy Now") : "Login to Buy"}
+                {!selectedSize ? "Select Size" : "Buy Now"}
 
               </button>
 

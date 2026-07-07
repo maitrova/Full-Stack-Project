@@ -51,8 +51,7 @@ import {
   X,
   AlertCircle,
   Info,
-  Ruler,
-  LogIn
+  Ruler
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
@@ -79,7 +78,6 @@ export default function ProductDetailPage() {
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState('specifications');
   const [sizeError, setSizeError] = useState('');
-  const [showLoginPrompt, setShowLoginPrompt] = useState(false); // New state for login prompt
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [relatedLoading, setRelatedLoading] = useState(false);
   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
@@ -88,7 +86,6 @@ export default function ProductDetailPage() {
 
   // Redux state
   const token = useSelector(selectCurrentToken);
-  const isLoggedIn = !!token;
   const cartItems = useSelector(selectCartItems);
   const cartLoading = useSelector(selectCartLoading);
   const cartSuccess = useSelector(selectCartSuccess);
@@ -378,15 +375,6 @@ export default function ProductDetailPage() {
   const cartQuantity = cartItemDetails?.quantity || 0;
   const totalInCart = cartItemDetails?.total || 0;
 
-  // New function to handle login prompt
-  const handleLoginPrompt = () => {
-    setShowLoginPrompt(true);
-    // Auto-hide after 5 seconds
-    setTimeout(() => {
-      setShowLoginPrompt(false);
-    }, 5000);
-  };
-
   const handleAddToCart = async () => {
     if (!itemData) {
       setNotification({
@@ -510,7 +498,7 @@ export default function ProductDetailPage() {
     } catch (error) {
       console.error('Add to cart failed:', error);
       
-      if (error.status === 401) {
+      if (error.status === 401 && token) {
         setNotification({
           show: true,
           message: 'Session expired. Please login again.',
@@ -532,11 +520,6 @@ export default function ProductDetailPage() {
   };
 
   const handleBuyNow = async () => {
-    if (!isLoggedIn) {
-      handleLoginPrompt();
-      return;
-    }
-
     if (hasVariants && !selectedSize) {
       setSizeError('Please select a size');
       setNotification({
@@ -556,7 +539,7 @@ export default function ProductDetailPage() {
     }
     
     await handleAddToCart();
-    if (isLoggedIn && itemData) {
+    if (itemData) {
       navigate('/cart');
     }
   };
@@ -987,50 +970,6 @@ export default function ProductDetailPage() {
         </div>
       )}
 
-      {/* Login Prompt Modal */}
-      {showLoginPrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl transform animate-slide-up">
-            <div className="text-center">
-              <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <LogIn className="w-10 h-10 text-purple-600" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Login Required</h3>
-              <p className="text-gray-600 mb-6">
-                Please login to your account to add items to cart and make purchases.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  onClick={() => {
-                    setShowLoginPrompt(false);
-                    navigate('/login', { state: { from: window.location.pathname } });
-                  }}
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:opacity-90 transition-all font-medium"
-                >
-                  Login Now
-                </button>
-                <button
-                  onClick={() => setShowLoginPrompt(false)}
-                  className="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-medium"
-                >
-                  Continue Browsing
-                </button>
-              </div>
-              <p className="text-sm text-gray-500 mt-4">
-                Don't have an account?{' '}
-                <Link 
-                  to="/register" 
-                  className="text-purple-600 font-medium hover:underline"
-                  onClick={() => setShowLoginPrompt(false)}
-                >
-                  Sign up
-                </Link>
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Sticky Header */}
       <div className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1117,24 +1056,6 @@ export default function ProductDetailPage() {
                     )}
                   </div>
                 </div>
-
-                {/* Login required overlay for non-logged in users */}
-                {!isLoggedIn && (
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-black/5 backdrop-blur-[2px] z-10 rounded-xl flex items-center justify-center">
-                      <div className="bg-white/90 p-4 rounded-xl shadow-lg text-center max-w-xs mx-4">
-                        <LogIn className="w-8 h-8 text-purple-600 mx-auto mb-2" />
-                        <p className="text-gray-800 font-medium mb-3">Login to add items to cart</p>
-                        <button
-                          onClick={() => navigate('/login', { state: { from: window.location.pathname } })}
-                          className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
-                        >
-                          Login Now
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {/* Main Media Display */}
                 <div className="relative h-[300px] sm:h-[400px] md:h-[500px] bg-white rounded-xl overflow-hidden">
@@ -1487,9 +1408,9 @@ export default function ProductDetailPage() {
                   <div className="flex items-center">
                     <button
                       onClick={() => handleQuantityChange(-1)}
-                      disabled={quantity <= 1 || !isLoggedIn}
+                      disabled={quantity <= 1}
                       className={`w-10 h-10 flex items-center justify-center border border-gray-300 rounded-l-lg ${
-                        quantity <= 1 || !isLoggedIn ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
+                        quantity <= 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
                       }`}
                     >
                       <span className="text-lg">-</span>
@@ -1499,34 +1420,13 @@ export default function ProductDetailPage() {
                     </div>
                     <button
                       onClick={() => handleQuantityChange(1)}
-                      disabled={quantity >= displayData.stock || !isLoggedIn}
+                      disabled={quantity >= displayData.stock}
                       className={`w-10 h-10 flex items-center justify-center border border-gray-300 rounded-r-lg ${
-                        quantity >= displayData.stock || !isLoggedIn ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
+                        quantity >= displayData.stock ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
                       }`}
                     >
                       <span className="text-lg">+</span>
                     </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Login required message for non-logged in users */}
-              {!isLoggedIn && (
-                <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-purple-100">
-                  <div className="flex items-start gap-3">
-                    <LogIn className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-purple-800 font-medium mb-2">Login to purchase</p>
-                      <p className="text-sm text-purple-600 mb-3">
-                        You need to be logged in to add items to cart and make purchases.
-                      </p>
-                      <button
-                        onClick={() => navigate('/login', { state: { from: window.location.pathname } })}
-                        className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
-                      >
-                        Login Now
-                      </button>
-                    </div>
                   </div>
                 </div>
               )}
@@ -1595,18 +1495,9 @@ export default function ProductDetailPage() {
               </div>
             )}
 
-            {/* Login required message for mobile */}
-            {!isLoggedIn && (
-              <div className="mb-1 rounded-lg border border-purple-100 bg-purple-50 p-2">
-                <p className="text-xs text-purple-700 text-center">
-                  Guest cart is enabled. Login will be required when you continue to checkout.
-                </p>
-              </div>
-            )}
-
             {/* Quantity and Action Buttons (Mobile) */}
             <div className="space-y-2">
-              {isReadymade && isLoggedIn && (
+              {isReadymade && (
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-gray-700">Qty</span>
                   <div className="flex items-center">

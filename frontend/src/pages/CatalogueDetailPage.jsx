@@ -377,22 +377,11 @@ export default function CatalogueDetailPage() {
 
   // Handle buy now
   const handleBuyNow = async () => {
-    if (!token) {
-      setNotification({
-        show: true,
-        message: 'Please login to proceed',
-        type: 'warning'
-      });
-      return;
-    }
-
     if (isInCart) {
       navigate('/cart');
     } else {
       await handleAddToCart();
-      if (token) {
-        setTimeout(() => navigate('/cart'), 500);
-      }
+      setTimeout(() => navigate('/cart'), 500);
     }
   };
 
@@ -842,9 +831,9 @@ export default function CatalogueDetailPage() {
               ) : (
                 <button
                   onClick={handleAddToCart}
-                  disabled={isUpdating || priceLoading || !token || !selectedSize}
+                  disabled={isUpdating || priceLoading || !selectedSize}
                   className={`h-14 rounded-lg font-semibold tracking-tight transition-all flex items-center justify-center gap-3 border ${
-                    token && selectedSize
+                    selectedSize
                       ? 'border-gray-900 bg-gray-900 text-white hover:bg-gray-800' 
                       : 'border-gray-300 bg-gray-100 text-gray-500 cursor-not-allowed'
                   } ${isUpdating || priceLoading ? 'opacity-50' : ''}`}
@@ -854,8 +843,8 @@ export default function CatalogueDetailPage() {
                   ) : (
                     <ShoppingCart className="w-5 h-5" />
                   )}
-                  {token ? 'ADD TO CART' : 'LOGIN REQUIRED'}
-                  <span className={`${token && selectedSize ? 'text-gray-300' : 'text-gray-400'}`}>
+                  ADD TO CART
+                  <span className={`${selectedSize ? 'text-gray-300' : 'text-gray-400'}`}>
                     ₹{currentPrice}
                     {(priceLoading) && <span className="text-xs ml-1">(loading...)</span>}
                   </span>
@@ -864,15 +853,15 @@ export default function CatalogueDetailPage() {
               
               <button
                 onClick={handleBuyNow}
-                disabled={isUpdating || priceLoading || !token || !selectedSize}
+                disabled={isUpdating || priceLoading || !selectedSize}
                 className={`h-14 rounded-lg font-semibold tracking-tight transition-all flex items-center justify-center gap-3 border ${
-                  token && selectedSize
+                  selectedSize
                     ? 'border-gray-900 bg-white text-gray-900 hover:bg-gray-50' 
                     : 'border-gray-300 bg-gray-100 text-gray-500 cursor-not-allowed'
                 } ${isUpdating || priceLoading ? 'opacity-50' : ''}`}
               >
                 <CreditCard className="w-5 h-5" />
-                {token ? 'BUY NOW' : 'LOGIN TO BUY'}
+                BUY NOW
               </button>
             </div>
           </div>
@@ -1467,15 +1456,7 @@ export default function CatalogueDetailPage() {
         <div className="space-y-2 p-3">
           {renderSizeSelector({ compact: true })}
 
-          {!token && (
-            <div className="rounded-lg border border-purple-100 bg-purple-50 p-2">
-              <p className="text-center text-xs text-purple-700">
-                Login to add this design to cart or buy now.
-              </p>
-            </div>
-          )}
-
-          {token && selectedSize && (
+          {selectedSize && (
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-gray-700">Qty</span>
               <div className="flex items-center">
@@ -1507,9 +1488,9 @@ export default function CatalogueDetailPage() {
           <div className="flex gap-2">
             <button
               onClick={isInCart ? () => navigate("/cart") : handleAddToCart}
-              disabled={isUpdating || priceLoading || !token || !selectedSize}
+              disabled={isUpdating || priceLoading || !selectedSize}
               className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold tracking-tight transition-all ${
-                token && selectedSize
+                selectedSize
                   ? "bg-gray-900 text-white"
                   : "bg-gray-100 text-gray-500"
               } ${isUpdating || priceLoading ? "opacity-50" : ""}`}
@@ -1518,15 +1499,13 @@ export default function CatalogueDetailPage() {
                 ? "Working..."
                 : isInCart
                   ? `In Cart (${quantity})`
-                  : token
-                    ? "Add to Cart"
-                    : "Login Required"}
+                  : "Add to Cart"}
             </button>
             <button
               onClick={handleBuyNow}
-              disabled={isUpdating || priceLoading || !token || !selectedSize}
+              disabled={isUpdating || priceLoading || !selectedSize}
               className={`flex-1 rounded-xl border px-4 py-3 text-sm font-semibold tracking-tight transition-all ${
-                token && selectedSize
+                selectedSize
                   ? "border-gray-900 bg-white text-gray-900"
                   : "border-gray-200 bg-gray-100 text-gray-500"
               } ${isUpdating || priceLoading ? "opacity-50" : ""}`}
