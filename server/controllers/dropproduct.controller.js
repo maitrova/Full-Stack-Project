@@ -197,8 +197,16 @@ const optimizeDropSizeChart = async (file) => {
 };
 
 const safeUnlink = async (filePath) => {
-  if (!filePath) return;
-  await deleteOptimizedImageSet(filePath);
+  const storedPath = getDropImageUrl(filePath) || filePath;
+  if (!storedPath || typeof storedPath !== "string") return;
+
+  try {
+    await deleteOptimizedImageSet(storedPath);
+  } catch (error) {
+    console.warn(
+      `Failed to delete drop product file ${storedPath}: ${error.code || error.message}`
+    );
+  }
 };
 
 const normalizeVariants = (variants) => {
