@@ -54,6 +54,37 @@ const cartHasCustomizationItems = (cart) =>
   Array.isArray(cart?.items) &&
   cart.items.some((item) => item?.kind === "DESIGN" || Boolean(item?.product));
 
+const getAllowedPaymentOptions = (product) => {
+  const options = Array.isArray(product?.paymentOptions)
+    ? product.paymentOptions
+    : ["COD", "ONLINE"];
+
+  const normalized = options
+    .map((option) => String(option || "").trim().toUpperCase())
+    .filter(Boolean);
+
+  return normalized.length ? normalized : ["COD", "ONLINE"];
+};
+
+const validateCartPaymentAvailability = (cart, paymentOption) => {
+  const requestedOption = String(paymentOption || "").trim().toUpperCase();
+
+  for (const item of cart?.items || []) {
+    if (item?.kind !== "READYMADE") continue;
+
+    const sourceProduct = item.dropproduct || item.readymadeProduct;
+    if (!sourceProduct) continue;
+
+    if (!getAllowedPaymentOptions(sourceProduct).includes(requestedOption)) {
+      const methodLabel =
+        requestedOption === "COD" ? "Cash on delivery" : "Online payment";
+      const error = new Error(`${methodLabel} is not available for ${getItemTitle(item)}`);
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+};
+
 const getCodMinimumOrderAmount = async () => {
   const settings = await HeaderBannerSettings.findOne({ key: "main" }).select(
     "codMinimumOrderAmount"
@@ -338,6 +369,7 @@ export const createRazorpayOrderFromCart = async (req, res) => {
 
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
     const cart = await getActiveCartWithPricing(userId);
+    validateCartPaymentAvailability(cart, "ONLINE");
     const { delivery, billing } = await getCheckoutAddresses(userId);
     const totals = await getCartTotals({ cart, userId, couponCode });
     const orderDoc = await createOrderDocFromCart({
@@ -394,6 +426,7 @@ export const createCashOnDeliveryOrderFromCart = async (req, res) => {
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
     const cart = await getActiveCartWithPricing(userId);
+    validateCartPaymentAvailability(cart, "COD");
     const { delivery, billing } = await getCheckoutAddresses(userId);
     const totals = await getCartTotals({ cart, userId, couponCode });
 

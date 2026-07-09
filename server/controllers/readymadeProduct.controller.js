@@ -60,6 +60,34 @@ const parseOptionalDate = (value) => {
   return date;
 };
 
+const normalizePaymentOptions = (value, fallback = ["COD", "ONLINE"]) => {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+
+  let options = value;
+  if (typeof options === "string") {
+    const trimmed = options.trim();
+    if (!trimmed) return fallback;
+    options = trimmed.startsWith("[") ? JSON.parse(trimmed) : trimmed.split(",");
+  }
+
+  if (!Array.isArray(options)) {
+    throw new Error("paymentOptions must be an array");
+  }
+
+  const normalized = [
+    ...new Set(options.map((option) => String(option || "").trim().toUpperCase())),
+  ].filter(Boolean);
+
+  const allowed = new Set(["COD", "ONLINE"]);
+  if (!normalized.length || normalized.some((option) => !allowed.has(option))) {
+    throw new Error("Select COD, online, or both payment options");
+  }
+
+  return normalized;
+};
+
 const normalizeRouteSegment = (value = "") =>
   String(value || "")
     .trim()
@@ -753,6 +781,7 @@ export const createReadymadeProduct = async (req, res) => {
       salePrice,
       saleStartAt,
       saleEndAt,
+      paymentOptions,
       thumbnail: thumbnailFromBody,
       imageAltTexts, // ✅ correct field
     } = req.body;
@@ -861,6 +890,7 @@ export const createReadymadeProduct = async (req, res) => {
       isActive: isActive === "true",
       bestSeller: bestSeller === "true",
       newArrival: newArrival === "true",
+      paymentOptions: normalizePaymentOptions(paymentOptions),
 
       images, // ✅ correct format
       thumbnail,
@@ -911,6 +941,7 @@ export const updateReadymadeProduct = async (req, res) => {
       salePrice,
       saleStartAt,
       saleEndAt,
+      paymentOptions,
       thumbnail: thumbnailFromBody,
       imageAltTexts,
     } = req.body;
@@ -931,6 +962,13 @@ export const updateReadymadeProduct = async (req, res) => {
 
     if (newArrival !== undefined)
       product.newArrival = newArrival === "true";
+
+    if (paymentOptions !== undefined) {
+      product.paymentOptions = normalizePaymentOptions(
+        paymentOptions,
+        product.paymentOptions
+      );
+    }
 
     if (salePrice !== undefined) {
       product.salePrice = parseOptionalNumber(salePrice);

@@ -77,7 +77,7 @@ export default function DropproductAdmin() {
   const [editMode, setEditMode] = useState(false);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [form, setForm] = useState({ name: '', description: '', salePrice: '', saleStartAt: '', saleEndAt: '', isActive: true, bestSeller: false, newArrival: false });
+  const [form, setForm] = useState({ name: '', description: '', salePrice: '', saleStartAt: '', saleEndAt: '', isActive: true, bestSeller: false, newArrival: false, paymentOptions: ['COD', 'ONLINE'] });
   const [category, setCategory] = useState('');
   const [newCategory, setNewCategory] = useState('');
   const [subCategory, setSubCategory] = useState('');
@@ -114,6 +114,9 @@ export default function DropproductAdmin() {
       isActive: currentProduct.isActive ?? true,
       bestSeller: currentProduct.bestSeller || false,
       newArrival: currentProduct.newArrival || false,
+      paymentOptions: Array.isArray(currentProduct.paymentOptions) && currentProduct.paymentOptions.length
+        ? currentProduct.paymentOptions
+        : ['COD', 'ONLINE'],
     });
     setCategory(currentProduct.category || '');
     setNewCategory('');
@@ -133,7 +136,7 @@ export default function DropproductAdmin() {
   }, [currentProduct]);
 
   const resetForm = () => {
-    setForm({ name: '', description: '', salePrice: '', saleStartAt: '', saleEndAt: '', isActive: true, bestSeller: false, newArrival: false });
+    setForm({ name: '', description: '', salePrice: '', saleStartAt: '', saleEndAt: '', isActive: true, bestSeller: false, newArrival: false, paymentOptions: ['COD', 'ONLINE'] });
     setCategory(''); setNewCategory(''); setSubCategory(''); setNewSubCategory('');
     setVariants([{ ...emptyVariant }]);
     setImages([]); setImagePreviews([]); setExistingImages([]);
@@ -152,6 +155,16 @@ export default function DropproductAdmin() {
 
   const clearField = (field) => setErrors((prev) => ({ ...prev, [field]: null, general: null }));
   const onInput = (e) => { const { name, value, type, checked } = e.target; setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value })); clearField(name); };
+  const onPaymentOption = (option, checked) => {
+    setForm((prev) => {
+      const currentOptions = Array.isArray(prev.paymentOptions) ? prev.paymentOptions : ['COD', 'ONLINE'];
+      const paymentOptions = checked
+        ? [...new Set([...currentOptions, option])]
+        : currentOptions.filter((item) => item !== option);
+      return { ...prev, paymentOptions };
+    });
+    clearField('paymentOptions');
+  };
   const onVariant = (index, field, value) => { setVariants((prev) => prev.map((v, i) => (i === index ? { ...v, [field]: value } : v))); clearField('variants'); };
   const addVariant = () => variants.length < sizeOptions.length && setVariants((prev) => [...prev, { ...emptyVariant }]);
   const dropVariant = (index) => variants.length > 1 && setVariants((prev) => prev.filter((_, i) => i !== index));
@@ -224,6 +237,7 @@ export default function DropproductAdmin() {
       else if (Number.isFinite(minVariantPrice) && sale >= minVariantPrice) next.salePrice = 'Offer price must be lower than the lowest MRP';
     }
     if (form.saleStartAt && form.saleEndAt && new Date(form.saleStartAt) >= new Date(form.saleEndAt)) next.saleEndAt = 'Offer end date must be after start date';
+    if (!Array.isArray(form.paymentOptions) || form.paymentOptions.length === 0) next.paymentOptions = 'Select COD, online, or both';
     const variantErrors = []; const sizes = new Set();
     variants.forEach((v, i) => {
       const size = String(v.size || '').trim().toUpperCase();
@@ -528,6 +542,14 @@ export default function DropproductAdmin() {
               className="hidden"
             />
             {errors.video && <p className="mt-3 text-sm text-red-600">{errors.video}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Availability</label>
+            <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 rounded-lg border p-4 ${errors.paymentOptions ? 'border-red-500 bg-red-50' : 'border-gray-200'}`}>
+              <label className="flex items-center"><input type="checkbox" checked={(form.paymentOptions || []).includes('COD')} onChange={(e) => onPaymentOption('COD', e.target.checked)} className="h-4 w-4 text-blue-600 rounded" /><span className="ml-2 text-sm text-gray-700">Cash on Delivery</span></label>
+              <label className="flex items-center"><input type="checkbox" checked={(form.paymentOptions || []).includes('ONLINE')} onChange={(e) => onPaymentOption('ONLINE', e.target.checked)} className="h-4 w-4 text-blue-600 rounded" /><span className="ml-2 text-sm text-gray-700">Online Payment</span></label>
+            </div>
+            {errors.paymentOptions && <p className="mt-1 text-sm text-red-600">{errors.paymentOptions}</p>}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4"><label className="flex items-center"><input type="checkbox" name="isActive" checked={form.isActive} onChange={onInput} className="h-4 w-4 text-blue-600 rounded" /><span className="ml-2 text-sm text-gray-700">Active Product</span></label><label className="flex items-center"><input type="checkbox" name="newArrival" checked={form.newArrival} onChange={onInput} className="h-4 w-4 text-green-600 rounded" /><span className="ml-2 text-sm text-gray-700">Mark as New Arrival</span></label><label className="flex items-center"><input type="checkbox" name="bestSeller" checked={form.bestSeller} onChange={onInput} className="h-4 w-4 text-amber-600 rounded" /><span className="ml-2 text-sm text-gray-700">Mark as Best Seller</span></label></div>
           <div className="flex justify-end space-x-3 pt-6 border-t"><button type="button" onClick={() => setOpen(false)} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Cancel</button><button type="submit" disabled={loading} className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">{loading ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Saving...</> : <><Save className="w-5 h-5 mr-2" />{editMode ? 'Update Product' : 'Create Product'}</>}</button></div>

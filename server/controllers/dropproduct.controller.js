@@ -91,6 +91,34 @@ const parseOptionalDate = (value) => {
   return date;
 };
 
+const normalizePaymentOptions = (value, fallback = ["COD", "ONLINE"]) => {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+
+  let options = value;
+  if (typeof options === "string") {
+    const trimmed = options.trim();
+    if (!trimmed) return fallback;
+    options = trimmed.startsWith("[") ? JSON.parse(trimmed) : trimmed.split(",");
+  }
+
+  if (!Array.isArray(options)) {
+    throw new Error("paymentOptions must be an array");
+  }
+
+  const normalized = [
+    ...new Set(options.map((option) => String(option || "").trim().toUpperCase())),
+  ].filter(Boolean);
+
+  const allowed = new Set(["COD", "ONLINE"]);
+  if (!normalized.length || normalized.some((option) => !allowed.has(option))) {
+    throw new Error("Select COD, online, or both payment options");
+  }
+
+  return normalized;
+};
+
 const optimizeDropImage = async (file) => {
   const optimized = await optimizeUploadedImage(normalizeStoredPath(file?.path), {
     cleanupSource: true,
@@ -287,6 +315,7 @@ export const createDropproduct = async (req, res) => {
       isActive: String(req.body.isActive ?? "true") === "true",
       bestSeller: String(req.body.bestSeller ?? "false") === "true",
       newArrival: String(req.body.newArrival ?? "false") === "true",
+      paymentOptions: normalizePaymentOptions(req.body.paymentOptions),
       images,
       sizeChart: await optimizeDropSizeChart(uploadedSizeChart),
       video: normalizeStoredPath(uploadedVideo?.path),
@@ -386,6 +415,10 @@ export const updateDropproduct = async (req, res) => {
         req.body.newArrival !== undefined
           ? String(req.body.newArrival) === "true"
           : product.newArrival,
+      paymentOptions:
+        req.body.paymentOptions !== undefined
+          ? normalizePaymentOptions(req.body.paymentOptions, product.paymentOptions)
+          : product.paymentOptions,
       images,
       sizeChart,
       video,

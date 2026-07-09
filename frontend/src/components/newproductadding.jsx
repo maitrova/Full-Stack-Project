@@ -95,6 +95,7 @@ const ProductFormModal = ({
   isActive: true,
   bestSeller: false,
   newArrival: false,
+  paymentOptions: ['COD', 'ONLINE'],
   
   });
 
@@ -273,6 +274,9 @@ const ProductFormModal = ({
       isActive: product.isActive ?? true,
       bestSeller: product.bestSeller || false,
       newArrival: product.newArrival || false,
+      paymentOptions: Array.isArray(product.paymentOptions) && product.paymentOptions.length
+        ? product.paymentOptions
+        : ['COD', 'ONLINE'],
     });
 
     // ✅ Variants
@@ -348,6 +352,7 @@ const ProductFormModal = ({
       isActive: true,
       bestSeller: false,
       newArrival: false,
+      paymentOptions: ['COD', 'ONLINE'],
       
       // ✅ NEW
     });
@@ -441,6 +446,28 @@ const removeSizeChart = () => {
   setSizeChartPreview(null);
   setErrors(prev => ({ ...prev, sizeChart: null, general: null }));
 };
+
+  const handlePaymentOptionChange = (option, checked) => {
+    setFormData((prev) => {
+      const currentOptions = Array.isArray(prev.paymentOptions)
+        ? prev.paymentOptions
+        : ['COD', 'ONLINE'];
+      const nextOptions = checked
+        ? [...new Set([...currentOptions, option])]
+        : currentOptions.filter((item) => item !== option);
+
+      return {
+        ...prev,
+        paymentOptions: nextOptions,
+      };
+    });
+
+    setErrors((prev) => ({
+      ...prev,
+      paymentOptions: null,
+      general: null,
+    }));
+  };
   // Step navigation handlers
   const goToNextStep = () => {
     if (currentStep === 1) {
@@ -1575,6 +1602,10 @@ const removeSizeChart = () => {
       nextErrors.saleEndAt = message;
     }
 
+    if (normalized.includes('payment option')) {
+      nextErrors.paymentOptions = message;
+    }
+
     if (Object.keys(nextErrors).length === 0) {
       nextErrors.general = message || 'Failed to save product';
     }
@@ -1639,6 +1670,10 @@ const validateForm = () => {
     }
   }
 
+  if (!Array.isArray(formData.paymentOptions) || formData.paymentOptions.length === 0) {
+    newErrors.paymentOptions = "Select COD, online, or both";
+  }
+
   // Keep your existing variant validation below this
   const variantErrors = [];
   const usedSizes = new Set();
@@ -1687,7 +1722,10 @@ const validateForm = () => {
       
       Object.keys(formData).forEach(key => {
         if (formData[key] !== null && formData[key] !== undefined && formData[key] !== '') {
-          data.append(key, formData[key]);
+          data.append(
+            key,
+            key === 'paymentOptions' ? JSON.stringify(formData[key]) : formData[key]
+          );
         }
       });
       
@@ -3383,6 +3421,40 @@ const validateForm = () => {
                   </p>
                 )}
               </div>
+            </div>
+
+            {/* Payment availability */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Payment Availability
+              </label>
+              <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 rounded-lg border p-4 ${
+                errors.paymentOptions ? 'border-red-500 bg-red-50' : 'border-gray-200'
+              }`}>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={(formData.paymentOptions || []).includes('COD')}
+                    onChange={(e) => handlePaymentOptionChange('COD', e.target.checked)}
+                    className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
+                    disabled={loading}
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Cash on Delivery</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={(formData.paymentOptions || []).includes('ONLINE')}
+                    onChange={(e) => handlePaymentOptionChange('ONLINE', e.target.checked)}
+                    className="h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
+                    disabled={loading}
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Online Payment</span>
+                </label>
+              </div>
+              {errors.paymentOptions && (
+                <p className="mt-2 text-sm text-red-600">{errors.paymentOptions}</p>
+              )}
             </div>
 
             {/* Status Flags */}

@@ -81,6 +81,15 @@ const readymadeProductSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
     bestSeller: { type: Boolean, default: false },
     newArrival: { type: Boolean, default: false },
+    paymentOptions: {
+      type: [String],
+      enum: ["COD", "ONLINE"],
+      default: () => ["COD", "ONLINE"],
+      validate: {
+        validator: (arr) => Array.isArray(arr) && arr.length > 0,
+        message: "At least one payment option is required",
+      },
+    },
     topOrder: { type: Boolean, default: false, index: true },
     topOrderTag: { type: String, default: "", trim: true },
     topOrderAt: { type: Date, default: null },

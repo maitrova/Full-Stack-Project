@@ -16,6 +16,7 @@ export const createDropproduct = createAsyncThunk(
       formData.append('salePrice', productData.salePrice ?? '');
       formData.append('saleStartAt', productData.saleStartAt ?? '');
       formData.append('saleEndAt', productData.saleEndAt ?? '');
+      formData.append('paymentOptions', JSON.stringify(productData.paymentOptions || ['COD', 'ONLINE']));
       formData.append('variants', JSON.stringify(productData.variants || []));
       formData.append('imageAltTexts', JSON.stringify(productData.imageAltTexts || []));
 
@@ -117,8 +118,8 @@ export const updateDropproduct = createAsyncThunk(
           return;
         }
 
-        if (key === 'variants') {
-          formData.append('variants', JSON.stringify(value || []));
+        if (key === 'variants' || key === 'paymentOptions') {
+          formData.append(key, JSON.stringify(value || []));
           return;
         }
 

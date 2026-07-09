@@ -131,6 +131,15 @@ const dropproductSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    paymentOptions: {
+      type: [String],
+      enum: ["COD", "ONLINE"],
+      default: () => ["COD", "ONLINE"],
+      validate: {
+        validator: (arr) => Array.isArray(arr) && arr.length > 0,
+        message: "At least one payment option is required",
+      },
+    },
     rating: {
       type: Number,
       default: 0,

@@ -317,13 +317,54 @@ export default function CheckoutAddresses() {
     () => cartItems.some((item) => item?.kind === "DESIGN" || Boolean(item?.product)),
     [cartItems]
   );
+  const getPaymentOptions = (item) => {
+    if (item?.kind === "DESIGN" || Boolean(item?.product)) {
+      return ["ONLINE"];
+    }
+
+    const product = item?.dropproduct || item?.readymadeProduct;
+    const options = Array.isArray(product?.paymentOptions) ? product.paymentOptions : ["COD", "ONLINE"];
+    return options.length ? options : ["COD", "ONLINE"];
+  };
+  const getPaymentLabel = (options = []) => {
+    const allowsCod = options.includes("COD");
+    const allowsOnline = options.includes("ONLINE");
+
+    if (allowsCod && allowsOnline) return "COD + Online";
+    if (allowsCod) return "COD only";
+    if (allowsOnline) return "Online only";
+    return "Payment unavailable";
+  };
+  const getPaymentBadgeClass = (options = []) => {
+    const allowsCod = options.includes("COD");
+    const allowsOnline = options.includes("ONLINE");
+
+    if (allowsCod && allowsOnline) return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    if (allowsCod) return "border-amber-200 bg-amber-50 text-amber-800";
+    if (allowsOnline) return "border-sky-200 bg-sky-50 text-sky-700";
+    return "border-rose-200 bg-rose-50 text-rose-700";
+  };
+  const codRestrictedItems = useMemo(
+    () => cartItems.filter((item) => item?.kind === "READYMADE" && !getPaymentOptions(item).includes("COD")),
+    [cartItems]
+  );
+  const onlineRestrictedItems = useMemo(
+    () => cartItems.filter((item) => item?.kind === "READYMADE" && !getPaymentOptions(item).includes("ONLINE")),
+    [cartItems]
+  );
   const codBelowMinimum = effectiveTotal < Number(codMinimumOrderAmount || 0);
-  const codDisabled = checkoutDisabled || codLoading || hasCustomizationItems || codBelowMinimum;
+  const onlineDisabled = checkoutDisabled || codLoading || onlineRestrictedItems.length > 0;
+  const codDisabled = checkoutDisabled || codLoading || hasCustomizationItems || codBelowMinimum || codRestrictedItems.length > 0;
   const codHelperMessage = hasCustomizationItems
     ? "Cash on delivery is not available for customization products."
-    : codBelowMinimum && codMinimumOrderAmount > 0
+    : codRestrictedItems.length > 0
+      ? "Cash on delivery is not available for one or more items in your cart."
+      : codBelowMinimum && codMinimumOrderAmount > 0
       ? `Cash on delivery is available only for orders of Rs. ${Number(codMinimumOrderAmount).toFixed(2)} or more.`
       : "";
+  const onlineHelperMessage = onlineRestrictedItems.length > 0
+    ? "Online payment is not available for one or more items in your cart."
+    : "";
 
   useEffect(() => {
     if (!token) {
@@ -827,12 +868,18 @@ export default function CheckoutAddresses() {
                     "Product";
                   const qty = Number(item?.qty || 1);
                   const price = Number(item?.unitPrice || 0) * qty;
+                  const paymentOptions = getPaymentOptions(item);
                   return (
                     <div key={`${item?._id || index}-${index}`} className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3 sm:px-4">
                       <div className="min-w-0">
                         <div className="truncate text-sm font-medium text-slate-900">{name}</div>
                         <div className="mt-1 text-xs text-slate-500">
                           Qty: {qty}{item?.size ? ` | Size: ${item.size}` : ""}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getPaymentBadgeClass(paymentOptions)}`}>
+                            {getPaymentLabel(paymentOptions)}
+                          </span>
                         </div>
                       </div>
                       <div className="shrink-0 text-sm font-semibold text-slate-900 sm:text-right">
@@ -949,7 +996,7 @@ export default function CheckoutAddresses() {
                     });
                   }}
                   onOrderCreated={handleOrderCreated}
-                  disabled={checkoutDisabled || codLoading}
+                  disabled={onlineDisabled}
                 />
 
                 <button
@@ -965,6 +1012,11 @@ export default function CheckoutAddresses() {
               {codHelperMessage ? (
                 <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                   {codHelperMessage}
+                </div>
+              ) : null}
+              {onlineHelperMessage ? (
+                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  {onlineHelperMessage}
                 </div>
               ) : null}
               {codError ? (
