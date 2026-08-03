@@ -4,7 +4,7 @@ const cartItemSchema = new mongoose.Schema(
   {
     kind: {
       type: String,
-      enum: ["READYMADE", "DESIGN"],
+      enum: ["READYMADE", "DESIGN", "COMBO"],
       required: true,
       index: true,
     },
@@ -26,6 +26,19 @@ const cartItemSchema = new mongoose.Schema(
       ref: "Dropproduct",
       default: null,
     },
+
+    comboPack: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ComboPack",
+      default: null,
+    },
+
+    comboSelections: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: [],
+    },
+
+    comboName: { type: String, default: "" },
 
     product: {
       type: mongoose.Schema.Types.ObjectId,

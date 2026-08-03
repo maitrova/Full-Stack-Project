@@ -37,6 +37,7 @@ import headerBannerRouter from "./routes/headerBannerRoutes.js";
 import reviewRouter from "./routes/reviewRoutes.js";
 import blogsRouter from "./routes/blogsRoutes.js";
 import sitemapRouter from "./routes/sitemapRoutes.js";
+import comboPackRouter from "./routes/comboPackRoutes.js";
 
 import colorselection from './routes/adminColorRoutes.js';
 import companypdfs from './routes/companyPdfRoutes.js';
@@ -146,6 +147,7 @@ app.use("/api/coupons", couponRouter);
 app.use("/api/header-banner", headerBannerRouter);
 app.use("/api/reviews", reviewRouter);
 app.use("/api/blogs", blogsRouter);
+app.use("/api/combo-packs", comboPackRouter);
 // Error handling
 app.use((err, req, res, next) => {
   console.error("Server error:", err);

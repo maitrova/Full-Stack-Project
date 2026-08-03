@@ -40,7 +40,6 @@ readymadeproducts.get("/subcategorylist", getHomeSubCategoryTiles);
 readymadeproducts.get("/public", getAllReadymadeProductsPublic);
 readymadeproducts.get("/path/:category/:subCategory/:productSlug", getReadymadeProductByPath);
 readymadeproducts.get("/", getAllReadymadeProducts); // Get all products with pagination
-readymadeproducts.get("/:id", getReadymadeProductById); // Get single product
 readymadeproducts.get("/search", searchProducts); // Search products
 
 // Special collections
@@ -69,5 +68,7 @@ readymadeproducts.get("/admin/filtered", getFilteredProducts); // Filter product
 // Bulk operations
 readymadeproducts.patch("/admin/bulk/update-flags", updateProductList); // Bulk update flags
 readymadeproducts.patch("/admin/toggle-status/:id", toggleProductStatus); // Toggle status
+
+readymadeproducts.get("/:id", getReadymadeProductById); // Get single product
 
 export default readymadeproducts;

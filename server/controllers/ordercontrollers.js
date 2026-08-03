@@ -687,6 +687,7 @@ export const getMyPaidOrders = async (req, res) => {
       .populate("billingAddress")
       .populate("items.readymadeProduct")
       .populate("items.dropproduct")
+      .populate("items.comboPack")
       .populate("items.design")
       .populate("items.product")
       .sort({ createdAt: -1 })
@@ -728,6 +729,7 @@ export const getMyPaidOrderById = async (req, res) => {
       .populate("billingAddress")
       .populate("items.readymadeProduct")
       .populate("items.dropproduct")
+      .populate("items.comboPack")
       .populate("items.design")
       .populate("items.product")
       .lean();
@@ -764,6 +766,7 @@ export const cancelMyOrder = async (req, res) => {
       .populate("billingAddress")
       .populate("items.readymadeProduct")
       .populate("items.dropproduct")
+      .populate("items.comboPack")
       .populate("items.design")
       .populate("items.product");
 
@@ -943,6 +946,7 @@ export const submitReturnRequest = async (req, res) => {
       .populate("billingAddress")
       .populate("items.readymadeProduct")
       .populate("items.dropproduct")
+      .populate("items.comboPack")
       .populate("items.design")
       .populate("items.product");
 
@@ -1346,6 +1350,7 @@ export const adminGetAllOrders = async (req, res) => {
       })
 
       .populate("items.dropproduct")
+      .populate("items.comboPack")
       .populate("items.product")
       .sort({ createdAt: -1 })
       .lean();

@@ -861,6 +861,7 @@ export default function CheckoutAddresses() {
               <div className="mt-4 max-h-72 space-y-3 overflow-auto pr-1">
                 {cartItems.length ? cartItems.map((item, index) => {
                   const name =
+                    item?.comboPack?.name ||
                     item?.dropproduct?.name ||
                     item?.readymadeProduct?.title ||
                     item?.design?.title ||
@@ -876,6 +877,19 @@ export default function CheckoutAddresses() {
                         <div className="mt-1 text-xs text-slate-500">
                           Qty: {qty}{item?.size ? ` | Size: ${item.size}` : ""}
                         </div>
+                        {item?.kind === "COMBO" && Array.isArray(item.comboSelections) && item.comboSelections.length > 0 && (
+                          <div className="mt-2 space-y-1 rounded-lg bg-white px-2 py-2">
+                            {item.comboSelections.map((selection, selectionIndex) => (
+                              <div key={`${selection.productId || selectionIndex}`} className="text-[11px] text-slate-600">
+                                <span className="font-medium">{selection.productName || `Item ${selectionIndex + 1}`}</span>
+                                {selection.size ? ` | Size: ${selection.size}` : ""}
+                                {selection.color?.label || selection.color?.value
+                                  ? ` | Color: ${selection.color.label || selection.color.value}`
+                                  : ""}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         <div className="mt-2 flex flex-wrap gap-2">
                           <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getPaymentBadgeClass(paymentOptions)}`}>
                             {getPaymentLabel(paymentOptions)}

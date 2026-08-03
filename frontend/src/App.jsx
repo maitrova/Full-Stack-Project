@@ -44,6 +44,8 @@ import Shipping from "./companypdfs/Shipping.jsx";
 import AdminRoute from "./components/AdminRoute.jsx";
 import BlogDetailPage from "./pages/BlogDetailPage.jsx";
 import OrderSuccessPage from "./pages/OrderSuccessPage.jsx";
+import ComboPacksPage from "./pages/ComboPacksPage.jsx";
+import ComboPackDetailPage from "./pages/ComboPackDetailPage.jsx";
 // You'll need to create this
 
 // Layout component with header for all pages except auth
@@ -246,6 +248,18 @@ function App() {
           </MainLayout>
         } />
 
+        <Route path="/combo-packs" element={
+          <MainLayout>
+            <ComboPacksPage />
+          </MainLayout>
+        } />
+
+        <Route path="/combo-packs/:slug" element={
+          <MainLayout>
+            <ComboPackDetailPage />
+          </MainLayout>
+        } />
+
         <Route path="/allproducts" element={
           <MainLayout>
             <AllProductsHub/>
@@ -357,6 +371,14 @@ function App() {
         <Route path="/productmanager" element={
           <MainLayout>
             <ReadymadeProductsManager />
+          </MainLayout>
+        } />
+
+        <Route path="/adminpage/combo-packs" element={
+          <MainLayout>
+            <AdminRoute>
+              <AdminDashboard />
+            </AdminRoute>
           </MainLayout>
         } />
 

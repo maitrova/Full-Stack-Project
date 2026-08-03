@@ -4,13 +4,16 @@ const orderItemSchema = new mongoose.Schema(
   {
     kind: { 
   type: String, 
-  enum: ["READYMADE", "DESIGN", "DROPPRODUCT"], 
+  enum: ["READYMADE", "DESIGN", "DROPPRODUCT", "COMBO"], 
   required: true 
 },
 
     readymadeProduct: { type: mongoose.Schema.Types.ObjectId, ref: "ReadymadeProduct" },
     design: { type: mongoose.Schema.Types.ObjectId, ref: "Design" },
     dropproduct: { type: mongoose.Schema.Types.ObjectId, ref: "Dropproduct" },
+    comboPack: { type: mongoose.Schema.Types.ObjectId, ref: "ComboPack" },
+    comboSelections: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    comboName: { type: String, default: "" },
     product: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
 
     size: String,

@@ -1,5 +1,5 @@
 // src/pages/ProductDetailPage.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { getProductById as fetchReadymadeProductById, getProductByPath as fetchReadymadeProductByPath } from '../redux/slices/productList.js';
@@ -57,6 +57,34 @@ import {
 const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend";
 const IMAGE_URL = import.meta.env.VITE_IMAGE_URL;
 
+const getSiteUrl = () => {
+  const configured =
+    (import.meta.env.VITE_SITE_URL || "").trim() ||
+    (typeof window !== "undefined" ? window.location.origin : "https://maitrova.in");
+  return configured.replace(/\/+$/, "");
+};
+
+const setMetaTag = (name, content) => {
+  if (typeof document === "undefined" || !content) return;
+  let element = document.head.querySelector(`meta[name="${name}"]`);
+  if (!element) {
+    element = document.createElement("meta");
+    element.setAttribute("name", name);
+    document.head.appendChild(element);
+  }
+  element.setAttribute("content", content);
+};
+
+const stripHtml = (value = "") => {
+  if (typeof document === "undefined") {
+    return String(value || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  }
+
+  const container = document.createElement("div");
+  container.innerHTML = DOMPurify.sanitize(value || "");
+  return (container.textContent || container.innerText || "").replace(/\s+/g, " ").trim();
+};
+
 export default function ProductDetailPage() {
   const { id, type = 'product', categoryName, subCategoryName, productSlug } = useParams();
   const navigate = useNavigate();
@@ -80,6 +108,8 @@ export default function ProductDetailPage() {
   const [sizeError, setSizeError] = useState('');
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [relatedLoading, setRelatedLoading] = useState(false);
+  const [comboOffers, setComboOffers] = useState([]);
+  const [comboOffersLoading, setComboOffersLoading] = useState(false);
   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
   const [isMobileDescriptionExpanded, setIsMobileDescriptionExpanded] = useState(false);
   const viewTrackedRef = useRef('');
@@ -309,6 +339,43 @@ export default function ProductDetailPage() {
       controller.abort();
     };
   }, [isReadymade, itemData?._id, itemData?.category, itemData?.subCategory]);
+
+  useEffect(() => {
+    if (!isReadymade || !itemData?._id) {
+      setComboOffers([]);
+      setComboOffersLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const loadComboOffers = async () => {
+      setComboOffersLoading(true);
+      try {
+        const response = await fetch(`${API_URL}/combo-packs/product/${itemData._id}`, {
+          signal: controller.signal,
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data?.message || "Failed to load combo offers");
+        }
+        setComboOffers(Array.isArray(data?.data) ? data.data : []);
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          console.error("Failed to load combo offers:", err);
+          setComboOffers([]);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setComboOffersLoading(false);
+        }
+      }
+    };
+
+    loadComboOffers();
+
+    return () => controller.abort();
+  }, [isReadymade, itemData?._id]);
 
   useEffect(() => {
     setIsMobileDescriptionExpanded(false);
@@ -745,12 +812,199 @@ export default function ProductDetailPage() {
       label: `Image ${index + 1}`,
     };
   });
+
+  const ComboOfferBlock = ({ compact = false } = {}) => {
+    if (!isReadymade) return null;
+
+    if (comboOffersLoading) {
+      return (
+        <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4">
+          <div className="h-4 w-36 animate-pulse rounded bg-indigo-100" />
+          <div className="mt-3 h-16 animate-pulse rounded-xl bg-white/80" />
+        </div>
+      );
+    }
+
+    if (!comboOffers.length) return null;
+
+    return (
+      <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
+              Combo offer available
+            </p>
+            <h3 className={`${compact ? "text-base" : "text-lg"} font-semibold text-gray-950`}>
+              Buy this in a bundle and save more
+            </h3>
+          </div>
+          <Tag className="flex-shrink-0 text-indigo-600" size={20} />
+        </div>
+
+        <div className="space-y-3">
+          {comboOffers.slice(0, compact ? 1 : 2).map((combo) => {
+            const imageProps = getResponsiveImageProps(combo.displayImage, {
+              sizes: compact ? "64px" : "96px",
+            });
+            const originalPrice = Number(combo.pricing?.originalPrice || combo.comboPrice || 0);
+            const savings = Number(combo.pricing?.savingsAmount || 0);
+            const discount = Number(combo.pricing?.discountPercentage || 0);
+
+            return (
+              <Link
+                key={combo._id}
+                to={`/combo-packs/${combo.slug}`}
+                className="group flex gap-3 rounded-xl border border-indigo-100 bg-white p-3 transition hover:border-indigo-300 hover:shadow-sm"
+              >
+                <div className={`${compact ? "h-16 w-16" : "h-20 w-20"} flex-shrink-0 overflow-hidden rounded-lg bg-gray-50`}>
+                  {combo.displayImage ? (
+                    <img
+                      src={imageProps.src || buildImageUrl(combo.displayImage)}
+                      srcSet={imageProps.srcSet}
+                      sizes={imageProps.sizes}
+                      alt={combo.name}
+                      className="h-full w-full object-contain p-1"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center">
+                      <Package className="text-gray-400" size={20} />
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="line-clamp-1 text-sm font-semibold text-gray-950">{combo.name}</p>
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        {combo.includedProductsCount} products included
+                      </p>
+                    </div>
+                    {discount > 0 && (
+                      <span className="rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                        {discount}% OFF
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-baseline gap-1.5">
+                    <span className="text-sm font-bold text-gray-950">
+                      {formatPrice(Number(combo.comboPrice || 0), combo.currency || displayData.currency)}
+                    </span>
+                    {originalPrice > Number(combo.comboPrice || 0) && (
+                      <span className="text-xs text-gray-400 line-through">
+                        {formatPrice(originalPrice, combo.currency || displayData.currency)}
+                      </span>
+                    )}
+                    {savings > 0 && (
+                      <span className="text-xs font-medium text-emerald-700">
+                        Save {formatPrice(savings, combo.currency || displayData.currency)}
+                      </span>
+                    )}
+                  </div>
+                  <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-indigo-700 group-hover:text-indigo-900">
+                    View combo offer
+                    <ChevronRight size={14} />
+                  </span>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
   
   const sizeChartImageProps = getResponsiveImageProps(itemData?.sizeChart, {
     sizes: "100vw",
   });
   const sizeChartUrl = sizeChartImageProps.src;
   const shouldShowRelatedProducts = isReadymade && (relatedLoading || relatedProducts.length > 0);
+
+  const productCanonicalUrl = useMemo(() => {
+    if (!isReadymade || !itemData?._id) return "";
+    const path = buildReadymadeProductPath(itemData) || (id ? `/readymade/${id}` : "");
+    return path ? `${getSiteUrl()}${path}` : "";
+  }, [id, isReadymade, itemData]);
+
+  const productPlainDescription = useMemo(
+    () => stripHtml(displayData?.description || "").slice(0, 5000),
+    [displayData?.description]
+  );
+
+  const productSchema = useMemo(() => {
+    if (!isReadymade || !itemData?._id || !displayData || !productCanonicalUrl) {
+      return null;
+    }
+
+    const imageUrls = galleryItems.map((item) => item.src).filter(Boolean);
+    const sku =
+      displayData.sku && displayData.sku !== "N/A"
+        ? displayData.sku
+        : String(itemData._id);
+    const price = Number(displayData.price || 0);
+    const originalPrice = Number(displayData.originalPrice || 0);
+    const currency = displayData.currency || "INR";
+    const offer = {
+      "@type": "Offer",
+      url: productCanonicalUrl,
+      price: price.toFixed(2),
+      priceCurrency: currency,
+      availability: isOutOfStock
+        ? "https://schema.org/OutOfStock"
+        : "https://schema.org/InStock",
+      itemCondition: "https://schema.org/NewCondition",
+      sku,
+    };
+
+    if (displayData.saleActive && originalPrice > price) {
+      offer.priceSpecification = {
+        "@type": "UnitPriceSpecification",
+        priceType: "https://schema.org/StrikethroughPrice",
+        price: originalPrice.toFixed(2),
+        priceCurrency: currency,
+      };
+    }
+
+    return {
+      "@context": "https://schema.org/",
+      "@type": "Product",
+      "@id": `${productCanonicalUrl}#product`,
+      name: displayData.title,
+      description: productPlainDescription || displayData.title,
+      image: imageUrls,
+      sku,
+      brand: {
+        "@type": "Brand",
+        name: itemData.brand || "Maitrova",
+      },
+      category: [displayData.category, itemData.subCategory].filter(Boolean).join(" > ") || undefined,
+      offers: offer,
+      aggregateRating:
+        displayData.reviewCount > 0 && displayData.rating > 0
+          ? {
+              "@type": "AggregateRating",
+              ratingValue: Number(displayData.rating).toFixed(1),
+              reviewCount: displayData.reviewCount,
+            }
+          : undefined,
+    };
+  }, [
+    displayData,
+    galleryItems,
+    isOutOfStock,
+    isReadymade,
+    itemData,
+    productCanonicalUrl,
+    productPlainDescription,
+  ]);
+
+  useEffect(() => {
+    if (!isReadymade || !displayData) return;
+
+    document.title = `${displayData.title} | Maitrova`;
+    setMetaTag("description", productPlainDescription || `${displayData.title} from Maitrova`);
+    setMetaTag("robots", itemData?.isActive === false ? "noindex,follow" : "index,follow");
+  }, [displayData, isReadymade, itemData?.isActive, productPlainDescription]);
 
   useEffect(() => {
     if (!itemData?._id || !displayData) return;
@@ -931,6 +1185,9 @@ export default function ProductDetailPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      {productSchema ? (
+        <script type="application/ld+json">{JSON.stringify(productSchema)}</script>
+      ) : null}
       {/* Notification Toast */}
       {notification.show && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in-down">
@@ -1339,6 +1596,10 @@ export default function ProductDetailPage() {
                 )}
               </div>
 
+              <div className="mb-6">
+                <ComboOfferBlock />
+              </div>
+
               {/* Rating */}
               <div className="mb-6">
                 <div className="flex items-center gap-2">
@@ -1623,6 +1884,8 @@ export default function ProductDetailPage() {
               </div>
             )}
           </div>
+
+          <ComboOfferBlock compact />
 
           {/* Color Selection (Mobile) */}
           {isReadymade && itemData?.colors && itemData.colors.length > 0 && (

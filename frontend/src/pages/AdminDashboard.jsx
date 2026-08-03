@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { 
   Edit2, 
@@ -100,9 +101,12 @@ import ReviewManagement from '../components/admin/ReviewManagement.jsx';
 import ReturnManagement from '../components/admin/ReturnManagement.jsx';
 import BlogManagement from '../components/admin/BlogManagement.jsx';
 import StoreDashboard from '../components/admin/Dashboard.jsx';
+import ComboPacksManager from '../components/admin/ComboPacksManager.jsx';
 
 const AdminDashboard = () => {
   const dispatch = useDispatch();
+  const location = useLocation();
+  const navigate = useNavigate();
   
   // Redux state
   const {
@@ -153,6 +157,14 @@ const AdminDashboard = () => {
   const [localSubCategory, setLocalSubCategory] = useState('');
   const [viewMode, setViewMode] = useState('products'); // 'products', 'designs', 'dropproducts', 'orders', 'homepage', 'search', 'adminDesigns'
   const [topOrderTags, setTopOrderTags] = useState({});
+
+  useEffect(() => {
+    if (location.pathname === '/adminpage/combo-packs') {
+      setActiveSidebarItem('comboPacks');
+      setViewMode('comboPacks');
+      dispatch(setActiveTab('comboPacks'));
+    }
+  }, [dispatch, location.pathname]);
   
   // Helper function to get full image URL
   const getImageUrl = (image) => {
@@ -203,7 +215,8 @@ const AdminDashboard = () => {
         activeTab !== 'coupons' &&
         activeTab !== 'reviews' &&
         activeTab !== 'users' &&
-        activeTab !== 'companyPolicies') {
+        activeTab !== 'companyPolicies' &&
+        activeTab !== 'comboPacks') {
       loadProducts();
     }
   }, [currentFilter, pagination.page, currentCategory, currentSubCategory, activeTab]);
@@ -301,6 +314,12 @@ const AdminDashboard = () => {
   };
 
   const handleTabChange = (tab) => {
+    if (tab === 'comboPacks') {
+      navigate('/adminpage/combo-packs');
+    } else if (location.pathname === '/adminpage/combo-packs') {
+      navigate('/adminpage');
+    }
+
   setActiveSidebarItem(tab);
   dispatch(setActiveTab(tab));
   dispatch(setCurrentFilter(tab));
@@ -335,6 +354,8 @@ const AdminDashboard = () => {
     setViewMode('reviews');
   } else if (tab === 'users') {
     setViewMode('users');
+  } else if (tab === 'comboPacks') {
+    setViewMode('comboPacks');
   } else if (tab === 'companyPolicies') {
     setViewMode('companyPolicies');
   } else {
@@ -745,6 +766,7 @@ const AdminDashboard = () => {
   const sidebarItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: 'allProducts', label: 'All Products', icon: <Package className="w-5 h-5" /> },
+    { id: 'comboPacks', label: 'Combo Packs', icon: <ShoppingBag className="w-5 h-5" /> },
     { id: 'designs', label: 'Designs', icon: <Palette className="w-5 h-5" /> },
     { id: 'adminDesigns', label: 'Admin Designs', icon: <Palette className="w-5 h-5" /> }, // Added admin designs item
     { id: 'dropproducts', label: 'Drop Products', icon: <Tag className="w-5 h-5" /> },
@@ -1120,6 +1142,7 @@ const AdminDashboard = () => {
               <h1 className="text-3xl font-bold text-gray-900">
                 {activeSidebarItem === 'dashboard' && 'Dashboard'}
                 {activeSidebarItem === 'allProducts' && 'All Products'}
+                {activeSidebarItem === 'comboPacks' && 'Combo Packs'}
                 {activeSidebarItem === 'designs' && 'Designs'}
                 {activeSidebarItem === 'adminDesigns' && 'Admin Designs'}
                 {activeSidebarItem === 'dropproducts' && 'Drop Products'}
@@ -1143,6 +1166,7 @@ const AdminDashboard = () => {
               <p className="text-gray-600 mt-2">
                 {activeSidebarItem === 'dashboard' && 'Overview of your store performance'}
                 {activeSidebarItem === 'allProducts' && 'Manage all products in your store'}
+                {activeSidebarItem === 'comboPacks' && 'Create and manage money-saving bundle offers'}
                 {activeSidebarItem === 'designs' && 'Manage user-created designs'}
                 {activeSidebarItem === 'adminDesigns' && 'Manage admin-created designs'}
                 {activeSidebarItem === 'dropproducts' && 'Manage drop products inventory'}
@@ -1209,6 +1233,10 @@ const AdminDashboard = () => {
           </div>
 
           {activeSidebarItem === 'dashboard' && <StoreDashboard />}
+
+          {activeSidebarItem === 'comboPacks' && (
+            <ComboPacksManager />
+          )}
 
           {/* Drop Products Component */}
           {activeSidebarItem === 'dropproducts' && (
@@ -1844,6 +1872,7 @@ const AdminDashboard = () => {
             </div>
 ) : activeSidebarItem !== 'dropproducts' && 
      activeSidebarItem !== 'orders' && 
+     activeSidebarItem !== 'comboPacks' &&
      activeSidebarItem !== 'returns' && 
      activeSidebarItem !== 'homepage' && 
      activeSidebarItem !== 'blogs' && 

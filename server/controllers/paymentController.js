@@ -20,6 +20,17 @@ const toPaise = (rupees) => Math.round(Number(rupees) * 100);
 const getRefId = (value) => value?._id || value || null;
 
 const refreshCartItemPricing = (item) => {
+  if (item.kind === "COMBO" && item.comboPack) {
+    item.unitPrice = Number(item.comboPack.comboPrice || item.unitPrice || 0);
+    item.basePrice = Number(
+      item.comboPack.originalPriceOverride ||
+      item.basePrice ||
+      item.unitPrice ||
+      0
+    );
+    return item;
+  }
+
   if (item.kind !== "READYMADE") {
     return item;
   }
@@ -43,6 +54,8 @@ const refreshCartItemPricing = (item) => {
 
 const getItemTitle = (item) =>
   item?.dropproduct?.name ||
+  item?.comboName ||
+  item?.comboPack?.name ||
   item?.readymadeProduct?.title ||
   item?.readymadeProduct?.name ||
   item?.product?.name ||
@@ -70,6 +83,59 @@ const validateCartPaymentAvailability = (cart, paymentOption) => {
   const requestedOption = String(paymentOption || "").trim().toUpperCase();
 
   for (const item of cart?.items || []) {
+    if (item?.kind === "COMBO") {
+      const combo = item.comboPack;
+      if (!combo || combo.status !== "ACTIVE") {
+        const error = new Error(`${getItemTitle(item)} is no longer available`);
+        error.statusCode = 404;
+        throw error;
+      }
+
+      const selections = Array.isArray(item.comboSelections) ? item.comboSelections : [];
+      const qty = Number(item.qty || 0);
+      if (selections.length !== (combo.items || []).length) {
+        const error = new Error("Select variants for every product in the combo");
+        error.statusCode = 400;
+        throw error;
+      }
+
+      for (const selection of selections) {
+        const productId = String(selection.productId || selection.product || "");
+        const comboItem = (combo.items || []).find(
+          (entry) => String(entry.product?._id || entry.product) === productId
+        );
+        const product = comboItem?.product;
+        if (!product || product.isActive === false) {
+          const error = new Error("One item in this combo is unavailable");
+          error.statusCode = 409;
+          throw error;
+        }
+
+        const selectedSize = String(selection.size || "").trim().toUpperCase();
+        const variants = Array.isArray(product.variants) ? product.variants : [];
+        if (variants.length > 0) {
+          const variant = variants.find(
+            (entry) => String(entry.size || "").trim().toUpperCase() === selectedSize
+          );
+          if (!variant) {
+            const error = new Error(`${product.title || "Combo item"} size ${selectedSize || "selected"} is unavailable`);
+            error.statusCode = 400;
+            throw error;
+          }
+          if (Number(variant.stock || 0) < qty) {
+            const error = new Error(`${product.title || "Combo item"} is out of stock for size ${selectedSize}`);
+            error.statusCode = 409;
+            throw error;
+          }
+        } else if (Number(product.stock || 0) < qty) {
+          const error = new Error(`${product.title || "Combo item"} is out of stock`);
+          error.statusCode = 409;
+          throw error;
+        }
+      }
+      continue;
+    }
+
     if (item?.kind !== "READYMADE") continue;
 
     const sourceProduct = item.dropproduct || item.readymadeProduct;
@@ -181,6 +247,13 @@ const getActiveCartWithPricing = async (userId) => {
   const cart = await Cart.findOne({ user: userId, status: "ACTIVE" })
     .populate("items.readymadeProduct")
     .populate("items.dropproduct")
+    .populate({
+      path: "items.comboPack",
+      populate: {
+        path: "items.product",
+        select: "title images thumbnail variants stock isActive",
+      },
+    })
     .populate("items.design")
     .populate("items.product")
     .populate({
@@ -265,6 +338,9 @@ const createOrderDocFromCart = async ({
       readymadeProduct: getRefId(item.readymadeProduct),
       design: getRefId(item.design),
       dropproduct: getRefId(item.dropproduct),
+      comboPack: getRefId(item.comboPack),
+      comboSelections: item.comboSelections || [],
+      comboName: item.comboName || item.comboPack?.name || "",
       product: getRefId(item.product),
       size: item.size,
       qty: item.qty,

@@ -1,6 +1,7 @@
 import { Blog } from "../models/Blog.js";
 import Dropproduct from "../models/dropproduct.model.js";
 import ReadymadeProduct from "../models/readymadeproducts.js";
+import { attachReadymadePricing } from "../utils/readymadePricing.js";
 
 const DEFAULT_SITE_URL = "https://maitrova.in";
 const DEFAULT_IMAGE_BASE_URL = "https://maitrova.in/backend";
@@ -34,6 +35,14 @@ const xmlEscape = (value = "") =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
+
+const stripHtml = (value = "") =>
+  String(value || "")
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, " ")
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
 const normalizeRouteSegment = (value = "") =>
   String(value || "")
@@ -147,6 +156,67 @@ const buildImageSitemapXml = (entries = []) => {
     .join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n${body}\n</urlset>\n`;
+};
+
+const buildMerchantFeedXml = (products = []) => {
+  const siteUrl = getSiteUrl();
+  const buildPrice = (price, currency = "INR") =>
+    `${Number(price || 0).toFixed(2)} ${String(currency || "INR").toUpperCase()}`;
+
+  const items = products
+    .map((rawProduct) => {
+      const product = attachReadymadePricing({ ...rawProduct });
+      const categoryName = product.category?.name || product.category || "";
+      const subCategoryName = product.subCategory?.name || product.subCategory || "";
+      const categorySlug = normalizeRouteSegment(categoryName);
+      const subCategorySlug = normalizeRouteSegment(subCategoryName);
+      const productSlug = normalizeRouteSegment(product.title);
+      const link =
+        categorySlug && subCategorySlug && productSlug
+          ? `${siteUrl}/products/${categorySlug}/${subCategorySlug}/${productSlug}`
+          : `${siteUrl}/readymade/${product._id}`;
+      const images = uniqueImageEntries(
+        [product.thumbnail, ...(product.images || [])]
+          .map((image) => ({ loc: buildImageUrl(image) }))
+          .filter((image) => image.loc)
+      );
+      const price = Number(product.mrp || product.price || product.effectivePrice || 0);
+      const salePrice = Number(product.effectivePrice || product.finalPrice || price);
+      const currency = product.currency || "INR";
+      const availability =
+        product.isActive && Number(product.stock || 0) > 0 ? "in stock" : "out of stock";
+      const brandName = product.brand?.name || product.brand || "Maitrova";
+      const description =
+        stripHtml(product.description) || `${product.title} from Maitrova`;
+
+      const tags = [
+        `<g:id>${xmlEscape(String(product._id))}</g:id>`,
+        `<g:title>${xmlEscape(product.title)}</g:title>`,
+        `<g:description>${xmlEscape(description.slice(0, 5000))}</g:description>`,
+        `<g:link>${xmlEscape(link)}</g:link>`,
+        images[0]?.loc ? `<g:image_link>${xmlEscape(images[0].loc)}</g:image_link>` : "",
+        ...images.slice(1, 10).map((image) => `<g:additional_image_link>${xmlEscape(image.loc)}</g:additional_image_link>`),
+        `<g:availability>${xmlEscape(availability)}</g:availability>`,
+        `<g:price>${xmlEscape(buildPrice(price || salePrice, currency))}</g:price>`,
+        product.saleActive && salePrice > 0 && salePrice < price
+          ? `<g:sale_price>${xmlEscape(buildPrice(salePrice, currency))}</g:sale_price>`
+          : "",
+        `<g:condition>new</g:condition>`,
+        `<g:brand>${xmlEscape(brandName)}</g:brand>`,
+        categoryName ? `<g:product_type>${xmlEscape([categoryName, subCategoryName].filter(Boolean).join(" > "))}</g:product_type>` : "",
+        `<g:identifier_exists>no</g:identifier_exists>`,
+      ].filter(Boolean);
+
+      if (!product.title || !description || !images[0]?.loc || !(price || salePrice)) {
+        return "";
+      }
+
+      return `    <item>\n${tags.map((tag) => `      ${tag}`).join("\n")}\n    </item>`;
+    })
+    .filter(Boolean)
+    .join("\n");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">\n  <channel>\n    <title>Maitrova Products</title>\n    <link>${xmlEscape(siteUrl)}</link>\n    <description>Maitrova product feed for Google Merchant Center</description>\n${items}\n  </channel>\n</rss>\n`;
 };
 
 const buildReadymadeUrlAndImageEntries = async () => {
@@ -354,12 +424,31 @@ export const getImageSitemap = async (req, res) => {
   }
 };
 
+export const getProductFeed = async (req, res) => {
+  try {
+    const products = await ReadymadeProduct.find({ isActive: true })
+      .populate("category", "name")
+      .populate("subCategory", "name")
+      .populate("brand", "name")
+      .select("title description thumbnail images price salePrice saleStartAt saleEndAt currency stock variants category subCategory brand isActive updatedAt")
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .lean();
+    const xml = buildMerchantFeedXml(products);
+
+    res.setHeader("Content-Type", "application/xml; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    return res.status(200).send(xml);
+  } catch (error) {
+    console.error("getProductFeed error:", error);
+    return res.status(500).json({ message: "Failed to generate product feed" });
+  }
+};
+
 export const getRobotsTxt = async (req, res) => {
   try {
     const siteUrl = getSiteUrl();
     const sitemapUrl = `${siteUrl}/sitemap.xml`;
     const imageSitemapUrl = `${siteUrl}/image-sitemap.xml`;
-
     const body = [
       "User-agent: *",
       "Allow: /",

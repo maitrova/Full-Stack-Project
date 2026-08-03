@@ -364,6 +364,9 @@ const UserOrders = () => {
   };
 
   const getItemName = (item) => {
+    if (item.kind === "COMBO") {
+      return item.comboName || item.comboPack?.name || "Combo Pack";
+    }
     if (item.kind === "READYMADE" && item.readymadeProduct?.title) {
       return item.readymadeProduct.title;
     } else if (item.kind === "DESIGN" && item.design?.name) {
@@ -384,12 +387,23 @@ const UserOrders = () => {
         return 'User Designed Product';
       case 'DROPPRODUCT':
         return 'Drop Product';
+      case 'COMBO':
+        return 'Combo Pack';
       default:
         return 'Product';
     }
   };
 
   const getProductDetails = (item) => {
+    if (item.kind === "COMBO") {
+      return {
+        isUserDesigned: false,
+        category: 'Combo Pack',
+        subCategory: `${item.comboSelections?.length || 0} products included`,
+        brand: '',
+        description: 'Bundle purchase with selected variants for each included product'
+      };
+    }
     if (item.kind === "READYMADE" && item.readymadeProduct) {
       return {
         isUserDesigned: false,
@@ -471,7 +485,12 @@ const UserOrders = () => {
       return resolveImageUrl(item.previewImage);
     }
 
-    if (item.kind === "READYMADE" && item.readymadeProduct) {
+    if (item.kind === "COMBO") {
+      if (item.previewImage) return resolveImageUrl(item.previewImage);
+      if (item.comboSelections?.[0]?.productImage) {
+        return resolveImageUrl(item.comboSelections[0].productImage);
+      }
+    } else if (item.kind === "READYMADE" && item.readymadeProduct) {
       if (item.readymadeProduct.thumbnail) {
         return resolveImageUrl(item.readymadeProduct.thumbnail);
       }
@@ -667,6 +686,10 @@ const UserOrders = () => {
         item.product?._id ||
         item.product;
       return readymadeId ? `/readymade/${readymadeId}` : null;
+    }
+
+    if (item.kind === 'COMBO') {
+      return item.comboPack?.slug ? `/combo-packs/${item.comboPack.slug}` : null;
     }
 
     if (item.kind === 'DROPPRODUCT') {
@@ -980,6 +1003,19 @@ const UserOrders = () => {
                                       </p>
                                       {item.size && (
                                         <p className="text-xs text-gray-500">Size: {item.size}</p>
+                                      )}
+                                      {item.kind === "COMBO" && Array.isArray(item.comboSelections) && item.comboSelections.length > 0 && (
+                                        <div className="mt-1 space-y-0.5 rounded bg-white px-2 py-1">
+                                          {item.comboSelections.map((selection, selectionIndex) => (
+                                            <p key={`${selection.productId || selectionIndex}`} className="text-xs text-gray-500">
+                                              {selection.productName || `Item ${selectionIndex + 1}`}
+                                              {selection.size ? ` | Size: ${selection.size}` : ""}
+                                              {selection.color?.label || selection.color?.value
+                                                ? ` | Color: ${selection.color.label || selection.color.value}`
+                                                : ""}
+                                            </p>
+                                          ))}
+                                        </div>
                                       )}
                                       <div className="mt-2 flex flex-wrap items-center gap-2">
                                         {item.reviewMeta?.existingReview ? (
@@ -1300,6 +1336,19 @@ const UserOrders = () => {
                                         {item.size && ` • Size: ${item.size}`}
                                         {item.signature && ` • Signature: ${item.signature}`}
                                       </p>
+                                      {item.kind === "COMBO" && Array.isArray(item.comboSelections) && item.comboSelections.length > 0 && (
+                                        <div className="mt-2 space-y-1 rounded bg-gray-50 px-2 py-2">
+                                          {item.comboSelections.map((selection, selectionIndex) => (
+                                            <p key={`${selection.productId || selectionIndex}`} className="text-xs text-gray-600">
+                                              {selection.productName || `Item ${selectionIndex + 1}`}
+                                              {selection.size ? ` | Size: ${selection.size}` : ""}
+                                              {selection.color?.label || selection.color?.value
+                                                ? ` | Color: ${selection.color.label || selection.color.value}`
+                                                : ""}
+                                            </p>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
                                     <div className="text-right">
                                       <p className="text-sm font-medium text-gray-900">

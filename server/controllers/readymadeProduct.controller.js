@@ -2,6 +2,7 @@ import ReadymadeProduct from "../models/readymadeproducts.js";
 import Category from "../models/Category.js";
 import SubCategory from "../models/SubCategory.js";
 import { attachReadymadePricing } from "../utils/readymadePricing.js";
+import { markAffectedCombosForReview } from "./comboPackController.js";
 import {
   createReadymadeThumbnail,
   deleteOptimizedImageSet,
@@ -1252,6 +1253,7 @@ export const deleteReadymadeProduct = async (req, res) => {
     }
 
     await ReadymadeProduct.findByIdAndDelete(req.params.id);
+    await markAffectedCombosForReview(req.params.id, "A selected product was deleted");
 
     res.status(200).json({
       success: true,
@@ -1283,6 +1285,9 @@ export const toggleProductStatus = async (req, res) => {
 
     product.isActive = !product.isActive;
     await product.save();
+    if (product.isActive === false) {
+      await markAffectedCombosForReview(product._id, "A selected product was disabled");
+    }
 
     res.status(200).json({
       success: true,

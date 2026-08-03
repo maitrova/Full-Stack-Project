@@ -10,6 +10,7 @@ import BestSellers from '../components/Bestsellers'
 import CategoryTilesHorizontal from '../components/Homepagecategotylist'
 import ProductCategoriesHorizontal from '../components/homepagecustomizationcategorieslist'
 import HomeBlogsSection from '../components/HomeBlogsSection.jsx'
+import ComboPacksPromoBanner from '../components/ComboPacksPromoBanner.jsx'
 
 
 const Homepage = () => {
@@ -18,6 +19,7 @@ const Homepage = () => {
     {/* <Header/> */}
     <HomepageVideoBanner/>
     <Hero/>
+    {/* <ComboPacksPromoBanner/> */}
     <Dropproduct/>
     
     <NewArrivals/>

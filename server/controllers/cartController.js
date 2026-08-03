@@ -8,7 +8,9 @@ import { Cart } from "../models/Cart.js";
 
 import Dropproduct from "../models/dropproduct.model.js"; // ✅ NEW
 import { attachReadymadePricing, getReadymadePricing } from "../utils/readymadePricing.js";
+import ComboPack from "../models/ComboPack.js";
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+const normalizeId = (value) => String(value?._id || value || "").trim();
 const GUEST_CART_COOKIE = "guest_cart_id_v2";
 const LEGACY_GUEST_CART_COOKIES = ["guest_cart_id"];
 
@@ -145,6 +147,20 @@ const parsePriceDetails = (value) => {
   return null;
 };
 
+const parseComboSelections = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
 const extractProductPreviewImage = (product) => {
   if (!product) return null;
 
@@ -161,6 +177,14 @@ const extractProductPreviewImage = (product) => {
   }
 
   return null;
+};
+
+const extractComboPreviewImage = (combo) => {
+  if (!combo) return null;
+  if (combo.imageMode === "CUSTOM_IMAGES") {
+    return combo.featuredImage || combo.galleryImages?.[0]?.url || combo.bannerImage || null;
+  }
+  return extractProductPreviewImage(combo.items?.[0]?.product) || combo.featuredImage || null;
 };
 
 const sanitizePreviewImage = (value) => {
@@ -207,6 +231,17 @@ const buildCartItemSignature = (item = {}) => {
 
   if (item.dropproduct) {
     return `DROP:${String(item.dropproduct)}:SIZE:${normalizedSize}`;
+  }
+
+  if (item.comboPack) {
+    const selectionSignature = Array.isArray(item.comboSelections)
+      ? item.comboSelections
+          .map((selection) =>
+            `${selection.productId || selection.product || ""}:${selection.size || "-"}:${selection.color?.value || selection.color || "-"}`
+          )
+          .join("|")
+      : "-";
+    return `COMBO:${String(item.comboPack)}:${selectionSignature}`;
   }
 
   if (item.readymadeProduct) {
@@ -311,6 +346,111 @@ const getReadymadeVariantSelection = (product, size) => {
   };
 };
 
+const getColorSelection = (product, colorValue) => {
+  const colors = Array.isArray(product?.colors) ? product.colors : [];
+  if (!colors.length) return null;
+
+  const normalizedColor = String(colorValue || "").trim().toLowerCase();
+  return (
+    colors.find(
+      (entry) =>
+        String(entry?.value || "").trim().toLowerCase() === normalizedColor ||
+        String(entry?.label || "").trim().toLowerCase() === normalizedColor
+    ) || null
+  );
+};
+
+const validateComboSelections = (combo, rawSelections, qty) => {
+  const selections = Array.isArray(rawSelections) ? rawSelections : [];
+  const comboItems = Array.isArray(combo?.items) ? combo.items : [];
+
+  if (selections.length !== comboItems.length) {
+    throw new Error("Select variants for every product in the combo");
+  }
+
+  const normalizedSelections = [];
+  const stockRequirements = new Map();
+
+  comboItems.forEach((item, index) => {
+    const product = item.product;
+    const selection = selections[index] || {};
+    const productId = normalizeId(product?._id || product);
+
+    if (!product || product.isActive === false) {
+      throw new Error("One item in this combo is unavailable");
+    }
+
+    if (normalizeId(selection.productId || selection.product) !== productId) {
+      throw new Error("Combo selections do not match the selected combo products");
+    }
+
+    const hasVariants = Array.isArray(product.variants) && product.variants.length > 0;
+    const selectedSize = String(selection.size || "").trim().toUpperCase();
+    if (hasVariants && !selectedSize) {
+      throw new Error(`Select a size for ${product.title || "combo item"}`);
+    }
+
+    const variantSelection = getReadymadeVariantSelection(product, selectedSize);
+    if (hasVariants && !variantSelection) {
+      throw new Error(`${product.title || "Combo item"} size is unavailable`);
+    }
+
+    const colors = Array.isArray(product.colors) ? product.colors : [];
+    const colorSelection = colors.length
+      ? getColorSelection(product, selection.color || selection.colorValue)
+      : null;
+    if (colors.length && !colorSelection) {
+      throw new Error(`Select a color for ${product.title || "combo item"}`);
+    }
+    if (
+      colorSelection?.stock !== null &&
+      colorSelection?.stock !== undefined &&
+      Number(colorSelection.stock) < qty
+    ) {
+      throw new Error(`${product.title || "Combo item"} is out of stock for the selected color`);
+    }
+
+    const stockKey = `${productId}:${selectedSize || "-"}`;
+    const currentRequirement = stockRequirements.get(stockKey) || {
+      product,
+      size: selectedSize,
+      qty: 0,
+      availableStock: hasVariants
+        ? Number(variantSelection?.availableStock || 0)
+        : Number(product.stock || 0),
+    };
+    currentRequirement.qty += qty;
+    stockRequirements.set(stockKey, currentRequirement);
+
+    normalizedSelections.push({
+      productId,
+      productName: product.title || "Combo item",
+      productImage: extractProductPreviewImage(product),
+      sortOrder: item.sortOrder ?? index,
+      size: selectedSize || "",
+      sku: variantSelection?.variant?.sku || "",
+      color: colorSelection
+        ? {
+            label: colorSelection.label || colorSelection.value || "",
+            value: colorSelection.value || colorSelection.label || "",
+          }
+        : null,
+    });
+  });
+
+  for (const requirement of stockRequirements.values()) {
+    if (requirement.availableStock < requirement.qty) {
+      throw new Error(
+        requirement.size
+          ? `${requirement.product.title || "Combo item"} is out of stock for size ${requirement.size}`
+          : `${requirement.product.title || "Combo item"} is out of stock`
+      );
+    }
+  }
+
+  return normalizedSelections;
+};
+
 const findActiveCartWithDetails = ({ userId = null, guestId = null }) => {
   if (!userId && !guestId) {
     return null;
@@ -328,6 +468,13 @@ const findActiveCartWithDetails = ({ userId = null, guestId = null }) => {
       ],
     })
     .populate("items.dropproduct")
+    .populate({
+      path: "items.comboPack",
+      populate: {
+        path: "items.product",
+        select: "title images thumbnail variants stock isActive",
+      },
+    })
     .populate("items.design")
     .populate("items.product")
     .lean();
@@ -349,6 +496,17 @@ const enrichCartItems = (items = []) =>
 
     if (it.dropproduct) {
       updatedItem.dropproduct = attachReadymadePricing({ ...it.dropproduct });
+    }
+
+    if (it.comboPack) {
+      updatedItem.comboPack = {
+        ...it.comboPack,
+        displayImage: extractComboPreviewImage(it.comboPack),
+      };
+      updatedItem.unitPrice = Number(it.comboPack.comboPrice || updatedItem.unitPrice || 0);
+      updatedItem.basePrice = Number(
+        it.comboPack.originalPriceOverride || updatedItem.basePrice || updatedItem.unitPrice || 0
+      );
     }
 
     if (it.kind === "READYMADE" && sourceProduct) {
@@ -444,6 +602,7 @@ export const addToCart = async (req, res) => {
       qty = 1,
       readymadeProductId,
       dropproductId,          // ✅ NEW
+      comboPackId,
       designId,
       size,
     } = body;
@@ -468,8 +627,8 @@ export const addToCart = async (req, res) => {
     if (!Number.isInteger(parsedQty) || parsedQty < 1) {
       return res.status(400).json({ message: "qty must be an integer >= 1" });
     }
-    if (!["READYMADE", "DESIGN"].includes(kind)) {
-      return res.status(400).json({ message: "kind must be READYMADE or DESIGN" });
+    if (!["READYMADE", "DESIGN", "COMBO"].includes(kind)) {
+      return res.status(400).json({ message: "kind must be READYMADE, DESIGN, or COMBO" });
     }
 
     const normalizedSize =
@@ -547,6 +706,76 @@ export const addToCart = async (req, res) => {
         priceDetails: selection.priceDetails,
         currency: product.currency || "INR",
         previewImage: sanitizePreviewImage(extractProductPreviewImage(product)),
+        signature,
+      };
+    }
+
+    // =========================
+    // COMBO
+    // =========================
+    if (kind === "COMBO") {
+      if (!comboPackId || !isValidObjectId(comboPackId)) {
+        return res.status(400).json({ message: "Valid comboPackId is required" });
+      }
+
+      const combo = await ComboPack.findById(comboPackId)
+        .populate("items.product")
+        .lean();
+
+      if (!combo || combo.status !== "ACTIVE") {
+        return res.status(404).json({ message: "Combo pack not found or inactive" });
+      }
+
+      const normalizedSelections = validateComboSelections(
+        combo,
+        parseComboSelections(body.comboSelections),
+        parsedQty
+      );
+
+      const selectionSignature = normalizedSelections
+        .map((selection) =>
+          `${selection.productId}:${selection.size || "-"}:${selection.color?.value || "-"}`
+        )
+        .join("|");
+      signature = `COMBO:${combo._id.toString()}:${selectionSignature}`;
+
+      const originalPrice = Number(combo.originalPriceOverride || 0) > 0
+        ? Number(combo.originalPriceOverride)
+        : normalizedSelections.reduce((sum, selection) => {
+            const comboItem = combo.items.find(
+              (item) => normalizeId(item.product?._id) === selection.productId
+            );
+            const product = comboItem?.product;
+            const variant = Array.isArray(product?.variants)
+              ? product.variants.find((entry) => entry.size === selection.size)
+              : null;
+            const pricing = getReadymadePricing(product, { variant });
+            return sum + Number(pricing.mrp || product?.price || 0);
+          }, 0);
+
+      itemToInsert = {
+        kind: "COMBO",
+        readymadeProduct: null,
+        dropproduct: null,
+        comboPack: combo._id,
+        comboSelections: normalizedSelections,
+        comboName: combo.name || "Combo Pack",
+        design: null,
+        product: null,
+        qty: parsedQty,
+        size: "",
+        unitPrice: Number(combo.comboPrice || 0),
+        basePrice: originalPrice,
+        priceDetails: {
+          originalPrice,
+          savingsAmount: Math.max(originalPrice - Number(combo.comboPrice || 0), 0),
+          discountPercentage:
+            originalPrice > 0
+              ? Math.round(((originalPrice - Number(combo.comboPrice || 0)) / originalPrice) * 100)
+              : 0,
+        },
+        currency: combo.currency || "INR",
+        previewImage: sanitizePreviewImage(extractComboPreviewImage(combo)),
         signature,
       };
     }
@@ -654,8 +883,23 @@ export const addToCart = async (req, res) => {
           sanitizePreviewImage(extractProductPreviewImage(p)) || cart.items[idx].previewImage;
       }
 
+      if (kind === "COMBO") {
+        const combo = await ComboPack.findById(cart.items[idx].comboPack)
+          .populate("items.product")
+          .lean();
+        if (!combo || combo.status !== "ACTIVE") {
+          return res.status(404).json({ message: "Combo pack not found or inactive" });
+        }
+        validateComboSelections(combo, cart.items[idx].comboSelections || [], nextQty);
+        cart.items[idx].unitPrice = Number(combo.comboPrice || cart.items[idx].unitPrice);
+        cart.items[idx].currency = combo.currency || cart.items[idx].currency;
+        cart.items[idx].previewImage =
+          sanitizePreviewImage(extractComboPreviewImage(combo)) || cart.items[idx].previewImage;
+      }
+
       cart.items[idx].qty = nextQty;
-      cart.items[idx].size = String(cart.items[idx].size || "M").toUpperCase();
+      cart.items[idx].size =
+        kind === "COMBO" ? "" : String(cart.items[idx].size || "M").toUpperCase();
 
       if (kind === "DESIGN" && designPriceSnapshot) {
         cart.items[idx].unitPrice = designPriceSnapshot.unitPrice;
@@ -822,6 +1066,22 @@ export const updateCartItemQty = async (req, res) => {
         item.priceDetails = selection.priceDetails;
         item.size = selection.size;
       }
+    }
+
+    if (item.kind === "COMBO") {
+      const combo = await ComboPack.findById(item.comboPack)
+        .populate("items.product")
+        .lean();
+
+      if (!combo || combo.status !== "ACTIVE") {
+        return res.status(404).json({ message: "Combo pack not found or inactive" });
+      }
+
+      validateComboSelections(combo, item.comboSelections || [], parsedQty);
+      item.unitPrice = Number(combo.comboPrice || item.unitPrice || 0);
+      item.currency = combo.currency || "INR";
+      item.previewImage = sanitizePreviewImage(extractComboPreviewImage(combo)) || item.previewImage;
+      item.size = "";
     }
 
     // =========================

@@ -56,6 +56,7 @@ const CartPage = () => {
   const navigate = useNavigate();
 
   const getMaxStock = (item) => {
+    if (item.kind === "COMBO") return null;
     const p = item.dropproduct || item.readymadeProduct;
     if (!p) return null;
     if (Array.isArray(p.variants) && p.variants.length && item.size) {
@@ -104,6 +105,9 @@ const CartPage = () => {
 
   // Get item name based on kind
   const getItemName = (item) => {
+    if (item.kind === "COMBO") {
+      return item.comboName || item.comboPack?.name || "Combo Pack";
+    }
     if (item.kind === "READYMADE") {
       if (getDropId(item)) return getDropName(item);
       return (
@@ -127,7 +131,13 @@ const CartPage = () => {
   const getImagePath = (item) => {
     if (item.previewImage) return getRawImagePath(item.previewImage);
     let imagePath = null;
-    if (item.kind === "READYMADE") {
+    if (item.kind === "COMBO") {
+      imagePath =
+        item.comboPack?.displayImage ||
+        item.comboPack?.featuredImage ||
+        item.comboPack?.galleryImages?.[0]?.url ||
+        item.comboSelections?.[0]?.productImage;
+    } else if (item.kind === "READYMADE") {
       if (item.dropproduct?.images?.length) imagePath = item.dropproduct.images[0];
       else if (item.dropproduct?.thumbnail) imagePath = item.dropproduct.thumbnail;
       else if (item.readymadeProduct?.thumbnail) imagePath = item.readymadeProduct.thumbnail;
@@ -148,6 +158,7 @@ const CartPage = () => {
 
   // Get product type for display
   const getProductType = (item) => {
+    if (item.kind === "COMBO") return "Combo Pack";
     if (item.kind === "READYMADE") return item.dropproduct ? "Drop Product" : "Readymade Product";
     if (item.kind === "DESIGN") return "Custom Design";
     return "Product";
@@ -155,6 +166,14 @@ const CartPage = () => {
 
   // Get additional product info
   const getProductInfo = (item) => {
+    if (item.kind === "COMBO") {
+      return {
+        description: getPlainTextFromHtml(
+          item.comboPack?.shortDescription || item.comboPack?.fullDescription
+        ),
+        category: `${item.comboSelections?.length || item.comboPack?.includedProductsCount || 0} products included`,
+      };
+    }
     if (item.kind === "READYMADE") {
       const product = item.dropproduct || item.readymadeProduct;
       if (!product) return {};
@@ -305,6 +324,9 @@ const CartPage = () => {
       const readymadePath = buildReadymadeProductPath(item.readymadeProduct);
       if (readymadePath) return navigate(readymadePath);
       if (item.readymadeProduct?._id) return navigate(`/readymade/${item.readymadeProduct._id}`);
+    }
+    if (item.kind === "COMBO") {
+      return navigate(`/combo-packs/${item.comboPack?.slug || ""}`);
     }
     if (item.kind === "DESIGN" && item.design?._id) {
       return navigate(buildCatalogueDesignPath(item.design) || `/catalogue/${item.design._id}`);
@@ -605,6 +627,27 @@ const CartPage = () => {
                                       Stock: {maxStock}
                                     </span>
                                   )}
+                                </div>
+                              )}
+
+                              {item.kind === "COMBO" && Array.isArray(item.comboSelections) && item.comboSelections.length > 0 && (
+                                <div className="mb-2 space-y-1.5 rounded-lg bg-gray-50 p-3">
+                                  {item.comboSelections.map((selection, selectionIndex) => (
+                                    <div
+                                      key={`${selection.productId || selection.productName}-${selectionIndex}`}
+                                      className="flex items-center justify-between gap-3 text-xs text-gray-700"
+                                    >
+                                      <span className="min-w-0 truncate font-medium">
+                                        {selection.productName || `Item ${selectionIndex + 1}`}
+                                      </span>
+                                      <span className="flex-shrink-0 text-gray-500">
+                                        {selection.size ? `Size: ${selection.size}` : ""}
+                                        {selection.color?.label || selection.color?.value
+                                          ? `${selection.size ? " | " : ""}Color: ${selection.color.label || selection.color.value}`
+                                          : ""}
+                                      </span>
+                                    </div>
+                                  ))}
                                 </div>
                               )}
 
