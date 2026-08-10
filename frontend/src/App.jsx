@@ -56,7 +56,7 @@ const MainLayout = ({ children }) => {
       <Header />
       <Breadcrumbs />
       <main className="min-w-0 flex-1">{children}</main>
-      <AIShoppingChat />
+      {/* <AIShoppingChat /> */}
       <Footer />
     </div>
   );
