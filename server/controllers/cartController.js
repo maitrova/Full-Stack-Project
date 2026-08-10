@@ -184,7 +184,12 @@ const extractComboPreviewImage = (combo) => {
   if (combo.imageMode === "CUSTOM_IMAGES") {
     return combo.featuredImage || combo.galleryImages?.[0]?.url || combo.bannerImage || null;
   }
-  return extractProductPreviewImage(combo.items?.[0]?.product) || combo.featuredImage || null;
+  return (
+    extractProductPreviewImage(combo.selectionGroups?.[0]?.eligibleProducts?.[0]) ||
+    extractProductPreviewImage(combo.items?.[0]?.product) ||
+    combo.featuredImage ||
+    null
+  );
 };
 
 const sanitizePreviewImage = (value) => {
@@ -362,6 +367,108 @@ const getColorSelection = (product, colorValue) => {
 
 const validateComboSelections = (combo, rawSelections, qty) => {
   const selections = Array.isArray(rawSelections) ? rawSelections : [];
+  const selectionGroups = Array.isArray(combo?.selectionGroups) && combo.selectionGroups.length
+    ? [...combo.selectionGroups].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
+    : [];
+
+  if (selectionGroups.length) {
+    if (selections.length !== selectionGroups.length) {
+      throw new Error("Select one product from every combo category");
+    }
+
+    const normalizedSelections = [];
+    const stockRequirements = new Map();
+
+    selectionGroups.forEach((group, index) => {
+      const selection = selections[index] || {};
+      const selectedProductId = normalizeId(selection.productId || selection.product);
+      const eligibleProducts = Array.isArray(group.eligibleProducts) ? group.eligibleProducts : [];
+      const product = eligibleProducts.find(
+        (entry) => normalizeId(entry?._id || entry) === selectedProductId
+      );
+
+      if (!product || product.isActive === false) {
+        throw new Error("Selected combo product is unavailable");
+      }
+
+      const productCategoryId = normalizeId(product.category?._id || product.category);
+      const groupCategoryId = normalizeId(group.category?._id || group.category);
+      if (productCategoryId && groupCategoryId && productCategoryId !== groupCategoryId) {
+        throw new Error("Selected product does not match the combo category");
+      }
+
+      const hasVariants = Array.isArray(product.variants) && product.variants.length > 0;
+      const selectedSize = String(selection.size || "").trim().toUpperCase();
+      if (hasVariants && !selectedSize) {
+        throw new Error(`Select a size for ${product.title || "combo item"}`);
+      }
+
+      const variantSelection = getReadymadeVariantSelection(product, selectedSize);
+      if (hasVariants && !variantSelection) {
+        throw new Error(`${product.title || "Combo item"} size is unavailable`);
+      }
+
+      const colors = Array.isArray(product.colors) ? product.colors : [];
+      const colorSelection = colors.length
+        ? getColorSelection(product, selection.color || selection.colorValue)
+        : null;
+      if (colors.length && !colorSelection) {
+        throw new Error(`Select a color for ${product.title || "combo item"}`);
+      }
+      if (
+        colorSelection?.stock !== null &&
+        colorSelection?.stock !== undefined &&
+        Number(colorSelection.stock) < qty
+      ) {
+        throw new Error(`${product.title || "Combo item"} is out of stock for the selected color`);
+      }
+
+      const stockKey = `${selectedProductId}:${selectedSize || "-"}`;
+      const currentRequirement = stockRequirements.get(stockKey) || {
+        product,
+        size: selectedSize,
+        qty: 0,
+        availableStock: hasVariants
+          ? Number(variantSelection?.availableStock || 0)
+          : Number(product.stock || 0),
+      };
+      currentRequirement.qty += qty;
+      stockRequirements.set(stockKey, currentRequirement);
+
+      normalizedSelections.push({
+        groupId: normalizeId(group._id),
+        categoryId: groupCategoryId,
+        categoryName: group.category?.name || group.label || "",
+        productId: selectedProductId,
+        productName: product.title || "Combo item",
+        productImage: extractProductPreviewImage(product),
+        sortOrder: group.sortOrder ?? index,
+        size: selectedSize || "",
+        sku: variantSelection?.variant?.sku || "",
+        unitPrice: Number(variantSelection?.unitPrice || 0),
+        basePrice: Number(variantSelection?.basePrice || product.price || 0),
+        color: colorSelection
+          ? {
+              label: colorSelection.label || colorSelection.value || "",
+              value: colorSelection.value || colorSelection.label || "",
+            }
+          : null,
+      });
+    });
+
+    for (const requirement of stockRequirements.values()) {
+      if (requirement.availableStock < requirement.qty) {
+        throw new Error(
+          requirement.size
+            ? `${requirement.product.title || "Combo item"} is out of stock for size ${requirement.size}`
+            : `${requirement.product.title || "Combo item"} is out of stock`
+        );
+      }
+    }
+
+    return normalizedSelections;
+  }
+
   const comboItems = Array.isArray(combo?.items) ? combo.items : [];
 
   if (selections.length !== comboItems.length) {
@@ -470,10 +577,16 @@ const findActiveCartWithDetails = ({ userId = null, guestId = null }) => {
     .populate("items.dropproduct")
     .populate({
       path: "items.comboPack",
-      populate: {
-        path: "items.product",
-        select: "title images thumbnail variants stock isActive",
-      },
+      populate: [
+        {
+          path: "items.product",
+          select: "title images thumbnail variants stock isActive",
+        },
+        {
+          path: "selectionGroups.eligibleProducts",
+          select: "title images thumbnail variants stock isActive category",
+        },
+      ],
     })
     .populate("items.design")
     .populate("items.product")
@@ -720,6 +833,8 @@ export const addToCart = async (req, res) => {
 
       const combo = await ComboPack.findById(comboPackId)
         .populate("items.product")
+        .populate("selectionGroups.category", "name")
+        .populate("selectionGroups.eligibleProducts")
         .lean();
 
       if (!combo || combo.status !== "ACTIVE") {
@@ -739,7 +854,10 @@ export const addToCart = async (req, res) => {
         .join("|");
       signature = `COMBO:${combo._id.toString()}:${selectionSignature}`;
 
-      const originalPrice = Number(combo.originalPriceOverride || 0) > 0
+      const hasSelectionGroups = Array.isArray(combo.selectionGroups) && combo.selectionGroups.length > 0;
+      const originalPrice = hasSelectionGroups
+        ? normalizedSelections.reduce((sum, selection) => sum + Number(selection.basePrice || 0), 0)
+        : Number(combo.originalPriceOverride || 0) > 0
         ? Number(combo.originalPriceOverride)
         : normalizedSelections.reduce((sum, selection) => {
             const comboItem = combo.items.find(
@@ -752,6 +870,9 @@ export const addToCart = async (req, res) => {
             const pricing = getReadymadePricing(product, { variant });
             return sum + Number(pricing.mrp || product?.price || 0);
           }, 0);
+      const comboPrice = hasSelectionGroups
+        ? Math.max(Math.round(originalPrice * (1 - Number(combo.discountPercentage || 0) / 100)), 0)
+        : Number(combo.comboPrice || 0);
 
       itemToInsert = {
         kind: "COMBO",
@@ -764,15 +885,17 @@ export const addToCart = async (req, res) => {
         product: null,
         qty: parsedQty,
         size: "",
-        unitPrice: Number(combo.comboPrice || 0),
+        unitPrice: comboPrice,
         basePrice: originalPrice,
         priceDetails: {
           originalPrice,
-          savingsAmount: Math.max(originalPrice - Number(combo.comboPrice || 0), 0),
+          savingsAmount: Math.max(originalPrice - comboPrice, 0),
           discountPercentage:
-            originalPrice > 0
-              ? Math.round(((originalPrice - Number(combo.comboPrice || 0)) / originalPrice) * 100)
-              : 0,
+            hasSelectionGroups
+              ? Number(combo.discountPercentage || 0)
+              : originalPrice > 0
+                ? Math.round(((originalPrice - Number(combo.comboPrice || 0)) / originalPrice) * 100)
+                : 0,
         },
         currency: combo.currency || "INR",
         previewImage: sanitizePreviewImage(extractComboPreviewImage(combo)),
@@ -886,12 +1009,27 @@ export const addToCart = async (req, res) => {
       if (kind === "COMBO") {
         const combo = await ComboPack.findById(cart.items[idx].comboPack)
           .populate("items.product")
+          .populate("selectionGroups.category", "name")
+          .populate("selectionGroups.eligibleProducts")
           .lean();
         if (!combo || combo.status !== "ACTIVE") {
           return res.status(404).json({ message: "Combo pack not found or inactive" });
         }
-        validateComboSelections(combo, cart.items[idx].comboSelections || [], nextQty);
-        cart.items[idx].unitPrice = Number(combo.comboPrice || cart.items[idx].unitPrice);
+        const normalizedSelections = validateComboSelections(combo, cart.items[idx].comboSelections || [], nextQty);
+        const hasSelectionGroups = Array.isArray(combo.selectionGroups) && combo.selectionGroups.length > 0;
+        if (hasSelectionGroups) {
+          const originalPrice = normalizedSelections.reduce((sum, selection) => sum + Number(selection.basePrice || 0), 0);
+          const comboPrice = Math.max(Math.round(originalPrice * (1 - Number(combo.discountPercentage || 0) / 100)), 0);
+          cart.items[idx].unitPrice = comboPrice;
+          cart.items[idx].basePrice = originalPrice;
+          cart.items[idx].priceDetails = {
+            originalPrice,
+            savingsAmount: Math.max(originalPrice - comboPrice, 0),
+            discountPercentage: Number(combo.discountPercentage || 0),
+          };
+        } else {
+          cart.items[idx].unitPrice = Number(combo.comboPrice || cart.items[idx].unitPrice);
+        }
         cart.items[idx].currency = combo.currency || cart.items[idx].currency;
         cart.items[idx].previewImage =
           sanitizePreviewImage(extractComboPreviewImage(combo)) || cart.items[idx].previewImage;
@@ -1071,14 +1209,29 @@ export const updateCartItemQty = async (req, res) => {
     if (item.kind === "COMBO") {
       const combo = await ComboPack.findById(item.comboPack)
         .populate("items.product")
+        .populate("selectionGroups.category", "name")
+        .populate("selectionGroups.eligibleProducts")
         .lean();
 
       if (!combo || combo.status !== "ACTIVE") {
         return res.status(404).json({ message: "Combo pack not found or inactive" });
       }
 
-      validateComboSelections(combo, item.comboSelections || [], parsedQty);
-      item.unitPrice = Number(combo.comboPrice || item.unitPrice || 0);
+      const normalizedSelections = validateComboSelections(combo, item.comboSelections || [], parsedQty);
+      const hasSelectionGroups = Array.isArray(combo.selectionGroups) && combo.selectionGroups.length > 0;
+      if (hasSelectionGroups) {
+        const originalPrice = normalizedSelections.reduce((sum, selection) => sum + Number(selection.basePrice || 0), 0);
+        const comboPrice = Math.max(Math.round(originalPrice * (1 - Number(combo.discountPercentage || 0) / 100)), 0);
+        item.unitPrice = comboPrice;
+        item.basePrice = originalPrice;
+        item.priceDetails = {
+          originalPrice,
+          savingsAmount: Math.max(originalPrice - comboPrice, 0),
+          discountPercentage: Number(combo.discountPercentage || 0),
+        };
+      } else {
+        item.unitPrice = Number(combo.comboPrice || item.unitPrice || 0);
+      }
       item.currency = combo.currency || "INR";
       item.previewImage = sanitizePreviewImage(extractComboPreviewImage(combo)) || item.previewImage;
       item.size = "";

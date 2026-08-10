@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import Header from "./components/Header.jsx";
 import Breadcrumbs from "./components/Breadcrumbs.jsx";
 import Footer from "./components/Footer.jsx";
+import AIShoppingChat from "./components/AIShoppingChat.jsx";
 import ProductList from "./pages/ProductList.jsx";
 import Homepage from "./pages/Homepage.jsx";
 import AdminDesignsPage from "./pages/AdminDesignsPage.jsx";
@@ -55,6 +56,7 @@ const MainLayout = ({ children }) => {
       <Header />
       <Breadcrumbs />
       <main className="min-w-0 flex-1">{children}</main>
+      <AIShoppingChat />
       <Footer />
     </div>
   );

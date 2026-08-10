@@ -3,7 +3,6 @@ import axios from "axios";
 import {
   AlertTriangle,
   Eye,
-  GripVertical,
   Image,
   PackagePlus,
   Pencil,
@@ -33,6 +32,8 @@ const emptyForm = {
   galleryImages: [],
   bannerImage: null,
   items: [],
+  discountPercentage: "",
+  selectionGroups: [],
 };
 
 const money = (value, currency = "INR") =>
@@ -66,7 +67,17 @@ const getProductPrice = (product) => {
 
 const productLabel = (product) => {
   const brand = typeof product?.brand === "object" ? product.brand?.name : product?.brand;
-  return brand ? `${product.title} · ${brand}` : product?.title || "Untitled product";
+  return brand ? `${product.title} - ${brand}` : product?.title || "Untitled product";
+};
+
+const getCategoryName = (category) =>
+  typeof category === "object" ? category?.name || "Category" : "Category";
+
+const getGroupProducts = (group) => group?.eligibleProducts || group?.products || [];
+
+const getGroupPreviewPrice = (group) => {
+  const prices = getGroupProducts(group).map(getProductPrice).filter((price) => price > 0);
+  return prices.length ? Math.min(...prices) : 0;
 };
 
 const ComboPacksManager = () => {
@@ -83,22 +94,23 @@ const ComboPacksManager = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [dragIndex, setDragIndex] = useState(null);
+  const [activeGroupIndex, setActiveGroupIndex] = useState(0);
 
-  const selectedProducts = form.items.map((item) => item.product);
-  const calculatedOriginalPrice = selectedProducts.reduce(
-    (sum, product) => sum + getProductPrice(product),
+  const calculatedOriginalPrice = form.selectionGroups.reduce(
+    (sum, group) => sum + getGroupPreviewPrice(group),
     0
   );
   const effectiveOriginalPrice = Number(form.originalPrice || 0) || calculatedOriginalPrice;
-  const savingsAmount = Math.max(effectiveOriginalPrice - Number(form.comboPrice || 0), 0);
-  const discountPercentage = effectiveOriginalPrice
-    ? Math.round((savingsAmount / effectiveOriginalPrice) * 100)
-    : 0;
+  const computedComboPrice = Math.max(
+    Math.round(effectiveOriginalPrice * (1 - Number(form.discountPercentage || 0) / 100)),
+    0
+  );
+  const savingsAmount = Math.max(effectiveOriginalPrice - computedComboPrice, 0);
+  const discountPercentage = Number(form.discountPercentage || 0);
 
   const selectedProductIds = useMemo(
-    () => form.items.map((item) => String(item.product?._id || item.product)),
-    [form.items]
+    () => form.selectionGroups.flatMap((group) => getGroupProducts(group).map((product) => String(product?._id || product))),
+    [form.selectionGroups]
   );
 
   const loadCombos = async () => {
@@ -163,43 +175,93 @@ const ComboPacksManager = () => {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
+  const addSelectionGroup = (categoryId = "") => {
+    const category = categories.find((entry) => String(entry._id) === String(categoryId)) || null;
+    setForm((current) => ({
+      ...current,
+      selectionGroups: [
+        ...current.selectionGroups,
+        {
+          category: category || categoryId,
+          label: category?.name || "",
+          eligibleProducts: [],
+          sortOrder: current.selectionGroups.length,
+        },
+      ],
+    }));
+    setActiveGroupIndex(form.selectionGroups.length);
+    if (categoryId) setProductFilters((current) => ({ ...current, category: categoryId }));
+  };
+
+  const updateSelectionGroup = (index, updates) => {
+    setForm((current) => ({
+      ...current,
+      selectionGroups: current.selectionGroups.map((group, groupIndex) =>
+        groupIndex === index ? { ...group, ...updates } : group
+      ),
+    }));
+  };
+
+  const removeSelectionGroup = (index) => {
+    setForm((current) => ({
+      ...current,
+      selectionGroups: current.selectionGroups.filter((_, groupIndex) => groupIndex !== index),
+    }));
+    setActiveGroupIndex((current) => Math.max(0, Math.min(current, form.selectionGroups.length - 2)));
+  };
+
   const addProduct = (product) => {
+    const activeGroup = form.selectionGroups[activeGroupIndex];
+    if (!activeGroup) {
+      setError("Add a combo category before selecting eligible products");
+      return;
+    }
+    const groupCategoryId = String(activeGroup.category?._id || activeGroup.category || "");
+    const productCategoryId = String(product.category?._id || product.category || "");
+    if (groupCategoryId && productCategoryId && groupCategoryId !== productCategoryId) {
+      setError("This product does not belong to the active combo category");
+      return;
+    }
     const productId = String(product._id);
+    const activeGroupProductIds = getGroupProducts(activeGroup).map((entry) => String(entry?._id || entry));
+    if (activeGroupProductIds.includes(productId)) {
+      setError("This product is already eligible for the active category");
+      return;
+    }
     if (!form.allowDuplicateProducts && selectedProductIds.includes(productId)) {
-      setError("Enable duplicate products before adding the same product again");
+      setError("Enable duplicate products before reusing the same product in another category slot");
       return;
     }
 
     setError("");
     setForm((current) => ({
       ...current,
-      items: [...current.items, { product, sortOrder: current.items.length }],
+      selectionGroups: current.selectionGroups.map((group, groupIndex) =>
+        groupIndex === activeGroupIndex
+          ? { ...group, eligibleProducts: [...getGroupProducts(group), product] }
+          : group
+      ),
     }));
   };
 
-  const removeProduct = (index) => {
+  const removeProduct = (groupIndex, productIndex) => {
     setForm((current) => ({
       ...current,
-      items: current.items.filter((_, itemIndex) => itemIndex !== index),
+      selectionGroups: current.selectionGroups.map((group, index) =>
+        index === groupIndex
+          ? {
+              ...group,
+              eligibleProducts: getGroupProducts(group).filter((_, itemIndex) => itemIndex !== productIndex),
+            }
+          : group
+      ),
     }));
-  };
-
-  const moveProduct = (fromIndex, toIndex) => {
-    if (toIndex < 0 || toIndex >= form.items.length || fromIndex === toIndex) return;
-    setForm((current) => {
-      const nextItems = [...current.items];
-      const [moved] = nextItems.splice(fromIndex, 1);
-      nextItems.splice(toIndex, 0, moved);
-      return {
-        ...current,
-        items: nextItems.map((item, index) => ({ ...item, sortOrder: index })),
-      };
-    });
   };
 
   const startCreate = () => {
     setForm(emptyForm);
     setEditingId(null);
+    setActiveGroupIndex(0);
     setShowForm(true);
     setViewingCombo(null);
   };
@@ -218,12 +280,17 @@ const ComboPacksManager = () => {
       seoDescription: combo.seoDescription || "",
       allowDuplicateProducts: Boolean(combo.allowDuplicateProducts),
       imageMode: combo.imageMode || "PRODUCT_IMAGES",
-      items: (combo.items || []).map((item, index) => ({
-        product: item.product,
-        sortOrder: item.sortOrder ?? index,
+      discountPercentage: combo.discountPercentage || combo.pricing?.discountPercentage || "",
+      selectionGroups: (combo.selectionGroups?.length ? combo.selectionGroups : []).map((group, index) => ({
+        category: group.category,
+        label: group.label || group.category?.name || "",
+        eligibleProducts: group.eligibleProducts || [],
+        sortOrder: group.sortOrder ?? index,
       })),
+      items: [],
     });
     setEditingId(combo._id);
+    setActiveGroupIndex(0);
     setShowForm(true);
     setViewingCombo(null);
   };
@@ -233,12 +300,16 @@ const ComboPacksManager = () => {
     setError("");
     setMessage("");
 
-    if (form.items.length < 2) {
-      setError("Select at least two products");
+    if (form.selectionGroups.length < 2) {
+      setError("Select at least two combo categories");
       return;
     }
-    if (Number(form.comboPrice || 0) > effectiveOriginalPrice) {
-      setError("Combo price cannot exceed the original price");
+    if (form.selectionGroups.some((group) => !group.category || !getGroupProducts(group).length)) {
+      setError("Each combo category must have at least one eligible product");
+      return;
+    }
+    if (Number(form.discountPercentage || 0) < 0 || Number(form.discountPercentage || 0) > 100) {
+      setError("Discount percentage must be between 0 and 100");
       return;
     }
 
@@ -248,7 +319,6 @@ const ComboPacksManager = () => {
       "slug",
       "shortDescription",
       "fullDescription",
-      "comboPrice",
       "originalPrice",
       "status",
       "seoTitle",
@@ -257,11 +327,15 @@ const ComboPacksManager = () => {
     ].forEach((field) => payload.append(field, form[field] ?? ""));
 
     payload.append("allowDuplicateProducts", String(form.allowDuplicateProducts));
+    payload.append("discountPercentage", String(form.discountPercentage || 0));
+    payload.append("comboPrice", String(computedComboPrice));
     payload.append(
-      "items",
+      "selectionGroups",
       JSON.stringify(
-        form.items.map((item, index) => ({
-          product: item.product._id || item.product,
+        form.selectionGroups.map((group, index) => ({
+          category: group.category?._id || group.category,
+          label: group.label || "",
+          eligibleProducts: getGroupProducts(group).map((product) => product._id || product),
           sortOrder: index,
         }))
       )
@@ -417,6 +491,19 @@ const ComboPacksManager = () => {
                   className="rounded-md border border-gray-300 px-3 py-2 text-sm"
                 />
               </label>
+              <label className="grid gap-1 text-sm">
+                <span className="font-medium text-gray-700">Discount percentage</span>
+                <input
+                  required
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={form.discountPercentage}
+                  onChange={(event) => updateForm("discountPercentage", event.target.value)}
+                  placeholder="Example: 10"
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
+              </label>
               <select
                 value={form.status}
                 onChange={(event) => updateForm("status", event.target.value)}
@@ -450,6 +537,84 @@ const ComboPacksManager = () => {
 
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
               <div className="space-y-4">
+                <div className="rounded-md border border-gray-200 bg-gray-50 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="font-medium text-gray-950">Combo Categories</h3>
+                      <p className="text-xs text-gray-500">Add one slot for each product the customer must choose.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => addSelectionGroup(categories[0]?._id || "")}
+                      className="rounded-md bg-gray-950 px-3 py-2 text-xs font-semibold text-white"
+                    >
+                      Add Category
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {form.selectionGroups.map((group, index) => {
+                      const categoryId = group.category?._id || group.category || "";
+                      const active = activeGroupIndex === index;
+                      return (
+                        <div
+                          key={`${categoryId}-${index}`}
+                          className={`rounded-md border p-3 ${active ? "border-gray-950 bg-white" : "border-gray-200 bg-white"}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveGroupIndex(index);
+                                setProductFilters((current) => ({ ...current, category: categoryId }));
+                              }}
+                              className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700"
+                            >
+                              Select
+                            </button>
+                            <select
+                              value={categoryId}
+                              onChange={(event) => {
+                                const nextCategory = categories.find((category) => category._id === event.target.value);
+                                updateSelectionGroup(index, {
+                                  category: nextCategory || event.target.value,
+                                  label: nextCategory?.name || "",
+                                  eligibleProducts: [],
+                                });
+                                setActiveGroupIndex(index);
+                                setProductFilters((current) => ({ ...current, category: event.target.value }));
+                              }}
+                              className="min-w-0 flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
+                            >
+                              <option value="">Choose category</option>
+                              {categories.map((category) => (
+                                <option key={category._id} value={category._id}>
+                                  {category.name}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => removeSelectionGroup(index)}
+                              className="rounded p-2 text-red-600 hover:bg-red-50"
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                          <div className="mt-2 text-xs text-gray-500">
+                            {getGroupProducts(group).length} eligible products
+                            {active ? " - active product target" : ""}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {!form.selectionGroups.length && (
+                      <div className="rounded-md border border-dashed border-gray-300 p-5 text-center text-sm text-gray-500">
+                        Add at least two category slots, for example Hoodie + T Shirt.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <div className="grid gap-3 md:grid-cols-3">
                   <input
                     value={productFilters.q}
@@ -483,6 +648,9 @@ const ComboPacksManager = () => {
                   </select>
                 </div>
 
+                <p className="text-xs text-gray-500">
+                  Products added here become eligible choices for the active combo category.
+                </p>
                 <div className="grid gap-3 md:grid-cols-2">
                   {products.map((product) => (
                     <button
@@ -513,51 +681,52 @@ const ComboPacksManager = () => {
               <div className="space-y-4">
                 <div className="rounded-md border border-gray-200 p-4">
                   <div className="mb-3 flex items-center justify-between">
-                    <h3 className="font-medium text-gray-950">Selected Products</h3>
-                    <span className="text-sm text-gray-500">{form.items.length} items</span>
+                    <h3 className="font-medium text-gray-950">Eligible Products</h3>
+                    <span className="text-sm text-gray-500">{form.selectionGroups.length} slots</span>
                   </div>
                   <div className="space-y-2">
-                    {form.items.map((item, index) => (
-                      <div
-                        key={`${item.product?._id || item.product}-${index}`}
-                        draggable
-                        onDragStart={() => setDragIndex(index)}
-                        onDragOver={(event) => event.preventDefault()}
-                        onDrop={() => {
-                          moveProduct(dragIndex, index);
-                          setDragIndex(null);
-                        }}
-                        className="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 p-2"
-                      >
-                        <GripVertical className="text-gray-400" size={16} />
-                        <img
-                          src={buildImageSrc(getProductImage(item.product))}
-                          alt=""
-                          className="h-10 w-10 rounded bg-white object-cover"
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm text-gray-800">
-                            {productLabel(item.product)}
+                    {form.selectionGroups.map((group, groupIndex) => (
+                      <div key={`eligible-${groupIndex}`} className="rounded-md border border-gray-200 bg-gray-50 p-3">
+                        <div className="mb-2 flex items-center justify-between text-sm">
+                          <span className="font-semibold text-gray-950">
+                            Slot {groupIndex + 1}: {group.label || getCategoryName(group.category)}
                           </span>
-                          <span className="block text-xs font-medium text-gray-500">
-                            Original price: {money(getProductPrice(item.product), item.product?.currency)}
+                          <span className="text-xs text-gray-500">
+                            From {money(getGroupPreviewPrice(group))}
                           </span>
-                        </span>
-                        <span className="text-sm font-semibold text-gray-950">
-                          {money(getProductPrice(item.product), item.product?.currency)}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeProduct(index)}
-                          className="rounded p-1 text-red-600 hover:bg-red-50"
-                        >
-                          <X size={16} />
-                        </button>
+                        </div>
+                        <div className="space-y-2">
+                          {getGroupProducts(group).map((product, productIndex) => (
+                            <div key={`${product?._id || product}-${productIndex}`} className="flex items-center gap-2 rounded-md bg-white p-2">
+                              <img
+                                src={buildImageSrc(getProductImage(product))}
+                                alt=""
+                                className="h-10 w-10 rounded bg-gray-100 object-cover"
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm text-gray-800">{productLabel(product)}</span>
+                                <span className="block text-xs text-gray-500">{money(getProductPrice(product), product.currency)}</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => removeProduct(groupIndex, productIndex)}
+                                className="rounded p-1 text-red-600 hover:bg-red-50"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+                          ))}
+                          {!getGroupProducts(group).length && (
+                            <div className="rounded-md border border-dashed border-gray-300 p-3 text-center text-xs text-gray-500">
+                              Select this slot, then add eligible products.
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
-                    {!form.items.length && (
+                    {!form.selectionGroups.length && (
                       <div className="rounded-md border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
-                        Select at least two products.
+                        Add combo categories to start.
                       </div>
                     )}
                   </div>
@@ -568,7 +737,7 @@ const ComboPacksManager = () => {
                     <div>
                       <h3 className="font-semibold text-gray-950">Offer Price Calculation</h3>
                       <p className="text-xs text-gray-600">
-                        Product original prices are calculated from the selected catalog products.
+                        Preview uses the lowest eligible product from each category slot.
                       </p>
                     </div>
                     <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-emerald-700">
@@ -577,16 +746,16 @@ const ComboPacksManager = () => {
                   </div>
 
                   <div className="space-y-2">
-                    {form.items.map((item, index) => (
+                    {form.selectionGroups.map((group, index) => (
                       <div
-                        key={`price-${item.product?._id || item.product}-${index}`}
+                        key={`price-${group.category?._id || group.category}-${index}`}
                         className="flex items-center justify-between gap-3 text-gray-700"
                       >
                         <span className="min-w-0 truncate">
-                          {index + 1}. {item.product?.title || "Selected product"}
+                          {index + 1}. {group.label || getCategoryName(group.category)}
                         </span>
                         <span className="font-semibold text-gray-950">
-                          {money(getProductPrice(item.product), item.product?.currency)}
+                          {money(getGroupPreviewPrice(group))}
                         </span>
                       </div>
                     ))}
@@ -598,8 +767,8 @@ const ComboPacksManager = () => {
                       <strong className="text-gray-950">{money(effectiveOriginalPrice)}</strong>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Admin combo offer price</span>
-                      <strong className="text-gray-950">{money(form.comboPrice)}</strong>
+                      <span className="text-gray-600">Computed combo price</span>
+                      <strong className="text-gray-950">{money(computedComboPrice)}</strong>
                     </div>
                     <div className="flex items-center justify-between text-emerald-700">
                       <span className="font-semibold">Customer savings</span>
@@ -607,30 +776,9 @@ const ComboPacksManager = () => {
                     </div>
                   </div>
 
-                  <label className="mt-4 grid gap-1">
-                    <span className="font-medium text-gray-700">Set combo offer price</span>
-                    <input
-                      required
-                      type="number"
-                      min="0"
-                      value={form.comboPrice}
-                      onChange={(event) => updateForm("comboPrice", event.target.value)}
-                      placeholder={calculatedOriginalPrice ? `Less than ${money(effectiveOriginalPrice)}` : "Add products first"}
-                      className="rounded-md border border-emerald-200 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
-                    />
-                  </label>
-
-                  {Number(form.comboPrice || 0) > effectiveOriginalPrice && (
-                    <p className="mt-2 text-xs font-medium text-red-600">
-                      Combo price cannot exceed the total original price.
-                    </p>
-                  )}
-                  {form.items.length >= 2 && !Number(form.comboPrice || 0) && (
-                    <p className="mt-2 text-xs text-gray-600">
-                      Example: if products total {money(effectiveOriginalPrice)}, enter a lower combo price like{" "}
-                      {money(Math.max(effectiveOriginalPrice - 200, 0))}.
-                    </p>
-                  )}
+                  <p className="mt-4 rounded-md bg-white px-3 py-2 text-xs text-gray-600">
+                    The discount percentage is entered in the top form and applied to the products the customer selects.
+                  </p>
                 </div>
 
                 <div className="rounded-md border border-gray-200 p-4">

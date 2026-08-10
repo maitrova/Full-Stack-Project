@@ -17,9 +17,10 @@ const Homepage = () => {
   return (
     <>
     {/* <Header/> */}
-    <HomepageVideoBanner/>
+    {/* <HomepageVideoBanner/> */}
+    <ComboPacksPromoBanner/>
     <Hero/>
-    {/* <ComboPacksPromoBanner/> */}
+    
     <Dropproduct/>
     
     <NewArrivals/>

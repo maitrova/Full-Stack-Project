@@ -160,6 +160,13 @@ const buildImageSitemapXml = (entries = []) => {
 
 const buildMerchantFeedXml = (products = []) => {
   const siteUrl = getSiteUrl();
+  const feedBrand = process.env.MERCHANT_FEED_BRAND || "Maitrova";
+  const shippingCountry = process.env.MERCHANT_FEED_SHIPPING_COUNTRY || "IN";
+  const shippingService = process.env.MERCHANT_FEED_SHIPPING_SERVICE || "Standard";
+  const shippingPrice = Number(process.env.MERCHANT_FEED_SHIPPING_PRICE || 0);
+  const googleProductCategory =
+    process.env.MERCHANT_FEED_GOOGLE_PRODUCT_CATEGORY ||
+    "Apparel & Accessories > Clothing > Shirts & Tops";
   const buildPrice = (price, currency = "INR") =>
     `${Number(price || 0).toFixed(2)} ${String(currency || "INR").toUpperCase()}`;
 
@@ -185,7 +192,9 @@ const buildMerchantFeedXml = (products = []) => {
       const currency = product.currency || "INR";
       const availability =
         product.isActive && Number(product.stock || 0) > 0 ? "in stock" : "out of stock";
-      const brandName = product.brand?.name || product.brand || "Maitrova";
+      const brandName = feedBrand;
+      const productType =
+        [categoryName, subCategoryName].filter(Boolean).join(" > ") || "Maitrova Products";
       const description =
         stripHtml(product.description) || `${product.title} from Maitrova`;
 
@@ -203,7 +212,15 @@ const buildMerchantFeedXml = (products = []) => {
           : "",
         `<g:condition>new</g:condition>`,
         `<g:brand>${xmlEscape(brandName)}</g:brand>`,
-        categoryName ? `<g:product_type>${xmlEscape([categoryName, subCategoryName].filter(Boolean).join(" > "))}</g:product_type>` : "",
+        `<g:product_type>${xmlEscape(productType)}</g:product_type>`,
+        `<g:google_product_category>${xmlEscape(googleProductCategory)}</g:google_product_category>`,
+        [
+          "<g:shipping>",
+          `  <g:country>${xmlEscape(shippingCountry)}</g:country>`,
+          `  <g:service>${xmlEscape(shippingService)}</g:service>`,
+          `  <g:price>${xmlEscape(buildPrice(shippingPrice, currency))}</g:price>`,
+          "</g:shipping>",
+        ].join("\n"),
         `<g:identifier_exists>no</g:identifier_exists>`,
       ].filter(Boolean);
 

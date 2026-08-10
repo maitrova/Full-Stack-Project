@@ -25,10 +25,14 @@ const getProductImage = (product) => {
 };
 
 const getComboPreviewProducts = (combo) =>
-  (combo?.items || [])
-    .map((item) => item.product)
-    .filter(Boolean)
-    .slice(0, 2);
+  (combo?.selectionGroups?.length
+    ? combo.selectionGroups
+        .map((group) => group.eligibleProducts?.[0])
+        .filter(Boolean)
+    : (combo?.items || [])
+        .map((item) => item.product)
+        .filter(Boolean)
+  ).slice(0, 2);
 
 const ComboPacksPage = () => {
   const [combos, setCombos] = useState([]);
@@ -108,6 +112,7 @@ const ComboPacksPage = () => {
             {combos.map((combo) => {
               const previewProducts = getComboPreviewProducts(combo);
               const originalPrice = Number(combo.pricing?.originalPrice || combo.comboPrice || 0);
+              const comboPrice = Number(combo.pricing?.comboPrice || combo.comboPrice || 0);
               const savings = Number(combo.pricing?.savingsAmount || 0);
               const discount = Number(combo.pricing?.discountPercentage || 0);
 
@@ -180,9 +185,9 @@ const ComboPacksPage = () => {
                     <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
                       <div className="flex items-baseline gap-2">
                         <span className="text-lg font-bold text-gray-950">
-                          {formatPrice(combo.comboPrice, combo.currency)}
+                          {formatPrice(comboPrice, combo.currency)}
                         </span>
-                        {originalPrice > Number(combo.comboPrice) && (
+                        {originalPrice > comboPrice && (
                           <span className="text-sm text-gray-400 line-through">
                             {formatPrice(originalPrice, combo.currency)}
                           </span>

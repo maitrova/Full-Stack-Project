@@ -166,6 +166,7 @@ const rollbackDropInventory = async ({ productId, size, qty }) => {
 const buildComboComponentAdjustments = async ({ productId, size, selections = [], qty }) => {
   const combo = await ComboPack.findById(productId)
     .populate("items.product", "_id stock variants isActive title")
+    .populate("selectionGroups.eligibleProducts", "_id stock variants isActive title")
     .lean();
 
   if (!combo || combo.status !== "ACTIVE") {
@@ -189,7 +190,10 @@ const buildComboComponentAdjustments = async ({ productId, size, selections = []
     const comboItem = (combo.items || []).find(
       (item) => normalizeId(item.product?._id || item.product) === productIdForSelection
     );
-    const product = comboItem?.product;
+    const groupProduct = (combo.selectionGroups || [])
+      .flatMap((group) => group.eligibleProducts || [])
+      .find((product) => normalizeId(product?._id || product) === productIdForSelection);
+    const product = comboItem?.product || groupProduct;
     if (!product || product.isActive === false) {
       const error = new Error("A combo product is unavailable");
       error.statusCode = 409;

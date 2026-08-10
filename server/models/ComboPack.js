@@ -17,6 +17,39 @@ const comboPackItemSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const comboPackSelectionGroupSchema = new mongoose.Schema(
+  {
+    category: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
+      required: true,
+      index: true,
+    },
+    label: { type: String, default: "", trim: true },
+    sortOrder: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    eligibleProducts: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "ReadymadeProduct",
+        },
+      ],
+      validate: {
+        validator(products) {
+          return Array.isArray(products) && products.length > 0;
+        },
+        message: "Each combo category must include at least one eligible product",
+      },
+      default: [],
+    },
+  },
+  { _id: true }
+);
+
 const comboPackImageSchema = new mongoose.Schema(
   {
     url: { type: String, required: true },
@@ -39,6 +72,7 @@ const comboPackSchema = new mongoose.Schema(
     shortDescription: { type: String, default: "", trim: true },
     fullDescription: { type: String, default: "" },
     comboPrice: { type: Number, required: true, min: 0 },
+    discountPercentage: { type: Number, default: 0, min: 0, max: 100 },
     originalPriceOverride: { type: Number, default: null, min: 0 },
     currency: { type: String, default: "INR" },
     status: {
@@ -62,10 +96,14 @@ const comboPackSchema = new mongoose.Schema(
       type: [comboPackItemSchema],
       validate: {
         validator(items) {
-          return Array.isArray(items) && items.length >= 2;
+          return Array.isArray(items);
         },
-        message: "A combo pack must include at least two products",
+        message: "A combo pack must include at least two products or category selections",
       },
+      default: [],
+    },
+    selectionGroups: {
+      type: [comboPackSelectionGroupSchema],
       default: [],
     },
     reviewIssues: { type: [String], default: [] },
@@ -76,5 +114,14 @@ const comboPackSchema = new mongoose.Schema(
 
 comboPackSchema.index({ status: 1, createdAt: -1 });
 comboPackSchema.index({ name: "text", slug: "text", shortDescription: "text" });
+
+comboPackSchema.pre("validate", function (next) {
+  const hasLegacyItems = Array.isArray(this.items) && this.items.length >= 2;
+  const hasSelectionGroups = Array.isArray(this.selectionGroups) && this.selectionGroups.length >= 2;
+  if (!hasLegacyItems && !hasSelectionGroups) {
+    this.invalidate("selectionGroups", "A combo pack must include at least two products or category selections");
+  }
+  next();
+});
 
 export default mongoose.model("ComboPack", comboPackSchema);
