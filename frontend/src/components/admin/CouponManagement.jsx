@@ -216,6 +216,7 @@ export default function CouponManagement() {
       readymade: productOptions.filter((product) => product.type === "Readymade"),
       customization: productOptions.filter((product) => product.type === "Customization"),
       drop: productOptions.filter((product) => product.type === "Drop"),
+      combo: productOptions.filter((product) => product.type === "Combo"),
     }),
     [productOptions]
   );
@@ -232,7 +233,7 @@ export default function CouponManagement() {
     const countSelected = (items) =>
       items.filter((product) => form.allowedProducts.includes(product.id)).length;
 
-    return `Product level flow: ${countSelected(groupedProductOptions.readymade)} readymade, ${countSelected(groupedProductOptions.customization)} customization, ${countSelected(groupedProductOptions.drop)} drop products selected.`;
+    return `Product level flow: ${countSelected(groupedProductOptions.readymade)} readymade, ${countSelected(groupedProductOptions.customization)} customization, ${countSelected(groupedProductOptions.drop)} drop, ${countSelected(groupedProductOptions.combo)} combo products selected.`;
   }, [form.allowedCategories.length, form.allowedProducts, form.allowedSubCategories.length, groupedProductOptions, targetingMode]);
 
   const loadCoupons = async () => {
@@ -258,16 +259,18 @@ export default function CouponManagement() {
     setProductOptionsLoading(true);
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const [customizationRes, readymadeRes, dropRes] = await Promise.all([
+      const [customizationRes, readymadeRes, dropRes, comboRes] = await Promise.all([
         fetch(`${API_URL}/products/admin/list`, { headers }),
         fetch(`${API_URL}/readymadeproducts/admin/all?limit=500`, { headers }),
         fetch(`${API_URL}/dropproducts`, { headers }),
+        fetch(`${API_URL}/combo-packs?limit=500`, { headers }),
       ]);
 
-      const [customizationData, readymadeData, dropData] = await Promise.all([
+      const [customizationData, readymadeData, dropData, comboData] = await Promise.all([
         customizationRes.json(),
         readymadeRes.json(),
         dropRes.json(),
+        comboRes.json(),
       ]);
 
       if (!customizationRes.ok) {
@@ -278,6 +281,9 @@ export default function CouponManagement() {
       }
       if (!dropRes.ok) {
         throw new Error(dropData?.message || "Failed to load drop products");
+      }
+      if (!comboRes.ok) {
+        throw new Error(comboData?.message || "Failed to load combo packs");
       }
 
       const customizationProducts = (customizationData?.data || []).map((product) => ({
@@ -303,8 +309,19 @@ export default function CouponManagement() {
         meta: [product.category, product.subCategory].filter(Boolean).join(" / "),
       }));
 
+      const comboProducts = (comboData?.data || []).map((combo) => ({
+        id: String(combo._id),
+        label: combo.name || "Untitled combo pack",
+        type: "Combo",
+        meta: [
+          `${combo.includedProductsCount || 0} items`,
+          combo.status,
+          combo.pricing?.discountPercentage ? `${combo.pricing.discountPercentage}% off` : "",
+        ].filter(Boolean).join(" / "),
+      }));
+
       setProductOptions(
-        [...customizationProducts, ...readymadeProducts, ...dropProducts].sort((a, b) =>
+        [...customizationProducts, ...readymadeProducts, ...dropProducts, ...comboProducts].sort((a, b) =>
           `${a.type} ${a.label}`.localeCompare(`${b.type} ${b.label}`)
         )
       );
@@ -812,6 +829,29 @@ export default function CouponManagement() {
                       </div>
                       <div className="grid max-h-56 grid-cols-1 gap-2 overflow-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
                         {groupedProductOptions.drop.map((product) => (
+                          <CheckboxField
+                            key={`${product.type}-${product.id}`}
+                            label={`${product.label}${product.meta ? ` - ${product.meta}` : ""}`}
+                            checked={form.allowedProducts.includes(product.id)}
+                            onChange={() => toggleArrayValue("allowedProducts", product.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {groupedProductOptions.combo.length > 0 ? (
+                    <div className="rounded-2xl border border-slate-200 p-4">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <h4 className="text-sm font-semibold text-slate-900">Combo Packs</h4>
+                        <div className="text-xs text-slate-500">
+                          {groupedProductOptions.combo.filter((product) =>
+                            form.allowedProducts.includes(product.id)
+                          ).length} selected
+                        </div>
+                      </div>
+                      <div className="grid max-h-56 grid-cols-1 gap-2 overflow-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
+                        {groupedProductOptions.combo.map((product) => (
                           <CheckboxField
                             key={`${product.type}-${product.id}`}
                             label={`${product.label}${product.meta ? ` - ${product.meta}` : ""}`}

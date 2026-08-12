@@ -75,6 +75,17 @@ const comboPackSchema = new mongoose.Schema(
     discountPercentage: { type: Number, default: 0, min: 0, max: 100 },
     originalPriceOverride: { type: Number, default: null, min: 0 },
     currency: { type: String, default: "INR" },
+    paymentOptions: {
+      type: [String],
+      enum: ["COD", "ONLINE"],
+      default: () => ["COD", "ONLINE"],
+      validate: {
+        validator(options) {
+          return Array.isArray(options) && options.length > 0;
+        },
+        message: "At least one payment option is required",
+      },
+    },
     status: {
       type: String,
       enum: ["ACTIVE", "INACTIVE", "REVIEW"],

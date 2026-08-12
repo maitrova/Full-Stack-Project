@@ -47,15 +47,27 @@ def _get_product_sizes(product: dict) -> list[str]:
     return sizes or ["Size details unavailable"]
 
 
+def _get_product_image(product: dict):
+    images = product.get("images") or []
+    first_image = images[0] if images else None
+
+    return product.get("thumbnail") or first_image
+
+
 def normalize_backend_product(product: dict) -> dict:
     # Step 5: Convert the MERN backend product shape into the simple AI product shape.
     return {
+        "_id": str(product.get("_id") or ""),
+        "title": product.get("title") or "Untitled product",
         "name": product.get("title") or "Untitled product",
         "category": product.get("category") or product.get("subCategory") or "Product",
+        "subCategory": product.get("subCategory") or "",
         "color": _detect_color(product),
         "price": _get_product_price(product),
         "sizes": _get_product_sizes(product),
         "description": product.get("description") or "No description available.",
+        "thumbnail": product.get("thumbnail"),
+        "image": _get_product_image(product),
         "source": "mern_backend",
     }
 

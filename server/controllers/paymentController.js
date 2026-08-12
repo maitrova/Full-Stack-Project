@@ -91,20 +91,38 @@ const validateCartPaymentAvailability = (cart, paymentOption) => {
         throw error;
       }
 
+      if (!getAllowedPaymentOptions(combo).includes(requestedOption)) {
+        const methodLabel =
+          requestedOption === "COD" ? "Cash on delivery" : "Online payment";
+        const error = new Error(`${methodLabel} is not available for ${getItemTitle(item)}`);
+        error.statusCode = 400;
+        throw error;
+      }
+
       const selections = Array.isArray(item.comboSelections) ? item.comboSelections : [];
       const qty = Number(item.qty || 0);
-      if (selections.length !== (combo.items || []).length) {
-        const error = new Error("Select variants for every product in the combo");
+      const comboItems = Array.isArray(combo.items) ? combo.items : [];
+      const selectionGroups = Array.isArray(combo.selectionGroups) ? combo.selectionGroups : [];
+      const expectedSelections = selectionGroups.length || comboItems.length;
+      if (selections.length !== expectedSelections) {
+        const error = new Error(
+          selectionGroups.length
+            ? "Select one product from every combo category"
+            : "Select variants for every product in the combo"
+        );
         error.statusCode = 400;
         throw error;
       }
 
       for (const selection of selections) {
         const productId = String(selection.productId || selection.product || "");
-        const comboItem = (combo.items || []).find(
+        const comboItem = comboItems.find(
           (entry) => String(entry.product?._id || entry.product) === productId
         );
-        const product = comboItem?.product;
+        const groupProduct = selectionGroups
+          .flatMap((group) => group.eligibleProducts || [])
+          .find((product) => String(product?._id || product) === productId);
+        const product = comboItem?.product || groupProduct;
         if (!product || product.isActive === false) {
           const error = new Error("One item in this combo is unavailable");
           error.statusCode = 409;
@@ -249,10 +267,16 @@ const getActiveCartWithPricing = async (userId) => {
     .populate("items.dropproduct")
     .populate({
       path: "items.comboPack",
-      populate: {
-        path: "items.product",
-        select: "title images thumbnail variants stock isActive",
-      },
+      populate: [
+        {
+          path: "items.product",
+          select: "title images thumbnail variants stock isActive category subCategory",
+        },
+        {
+          path: "selectionGroups.eligibleProducts",
+          select: "title images thumbnail variants stock isActive category subCategory",
+        },
+      ],
     })
     .populate("items.design")
     .populate("items.product")

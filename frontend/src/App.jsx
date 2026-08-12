@@ -56,12 +56,12 @@ const MainLayout = ({ children }) => {
       <Header />
       <Breadcrumbs />
       <main className="min-w-0 flex-1">{children}</main>
-      {/* <AIShoppingChat /> */}
+      <AIShoppingChat />
       <Footer />
     </div>
   );
 };
-
+   
 // Layout without header for auth pages
 const AuthLayout = ({ children }) => {
   return (

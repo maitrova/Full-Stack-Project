@@ -1,6 +1,8 @@
 import { useState } from "react";
 import axios from "axios";
 import { Bot, Loader2, MessageCircle, Send, X } from "lucide-react";
+import { buildImageUrl } from "../utils/responsiveImage";
+import { buildReadymadeProductPath } from "../utils/readymadeRoutes";
 
 const AI_AGENT_API_URL =
   import.meta.env.VITE_AI_AGENT_API_URL || "http://127.0.0.1:8000";
@@ -9,6 +11,7 @@ const initialMessages = [
   {
     role: "assistant",
     text: "Hi, I can help with fashion shopping questions. I cannot search live products yet.",
+    products: [],
   },
 ];
 
@@ -25,7 +28,7 @@ const AIShoppingChat = () => {
     const trimmedMessage = message.trim();
     if (!trimmedMessage || isLoading) return;
 
-    const userMessage = { role: "user", text: trimmedMessage };
+    const userMessage = { role: "user", text: trimmedMessage, products: [] };
     setMessages((currentMessages) => [...currentMessages, userMessage]);
     setMessage("");
     setError("");
@@ -37,10 +40,14 @@ const AIShoppingChat = () => {
         message: trimmedMessage,
       });
 
-      // The Python API returns { response: "..." }, and React displays it here.
+      // Step 7: The Python API now returns { response: "...", products: [...] }.
       setMessages((currentMessages) => [
         ...currentMessages,
-        { role: "assistant", text: data.response },
+        {
+          role: "assistant",
+          text: data.response,
+          products: Array.isArray(data.products) ? data.products : [],
+        },
       ]);
     } catch (requestError) {
       setError(
@@ -61,7 +68,7 @@ const AIShoppingChat = () => {
               <Bot className="h-5 w-5 shrink-0" aria-hidden="true" />
               <div className="min-w-0">
                 <h2 className="truncate text-sm font-semibold">AI Shopping Assistant</h2>
-                <p className="truncate text-xs text-gray-300">Step 5: real product API</p>
+                <p className="truncate text-xs text-gray-300">Step 7: product cards</p>
               </div>
             </div>
             <button
@@ -82,15 +89,61 @@ const AIShoppingChat = () => {
                   chatMessage.role === "user" ? "justify-end" : "justify-start"
                 }`}
               >
-                <p
-                  className={`max-w-[85%] rounded-md px-3 py-2 text-sm leading-6 ${
-                    chatMessage.role === "user"
-                      ? "bg-gray-950 text-white"
-                      : "border border-gray-200 bg-white text-gray-800"
-                  }`}
-                >
-                  {chatMessage.text}
-                </p>
+                <div className={`max-w-[90%] ${chatMessage.role === "user" ? "" : "space-y-2"}`}>
+                  <p
+                    className={`rounded-md px-3 py-2 text-sm leading-6 ${
+                      chatMessage.role === "user"
+                        ? "bg-gray-950 text-white"
+                        : "border border-gray-200 bg-white text-gray-800"
+                    }`}
+                  >
+                    {chatMessage.text}
+                  </p>
+
+                  {chatMessage.role === "assistant" && chatMessage.products?.length > 0 && (
+                    <div className="space-y-2">
+                      {chatMessage.products.slice(0, 3).map((product, productIndex) => {
+                        const productPath = buildReadymadeProductPath(product);
+                        const imageUrl = buildImageUrl(product.image || product.thumbnail);
+
+                        return (
+                          <a
+                            key={product._id || `${product.name}-${productIndex}`}
+                            href={productPath || "/products"}
+                            className="flex gap-3 rounded-md border border-gray-200 bg-white p-2 text-left shadow-sm transition hover:border-gray-300 hover:shadow"
+                          >
+                            <div className="h-16 w-14 shrink-0 overflow-hidden rounded-md bg-gray-100">
+                              {imageUrl ? (
+                                <img
+                                  src={imageUrl}
+                                  alt={product.name || "Product"}
+                                  className="h-full w-full object-cover"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
+                                  No image
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="line-clamp-2 text-xs font-semibold text-gray-900">
+                                {product.name}
+                              </h3>
+                              <p className="mt-1 text-xs text-gray-500">
+                                {product.category}
+                                {product.subCategory ? ` / ${product.subCategory}` : ""}
+                              </p>
+                              <p className="mt-1 text-sm font-semibold text-gray-950">
+                                Rs {product.price}
+                              </p>
+                            </div>
+                          </a>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
 
@@ -130,7 +183,7 @@ const AIShoppingChat = () => {
         </section>
       )}
 
-      <button
+      {/* <button
         type="button"
         onClick={() => setIsOpen((currentValue) => !currentValue)}
         className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-gray-950 text-white shadow-xl transition hover:bg-gray-800 focus:outline-none focus:ring-4 focus:ring-gray-900/20"
@@ -141,7 +194,7 @@ const AIShoppingChat = () => {
         ) : (
           <MessageCircle className="h-6 w-6" aria-hidden="true" />
         )}
-      </button>
+      </button> */}
     </div>
   );
 };

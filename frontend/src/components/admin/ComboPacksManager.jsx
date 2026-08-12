@@ -32,6 +32,7 @@ const emptyForm = {
   galleryImages: [],
   bannerImage: null,
   items: [],
+  paymentOptions: ["COD", "ONLINE"],
   discountPercentage: "",
   selectionGroups: [],
 };
@@ -78,6 +79,17 @@ const getGroupProducts = (group) => group?.eligibleProducts || group?.products |
 const getGroupPreviewPrice = (group) => {
   const prices = getGroupProducts(group).map(getProductPrice).filter((price) => price > 0);
   return prices.length ? Math.min(...prices) : 0;
+};
+
+const getPaymentLabel = (options = []) => {
+  const normalized = Array.isArray(options) && options.length ? options : ["COD", "ONLINE"];
+  const allowsCod = normalized.includes("COD");
+  const allowsOnline = normalized.includes("ONLINE");
+
+  if (allowsCod && allowsOnline) return "COD + Online";
+  if (allowsCod) return "COD only";
+  if (allowsOnline) return "Online only";
+  return "Payment unavailable";
 };
 
 const ComboPacksManager = () => {
@@ -173,6 +185,19 @@ const ComboPacksManager = () => {
 
   const updateForm = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const updatePaymentOption = (option, checked) => {
+    setForm((current) => {
+      const currentOptions = Array.isArray(current.paymentOptions)
+        ? current.paymentOptions
+        : ["COD", "ONLINE"];
+      const paymentOptions = checked
+        ? [...new Set([...currentOptions, option])]
+        : currentOptions.filter((entry) => entry !== option);
+
+      return { ...current, paymentOptions };
+    });
   };
 
   const addSelectionGroup = (categoryId = "") => {
@@ -280,6 +305,9 @@ const ComboPacksManager = () => {
       seoDescription: combo.seoDescription || "",
       allowDuplicateProducts: Boolean(combo.allowDuplicateProducts),
       imageMode: combo.imageMode || "PRODUCT_IMAGES",
+      paymentOptions: Array.isArray(combo.paymentOptions) && combo.paymentOptions.length
+        ? combo.paymentOptions
+        : ["COD", "ONLINE"],
       discountPercentage: combo.discountPercentage || combo.pricing?.discountPercentage || "",
       selectionGroups: (combo.selectionGroups?.length ? combo.selectionGroups : []).map((group, index) => ({
         category: group.category,
@@ -312,6 +340,10 @@ const ComboPacksManager = () => {
       setError("Discount percentage must be between 0 and 100");
       return;
     }
+    if (!Array.isArray(form.paymentOptions) || form.paymentOptions.length === 0) {
+      setError("Select COD, online, or both payment options");
+      return;
+    }
 
     const payload = new FormData();
     [
@@ -327,6 +359,7 @@ const ComboPacksManager = () => {
     ].forEach((field) => payload.append(field, form[field] ?? ""));
 
     payload.append("allowDuplicateProducts", String(form.allowDuplicateProducts));
+    payload.append("paymentOptions", JSON.stringify(form.paymentOptions));
     payload.append("discountPercentage", String(form.discountPercentage || 0));
     payload.append("comboPrice", String(computedComboPrice));
     payload.append(
@@ -521,6 +554,27 @@ const ComboPacksManager = () => {
                 />
                 Allow duplicate products
               </label>
+              <div className="grid gap-2 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 md:col-span-2">
+                <span className="font-medium text-gray-700">Payment options</span>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={(form.paymentOptions || []).includes("COD")}
+                      onChange={(event) => updatePaymentOption("COD", event.target.checked)}
+                    />
+                    Cash on Delivery
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={(form.paymentOptions || []).includes("ONLINE")}
+                      onChange={(event) => updatePaymentOption("ONLINE", event.target.checked)}
+                    />
+                    Online Payment
+                  </label>
+                </div>
+              </div>
               <input
                 value={form.seoTitle}
                 onChange={(event) => updateForm("seoTitle", event.target.value)}
@@ -871,6 +925,7 @@ const ComboPacksManager = () => {
                   <th className="px-4 py-3">Combo Name</th>
                   <th className="px-4 py-3">Products</th>
                   <th className="px-4 py-3">Combo Price</th>
+                  <th className="px-4 py-3">Payment</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Created Date</th>
                   <th className="px-4 py-3">Actions</th>
@@ -908,6 +963,11 @@ const ComboPacksManager = () => {
                       <div className="text-xs text-gray-500">
                         Save {money(combo.pricing?.savingsAmount, combo.currency)}
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="rounded-full bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700">
+                        {getPaymentLabel(combo.paymentOptions)}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -957,7 +1017,7 @@ const ComboPacksManager = () => {
                 ))}
                 {!combos.length && (
                   <tr>
-                    <td colSpan="7" className="px-4 py-12 text-center text-gray-500">
+                    <td colSpan="8" className="px-4 py-12 text-center text-gray-500">
                       {loading ? "Loading combo packs..." : "No combo packs found"}
                     </td>
                   </tr>
@@ -978,7 +1038,7 @@ const ComboPacksManager = () => {
               </button>
             </div>
             <p className="mb-4 text-sm text-gray-600">{viewingCombo.shortDescription}</p>
-            <div className="mb-4 grid grid-cols-3 gap-3 rounded-md bg-gray-50 p-4 text-sm">
+            <div className="mb-4 grid grid-cols-2 gap-3 rounded-md bg-gray-50 p-4 text-sm md:grid-cols-4">
               <div>
                 <span className="block text-gray-500">Original</span>
                 <strong>{money(viewingCombo.pricing?.originalPrice, viewingCombo.currency)}</strong>
@@ -990,6 +1050,10 @@ const ComboPacksManager = () => {
               <div>
                 <span className="block text-gray-500">Discount</span>
                 <strong>{viewingCombo.pricing?.discountPercentage || 0}%</strong>
+              </div>
+              <div>
+                <span className="block text-gray-500">Payment</span>
+                <strong>{getPaymentLabel(viewingCombo.paymentOptions)}</strong>
               </div>
             </div>
             {viewingCombo.reviewIssues?.length > 0 && (

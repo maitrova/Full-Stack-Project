@@ -125,6 +125,20 @@ const parseDiscountPercentage = (value, fallback = 0) => {
   return number;
 };
 
+const normalizePaymentOptions = (value, fallback = ["COD", "ONLINE"]) => {
+  const rawOptions = parseArrayField(value, fallback);
+  const allowed = new Set(["COD", "ONLINE"]);
+  const normalized = [...new Set(
+    rawOptions.map((option) => String(option || "").trim().toUpperCase()).filter(Boolean)
+  )];
+
+  if (!normalized.length || normalized.some((option) => !allowed.has(option))) {
+    throw new Error("Select COD, online, or both payment options");
+  }
+
+  return normalized;
+};
+
 const getProductOriginalPrice = (product) => {
   const pricing = getReadymadePricing(product);
   const variantPrices = Array.isArray(product?.variants)
@@ -554,6 +568,7 @@ export const createComboPack = async (req, res) => {
       discountPercentage,
       originalPriceOverride,
       currency: req.body.currency || "INR",
+      paymentOptions: normalizePaymentOptions(req.body.paymentOptions),
       status: String(req.body.status || "INACTIVE").toUpperCase(),
       seoTitle: req.body.seoTitle || "",
       seoDescription: req.body.seoDescription || "",
@@ -624,6 +639,9 @@ export const updateComboPack = async (req, res) => {
     combo.discountPercentage = discountPercentage;
     combo.originalPriceOverride = originalPriceOverride;
     combo.currency = req.body.currency || combo.currency || "INR";
+    if (req.body.paymentOptions !== undefined) {
+      combo.paymentOptions = normalizePaymentOptions(req.body.paymentOptions, combo.paymentOptions);
+    }
     if (req.body.status !== undefined) combo.status = String(req.body.status).toUpperCase();
     if (req.body.seoTitle !== undefined) combo.seoTitle = req.body.seoTitle;
     if (req.body.seoDescription !== undefined) combo.seoDescription = req.body.seoDescription;

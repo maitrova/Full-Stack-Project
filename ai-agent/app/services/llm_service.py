@@ -15,7 +15,7 @@ SYSTEM_INSTRUCTION = (
 )
 
 
-async def get_llm_response(user_message: str) -> str:
+async def get_llm_response(user_message: str) -> dict:
     if not settings.GEMINI_API_KEY:
         raise ValueError("GEMINI_API_KEY is missing. Add it to your .env file.")
 
@@ -23,8 +23,8 @@ async def get_llm_response(user_message: str) -> str:
     matching_products = await search_products(user_message)
     product_context = build_product_context(matching_products)
     prompt = (
-        "Matching sample products from Python search:\n"
-        f"{product_context or 'No matching sample products found.'}\n\n"
+        "Matching products from Python search:\n"
+        f"{product_context or 'No matching products found.'}\n\n"
         "Customer message:\n"
         f"{user_message}"
     )
@@ -40,4 +40,7 @@ async def get_llm_response(user_message: str) -> str:
     )
 
     # 5. The LLM response comes back from Gemini in response.text.
-    return response.text or ""
+    return {
+        "response": response.text or "",
+        "products": matching_products,
+    }

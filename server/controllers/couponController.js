@@ -3,6 +3,36 @@ import Coupon from "../models/Coupon.js";
 import { Cart } from "../models/Cart.js";
 import { validateCouponForCart } from "../services/couponService.js";
 
+const populateCouponCartQuery = (query) =>
+  query
+    .populate("items.readymadeProduct")
+    .populate("items.dropproduct")
+    .populate("items.product")
+    .populate({
+      path: "items.comboPack",
+      populate: [
+        {
+          path: "items.product",
+          select: "title category subCategory",
+        },
+        {
+          path: "selectionGroups.category",
+          select: "name",
+        },
+        {
+          path: "selectionGroups.eligibleProducts",
+          select: "title category subCategory",
+        },
+      ],
+    })
+    .populate({
+      path: "items.readymadeProduct",
+      populate: [
+        { path: "category", select: "name" },
+        { path: "subCategory", select: "name category" },
+      ],
+    });
+
 const ensureAdmin = (req, res) => {
   if (!req.user || req.user.role !== "admin") {
     res.status(403).json({ message: "Admin only" });
@@ -173,17 +203,9 @@ export const listEligibleCoupons = async (req, res) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const cart = await Cart.findOne({ user: userId, status: "ACTIVE" })
-      .populate("items.readymadeProduct")
-      .populate("items.dropproduct")
-      .populate("items.product")
-      .populate({
-        path: "items.readymadeProduct",
-        populate: [
-          { path: "category", select: "name" },
-          { path: "subCategory", select: "name category" },
-        ],
-      });
+    const cart = await populateCouponCartQuery(
+      Cart.findOne({ user: userId, status: "ACTIVE" })
+    );
 
     if (!cart || !Array.isArray(cart.items) || cart.items.length === 0) {
       return res.status(200).json({ coupons: [] });
@@ -294,17 +316,9 @@ export const validateCoupon = async (req, res) => {
     }
 
     const { couponCode } = req.body;
-    const cart = await Cart.findOne({ user: userId, status: "ACTIVE" })
-      .populate("items.readymadeProduct")
-      .populate("items.dropproduct")
-      .populate("items.product")
-      .populate({
-        path: "items.readymadeProduct",
-        populate: [
-          { path: "category", select: "name" },
-          { path: "subCategory", select: "name category" },
-        ],
-      });
+    const cart = await populateCouponCartQuery(
+      Cart.findOne({ user: userId, status: "ACTIVE" })
+    );
 
     const result = await validateCouponForCart({ couponCode, cart, userId });
     if (!result.valid) {

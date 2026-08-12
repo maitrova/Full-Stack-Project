@@ -322,7 +322,9 @@ export default function CheckoutAddresses() {
       return ["ONLINE"];
     }
 
-    const product = item?.dropproduct || item?.readymadeProduct;
+    const product = item?.kind === "COMBO"
+      ? item?.comboPack
+      : item?.dropproduct || item?.readymadeProduct;
     const options = Array.isArray(product?.paymentOptions) ? product.paymentOptions : ["COD", "ONLINE"];
     return options.length ? options : ["COD", "ONLINE"];
   };
@@ -345,11 +347,11 @@ export default function CheckoutAddresses() {
     return "border-rose-200 bg-rose-50 text-rose-700";
   };
   const codRestrictedItems = useMemo(
-    () => cartItems.filter((item) => item?.kind === "READYMADE" && !getPaymentOptions(item).includes("COD")),
+    () => cartItems.filter((item) => !getPaymentOptions(item).includes("COD")),
     [cartItems]
   );
   const onlineRestrictedItems = useMemo(
-    () => cartItems.filter((item) => item?.kind === "READYMADE" && !getPaymentOptions(item).includes("ONLINE")),
+    () => cartItems.filter((item) => !getPaymentOptions(item).includes("ONLINE")),
     [cartItems]
   );
   const codBelowMinimum = effectiveTotal < Number(codMinimumOrderAmount || 0);

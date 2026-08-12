@@ -19,8 +19,12 @@ const endOfDay = (date = new Date()) => {
 
 const getItemProductIds = (item) => {
   const ids = [];
-  for (const candidate of [item.readymadeProduct, item.dropproduct, item.product]) {
+  for (const candidate of [item.readymadeProduct, item.dropproduct, item.product, item.comboPack]) {
     const value = candidate?._id || candidate;
+    if (value) ids.push(String(value));
+  }
+  for (const selection of item.comboSelections || []) {
+    const value = selection?.productId || selection?.product;
     if (value) ids.push(String(value));
   }
   return ids;
@@ -31,7 +35,28 @@ const getItemCategoryIds = (item) => {
   const candidates = [
     item.readymadeProduct?.category?._id,
     item.readymadeProduct?.category,
+    item.dropproduct?.category?._id,
+    item.dropproduct?.category,
   ];
+
+  for (const selection of item.comboSelections || []) {
+    if (selection?.categoryId) candidates.push(selection.categoryId);
+  }
+
+  if (item.comboPack?.items?.length) {
+    for (const comboItem of item.comboPack.items) {
+      candidates.push(comboItem?.product?.category?._id, comboItem?.product?.category);
+    }
+  }
+
+  if (item.comboPack?.selectionGroups?.length) {
+    for (const group of item.comboPack.selectionGroups) {
+      candidates.push(group?.category?._id, group?.category);
+      for (const product of group?.eligibleProducts || []) {
+        candidates.push(product?.category?._id, product?.category);
+      }
+    }
+  }
 
   for (const candidate of candidates) {
     if (!candidate) continue;
@@ -43,10 +68,37 @@ const getItemCategoryIds = (item) => {
 
 const getItemSubCategoryIds = (item) => {
   const ids = [];
+  const selectedComboProductIds = new Set(
+    (item.comboSelections || [])
+      .map((selection) => String(selection?.productId || selection?.product || ""))
+      .filter(Boolean)
+  );
   const candidates = [
     item.readymadeProduct?.subCategory?._id,
     item.readymadeProduct?.subCategory,
+    item.dropproduct?.subCategory?._id,
+    item.dropproduct?.subCategory,
   ];
+
+  if (item.comboPack?.items?.length) {
+    for (const comboItem of item.comboPack.items) {
+      candidates.push(comboItem?.product?.subCategory?._id, comboItem?.product?.subCategory);
+    }
+  }
+
+  if (item.comboPack?.selectionGroups?.length) {
+    for (const group of item.comboPack.selectionGroups) {
+      for (const product of group?.eligibleProducts || []) {
+        if (
+          selectedComboProductIds.size > 0 &&
+          !selectedComboProductIds.has(String(product?._id || product))
+        ) {
+          continue;
+        }
+        candidates.push(product?.subCategory?._id, product?.subCategory);
+      }
+    }
+  }
 
   for (const candidate of candidates) {
     if (!candidate) continue;

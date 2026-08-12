@@ -1,4 +1,4 @@
-# AI Shopping Agent - Step 5
+# AI Shopping Agent - Step 7
 
 This is a small Python FastAPI service for learning how a backend communicates with an existing LLM API.
 
@@ -17,6 +17,10 @@ Step 3 adds a small hardcoded sample product catalog and sends it to the LLM as 
 Step 4 adds a simple Python product search function over the static catalog. The LLM now receives only matching sample products instead of the full sample catalog.
 
 Step 5 connects the Python AI service to the existing Node/Express product API. The static sample catalog remains as a fallback when the MERN backend is not running.
+
+Step 6 improves product matching with aliases, simple typo tolerance, and price formats such as `1k` and `2.5k`.
+
+Step 7 returns structured matched products to React so the chat can show product cards, not only AI text.
 
 ## Project Structure
 
@@ -45,13 +49,13 @@ React/user
 -> POST /chat
 -> FastAPI
 -> backend_product_service calls Node/Express API
--> product_search
+-> product_search with aliases and typo tolerance
 -> llm_service
 -> matching sample product context
 -> Gemini API
 -> LLM
 -> llm_service
--> FastAPI
+-> FastAPI returns response text and products
 -> user
 ```
 
@@ -148,11 +152,19 @@ Example response:
 
 ```json
 {
-  "response": "From the sample catalog, you may like the Black Cotton A-Line Dress for Rs 1499 or the Black Party Midi Dress for Rs 1999. Both are black dresses under Rs 2000."
+  "response": "I found a few matching products.",
+  "products": [
+    {
+      "name": "inner wear updated",
+      "category": "inners",
+      "price": 1000,
+      "sizes": ["M", "L"]
+    }
+  ]
 }
 ```
 
-## What Step 5 Accomplishes
+## What Step 7 Accomplishes
 
 In Step 1, the Python backend learned how to receive a user message, send it to Gemini, receive the LLM response, and return it as JSON.
 
@@ -163,5 +175,9 @@ In Step 3, the Python service now gives Gemini a small static product catalog. T
 In Step 4, Python filters the static catalog before calling Gemini. This helps you understand that business logic can run in your backend before the LLM writes the final customer-friendly response.
 
 In Step 5, Python gets real product data from your existing MERN backend API before filtering products. This means the AI service still does not know MongoDB directly; it uses the same backend API your website already uses.
+
+In Step 6, Python search became more flexible. For example, `inside wear below 1k` can match an `inners` category, and `tshirt under 800` can match `t-shirt` products. This is still normal Python code, not LLM tool calling.
+
+In Step 7, FastAPI returns structured products along with the AI response. React can now render product cards inside the chat, using the product data found by Python search.
 
 Later, when tools are introduced, the LLM will be able to request actions such as searching products, checking inventory, or helping with cart actions. For now, it only replies with text using products found by Python search and has no ability to perform website actions.
