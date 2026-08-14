@@ -1,4 +1,4 @@
-# AI Shopping Agent - Step 7
+# AI Shopping Agent - Complete Flow
 
 This is a small Python FastAPI service for learning how a backend communicates with an existing LLM API.
 
@@ -21,6 +21,8 @@ Step 5 connects the Python AI service to the existing Node/Express product API. 
 Step 6 improves product matching with aliases, simple typo tolerance, and price formats such as `1k` and `2.5k`.
 
 Step 7 returns structured matched products to React so the chat can show product cards, not only AI text.
+
+The complete flow adds in-memory session history, follow-up-aware search, size filtering, chat reset, and add-to-cart buttons in React that use the existing MERN cart API.
 
 ## Project Structure
 
@@ -48,6 +50,7 @@ ai-agent/
 React/user
 -> POST /chat
 -> FastAPI
+-> in-memory chat history
 -> backend_product_service calls Node/Express API
 -> product_search with aliases and typo tolerance
 -> llm_service
@@ -56,7 +59,7 @@ React/user
 -> LLM
 -> llm_service
 -> FastAPI returns response text and products
--> user
+-> React shows text, products, and add-to-cart buttons
 ```
 
 ## Installation
@@ -164,7 +167,7 @@ Example response:
 }
 ```
 
-## What Step 7 Accomplishes
+## What The Complete Flow Accomplishes
 
 In Step 1, the Python backend learned how to receive a user message, send it to Gemini, receive the LLM response, and return it as JSON.
 
@@ -180,4 +183,6 @@ In Step 6, Python search became more flexible. For example, `inside wear below 1
 
 In Step 7, FastAPI returns structured products along with the AI response. React can now render product cards inside the chat, using the product data found by Python search.
 
-Later, when tools are introduced, the LLM will be able to request actions such as searching products, checking inventory, or helping with cart actions. For now, it only replies with text using products found by Python search and has no ability to perform website actions.
+The complete flow keeps the LLM focused on language, while Python handles product search and React/Node handles cart changes. Session memory is in-memory only, so it resets when FastAPI restarts.
+
+This still does not use LangChain, LangGraph, embeddings, vector databases, or RAG.

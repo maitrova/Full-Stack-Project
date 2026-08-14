@@ -44,7 +44,15 @@ const getProductImages = (product) => {
 };
 
 const getProductPrice = (product) =>
-  Number(product?.pricing?.mrp || product?.mrp || product?.price || product?.basePrice || 0);
+  Number(
+    product?.pricing?.effectivePrice ||
+      product?.effectivePrice ||
+      product?.offerPrice ||
+      product?.salePrice ||
+      product?.price ||
+      product?.basePrice ||
+      0
+  );
 
 const getProductDetailsPath = (product) =>
   buildReadymadeProductPath({
@@ -159,8 +167,8 @@ const ComboPackDetailPage = () => {
 
   const dynamicComboPrice = useMemo(() => {
     if (!selectionGroups.length) return Number(combo?.comboPrice || 0);
-    return Math.max(Math.round(dynamicOriginalPrice * (1 - Number(combo?.discountPercentage || 0) / 100)), 0);
-  }, [combo, dynamicOriginalPrice, selectionGroups.length]);
+    return Number(combo?.comboPrice || 0);
+  }, [combo, selectionGroups.length]);
 
   const validation = useMemo(() => {
     if (selectionGroups.length) {
@@ -313,7 +321,7 @@ const ComboPackDetailPage = () => {
     : Number(combo.pricing?.originalPrice || combo.comboPrice || 0);
   const displayComboPrice = selectionGroups.length && dynamicOriginalPrice > 0 ? dynamicComboPrice : Number(combo.comboPrice || 0);
   const savings = Math.max(originalPrice - displayComboPrice, 0);
-  const discount = Number(combo.discountPercentage || combo.pricing?.discountPercentage || 0);
+  const discount = originalPrice > 0 ? Math.round((savings / originalPrice) * 100) : 0;
   const completedSelectionCount = selectionGroups.length
     ? selectedComboProducts.filter(Boolean).length
     : combo.items?.length || 0;

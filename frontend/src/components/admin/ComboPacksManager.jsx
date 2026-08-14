@@ -29,6 +29,7 @@ const emptyForm = {
   allowDuplicateProducts: false,
   imageMode: "PRODUCT_IMAGES",
   featuredImage: null,
+  existingFeaturedImage: "",
   galleryImages: [],
   bannerImage: null,
   items: [],
@@ -57,10 +58,14 @@ const getProductImage = (product) => {
 };
 
 const getProductPrice = (product) => {
-  if (product?.pricing?.mrp) return Number(product.pricing.mrp);
-  if (product?.mrp) return Number(product.mrp);
+  if (product?.pricing?.effectivePrice) return Number(product.pricing.effectivePrice);
+  if (product?.effectivePrice) return Number(product.effectivePrice);
+  if (product?.offerPrice) return Number(product.offerPrice);
+  if (product?.salePrice) return Number(product.salePrice);
   if (Array.isArray(product?.variants) && product.variants.length) {
-    const prices = product.variants.map((variant) => Number(variant.price || 0)).filter(Boolean);
+    const prices = product.variants
+      .map((variant) => Number(variant.effectivePrice || variant.salePrice || variant.price || 0))
+      .filter(Boolean);
     return prices.length ? Math.min(...prices) : Number(product.price || 0);
   }
   return Number(product?.price || 0);
@@ -113,12 +118,12 @@ const ComboPacksManager = () => {
     0
   );
   const effectiveOriginalPrice = Number(form.originalPrice || 0) || calculatedOriginalPrice;
-  const computedComboPrice = Math.max(
-    Math.round(effectiveOriginalPrice * (1 - Number(form.discountPercentage || 0) / 100)),
-    0
-  );
+  const computedComboPrice = Number(form.comboPrice || 0);
   const savingsAmount = Math.max(effectiveOriginalPrice - computedComboPrice, 0);
-  const discountPercentage = Number(form.discountPercentage || 0);
+  const discountPercentage =
+    effectiveOriginalPrice > 0 && computedComboPrice > 0 && computedComboPrice < effectiveOriginalPrice
+      ? Math.round((savingsAmount / effectiveOriginalPrice) * 100)
+      : 0;
 
   const selectedProductIds = useMemo(
     () => form.selectionGroups.flatMap((group) => getGroupProducts(group).map((product) => String(product?._id || product))),
@@ -305,6 +310,7 @@ const ComboPacksManager = () => {
       seoDescription: combo.seoDescription || "",
       allowDuplicateProducts: Boolean(combo.allowDuplicateProducts),
       imageMode: combo.imageMode || "PRODUCT_IMAGES",
+      existingFeaturedImage: combo.featuredImage || "",
       paymentOptions: Array.isArray(combo.paymentOptions) && combo.paymentOptions.length
         ? combo.paymentOptions
         : ["COD", "ONLINE"],
@@ -336,8 +342,12 @@ const ComboPacksManager = () => {
       setError("Each combo category must have at least one eligible product");
       return;
     }
-    if (Number(form.discountPercentage || 0) < 0 || Number(form.discountPercentage || 0) > 100) {
-      setError("Discount percentage must be between 0 and 100");
+    if (!(computedComboPrice > 0)) {
+      setError("Enter a combo offer price");
+      return;
+    }
+    if (computedComboPrice > effectiveOriginalPrice) {
+      setError("Combo offer price cannot be more than the combined eligible product price");
       return;
     }
     if (!Array.isArray(form.paymentOptions) || form.paymentOptions.length === 0) {
@@ -360,7 +370,7 @@ const ComboPacksManager = () => {
 
     payload.append("allowDuplicateProducts", String(form.allowDuplicateProducts));
     payload.append("paymentOptions", JSON.stringify(form.paymentOptions));
-    payload.append("discountPercentage", String(form.discountPercentage || 0));
+    payload.append("discountPercentage", String(discountPercentage));
     payload.append("comboPrice", String(computedComboPrice));
     payload.append(
       "selectionGroups",
@@ -513,7 +523,7 @@ const ComboPacksManager = () => {
                 rows={3}
                 className="rounded-md border border-gray-300 px-3 py-2 text-sm"
               />
-              <label className="grid gap-1 text-sm">
+              {/* <label className="grid gap-1 text-sm">
                 <span className="font-medium text-gray-700">Original price override</span>
                 <input
                   type="number"
@@ -523,17 +533,16 @@ const ComboPacksManager = () => {
                   placeholder={`Auto total: ${money(calculatedOriginalPrice)}`}
                   className="rounded-md border border-gray-300 px-3 py-2 text-sm"
                 />
-              </label>
+              </label> */}
               <label className="grid gap-1 text-sm">
-                <span className="font-medium text-gray-700">Discount percentage</span>
+                <span className="font-medium text-gray-700">Combo offer price</span>
                 <input
                   required
                   type="number"
                   min="0"
-                  max="100"
-                  value={form.discountPercentage}
-                  onChange={(event) => updateForm("discountPercentage", event.target.value)}
-                  placeholder="Example: 10"
+                  value={form.comboPrice}
+                  onChange={(event) => updateForm("comboPrice", event.target.value)}
+                  placeholder="Example: 3500"
                   className="rounded-md border border-gray-300 px-3 py-2 text-sm"
                 />
               </label>
@@ -821,7 +830,7 @@ const ComboPacksManager = () => {
                       <strong className="text-gray-950">{money(effectiveOriginalPrice)}</strong>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Computed combo price</span>
+                      <span className="text-gray-600">Admin combo price</span>
                       <strong className="text-gray-950">{money(computedComboPrice)}</strong>
                     </div>
                     <div className="flex items-center justify-between text-emerald-700">
@@ -831,80 +840,41 @@ const ComboPacksManager = () => {
                   </div>
 
                   <p className="mt-4 rounded-md bg-white px-3 py-2 text-xs text-gray-600">
-                    The discount percentage is entered in the top form and applied to the products the customer selects.
+                    Enter the final combo price. The discount percentage is calculated from the selected products' combined offer price.
                   </p>
                 </div>
 
                 <div className="rounded-md border border-gray-200 p-4">
-                  <div className="mb-3 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => updateForm("imageMode", "PRODUCT_IMAGES")}
-                      className={`rounded-md px-3 py-2 text-sm ${
-                        form.imageMode === "PRODUCT_IMAGES" ? "bg-gray-950 text-white" : "bg-gray-100 text-gray-700"
-                      }`}
-                    >
-                      Product Images
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateForm("imageMode", "CUSTOM_IMAGES")}
-                      className={`rounded-md px-3 py-2 text-sm ${
-                        form.imageMode === "CUSTOM_IMAGES" ? "bg-gray-950 text-white" : "bg-gray-100 text-gray-700"
-                      }`}
-                    >
-                      Custom Images
-                    </button>
-                  </div>
-                  {form.imageMode === "CUSTOM_IMAGES" && (
-                    <div className="grid gap-3 text-sm">
-                      <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-3">
-                        <Upload size={16} />
-                        Featured Image
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(event) => updateForm("featuredImage", event.target.files?.[0] || null)}
-                          className="hidden"
-                        />
-                      </label>
-                      <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-3">
-                        <Image size={16} />
-                        Gallery Images
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          onChange={(event) =>
-                            updateForm("galleryImages", Array.from(event.target.files || []))
-                          }
-                          className="hidden"
-                        />
-                      </label>
-                      <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-3">
-                        <Upload size={16} />
-                        Banner Image
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(event) => updateForm("bannerImage", event.target.files?.[0] || null)}
-                          className="hidden"
-                        />
-                      </label>
-                    </div>
-                  )}
+                  <label className="mb-3 flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-3 text-sm">
+                    <Upload size={16} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium text-gray-800">Combo thumbnail</span>
+                      <span className="block truncate text-xs text-gray-500">
+                        {form.featuredImage?.name ||
+                          (form.existingFeaturedImage
+                            ? String(form.existingFeaturedImage).split("/").pop()
+                            : "No thumbnail selected")}
+                      </span>
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => updateForm("featuredImage", event.target.files?.[0] || null)}
+                      className="hidden"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full rounded-md bg-gray-950 px-5 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-60"
+                  >
+                    {editingId ? "Update Combo" : "Create Combo"}
+                  </button>
                 </div>
               </div>
             </div>
 
             <div className="flex gap-3 border-t border-gray-200 pt-4">
-              <button
-                type="submit"
-                disabled={loading}
-                className="rounded-md bg-gray-950 px-5 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-60"
-              >
-                {editingId ? "Update Combo" : "Create Combo"}
-              </button>
               <button
                 type="button"
                 onClick={resetForm}

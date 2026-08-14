@@ -10,6 +10,8 @@ load_dotenv()
 class Settings:
     GEMINI_API_KEY: str | None = os.getenv("GEMINI_API_KEY")
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+    GEMINI_EMBEDDING_MODEL: str = os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001")
+    USE_EMBEDDING_SEARCH: bool = os.getenv("USE_EMBEDDING_SEARCH", "false").lower() == "true"
     MERN_API_URL: str = os.getenv("MERN_API_URL", "http://localhost:5000/api").rstrip("/")
     MERN_PRODUCTS_LIMIT: int = int(os.getenv("MERN_PRODUCTS_LIMIT", "100"))
     FRONTEND_ORIGINS: list[str] = [

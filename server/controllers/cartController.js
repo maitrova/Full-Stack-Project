@@ -446,7 +446,7 @@ const validateComboSelections = (combo, rawSelections, qty) => {
         size: selectedSize || "",
         sku: variantSelection?.variant?.sku || "",
         unitPrice: Number(variantSelection?.unitPrice || 0),
-        basePrice: Number(variantSelection?.basePrice || product.price || 0),
+        basePrice: Number(variantSelection?.unitPrice || product.price || 0),
         color: colorSelection
           ? {
               label: colorSelection.label || colorSelection.value || "",
@@ -856,7 +856,7 @@ export const addToCart = async (req, res) => {
 
       const hasSelectionGroups = Array.isArray(combo.selectionGroups) && combo.selectionGroups.length > 0;
       const originalPrice = hasSelectionGroups
-        ? normalizedSelections.reduce((sum, selection) => sum + Number(selection.basePrice || 0), 0)
+        ? normalizedSelections.reduce((sum, selection) => sum + Number(selection.basePrice || selection.unitPrice || 0), 0)
         : Number(combo.originalPriceOverride || 0) > 0
         ? Number(combo.originalPriceOverride)
         : normalizedSelections.reduce((sum, selection) => {
@@ -868,10 +868,10 @@ export const addToCart = async (req, res) => {
               ? product.variants.find((entry) => entry.size === selection.size)
               : null;
             const pricing = getReadymadePricing(product, { variant });
-            return sum + Number(pricing.mrp || product?.price || 0);
+            return sum + Number(pricing.effectivePrice || product?.price || 0);
           }, 0);
       const comboPrice = hasSelectionGroups
-        ? Math.max(Math.round(originalPrice * (1 - Number(combo.discountPercentage || 0) / 100)), 0)
+        ? Number(combo.comboPrice || 0)
         : Number(combo.comboPrice || 0);
 
       itemToInsert = {
@@ -892,7 +892,9 @@ export const addToCart = async (req, res) => {
           savingsAmount: Math.max(originalPrice - comboPrice, 0),
           discountPercentage:
             hasSelectionGroups
-              ? Number(combo.discountPercentage || 0)
+              ? originalPrice > 0
+                ? Math.round(((originalPrice - comboPrice) / originalPrice) * 100)
+                : 0
               : originalPrice > 0
                 ? Math.round(((originalPrice - Number(combo.comboPrice || 0)) / originalPrice) * 100)
                 : 0,
@@ -1018,14 +1020,14 @@ export const addToCart = async (req, res) => {
         const normalizedSelections = validateComboSelections(combo, cart.items[idx].comboSelections || [], nextQty);
         const hasSelectionGroups = Array.isArray(combo.selectionGroups) && combo.selectionGroups.length > 0;
         if (hasSelectionGroups) {
-          const originalPrice = normalizedSelections.reduce((sum, selection) => sum + Number(selection.basePrice || 0), 0);
-          const comboPrice = Math.max(Math.round(originalPrice * (1 - Number(combo.discountPercentage || 0) / 100)), 0);
+          const originalPrice = normalizedSelections.reduce((sum, selection) => sum + Number(selection.basePrice || selection.unitPrice || 0), 0);
+          const comboPrice = Number(combo.comboPrice || 0);
           cart.items[idx].unitPrice = comboPrice;
           cart.items[idx].basePrice = originalPrice;
           cart.items[idx].priceDetails = {
             originalPrice,
             savingsAmount: Math.max(originalPrice - comboPrice, 0),
-            discountPercentage: Number(combo.discountPercentage || 0),
+            discountPercentage: originalPrice > 0 ? Math.round(((originalPrice - comboPrice) / originalPrice) * 100) : 0,
           };
         } else {
           cart.items[idx].unitPrice = Number(combo.comboPrice || cart.items[idx].unitPrice);
@@ -1220,14 +1222,14 @@ export const updateCartItemQty = async (req, res) => {
       const normalizedSelections = validateComboSelections(combo, item.comboSelections || [], parsedQty);
       const hasSelectionGroups = Array.isArray(combo.selectionGroups) && combo.selectionGroups.length > 0;
       if (hasSelectionGroups) {
-        const originalPrice = normalizedSelections.reduce((sum, selection) => sum + Number(selection.basePrice || 0), 0);
-        const comboPrice = Math.max(Math.round(originalPrice * (1 - Number(combo.discountPercentage || 0) / 100)), 0);
+        const originalPrice = normalizedSelections.reduce((sum, selection) => sum + Number(selection.basePrice || selection.unitPrice || 0), 0);
+        const comboPrice = Number(combo.comboPrice || 0);
         item.unitPrice = comboPrice;
         item.basePrice = originalPrice;
         item.priceDetails = {
           originalPrice,
           savingsAmount: Math.max(originalPrice - comboPrice, 0),
-          discountPercentage: Number(combo.discountPercentage || 0),
+          discountPercentage: originalPrice > 0 ? Math.round(((originalPrice - comboPrice) / originalPrice) * 100) : 0,
         };
       } else {
         item.unitPrice = Number(combo.comboPrice || item.unitPrice || 0);

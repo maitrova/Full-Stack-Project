@@ -412,7 +412,7 @@ const Hero = () => {
           </div>
         </div>
 
-        <aside className="floating-panel floating-panel-delay relative min-w-0 flex flex-col overflow-hidden rounded-[1.35rem] border border-white/70 bg-[#dbe8a6]/95 p-3 shadow-[0_28px_75px_rgba(62,78,20,0.2)] backdrop-blur sm:rounded-[2rem] sm:p-4">
+        <aside className="floating-panel floating-panel-delay relative hidden min-w-0 flex-col overflow-hidden rounded-[1.35rem] border border-white/70 bg-[#dbe8a6]/95 p-3 shadow-[0_28px_75px_rgba(62,78,20,0.2)] backdrop-blur sm:rounded-[2rem] sm:p-4 lg:flex">
           <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full border-[42px] border-white/25" />
           <div className="pointer-events-none absolute -bottom-20 -left-20 h-56 w-56 rounded-full bg-orange-400/20 blur-3xl" />
 

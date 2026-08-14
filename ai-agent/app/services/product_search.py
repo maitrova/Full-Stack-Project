@@ -2,6 +2,7 @@ import re
 from difflib import SequenceMatcher
 
 from app.services.backend_product_service import fetch_backend_products
+from app.services.embedding_service import rank_products_by_embedding
 from app.services.product_context import SAMPLE_PRODUCTS
 
 
@@ -25,6 +26,15 @@ CATEGORY_ALIASES = {
     "t-shirt": ["t-shirt", "tshirt", "tee", "t shirt", "round neck", "oversized tee"],
     "jacket": ["jacket", "jackets", "denim jacket", "outerwear", "layering"],
     "inners": ["inners", "inner", "innerwear", "inside wear", "vest", "undergarment"],
+}
+
+SIZE_ALIASES = {
+    "XS": ["xs", "extra small"],
+    "S": ["s", "small"],
+    "M": ["m", "medium"],
+    "L": ["l", "large"],
+    "XL": ["xl", "extra large"],
+    "XXL": ["xxl", "double xl", "2xl"],
 }
 
 STOP_WORDS = {
@@ -102,6 +112,17 @@ def _extract_requested_categories(message: str) -> list[str]:
     return requested_categories
 
 
+def _extract_requested_sizes(message: str) -> list[str]:
+    requested_sizes = []
+    padded_message = f" {message} "
+
+    for size, aliases in SIZE_ALIASES.items():
+        if any(f" {_normalize_text(alias)} " in padded_message for alias in aliases):
+            requested_sizes.append(size)
+
+    return requested_sizes
+
+
 def _is_similar(left: str, right: str) -> bool:
     if len(left) < 4 or len(right) < 4:
         return False
@@ -127,6 +148,7 @@ def _score_product(
     user_tokens: list[str],
     requested_colors: list[str],
     requested_categories: list[str],
+    requested_sizes: list[str],
     max_price: int | None,
 ) -> int:
     product_color = str(product.get("color") or "").lower()
@@ -158,6 +180,16 @@ def _score_product(
         score += 4
         has_product_signal = True
 
+    if requested_sizes:
+        product_sizes = [
+            str(size).upper()
+            for size in product.get("sizes", [])
+        ]
+        if not any(size in product_sizes for size in requested_sizes):
+            return 0
+        score += 3
+        has_product_signal = True
+
     for user_token in user_tokens:
         if user_token in searchable_text:
             score += 2
@@ -181,6 +213,7 @@ def _filter_products(products: list[dict], user_message: str) -> list[dict]:
         color for color in KNOWN_COLORS if color in normalized_message
     ]
     requested_categories = _extract_requested_categories(normalized_message)
+    requested_sizes = _extract_requested_sizes(normalized_message)
     max_price = _extract_max_price(normalized_message)
 
     scored_products = []
@@ -191,6 +224,7 @@ def _filter_products(products: list[dict], user_message: str) -> list[dict]:
             user_tokens,
             requested_colors,
             requested_categories,
+            requested_sizes,
             max_price,
         )
         if score > 0:
@@ -204,7 +238,7 @@ def _filter_products(products: list[dict], user_message: str) -> list[dict]:
     return [product for score, product in scored_products]
 
 
-async def search_products(user_message: str) -> list[dict]:
+async def search_products(user_message: str, preference_text: str = "") -> list[dict]:
     # Step 6: Try real products from the MERN API first, then run smarter Python matching.
     try:
         products = await fetch_backend_products()
@@ -212,7 +246,11 @@ async def search_products(user_message: str) -> list[dict]:
         products = []
 
     if products:
-        return _filter_products(products, user_message)[:10]
+        filtered_products = _filter_products(products, user_message)
+        ranking_query = f"{user_message}\n{preference_text}".strip()
+        return (await rank_products_by_embedding(ranking_query, filtered_products))[:10]
 
     # Fallback keeps the AI service usable while the MERN backend is stopped.
-    return _filter_products(SAMPLE_PRODUCTS, user_message)[:10]
+    fallback_products = _filter_products(SAMPLE_PRODUCTS, user_message)
+    ranking_query = f"{user_message}\n{preference_text}".strip()
+    return (await rank_products_by_embedding(ranking_query, fallback_products))[:10]

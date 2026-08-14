@@ -111,6 +111,7 @@ const ComboPacksPage = () => {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {combos.map((combo) => {
               const previewProducts = getComboPreviewProducts(combo);
+              const comboImage = combo.displayImage || combo.featuredImage || "";
               const originalPrice = Number(combo.pricing?.originalPrice || combo.comboPrice || 0);
               const comboPrice = Number(combo.pricing?.comboPrice || combo.comboPrice || 0);
               const savings = Number(combo.pricing?.savingsAmount || 0);
@@ -131,7 +132,14 @@ const ComboPacksPage = () => {
                         </span>
                       )}
                       <div className="flex h-full items-center justify-center rounded-xl border border-gray-100 bg-gray-50 px-3 pt-8">
-                        {previewProducts.length ? (
+                        {comboImage ? (
+                          <img
+                            src={buildImageUrl(comboImage)}
+                            alt={combo.name || "Combo pack"}
+                            className="h-full w-full rounded-lg object-cover transition-transform duration-300 group-hover:scale-105"
+                            loading="lazy"
+                          />
+                        ) : previewProducts.length ? (
                           <div className="grid w-full grid-cols-[minmax(0,1fr)_28px_minmax(0,1fr)] items-center gap-2">
                             {previewProducts.map((product, index) => {
                               const image = getProductImage(product);

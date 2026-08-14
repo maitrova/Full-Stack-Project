@@ -142,9 +142,11 @@ const normalizePaymentOptions = (value, fallback = ["COD", "ONLINE"]) => {
 const getProductOriginalPrice = (product) => {
   const pricing = getReadymadePricing(product);
   const variantPrices = Array.isArray(product?.variants)
-    ? product.variants.map((variant) => Number(variant.price || 0)).filter((price) => price > 0)
+    ? product.variants
+        .map((variant) => Number(getReadymadePricing(product, { variant }).effectivePrice || 0))
+        .filter((price) => price > 0)
     : [];
-  return Number(pricing?.mrp || 0) || Number(product?.price || 0) || (variantPrices.length ? Math.min(...variantPrices) : 0);
+  return Number(pricing?.effectivePrice || 0) || (variantPrices.length ? Math.min(...variantPrices) : 0) || Number(product?.price || 0);
 };
 
 const getSelectionGroups = (combo) =>
@@ -175,9 +177,9 @@ const buildComboPricing = (combo) => {
     const originalPrice = Number(combo.originalPriceOverride || 0) > 0
       ? Number(combo.originalPriceOverride)
       : totalOriginalPrice;
-    const discountPercentage = Number(combo.discountPercentage || 0);
-    const comboPrice = Math.max(Math.round(originalPrice * (1 - discountPercentage / 100)), 0);
+    const comboPrice = Number(combo.comboPrice || 0);
     const savingsAmount = Math.max(originalPrice - comboPrice, 0);
+    const discountPercentage = originalPrice > 0 ? Math.round((savingsAmount / originalPrice) * 100) : 0;
 
     return {
       totalOriginalPrice,
@@ -279,9 +281,11 @@ const serializeCombo = (comboDoc) => {
     includedProductsCount: getSelectionGroups(combo).length || combo.items?.length || 0,
     productImages: groupProductImages.length ? groupProductImages : selectedProductImages,
     displayImage:
-      combo.imageMode === "CUSTOM_IMAGES"
-        ? combo.featuredImage || combo.galleryImages?.[0]?.url || combo.bannerImage || groupProductImages[0] || selectedProductImages[0] || null
-        : groupProductImages[0] || selectedProductImages[0] || combo.featuredImage || null,
+      combo.featuredImage ||
+      (combo.imageMode === "CUSTOM_IMAGES" ? combo.galleryImages?.[0]?.url || combo.bannerImage : null) ||
+      groupProductImages[0] ||
+      selectedProductImages[0] ||
+      null,
     pricing,
     reviewIssues: issues.length ? issues : combo.reviewIssues || [],
     needsReview: issues.length > 0 || combo.status === "REVIEW",
@@ -344,7 +348,7 @@ const applyUploadedImages = async (combo, files = {}) => {
   }
 };
 
-const validateComboPayload = async ({ items = [], selectionGroups = [], comboPrice, originalPriceOverride, discountPercentage = 0 }) => {
+const validateComboPayload = async ({ items = [], selectionGroups = [], comboPrice, originalPriceOverride }) => {
   if (selectionGroups.length) {
     const productIds = [...new Set(selectionGroups.flatMap((group) => group.eligibleProducts).map(String))];
     const products = await ReadymadeProduct.find({ _id: { $in: productIds } }).lean();
@@ -374,8 +378,11 @@ const validateComboPayload = async ({ items = [], selectionGroups = [], comboPri
       : totalOriginalPrice;
 
     if (selectionGroups.length < 2) throw new Error("Select at least two combo categories");
-    if (!(Number(discountPercentage) >= 0 && Number(discountPercentage) <= 100)) {
-      throw new Error("Discount percentage must be between 0 and 100");
+    if (!(Number(comboPrice) > 0)) {
+      throw new Error("Combo price must be greater than 0");
+    }
+    if (Number(comboPrice) > effectiveOriginalPrice) {
+      throw new Error("Combo price cannot exceed the combined eligible product price");
     }
     return { totalOriginalPrice };
   }
@@ -550,21 +557,20 @@ export const createComboPack = async (req, res) => {
     const items = hasGroupsPayload
       ? []
       : normalizeProductItems(req.body.items || req.body.productIds, allowDuplicateProducts);
-    const discountPercentage = parseDiscountPercentage(req.body.discountPercentage);
-    const comboPrice = hasGroupsPayload ? 0 : Number(req.body.comboPrice);
+    const comboPrice = Number(req.body.comboPrice);
     const originalPriceOverride = parseOptionalNumber(req.body.originalPrice);
 
-    const validation = await validateComboPayload({ items, selectionGroups, comboPrice, originalPriceOverride, discountPercentage });
-    const computedComboPrice = hasGroupsPayload
-      ? Math.max(Math.round((Number(originalPriceOverride || 0) > 0 ? Number(originalPriceOverride) : validation.totalOriginalPrice) * (1 - discountPercentage / 100)), 0)
-      : comboPrice;
+    const validation = await validateComboPayload({ items, selectionGroups, comboPrice, originalPriceOverride });
+    const effectiveOriginalPrice = Number(originalPriceOverride || 0) > 0 ? Number(originalPriceOverride) : validation.totalOriginalPrice;
+    const savingsAmount = Math.max(effectiveOriginalPrice - comboPrice, 0);
+    const discountPercentage = effectiveOriginalPrice > 0 ? Math.round((savingsAmount / effectiveOriginalPrice) * 100) : 0;
 
     const combo = new ComboPack({
       name: req.body.name,
       slug: slugify(req.body.slug || req.body.name),
       shortDescription: req.body.shortDescription || "",
       fullDescription: req.body.fullDescription || "",
-      comboPrice: computedComboPrice,
+      comboPrice,
       discountPercentage,
       originalPriceOverride,
       currency: req.body.currency || "INR",
@@ -616,18 +622,15 @@ export const updateComboPack = async (req, res) => {
       : hasItemsPayload
       ? normalizeProductItems(req.body.items || req.body.productIds, allowDuplicateProducts)
       : combo.items.map((item, index) => ({ product: item.product, sortOrder: item.sortOrder ?? index }));
-    const discountPercentage = parseDiscountPercentage(req.body.discountPercentage, combo.discountPercentage);
-    const comboPrice = hasGroupsPayload || selectionGroups.length
-      ? 0
-      : req.body.comboPrice !== undefined ? Number(req.body.comboPrice) : combo.comboPrice;
+    const comboPrice = req.body.comboPrice !== undefined ? Number(req.body.comboPrice) : combo.comboPrice;
     const originalPriceOverride = req.body.originalPrice !== undefined
       ? parseOptionalNumber(req.body.originalPrice)
       : combo.originalPriceOverride;
 
-    const validation = await validateComboPayload({ items, selectionGroups, comboPrice, originalPriceOverride, discountPercentage });
-    const computedComboPrice = selectionGroups.length
-      ? Math.max(Math.round((Number(originalPriceOverride || 0) > 0 ? Number(originalPriceOverride) : validation.totalOriginalPrice) * (1 - discountPercentage / 100)), 0)
-      : comboPrice;
+    const validation = await validateComboPayload({ items, selectionGroups, comboPrice, originalPriceOverride });
+    const effectiveOriginalPrice = Number(originalPriceOverride || 0) > 0 ? Number(originalPriceOverride) : validation.totalOriginalPrice;
+    const savingsAmount = Math.max(effectiveOriginalPrice - comboPrice, 0);
+    const discountPercentage = effectiveOriginalPrice > 0 ? Math.round((savingsAmount / effectiveOriginalPrice) * 100) : 0;
 
     if (req.body.name !== undefined) combo.name = req.body.name;
     if (req.body.slug !== undefined || req.body.name !== undefined) {
@@ -635,7 +638,7 @@ export const updateComboPack = async (req, res) => {
     }
     if (req.body.shortDescription !== undefined) combo.shortDescription = req.body.shortDescription;
     if (req.body.fullDescription !== undefined) combo.fullDescription = req.body.fullDescription;
-    combo.comboPrice = computedComboPrice;
+    combo.comboPrice = comboPrice;
     combo.discountPercentage = discountPercentage;
     combo.originalPriceOverride = originalPriceOverride;
     combo.currency = req.body.currency || combo.currency || "INR";

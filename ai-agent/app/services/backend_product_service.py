@@ -56,6 +56,10 @@ def _get_product_image(product: dict):
 
 def normalize_backend_product(product: dict) -> dict:
     # Step 5: Convert the MERN backend product shape into the simple AI product shape.
+    price = _get_product_price(product)
+    discount_percent = int(product.get("discountPercent") or product.get("discountPercentage") or 0)
+    original_price = product.get("mrp") or product.get("originalPrice") or product.get("compareAtPrice")
+
     return {
         "_id": str(product.get("_id") or ""),
         "title": product.get("title") or "Untitled product",
@@ -63,7 +67,16 @@ def normalize_backend_product(product: dict) -> dict:
         "category": product.get("category") or product.get("subCategory") or "Product",
         "subCategory": product.get("subCategory") or "",
         "color": _detect_color(product),
-        "price": _get_product_price(product),
+        "price": price,
+        "originalPrice": original_price,
+        "discountPercent": discount_percent,
+        "hasOffer": bool(
+            product.get("offerPrice")
+            or product.get("salePrice")
+            or product.get("saleActive")
+            or product.get("offerActive")
+            or discount_percent > 0
+        ),
         "sizes": _get_product_sizes(product),
         "description": product.get("description") or "No description available.",
         "thumbnail": product.get("thumbnail"),
