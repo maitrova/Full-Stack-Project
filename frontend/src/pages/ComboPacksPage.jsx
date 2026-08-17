@@ -108,7 +108,7 @@ const ComboPacksPage = () => {
             ))}
           </div>
         ) : combos.length ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
             {combos.map((combo) => {
               const previewProducts = getComboPreviewProducts(combo);
               const comboImage = combo.displayImage || combo.featuredImage || "";
@@ -120,18 +120,18 @@ const ComboPacksPage = () => {
               return (
                 <article key={combo._id} className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:border-gray-300 hover:shadow-lg">
                   <Link to={`/combo-packs/${combo.slug}`} className="block">
-                    <div className="relative aspect-[4/3] bg-white px-4 pb-4 pt-5">
+                    <div className="relative aspect-[4/3] bg-white px-2 pb-2 pt-3 sm:px-4 sm:pb-4 sm:pt-5">
                       {discount > 0 && (
-                        <span className="absolute right-3 top-3 z-10 rounded-full bg-red-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm">
+                        <span className="absolute right-2 top-2 z-10 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm sm:right-3 sm:top-3 sm:px-2.5 sm:py-1 sm:text-[11px]">
                           {discount}% OFF
                         </span>
                       )}
                       {savings > 0 && (
-                        <span className="absolute left-3 top-3 z-10 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm">
+                        <span className="absolute left-2 top-2 z-10 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm sm:left-3 sm:top-3 sm:px-2.5 sm:py-1 sm:text-[11px]">
                           Save {formatPrice(savings, combo.currency)}
                         </span>
                       )}
-                      <div className="flex h-full items-center justify-center rounded-xl border border-gray-100 bg-gray-50 px-3 pt-8">
+                      <div className="flex h-full items-center justify-center rounded-xl border border-gray-100 bg-gray-50 px-2 pt-6 sm:px-3 sm:pt-8">
                         {comboImage ? (
                           <img
                             src={buildImageUrl(comboImage)}
@@ -176,23 +176,23 @@ const ComboPacksPage = () => {
                             <Package className="text-gray-400" />
                           </div>
                         )}
-                        <div className="absolute bottom-3 left-3 rounded-md bg-yellow-300 px-2.5 py-1 text-[11px] font-bold text-gray-950 shadow-sm">
+                        <div className="absolute bottom-2 left-2 rounded-md bg-yellow-300 px-2 py-0.5 text-[10px] font-bold text-gray-950 shadow-sm sm:bottom-3 sm:left-3 sm:px-2.5 sm:py-1 sm:text-[11px]">
                           Combo Offer
                         </div>
                       </div>
                     </div>
                   </Link>
-                  <div className="space-y-3 p-4">
+                  <div className="space-y-2 p-3 sm:space-y-3 sm:p-4">
                     <div>
                       <p className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-600">
                         <Layers size={12} />
                         {combo.includedProductsCount} products included
                       </p>
-                      <h3 className="mt-2 line-clamp-2 min-h-10 text-base font-semibold leading-5 text-gray-950">{combo.name}</h3>
+                      <h3 className="mt-2 line-clamp-2 min-h-9 text-sm font-semibold leading-5 text-gray-950 sm:min-h-10 sm:text-base">{combo.name}</h3>
                     </div>
                     <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
                       <div className="flex items-baseline gap-2">
-                        <span className="text-lg font-bold text-gray-950">
+                        <span className="text-base font-bold text-gray-950 sm:text-lg">
                           {formatPrice(comboPrice, combo.currency)}
                         </span>
                         {originalPrice > comboPrice && (
@@ -212,7 +212,7 @@ const ComboPacksPage = () => {
                     </div>
                     <Link
                       to={`/combo-packs/${combo.slug}`}
-                      className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-gray-950 px-3 text-sm font-semibold text-white transition hover:bg-gray-800"
+                      className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl bg-gray-950 px-2 text-xs font-semibold text-white transition hover:bg-gray-800 sm:h-10 sm:gap-2 sm:px-3 sm:text-sm"
                     >
                       View Combo Deal
                       <ChevronRight size={16} />

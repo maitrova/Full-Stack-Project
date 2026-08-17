@@ -18,6 +18,8 @@ def build_preference_text(preferences: dict | None) -> str:
         parts.append(f"Preferred colors: {', '.join(preferences['preferred_colors'])}")
     if preferences.get("liked_product_names"):
         parts.append(f"Previously liked products: {', '.join(preferences['liked_product_names'])}")
+    if preferences.get("long_viewed_products"):
+        parts.append(f"Products viewed for longer: {', '.join(preferences['long_viewed_products'])}")
     if preferences.get("average_price"):
         parts.append(f"Typical price: around Rs {preferences['average_price']}")
 

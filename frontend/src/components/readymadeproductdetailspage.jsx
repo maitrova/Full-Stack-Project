@@ -1,6 +1,6 @@
 // src/pages/ProductDetailPage.jsx
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { getProductById as fetchReadymadeProductById, getProductByPath as fetchReadymadeProductByPath } from '../redux/slices/productList.js';
 import DOMPurify from "dompurify";
@@ -88,6 +88,7 @@ const stripHtml = (value = "") => {
 export default function ProductDetailPage() {
   const { id, type = 'product', categoryName, subCategoryName, productSlug } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
   const [selectedVariant, setSelectedVariant] = useState(null);
 
@@ -129,6 +130,8 @@ export default function ProductDetailPage() {
   const subCategoryListingPath = isReadymade
     ? buildProductsListingPath(itemData?.category, itemData?.subCategory)
     : '/catalogue';
+  const returnTo = typeof location.state?.returnTo === "string" ? location.state.returnTo : "";
+  const returnLabel = typeof location.state?.returnLabel === "string" ? location.state.returnLabel : "";
   
   const hasVariants = isReadymade &&
     Array.isArray(itemData?.variants) &&
@@ -225,6 +228,11 @@ export default function ProductDetailPage() {
   }, [product, isReadymade]);
 
   const handleBackNavigation = () => {
+    if (returnTo) {
+      navigate(returnTo);
+      return;
+    }
+
     if (!isReadymade) {
       navigate('/catalogue');
       return;
@@ -1239,7 +1247,7 @@ export default function ProductDetailPage() {
                 <ArrowLeft className="w-4 h-4" />
               </div>
               <span className="font-medium hidden sm:inline">
-                Back to {isReadymade ? (displayData?.subCategory || 'Products') : 'Catalogue'}
+                Back to {returnLabel || (isReadymade ? (displayData?.subCategory || 'Products') : 'Catalogue')}
               </span>
             </button>
 

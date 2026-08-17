@@ -40,6 +40,7 @@ import sitemapRouter from "./routes/sitemapRoutes.js";
 import comboPackRouter from "./routes/comboPackRoutes.js";
 import aiPreferenceRouter from "./routes/aiPreferenceRoutes.js";
 import aiBehaviorRouter from "./routes/aiBehaviorRoutes.js";
+import aiChatRouter from "./routes/aiChatRoutes.js";
 
 import colorselection from './routes/adminColorRoutes.js';
 import companypdfs from './routes/companyPdfRoutes.js';
@@ -152,6 +153,7 @@ app.use("/api/blogs", blogsRouter);
 app.use("/api/combo-packs", comboPackRouter);
 app.use("/api/ai", aiBehaviorRouter);
 app.use("/api/ai", aiPreferenceRouter);
+app.use("/api/ai", aiChatRouter);
 // Error handling
 app.use((err, req, res, next) => {
   console.error("Server error:", err);

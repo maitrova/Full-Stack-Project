@@ -5,6 +5,8 @@ from app.config import settings
 from app.services.backend_product_service import fetch_backend_products
 from app.services.embedding_service import rank_products_by_embedding
 from app.services.offer_service import fetch_combo_offers
+from app.services.recommendation_reason_service import add_recommendation_reasons
+from app.services.shopping_context_service import build_cart_text, fetch_cart_summary
 from app.services.user_preference_service import (
     build_behavior_text,
     build_preference_text,
@@ -45,7 +47,13 @@ def _matches_page(product: dict, page_context: dict) -> bool:
     return any(token and token in path for token in [product_category, product_sub_category])
 
 
-def _score_recommendation(product: dict, page_context: dict, preference_text: str, behavior_text: str) -> int:
+def _score_recommendation(
+    product: dict,
+    page_context: dict,
+    preference_text: str,
+    behavior_text: str,
+    cart_text: str = "",
+) -> int:
     searchable = _text(
         " ".join(
             [
@@ -57,13 +65,15 @@ def _score_recommendation(product: dict, page_context: dict, preference_text: st
             ]
         )
     )
-    taste_text = _text(f"{preference_text} {behavior_text}")
+    taste_text = _text(f"{preference_text} {behavior_text} {cart_text}")
     score = 0
 
     if product.get("hasOffer"):
         score += 8
     if _matches_page(product, page_context):
         score += 6
+    if _text(page_context.get("page_type") or page_context.get("pageType")) == "cart":
+        score += 4
     for token in taste_text.split():
         if len(token) > 2 and token in searchable:
             score += 1
@@ -80,11 +90,13 @@ async def get_page_recommendations(
     offers = await fetch_combo_offers()
     preferences = await fetch_user_preferences(auth_token)
     behavior = await fetch_behavior_summary(auth_token, session_id)
+    cart = await fetch_cart_summary(auth_token)
     preference_text = build_preference_text(preferences)
     behavior_text = build_behavior_text(behavior)
+    cart_text = build_cart_text(cart)
 
     scored_products = [
-        (_score_recommendation(product, page_context, preference_text, behavior_text), product)
+        (_score_recommendation(product, page_context, preference_text, behavior_text, cart_text), product)
         for product in products
     ]
     scored_products = [(score, product) for score, product in scored_products if score > 0]
@@ -103,10 +115,18 @@ async def get_page_recommendations(
             str(page_context),
             preference_text,
             behavior_text,
+            cart_text,
             "prefer products with offers and products similar to the current page",
         ]
     ).strip()
     recommended_products = await rank_products_by_embedding(ranking_query, recommended_products)
+    recommended_products = add_recommendation_reasons(
+        recommended_products,
+        page_context,
+        preferences,
+        behavior,
+        cart,
+    )
 
     prompt = (
         "Current page context:\n"
@@ -115,6 +135,8 @@ async def get_page_recommendations(
         f"{preference_text or 'No order/cart preferences available.'}\n\n"
         "Recent browsing behavior:\n"
         f"{behavior_text or 'No browsing behavior available yet.'}\n\n"
+        "Current cart summary:\n"
+        f"{cart_text or 'No cart summary available.'}\n\n"
         "Available combo offers:\n"
         f"{offers[:3]}\n\n"
         "Recommended products:\n"

@@ -7,6 +7,11 @@ from pydantic import BaseModel, Field
 from app.config import settings
 from app.services.llm_service import get_llm_response
 from app.services.chat_memory import clear_chat_history, get_chat_history, save_chat_turn
+from app.services.persistent_chat_service import (
+    clear_persistent_chat_history,
+    fetch_persistent_chat_history,
+    save_persistent_chat_turn,
+)
 from app.services.recommendation_service import get_page_recommendations
 
 
@@ -33,6 +38,11 @@ class ChatResponse(BaseModel):
     response: str
     products: list[dict] = Field(default_factory=list)
     action: dict | None = None
+
+
+class ChatHistoryResponse(BaseModel):
+    session_id: str
+    messages: list[dict] = Field(default_factory=list)
 
 
 class RecommendationRequest(BaseModel):
@@ -63,6 +73,8 @@ async def chat(request: ChatRequest, authorization: str | None = Header(default=
     try:
         # The endpoint passes the user message to llm_service.py.
         history = get_chat_history(session_id)
+        if not history:
+            history = await fetch_persistent_chat_history(session_id, authorization)
         chat_result = await get_llm_response(
             request.message,
             history,
@@ -71,6 +83,12 @@ async def chat(request: ChatRequest, authorization: str | None = Header(default=
             session_id,
         )
         save_chat_turn(session_id, request.message, chat_result["response"])
+        await save_persistent_chat_turn(
+            session_id,
+            request.message,
+            chat_result["response"],
+            authorization,
+        )
     except ValueError as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
     except Exception as error:
@@ -116,6 +134,16 @@ async def recommendations(
 
 
 @app.delete("/chat/{session_id}")
-def clear_chat(session_id: str):
+async def clear_chat(session_id: str, authorization: str | None = Header(default=None)):
     clear_chat_history(session_id)
+    await clear_persistent_chat_history(session_id, authorization)
     return {"status": "cleared", "session_id": session_id}
+
+
+@app.get("/chat/{session_id}", response_model=ChatHistoryResponse)
+async def chat_history(session_id: str, authorization: str | None = Header(default=None)):
+    history = get_chat_history(session_id)
+    if not history:
+        history = await fetch_persistent_chat_history(session_id, authorization)
+
+    return ChatHistoryResponse(session_id=session_id, messages=history)

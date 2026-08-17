@@ -116,6 +116,12 @@ export const buildCartPricingContext = (cart) => {
   for (const item of cart?.items || []) {
     let effectiveUnitPrice = Number(item.unitPrice || 0);
     let saleActive = false;
+    const quantity = Number(item.qty || 0);
+
+    if (item.kind === "COMBO") {
+      subtotal += effectiveUnitPrice * quantity;
+      continue;
+    }
 
     const sourceProduct =
       item.kind === "READYMADE" ? item.dropproduct || item.readymadeProduct : null;
@@ -131,11 +137,10 @@ export const buildCartPricingContext = (cart) => {
       effectiveUnitPrice = pricing.effectivePrice;
       saleActive = Boolean(pricing.saleActive);
       if (saleActive) {
-        saleItemCount += Number(item.qty || 0);
+        saleItemCount += quantity;
       }
     }
 
-    const quantity = Number(item.qty || 0);
     const lineSubtotal = effectiveUnitPrice * quantity;
     subtotal += lineSubtotal;
 

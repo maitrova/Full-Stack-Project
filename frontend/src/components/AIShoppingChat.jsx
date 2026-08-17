@@ -23,6 +23,7 @@ const AI_AGENT_API_URL =
   import.meta.env.VITE_AI_AGENT_API_URL || "http://127.0.0.1:8000";
 const AI_AGENT_FALLBACK_API_URL = "http://127.0.0.1:8002";
 const MERN_API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const CHAT_SESSION_STORAGE_KEY = "ai-shopping-chat-session-id";
 
 const initialMessages = [
   {
@@ -37,6 +38,37 @@ const tabs = [
   { id: "recommendations", label: "Recommendations", Icon: Sparkles },
   { id: "orders", label: "Track Order", Icon: PackageSearch },
 ];
+
+const buildPageQuestionSuggestions = (pageContext) => {
+  if (pageContext.page_type === "product_detail") {
+    return [
+      "What fabric or material is this made from?",
+      "Is my usual size available?",
+      "Does this product have any offer?",
+      "Show me similar products",
+    ];
+  }
+
+  if (pageContext.page_type === "combo_detail" || pageContext.page_type === "combo_listing") {
+    return [
+      "What is included in this combo?",
+      "Is this combo a better deal?",
+      "Show me matching products",
+      "Which combo should I buy?",
+    ];
+  }
+
+  if (pageContext.page_type === "cart") {
+    return [
+      "Recommend add-ons for my cart",
+      "Can I get a better combo?",
+      "What should I remove or keep?",
+      "Show offers for my cart",
+    ];
+  }
+
+  return [];
+};
 
 const getAiAgentUrls = () => {
   const urls = [AI_AGENT_API_URL, AI_AGENT_FALLBACK_API_URL];
@@ -58,6 +90,56 @@ const postToAiAgent = async (path, body, config = {}) => {
   }
 
   throw lastError;
+};
+
+const getFromAiAgent = async (path, config = {}) => {
+  let lastError;
+
+  for (const baseUrl of getAiAgentUrls()) {
+    try {
+      return await axios.get(`${baseUrl}${path}`, config);
+    } catch (error) {
+      lastError = error;
+      if (!["ERR_NETWORK"].includes(error.code) && error.response?.status !== 404) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError;
+};
+
+const deleteFromAiAgent = async (path, config = {}) => {
+  let lastError;
+
+  for (const baseUrl of getAiAgentUrls()) {
+    try {
+      return await axios.delete(`${baseUrl}${path}`, config);
+    } catch (error) {
+      lastError = error;
+      if (!["ERR_NETWORK"].includes(error.code) && error.response?.status !== 404) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError;
+};
+
+const createSessionId = () =>
+  typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+const getStoredSessionId = () => {
+  if (typeof localStorage === "undefined") return createSessionId();
+
+  const existingSessionId = localStorage.getItem(CHAT_SESSION_STORAGE_KEY);
+  if (existingSessionId) return existingSessionId;
+
+  const nextSessionId = createSessionId();
+  localStorage.setItem(CHAT_SESSION_STORAGE_KEY, nextSessionId);
+  return nextSessionId;
 };
 
 const ProductCard = ({ product, addingProductId, onAddToCart, onClick }) => {
@@ -119,6 +201,15 @@ const ProductCard = ({ product, addingProductId, onAddToCart, onClick }) => {
               )}
             </button>
           </div>
+          {Array.isArray(product.recommendationReasons) && product.recommendationReasons.length > 0 && (
+            <div className="mt-2 space-y-1 border-t border-gray-100 pt-2">
+              {product.recommendationReasons.slice(0, 2).map((reason, reasonIndex) => (
+                <p key={`${product._id || product.name}-reason-${reasonIndex}`} className="text-[11px] leading-4 text-gray-600">
+                  {reason}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -175,11 +266,7 @@ const AIShoppingChat = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState(initialMessages);
-  const [sessionId, setSessionId] = useState(() =>
-    typeof crypto !== "undefined" && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(16).slice(2)}`
-  );
+  const [sessionId, setSessionId] = useState(getStoredSessionId);
   const [isLoading, setIsLoading] = useState(false);
   const [addingProductId, setAddingProductId] = useState("");
   const [error, setError] = useState("");
@@ -191,6 +278,7 @@ const AIShoppingChat = () => {
   });
   const [recommendationNoticeCount, setRecommendationNoticeCount] = useState(0);
   const suggestedPathsRef = useRef(new Set());
+  const chatPromptPathsRef = useRef(new Set());
   const pageStartedAtRef = useRef(Date.now());
 
   const pageContext = useMemo(() => {
@@ -225,6 +313,38 @@ const AIShoppingChat = () => {
     ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
     "x-ai-session-id": sessionId,
   }), [authToken, sessionId]);
+
+  useEffect(() => {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(CHAT_SESSION_STORAGE_KEY, sessionId);
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getFromAiAgent(`/chat/${sessionId}`, { headers: requestHeaders })
+      .then(({ data }) => {
+        if (!isMounted || !Array.isArray(data.messages) || data.messages.length === 0) return;
+
+        setMessages([
+          initialMessages[0],
+          ...data.messages.map((savedMessage) => ({
+            role: savedMessage.role,
+            text: savedMessage.content,
+            products: [],
+            offers: [],
+          })),
+        ]);
+      })
+      .catch(() => {
+        // Saved history is optional; the chat still works without it.
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [sessionId]);
 
   const trackBehaviorEvent = async (eventType, extra = {}) => {
     try {
@@ -290,6 +410,26 @@ const AIShoppingChat = () => {
     };
   }, [pageContext.path]);
 
+  useEffect(() => {
+    const suggestions = buildPageQuestionSuggestions(pageContext);
+    if (!suggestions.length || chatPromptPathsRef.current.has(pageContext.path)) return;
+
+    chatPromptPathsRef.current.add(pageContext.path);
+    setMessages((currentMessages) => [
+      ...currentMessages,
+      {
+        role: "assistant",
+        text:
+          pageContext.page_type === "product_detail"
+            ? "I can answer questions about this product."
+            : "I can help you decide from here.",
+        products: [],
+        offers: [],
+        suggestions,
+      },
+    ]);
+  }, [pageContext.path]);
+
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
     if (tabId === "recommendations") {
@@ -297,10 +437,8 @@ const AIShoppingChat = () => {
     }
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-
-    const trimmedMessage = message.trim();
+  const sendChatMessage = async (rawMessage) => {
+    const trimmedMessage = rawMessage.trim();
     if (!trimmedMessage || isLoading) return;
 
     const userMessage = { role: "user", text: trimmedMessage, products: [] };
@@ -345,19 +483,29 @@ const AIShoppingChat = () => {
     }
   };
 
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    await sendChatMessage(message);
+  };
+
+  const handleSuggestedQuestion = async (question) => {
+    setActiveTab("chat");
+    await sendChatMessage(question);
+  };
+
   const handleResetChat = async () => {
     const previousSessionId = sessionId;
-    const nextSessionId =
-      typeof crypto !== "undefined" && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const nextSessionId = createSessionId();
 
     setMessages(initialMessages);
     setSessionId(nextSessionId);
     setError("");
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(CHAT_SESSION_STORAGE_KEY, nextSessionId);
+    }
 
     try {
-      await axios.delete(`${AI_AGENT_API_URL}/chat/${previousSessionId}`);
+      await deleteFromAiAgent(`/chat/${previousSessionId}`, { headers: requestHeaders });
     } catch {
       // The UI can reset even if the old in-memory server session was already gone.
     }
@@ -523,6 +671,22 @@ const AIShoppingChat = () => {
                     {chatMessage.role === "assistant" && chatMessage.products?.length > 0 && (
                       renderProducts(chatMessage.products, 3)
                     )}
+
+                    {chatMessage.role === "assistant" && chatMessage.suggestions?.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {chatMessage.suggestions.map((suggestion) => (
+                          <button
+                            key={suggestion}
+                            type="button"
+                            onClick={() => handleSuggestedQuestion(suggestion)}
+                            disabled={isLoading}
+                            className="rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-left text-xs font-semibold text-gray-700 transition hover:border-gray-400 hover:text-gray-950 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -577,7 +741,7 @@ const AIShoppingChat = () => {
                   <div>
                     <h3 className="text-sm font-semibold text-gray-950">Order help</h3>
                     <p className="mt-1 text-sm leading-6 text-gray-600">
-                      Ask in chat about your order status, delivery, returns, or payment. Direct order lookup will be connected in the next backend step.
+                      Ask in chat about your latest order, delivery status, return eligibility, or payment status.
                     </p>
                     <button
                       type="button"
@@ -621,18 +785,23 @@ const AIShoppingChat = () => {
         </section>
       )}
 
-      {/* <button
+      <button
         type="button"
         onClick={() => setIsOpen((currentValue) => !currentValue)}
-        className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-gray-950 text-white shadow-xl transition hover:bg-gray-800 focus:outline-none focus:ring-4 focus:ring-gray-900/20"
+        className="relative inline-flex h-14 w-14 items-center justify-center rounded-full bg-gray-950 text-white shadow-xl transition hover:bg-gray-800 focus:outline-none focus:ring-4 focus:ring-gray-900/20"
         aria-label={isOpen ? "Close AI chat" : "Open AI chat"}
       >
+        {recommendationNoticeCount > 0 && (
+          <span className="absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-orange-500 px-1.5 text-xs font-bold text-white ring-2 ring-white">
+            {recommendationNoticeCount > 9 ? "9+" : recommendationNoticeCount}
+          </span>
+        )}
         {isOpen ? (
           <X className="h-6 w-6" aria-hidden="true" />
         ) : (
           <MessageCircle className="h-6 w-6" aria-hidden="true" />
         )}
-      </button> */}
+      </button>
     </div>
   );
 };

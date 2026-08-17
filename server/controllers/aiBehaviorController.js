@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import UserBehaviorEvent from "../models/UserBehaviorEvent.js";
+import { rebuildUserPreferenceProfile } from "./aiPreferenceController.js";
 
 const safeString = (value) => String(value || "").trim().slice(0, 240);
 
@@ -43,6 +44,12 @@ export const trackBehaviorEvent = async (req, res) => {
       dwellMs: Math.max(Number(body.dwellMs || 0), 0),
       metadata: body.metadata && typeof body.metadata === "object" ? body.metadata : {},
     });
+
+    if (req.user?._id) {
+      rebuildUserPreferenceProfile(req.user._id).catch((error) => {
+        console.warn("Preference profile background refresh failed:", error.message);
+      });
+    }
 
     return res.status(201).json({ success: true, data: { id: event._id } });
   } catch (error) {

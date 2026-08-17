@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import DOMPurify from "dompurify";
 import { 
@@ -12,6 +12,7 @@ import {
   Package,
   ArrowRight,
   Zap,
+  Undo2,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { addToCart, getCart, selectCartLoading } from "../redux/slices/Cartslice.js";
@@ -77,6 +78,7 @@ const ComboPackDetailPage = () => {
   const { slug } = useParams();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const cartLoading = useSelector(selectCartLoading);
   const [combo, setCombo] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -135,8 +137,31 @@ const ComboPackDetailPage = () => {
   const selectGroupProduct = (index, productId) => {
     setSelections((current) => ({
       ...current,
-      [index]: { productId, size: "", color: "" },
+      [index]:
+        current[index]?.productId === productId
+          ? current[index]
+          : { productId, size: "", color: "" },
     }));
+  };
+
+  const undoGroupSelection = (index) => {
+    setSelections((current) => {
+      const next = { ...current };
+      delete next[index];
+      return next;
+    });
+  };
+
+  const hasSelectedRequiredSize = (product, selection = {}) => {
+    if (!product) return false;
+    const variants = Array.isArray(product?.variants) ? product.variants : [];
+    return variants.length === 0 || Boolean(selection.size);
+  };
+
+  const hasSelectedRequiredOptions = (product, selection = {}) => {
+    if (!hasSelectedRequiredSize(product, selection)) return false;
+    const colors = Array.isArray(product?.colors) ? product.colors : [];
+    return colors.length === 0 || Boolean(selection.color);
   };
 
   const selectionGroups = useMemo(
@@ -323,7 +348,11 @@ const ComboPackDetailPage = () => {
   const savings = Math.max(originalPrice - displayComboPrice, 0);
   const discount = originalPrice > 0 ? Math.round((savings / originalPrice) * 100) : 0;
   const completedSelectionCount = selectionGroups.length
-    ? selectedComboProducts.filter(Boolean).length
+    ? selectionGroups.reduce((count, group, index) => {
+        const selection = selections[index] || {};
+        const product = (group.eligibleProducts || []).find((entry) => entry._id === selection.productId);
+        return count + (hasSelectedRequiredSize(product, selection) ? 1 : 0);
+      }, 0)
     : combo.items?.length || 0;
 
   return (
@@ -383,6 +412,7 @@ const ComboPackDetailPage = () => {
                       {selectionGroups.map((group, index) => {
                         const selectedProductId = selections[index]?.productId || "";
                         const selectedProduct = (group.eligibleProducts || []).find((product) => product._id === selectedProductId);
+                        const selectedSizeReady = hasSelectedRequiredSize(selectedProduct, selections[index]);
                         const slotName = group.label || group.category?.name || `Slot ${index + 1}`;
                         const active = activeSelectionGroupIndex === index;
 
@@ -394,16 +424,18 @@ const ComboPackDetailPage = () => {
                             className={`flex min-w-0 items-center justify-between gap-2 rounded-xl border-2 px-2.5 py-3 text-left transition-all sm:gap-3 sm:px-4 ${
                               active
                                 ? "border-violet-600 bg-violet-50 shadow-sm"
-                                : selectedProduct
+                                : selectedSizeReady
                                   ? "border-green-200 bg-white hover:border-green-300"
+                                  : selectedProduct
+                                    ? "border-amber-200 bg-white hover:border-amber-300"
                                   : "border-gray-200 bg-white hover:border-violet-300"
                             }`}
                           >
                             <span className="flex min-w-0 items-center gap-2 sm:gap-3">
                               <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-bold sm:h-9 sm:w-9 ${
-                                selectedProduct ? "bg-green-600 text-white" : "bg-violet-600 text-white"
+                                selectedSizeReady ? "bg-green-600 text-white" : "bg-violet-600 text-white"
                               }`}>
-                                {selectedProduct ? <Check size={18} /> : index + 1}
+                                {selectedSizeReady ? <Check size={18} /> : index + 1}
                               </span>
                               <span className="min-w-0">
                                 <span className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -420,9 +452,9 @@ const ComboPackDetailPage = () => {
                               </span>
                             </span>
                             <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold sm:px-2.5 sm:text-xs ${
-                              selectedProduct ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-800"
+                              selectedSizeReady ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-800"
                             }`}>
-                              {selectedProduct ? "Selected" : "Pick 1"}
+                              {selectedSizeReady ? "Selected" : selectedProduct ? "Choose size" : "Pick 1"}
                             </span>
                           </button>
                         );
@@ -435,6 +467,8 @@ const ComboPackDetailPage = () => {
                   if (!group) return null;
                   const selectedProductId = selections[index]?.productId || "";
                   const selectedProduct = (group.eligibleProducts || []).find((product) => product._id === selectedProductId);
+                  const selectedSizeReady = hasSelectedRequiredSize(selectedProduct, selections[index]);
+                  const selectedOptionsReady = hasSelectedRequiredOptions(selectedProduct, selections[index]);
                   const slotName = group.label || group.category?.name || `Slot ${index + 1}`;
                   const products = group.eligibleProducts || [];
                   const selectedProductIds = Object.entries(selections)
@@ -446,16 +480,16 @@ const ComboPackDetailPage = () => {
                     <section
                       key={group._id || index}
                       className={`overflow-hidden rounded-xl border bg-white shadow-sm transition-all ${
-                        selectedProduct ? "border-green-200" : "border-violet-200"
+                        selectedSizeReady ? "border-green-200" : selectedProduct ? "border-amber-200" : "border-violet-200"
                       }`}
                     >
                       <div className="border-b border-gray-100 bg-white px-4 py-3">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div className="flex items-start gap-3">
                             <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${
-                              selectedProduct ? "bg-green-600 text-white" : "bg-violet-600 text-white"
+                              selectedSizeReady ? "bg-green-600 text-white" : "bg-violet-600 text-white"
                             }`}>
-                              {selectedProduct ? <Check size={20} /> : index + 1}
+                              {selectedSizeReady ? <Check size={20} /> : index + 1}
                             </div>
                             <div className="min-w-0">
                               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -470,9 +504,25 @@ const ComboPackDetailPage = () => {
                             </div>
                           </div>
                           {selectedProduct ? (
-                            <div className="inline-flex items-center gap-2 self-start rounded-full bg-green-100 px-3 py-1 text-green-700 sm:self-auto">
-                              <CheckCircle2 size={16} />
-                              <span className="text-xs font-semibold">Slot complete</span>
+                            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                              <span
+                                className={`inline-flex items-center gap-2 rounded-full px-3 py-1 ${
+                                  selectedSizeReady ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-800"
+                                }`}
+                              >
+                                {selectedSizeReady ? <CheckCircle2 size={16} /> : <Package size={16} />}
+                                <span className="text-xs font-semibold">
+                                  {selectedOptionsReady ? "Slot complete" : selectedSizeReady ? "Choose color" : "Choose size"}
+                                </span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => undoGroupSelection(index)}
+                                className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold text-gray-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+                              >
+                                <Undo2 size={14} />
+                                Undo
+                              </button>
                             </div>
                           ) : (
                             <span className="inline-flex self-start rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 sm:self-auto">
@@ -486,7 +536,6 @@ const ComboPackDetailPage = () => {
                         <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
                           {products.map((product) => {
                             const active = selectedProductId === product._id;
-                            const disabled = !combo.allowDuplicateProducts && selectedProductIds.includes(product._id);
                             const productImages = getProductImages(product);
                             const imageIndex = productImageIndexes[product._id] || 0;
                             const activeProductImage = productImages[imageIndex] || getProductImage(product);
@@ -496,6 +545,11 @@ const ComboPackDetailPage = () => {
                             const productColors = Array.isArray(product?.colors) ? product.colors : [];
                             const selectedSize = selections[index]?.size || "";
                             const selectedStock = active ? getVariantStock(product, selectedSize) : 0;
+                            const activeSizeReady = active && hasSelectedRequiredSize(product, selections[index]);
+                            const slotLocked = Boolean(selectedProduct && selectedSizeReady);
+                            const duplicateDisabled = !combo.allowDuplicateProducts && selectedProductIds.includes(product._id);
+                            const slotProductDisabled = slotLocked && !active;
+                            const disabled = duplicateDisabled || slotProductDisabled;
                             
                             return (
                               <div
@@ -514,7 +568,9 @@ const ComboPackDetailPage = () => {
                                 }}
                                 className={`group relative overflow-hidden rounded-xl border-2 bg-white transition-all duration-200 ${
                                   active
-                                    ? "border-violet-600 shadow-lg"
+                                    ? activeSizeReady
+                                      ? "border-green-500 shadow-lg"
+                                      : "border-violet-600 shadow-lg"
                                     : disabled
                                       ? "cursor-not-allowed border-gray-200 opacity-60"
                                       : "cursor-pointer border-gray-200 hover:border-violet-300 hover:shadow-lg"
@@ -522,11 +578,22 @@ const ComboPackDetailPage = () => {
                               >
                                 <div className="relative aspect-square overflow-hidden bg-gray-50">
                                   {activeProductImage ? (
-                                    <img
-                                      src={buildImageUrl(activeProductImage)}
-                                      alt={product.title}
-                                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                                    />
+                                    <Link
+                                      to={getProductDetailsPath(product)}
+                                      state={{
+                                        returnTo: `${location.pathname}${location.search || ""}`,
+                                        returnLabel: "combo offer",
+                                      }}
+                                      onClick={(event) => event.stopPropagation()}
+                                      className="block h-full w-full"
+                                      title={`View ${product.title || "product"} details`}
+                                    >
+                                      <img
+                                        src={buildImageUrl(activeProductImage)}
+                                        alt={product.title}
+                                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                                      />
+                                    </Link>
                                   ) : (
                                     <div className="flex h-full w-full items-center justify-center text-gray-400">
                                       <Package size={34} />
@@ -556,11 +623,13 @@ const ComboPackDetailPage = () => {
                                   )}
                                   
                                   <div className={`absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border-2 transition-all ${
-                                    active 
-                                      ? "bg-violet-600 border-violet-600" 
+                                    activeSizeReady
+                                      ? "bg-green-600 border-green-600"
+                                      : active
+                                        ? "bg-violet-600 border-violet-600"
                                       : "bg-white border-gray-300"
                                   }`}>
-                                    {active && <Check size={16} className="text-white" />}
+                                    {(activeSizeReady || active) && <Check size={16} className="text-white" />}
                                   </div>
                                 </div>
 
@@ -582,6 +651,10 @@ const ComboPackDetailPage = () => {
                                     </span>
                                     <Link
                                       to={getProductDetailsPath(product)}
+                                      state={{
+                                        returnTo: `${location.pathname}${location.search || ""}`,
+                                        returnLabel: "combo offer",
+                                      }}
                                       onClick={(event) => event.stopPropagation()}
                                       className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
                                     >
@@ -677,21 +750,23 @@ const ComboPackDetailPage = () => {
                                       if (disabled) return;
                                       selectGroupProduct(index, product._id);
                                     }}
-                                    className={`mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-lg text-sm font-semibold transition ${
-                                      active
-                                        ? "bg-violet-600 text-white"
+                                     className={`mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-lg text-sm font-semibold transition ${
+                                      activeSizeReady
+                                        ? "bg-green-600 text-white"
+                                        : active
+                                          ? "bg-violet-600 text-white"
                                         : disabled
                                           ? "bg-gray-100 text-gray-400"
                                           : "bg-gray-900 text-white hover:bg-black"
                                     }`}
                                   >
-                                    {active && <Check size={16} />}
-                                    {active ? "Selected" : "Select"}
+                                    {(activeSizeReady || active) && <Check size={16} />}
+                                    {activeSizeReady ? "Selected" : active ? "Choose Size" : "Select"}
                                   </button>
 
                                   {disabled && (
                                     <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
-                                      Already selected in another group
+                                      {slotProductDisabled ? "Product already selected for this slot" : "Already selected in another group"}
                                     </span>
                                   )}
                                 </div>
@@ -716,11 +791,20 @@ const ComboPackDetailPage = () => {
                     <div key={`${product._id}-${index}`} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all">
                       <div className="flex gap-4">
                         <div className="relative">
-                          <img
-                            src={buildImageUrl(getProductImage(product))}
-                            alt={product.title}
-                            className="w-24 h-24 rounded-xl object-cover shadow-md"
-                          />
+                          <Link
+                            to={getProductDetailsPath(product)}
+                            state={{
+                              returnTo: `${location.pathname}${location.search || ""}`,
+                              returnLabel: "combo offer",
+                            }}
+                            title={`View ${product.title || "product"} details`}
+                          >
+                            <img
+                              src={buildImageUrl(getProductImage(product))}
+                              alt={product.title}
+                              className="w-24 h-24 rounded-xl object-cover shadow-md"
+                            />
+                          </Link>
                           <div className="absolute -top-2 -left-2 w-8 h-8 bg-violet-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
                             {index + 1}
                           </div>
