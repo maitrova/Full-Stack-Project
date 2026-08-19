@@ -785,7 +785,7 @@ const AIShoppingChat = () => {
         </section>
       )}
 
-      <button
+      {/* <button
         type="button"
         onClick={() => setIsOpen((currentValue) => !currentValue)}
         className="relative inline-flex h-14 w-14 items-center justify-center rounded-full bg-gray-950 text-white shadow-xl transition hover:bg-gray-800 focus:outline-none focus:ring-4 focus:ring-gray-900/20"
@@ -801,7 +801,7 @@ const AIShoppingChat = () => {
         ) : (
           <MessageCircle className="h-6 w-6" aria-hidden="true" />
         )}
-      </button>
+      </button> */}
     </div>
   );
 };
