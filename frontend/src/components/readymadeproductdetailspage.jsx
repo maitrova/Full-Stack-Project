@@ -17,7 +17,7 @@ import {
 import { selectCurrentToken } from '../redux/slices/Userslice.js';
 import { buildImageUrl, getRawImagePath, getResponsiveImageProps } from "../utils/responsiveImage.js";
 import { buildProductsListingPath, buildReadymadeProductPath } from "../utils/readymadeRoutes.js";
-import { trackAddToCart, trackViewItem } from "../utils/analytics.js";
+import { trackViewItem } from "../utils/analytics.js";
 import ProductImageLightbox from "./ProductImageLightbox.jsx";
 import ProductReviews from "./ProductReviews.jsx";
 import ExpandableDescription from "./ExpandableDescription.jsx";
@@ -551,16 +551,6 @@ export default function ProductDetailPage() {
 
       console.log('Adding to cart:', cartData);
       await dispatch(addToCart(cartData)).unwrap();
-      trackAddToCart({
-        item: {
-          ...itemData,
-          qty: isReadymade ? quantity : 1,
-          unitPrice: displayData?.price,
-          size: hasVariants ? selectedSize : selectedColor,
-        },
-        value: Number(displayData?.price || 0) * Number(isReadymade ? quantity : 1),
-        currency: displayData?.currency || 'INR',
-      });
       trackMetaAddToCart({
         productId: itemData?._id,
         productName: itemData?.title || itemData?.name,

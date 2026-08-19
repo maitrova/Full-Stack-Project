@@ -17,7 +17,7 @@ import {
 import { getCart, selectCartItems, selectCartSummary } from "../redux/slices/Cartslice.js";
 import { selectCurrentToken } from "../redux/slices/Userslice.js";
 import RazorpayPayNow from "../components/RazorpayPayNow.jsx";
-import { trackBeginCheckout } from "../utils/analytics.js";
+import { trackAddPaymentInfo, trackBeginCheckoutOnce } from "../utils/analytics.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/api";
 
@@ -397,7 +397,7 @@ export default function CheckoutAddresses() {
     if (hasTrackedBeginCheckoutRef.current || !cartItems.length) return;
 
     hasTrackedBeginCheckoutRef.current = true;
-    trackBeginCheckout({
+    trackBeginCheckoutOnce({
       items: cartItems,
       value: cartSummary.total,
       currency: "INR",
@@ -625,6 +625,13 @@ export default function CheckoutAddresses() {
 
     setCodLoading(true);
     setCodError("");
+    trackAddPaymentInfo({
+      items: cartItems,
+      value: effectiveTotal,
+      currency: "INR",
+      coupon: isCouponApplied ? normalizedCouponCode : "",
+      paymentType: "Cash on Delivery",
+    });
 
     try {
       const res = await fetch(`${API_URL}/payment/cod/create-from-cart`, {
@@ -1012,6 +1019,15 @@ export default function CheckoutAddresses() {
                     });
                   }}
                   onOrderCreated={handleOrderCreated}
+                  onPaymentInfo={() => {
+                    trackAddPaymentInfo({
+                      items: cartItems,
+                      value: effectiveTotal,
+                      currency: "INR",
+                      coupon: isCouponApplied ? normalizedCouponCode : "",
+                      paymentType: "Online payment",
+                    });
+                  }}
                   disabled={onlineDisabled}
                 />
 

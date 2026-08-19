@@ -1,6 +1,7 @@
 // cartSlice.js
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
+import { trackAddToCart } from "../../utils/analytics.js";
 
 // Import the selector from userSlice
 import { selectCurrentToken } from "./Userslice.js";
@@ -94,6 +95,82 @@ const summarizeCartPayload = (cartData) => {
   return cartData;
 };
 
+const getCartPayloadValue = (cartData, key) => {
+  if (isFormDataPayload(cartData)) return cartData.get(key);
+  return cartData?.[key];
+};
+
+const idsMatch = (left, right) =>
+  Boolean(left && right && String(left) === String(right));
+
+const getProductIdFromCartItem = (item = {}) =>
+  item.dropproduct?._id ||
+  item.readymadeProduct?._id ||
+  item.design?._id ||
+  item.product?._id ||
+  item.comboPack?._id ||
+  item.dropproductId ||
+  item.readymadeProductId ||
+  item.designId ||
+  item.productId ||
+  item.comboPackId ||
+  "";
+
+const findAddedCartItem = (cartData, responseData) => {
+  const items = responseData?.cart?.items || [];
+  if (!Array.isArray(items) || !items.length) return null;
+
+  const payloadSignature = getCartPayloadValue(cartData, "signature");
+  if (payloadSignature) {
+    const signatureMatch = items.find((item) => item.signature === payloadSignature);
+    if (signatureMatch) return signatureMatch;
+  }
+
+  const kind = String(getCartPayloadValue(cartData, "kind") || "").toUpperCase();
+  const size = String(getCartPayloadValue(cartData, "size") || "").toUpperCase();
+  const targetId =
+    getCartPayloadValue(cartData, "dropproductId") ||
+    getCartPayloadValue(cartData, "readymadeProductId") ||
+    getCartPayloadValue(cartData, "designId") ||
+    getCartPayloadValue(cartData, "productId") ||
+    getCartPayloadValue(cartData, "comboPackId") ||
+    "";
+
+  const matches = items.filter((item) => {
+    if (kind && String(item.kind || "").toUpperCase() !== kind) return false;
+    if (size && String(item.size || "").toUpperCase() !== size) return false;
+
+    if (!targetId) return true;
+    return (
+      idsMatch(targetId, getProductIdFromCartItem(item)) ||
+      idsMatch(targetId, item.dropproduct?._id) ||
+      idsMatch(targetId, item.readymadeProduct?._id) ||
+      idsMatch(targetId, item.design?._id) ||
+      idsMatch(targetId, item.product?._id) ||
+      idsMatch(targetId, item.comboPack?._id)
+    );
+  });
+
+  return matches[matches.length - 1] || null;
+};
+
+const trackSuccessfulAddToCart = (cartData, responseData) => {
+  const addedQty = Number(getCartPayloadValue(cartData, "qty") || 1);
+  const addedItem = findAddedCartItem(cartData, responseData) || summarizeCartPayload(cartData);
+  const unitPrice = Number(addedItem?.unitPrice ?? addedItem?.price ?? 0);
+  const currency = addedItem?.currency || "INR";
+
+  trackAddToCart({
+    item: {
+      ...addedItem,
+      qty: addedQty,
+      quantity: addedQty,
+    },
+    value: unitPrice * addedQty,
+    currency,
+  });
+};
+
 const extractErrorMessage = (data) => {
   if (!data) return null;
   if (typeof data === "string") return data;
@@ -182,6 +259,8 @@ export const addToCart = createAsyncThunk(
         message: response.data?.message || null,
         itemCount: response.data?.cart?.items?.length ?? null,
       });
+
+      trackSuccessfulAddToCart(cartData, response.data);
       
       return response.data;
     } catch (error) {

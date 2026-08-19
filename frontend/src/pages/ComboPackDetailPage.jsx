@@ -578,22 +578,11 @@ const ComboPackDetailPage = () => {
                               >
                                 <div className="relative aspect-square overflow-hidden bg-gray-50">
                                   {activeProductImage ? (
-                                    <Link
-                                      to={getProductDetailsPath(product)}
-                                      state={{
-                                        returnTo: `${location.pathname}${location.search || ""}`,
-                                        returnLabel: "combo offer",
-                                      }}
-                                      onClick={(event) => event.stopPropagation()}
-                                      className="block h-full w-full"
-                                      title={`View ${product.title || "product"} details`}
-                                    >
-                                      <img
-                                        src={buildImageUrl(activeProductImage)}
-                                        alt={product.title}
-                                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                                      />
-                                    </Link>
+                                    <img
+                                      src={buildImageUrl(activeProductImage)}
+                                      alt={product.title}
+                                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                                    />
                                   ) : (
                                     <div className="flex h-full w-full items-center justify-center text-gray-400">
                                       <Package size={34} />
@@ -656,7 +645,7 @@ const ComboPackDetailPage = () => {
                                         returnLabel: "combo offer",
                                       }}
                                       onClick={(event) => event.stopPropagation()}
-                                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-gray-700 transition hover:bg-gray-100"
+                                      className="inline-flex items-center gap-1 rounded-md bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700 transition hover:bg-sky-100 hover:text-sky-800"
                                     >
                                       <Eye size={14} />
                                       Details

@@ -10,6 +10,7 @@ const getProductSource = (item = {}) =>
   item.readymadeProduct ||
   item.design ||
   item.product ||
+  item.comboPack ||
   item;
 
 const getProductId = (item = {}, source = getProductSource(item)) =>
@@ -19,6 +20,7 @@ const getProductId = (item = {}, source = getProductSource(item)) =>
   item.readymadeProductId ||
   item.designId ||
   item.productId ||
+  item.comboPackId ||
   item._id ||
   item.id ||
   "";
@@ -28,9 +30,12 @@ const getProductName = (item = {}, source = getProductSource(item)) =>
   source?.name ||
   source?.productName ||
   source?.designName ||
+  source?.comboName ||
   item.title ||
   item.name ||
   item.productName ||
+  item.comboName ||
+  item.comboPackName ||
   (item.kind === "DESIGN" ? "Customized Product" : "Product");
 
 export const buildAnalyticsItem = (item = {}, overrides = {}) => {
@@ -104,6 +109,45 @@ export const trackBeginCheckout = ({
       analyticsItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
     ),
     coupon,
+    items: analyticsItems,
+  });
+};
+
+const buildCheckoutEventKey = ({ items = [], value, coupon = "" } = {}) => {
+  const itemKey = buildAnalyticsItems(items)
+    .map((item) => `${item.item_id}:${item.item_variant}:${item.quantity}`)
+    .join("|");
+
+  return `ga4_begin_checkout:${itemKey}:${toNumber(value, 0)}:${coupon}`;
+};
+
+export const trackBeginCheckoutOnce = (checkout = {}) => {
+  const key = buildCheckoutEventKey(checkout);
+
+  if (typeof window !== "undefined" && window.sessionStorage) {
+    if (window.sessionStorage.getItem(key)) return;
+    window.sessionStorage.setItem(key, "1");
+  }
+
+  trackBeginCheckout(checkout);
+};
+
+export const trackAddPaymentInfo = ({
+  items = [],
+  value,
+  currency = DEFAULT_CURRENCY,
+  coupon = "",
+  paymentType = "",
+} = {}) => {
+  const analyticsItems = buildAnalyticsItems(items);
+  pushAnalyticsEvent("add_payment_info", {
+    currency,
+    value: toNumber(
+      value,
+      analyticsItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+    ),
+    coupon,
+    payment_type: paymentType,
     items: analyticsItems,
   });
 };

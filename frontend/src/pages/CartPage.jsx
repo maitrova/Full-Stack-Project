@@ -22,6 +22,7 @@ import { buildImageUrl, getRawImagePath, getResponsiveImageProps } from "../util
 import { buildReadymadeProductPath } from "../utils/readymadeRoutes.js";
 import { buildDropProductPath } from "../utils/dropProductRoutes.js";
 import { buildCatalogueDesignPath } from "../utils/catalogueDesignRoutes.js";
+import { trackBeginCheckoutOnce } from "../utils/analytics.js";
 
 // Constants
 const ensureImageUrl = (imagePath) => buildImageUrl(imagePath) || null;
@@ -280,6 +281,11 @@ const CartPage = () => {
       });
       return;
     }
+    trackBeginCheckoutOnce({
+      items: cartItems,
+      value: cartSummary.total,
+      currency: "INR",
+    });
     setIsCheckoutLoading(true);
     setTimeout(() => {
       navigate('/checkout');

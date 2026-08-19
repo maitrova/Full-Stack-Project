@@ -9,6 +9,7 @@ export default function RazorpayPayNow({
   disabled = false,
   onSuccess,
   onOrderCreated,
+  onPaymentInfo,
 }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
@@ -96,6 +97,7 @@ export default function RazorpayPayNow({
       };
 
       const rzp = new window.Razorpay(options);
+      onPaymentInfo?.(created);
       rzp.open();
     } catch (error) {
       setErr(error.message || "Something went wrong");
