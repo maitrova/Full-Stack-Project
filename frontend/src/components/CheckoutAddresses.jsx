@@ -17,7 +17,7 @@ import {
 import { getCart, selectCartItems, selectCartSummary } from "../redux/slices/Cartslice.js";
 import { selectCurrentToken } from "../redux/slices/Userslice.js";
 import RazorpayPayNow from "../components/RazorpayPayNow.jsx";
-import { trackAddPaymentInfo, trackBeginCheckoutOnce } from "../utils/analytics.js";
+import { trackAddPaymentInfo, trackBeginCheckoutOnce, trackPurchaseOnce } from "../utils/analytics.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/api";
 
@@ -603,6 +603,15 @@ export default function CheckoutAddresses() {
 
   const handleOrderSuccess = ({ orderId, paymentLabel, totalAmount }) => {
     const purchaseItems = buildPurchaseItems(cartItems);
+    const purchaseTotal = Number(totalAmount || 0);
+
+    trackPurchaseOnce({
+      transactionId: orderId,
+      items: purchaseItems,
+      value: purchaseTotal,
+      currency: "INR",
+      paymentType: paymentLabel || "",
+    });
 
     dispatch(getCart());
     navigate("/checkout/success", {
@@ -611,7 +620,7 @@ export default function CheckoutAddresses() {
         orderSuccess: {
           orderId,
           paymentLabel,
-          totalAmount: Number(totalAmount || 0),
+          totalAmount: purchaseTotal,
           items: purchaseItems,
           itemCount: purchaseItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
           createdAt: Date.now(),
