@@ -68,6 +68,11 @@ export const buildAnalyticsItems = (items = []) =>
 export const pushAnalyticsEvent = (event, ecommerce = {}, extra = {}) => {
   if (typeof window === "undefined") return;
 
+  const eventPayload = {
+    ...ecommerce,
+    ...extra,
+  };
+
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({ ecommerce: null });
   window.dataLayer.push({
@@ -75,9 +80,13 @@ export const pushAnalyticsEvent = (event, ecommerce = {}, extra = {}) => {
     ecommerce,
     ...extra,
   });
+
+  if (typeof window.gtag === "function") {
+    window.gtag("event", event, eventPayload);
+  }
 };
 
-export const trackViewItem = ({ item, value, currency = DEFAULT_CURRENCY }) => {
+export const trackViewItem = ({ item, value, currency = DEFAULT_CURRENCY } = {}) => {
   const analyticsItem = buildAnalyticsItem(item, { currency });
   pushAnalyticsEvent("view_item", {
     currency: analyticsItem.currency || currency,
@@ -86,12 +95,27 @@ export const trackViewItem = ({ item, value, currency = DEFAULT_CURRENCY }) => {
   });
 };
 
-export const trackAddToCart = ({ item, value, currency = DEFAULT_CURRENCY }) => {
-  const analyticsItem = buildAnalyticsItem(item, { currency });
-  pushAnalyticsEvent("add_to_cart", {
+export const trackAddToCart = ({
+  item,
+  items,
+  value,
+  currency = DEFAULT_CURRENCY,
+} = {}) => {
+  const sourceItems = Array.isArray(items) && items.length ? items : [item];
+  const analyticsItems = buildAnalyticsItems(sourceItems).map((analyticsItem) => ({
+    ...analyticsItem,
     currency: analyticsItem.currency || currency,
-    value: toNumber(value ?? analyticsItem.price * analyticsItem.quantity, 0),
-    items: [analyticsItem],
+  }));
+
+  pushAnalyticsEvent("add_to_cart", {
+    currency,
+    value: toNumber(
+      value,
+      analyticsItems.reduce((sum, analyticsItem) => (
+        sum + analyticsItem.price * analyticsItem.quantity
+      ), 0)
+    ),
+    items: analyticsItems,
   });
 };
 
