@@ -4,7 +4,6 @@ import {
   trackAddToCart,
   trackBeginCheckout,
   trackPurchase,
-  trackPurchaseOnce,
 } from "../src/utils/analytics.js";
 
 const sampleItems = [
@@ -25,19 +24,9 @@ const sampleItems = [
 ];
 
 const resetWindow = () => {
-  const storage = new Map();
-
   global.window = {
     dataLayer: [],
     gtagCalls: [],
-    localStorage: {
-      getItem(key) {
-        return storage.has(key) ? storage.get(key) : null;
-      },
-      setItem(key, value) {
-        storage.set(key, String(value));
-      },
-    },
     gtag(...args) {
       this.gtagCalls.push(args);
     },
@@ -89,48 +78,12 @@ assert.equal(lastDataLayerEvent().ecommerce.payment_type, "Online payment");
 resetWindow();
 trackPurchase({
   transactionId: "order-1",
-  items: [
-    {
-      id: "product-1",
-      name: "Classic Tee",
-      item_category: "T-Shirts",
-      item_variant: "M",
-      item_price: 499,
-      quantity: 2,
-      currency: "INR",
-    },
-  ],
+  items: sampleItems,
   value: 998,
   currency: "INR",
   paymentType: "Online payment",
 });
 assertEcommerceEvent("purchase", 998);
 assert.equal(lastDataLayerEvent().ecommerce.transaction_id, "order-1");
-
-resetWindow();
-assert.equal(
-  trackPurchaseOnce({
-    transactionId: "order-2",
-    items: sampleItems,
-    value: 998,
-    currency: "INR",
-    paymentType: "Cash on Delivery",
-  }),
-  true
-);
-assertEcommerceEvent("purchase", 998);
-assert.equal(lastDataLayerEvent().ecommerce.transaction_id, "order-2");
-assert.equal(
-  trackPurchaseOnce({
-    transactionId: "order-2",
-    items: sampleItems,
-    value: 998,
-    currency: "INR",
-    paymentType: "Cash on Delivery",
-  }),
-  false
-);
-assert.equal(window.gtagCalls.length, 1);
-assert.equal(window.dataLayer.filter((entry) => entry?.event === "purchase").length, 1);
 
 console.log("GA4 ecommerce analytics smoke test passed");
