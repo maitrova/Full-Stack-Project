@@ -1636,7 +1636,6 @@ setPriceBreakdown((prev) => ({
       stopCropPreviewPan();
     };
   }, [isCropModalOpen, activeDesign]);
-  const shouldUseFolderDropdown = folders.length > 6;
   const selectedSizeStockEntry = availableSizePricing.find(
     (entry) => String(entry?.size || "").toUpperCase() === String(selectedSize || "").toUpperCase()
   );
@@ -3975,65 +3974,25 @@ const startCropPreviewPan = (event, mode = "move") => {
                 <div className="border-b border-slate-200 bg-slate-50/80 p-4 lg:border-b-0 lg:border-r">
                   <div>
                     <label className="mb-2 block text-xs font-medium text-slate-700">Folders</label>
-                    <div className="space-y-2 sm:hidden">
-                      <select
-                        value={currentFolder || ""}
-                        onChange={(e) => selectDesignLibraryFolder(e.target.value)}
-                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-sky-400"
-                      >
-                        <option value="" disabled>
-                          Select a folder
-                        </option>
-                        {folders.map((folder) => (
-                          <option key={folder} value={folder}>
-                            {folder}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-[11px] text-slate-500">
-                        Browse folders from the dropdown to keep the gallery easy to scan on mobile.
-                      </p>
+                    <div className="flex max-h-[96px] gap-2 overflow-x-auto overflow-y-hidden pb-2 pr-1 sm:max-h-[180px] sm:flex-wrap sm:overflow-y-auto sm:pb-0 lg:max-h-[220px]">
+                      {folders.map((folder) => (
+                        <button
+                          key={folder}
+                          type="button"
+                          onClick={() => selectDesignLibraryFolder(folder)}
+                          className={`shrink-0 rounded-full border px-3 py-1.5 text-xs transition sm:shrink ${
+                            currentFolder === folder
+                              ? "border-sky-300 bg-sky-100 text-sky-700"
+                              : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                          }`}
+                        >
+                          {folder}
+                        </button>
+                      ))}
                     </div>
-                    <div className="hidden sm:block">
-                      {shouldUseFolderDropdown ? (
-                        <div className="space-y-2">
-                          <select
-                            value={currentFolder || ""}
-                            onChange={(e) => selectDesignLibraryFolder(e.target.value)}
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-sky-400"
-                          >
-                            <option value="" disabled>
-                              Select a folder
-                            </option>
-                            {folders.map((folder) => (
-                              <option key={folder} value={folder}>
-                                {folder}
-                              </option>
-                            ))}
-                          </select>
-                          <p className="text-[11px] text-slate-500">
-                            {folders.length} folders available. Use the dropdown to switch quickly without hiding the designs.
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="flex max-h-[180px] flex-wrap gap-2 overflow-y-auto pr-1 lg:max-h-[220px]">
-                          {folders.map((folder) => (
-                            <button
-                              key={folder}
-                              type="button"
-                              onClick={() => selectDesignLibraryFolder(folder)}
-                              className={`rounded-full border px-3 py-1.5 text-xs ${
-                                currentFolder === folder
-                                  ? "border-sky-300 bg-sky-100 text-sky-700"
-                                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
-                              }`}
-                            >
-                              {folder}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <p className="mt-2 text-[11px] text-slate-500">
+                      {folders.length} collections. Scroll this list to switch folders.
+                    </p>
                   </div>
                 </div>
 
