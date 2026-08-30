@@ -93,6 +93,10 @@ export const deleteFolder = createAsyncThunk(
 const initialState = {
   folders: [],
   currentFolder: null,
+  imagesFolder: null,
+  imagesByFolder: {},
+  loadingFolders: {},
+  loadingImagesFor: null,
   images: [],
   loading: false,
   uploading: false,
@@ -112,17 +116,32 @@ const designUploadsSlice = createSlice({
     },
     setCurrentFolder: (state, action) => {
       state.currentFolder = action.payload;
+      const cachedImages = state.imagesByFolder[action.payload];
+      if (cachedImages) {
+        state.images = cachedImages;
+        state.imagesFolder = action.payload;
+      }
     },
     clearCurrentFolder: (state) => {
       state.currentFolder = null;
+      state.imagesFolder = null;
+      state.imagesByFolder = {};
+      state.loadingFolders = {};
+      state.loadingImagesFor = null;
       state.images = [];
     },
     // Optional: For real-time updates without refetching
     addImageLocally: (state, action) => {
       state.images.unshift(action.payload);
+      if (state.imagesFolder) {
+        state.imagesByFolder[state.imagesFolder] = state.images;
+      }
     },
     removeImageLocally: (state, action) => {
       state.images = state.images.filter(img => img.filename !== action.payload);
+      if (state.imagesFolder) {
+        state.imagesByFolder[state.imagesFolder] = state.images;
+      }
     },
     addFolderLocally: (state, action) => {
       if (!state.folders.includes(action.payload)) {
@@ -181,7 +200,12 @@ const designUploadsSlice = createSlice({
         if (state.currentFolder === action.payload.folder) {
           const newImages = action.payload.files || [];
           state.images = [...newImages, ...state.images];
+          state.imagesFolder = action.payload.folder;
         }
+        state.imagesByFolder[action.payload.folder] = [
+          ...(action.payload.files || []),
+          ...(state.imagesByFolder[action.payload.folder] || []),
+        ];
       })
       .addCase(uploadImages.rejected, (state, action) => {
         state.uploading = false;
@@ -189,17 +213,33 @@ const designUploadsSlice = createSlice({
       })
 
       // Fetch Images
-      .addCase(fetchImages.pending, (state) => {
+      .addCase(fetchImages.pending, (state, action) => {
         state.loading = true;
+        state.loadingImagesFor = action.meta.arg;
+        state.loadingFolders[action.meta.arg] = true;
         state.error = null;
       })
       .addCase(fetchImages.fulfilled, (state, action) => {
-        state.loading = false;
-        state.images = action.payload.files || [];
-        state.currentFolder = action.payload.folder;
+        const folder = action.payload.folder || action.meta.arg;
+        const files = action.payload.files || [];
+        delete state.loadingFolders[folder];
+        state.loading = Object.keys(state.loadingFolders).length > 0;
+        if (state.loadingImagesFor === folder) {
+          state.loadingImagesFor = null;
+        }
+        state.imagesByFolder[folder] = files;
+        if (state.currentFolder === folder) {
+          state.images = files;
+          state.imagesFolder = folder;
+        }
       })
       .addCase(fetchImages.rejected, (state, action) => {
-        state.loading = false;
+        const folder = action.meta.arg;
+        delete state.loadingFolders[folder];
+        state.loading = Object.keys(state.loadingFolders).length > 0;
+        if (state.loadingImagesFor === folder) {
+          state.loadingImagesFor = null;
+        }
         state.error = action.payload?.message || 'Failed to fetch images';
       })
 
@@ -212,6 +252,11 @@ const designUploadsSlice = createSlice({
         state.loading = false;
         state.success = action.payload.message || 'Image deleted successfully';
         state.images = state.images.filter(img => img.filename !== action.payload.filename);
+        if (state.imagesByFolder[action.payload.folder]) {
+          state.imagesByFolder[action.payload.folder] = state.imagesByFolder[action.payload.folder].filter(
+            img => img.filename !== action.payload.filename
+          );
+        }
       })
       .addCase(deleteImage.rejected, (state, action) => {
         state.loading = false;
@@ -227,10 +272,14 @@ const designUploadsSlice = createSlice({
         state.loading = false;
         state.success = action.payload.message || 'Folder deleted successfully';
         state.folders = state.folders.filter(folder => folder !== action.payload.folder);
+        delete state.imagesByFolder[action.payload.folder];
+        delete state.loadingFolders[action.payload.folder];
         
         // Clear current folder if it was deleted
         if (state.currentFolder === action.payload.folder) {
           state.currentFolder = null;
+          state.imagesFolder = null;
+          state.loadingImagesFor = null;
           state.images = [];
         }
       })

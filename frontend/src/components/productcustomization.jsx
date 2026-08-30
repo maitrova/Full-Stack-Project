@@ -729,8 +729,11 @@ export default function DesignerPage() {
   const { 
     folders, 
     images, 
+    imagesFolder,
+    imagesByFolder,
     currentFolder, 
-    loading: libraryLoading 
+    loadingFolders,
+    loadingImagesFor
   } = useSelector((state) => state.designUploads);
 const getSizeBasePrice = (prod, size) => {
   const list = prod?.sizePricing || [];
@@ -1636,6 +1639,13 @@ setPriceBreakdown((prev) => ({
       stopCropPreviewPan();
     };
   }, [isCropModalOpen, activeDesign]);
+  const currentFolderImages =
+    (currentFolder && imagesByFolder?.[currentFolder]) ||
+    (imagesFolder === currentFolder ? images : []);
+  const isCurrentFolderLoading =
+    Boolean(currentFolder) &&
+    Boolean(loadingFolders?.[currentFolder] || loadingImagesFor === currentFolder) &&
+    currentFolderImages.length === 0;
   const selectedSizeStockEntry = availableSizePricing.find(
     (entry) => String(entry?.size || "").toUpperCase() === String(selectedSize || "").toUpperCase()
   );
@@ -4005,7 +4015,9 @@ const startCropPreviewPan = (event, mode = "move") => {
                         </p>
                         <p className="text-xs text-slate-500">
                           {currentFolder
-                            ? `${images.length} design${images.length === 1 ? "" : "s"} available`
+                            ? isCurrentFolderLoading
+                              ? "Loading designs..."
+                              : `${currentFolderImages.length} design${currentFolderImages.length === 1 ? "" : "s"} available`
                             : "Choose a folder on the left to view designs."}
                         </p>
                       </div>
@@ -4018,13 +4030,24 @@ const startCropPreviewPan = (event, mode = "move") => {
                   </div>
 
                   <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-                    {libraryLoading ? (
-                      <div className="flex h-full items-center justify-center text-xs text-slate-500">
-                        Loading designs...
-                      </div>
-                    ) : currentFolder && images.length > 0 ? (
+                    {isCurrentFolderLoading ? (
                       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
-                        {images.map((image) => (
+                        {Array.from({ length: 8 }).map((_, index) => (
+                          <div
+                            key={`library-skeleton-${index}`}
+                            className="overflow-hidden rounded-[22px] border border-slate-200 bg-slate-50"
+                          >
+                            <div className="aspect-square animate-pulse bg-slate-100" />
+                            <div className="space-y-2 px-3 pb-3 pt-2">
+                              <div className="h-3 w-4/5 animate-pulse rounded-full bg-slate-200" />
+                              <div className="h-2.5 w-1/2 animate-pulse rounded-full bg-slate-200" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : currentFolder && currentFolderImages.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+                        {currentFolderImages.map((image) => (
                           <button
                             key={image.filename}
                             type="button"
