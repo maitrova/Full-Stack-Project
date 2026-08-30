@@ -3984,7 +3984,26 @@ const startCropPreviewPan = (event, mode = "move") => {
                 <div className="border-b border-slate-200 bg-slate-50/80 p-4 lg:border-b-0 lg:border-r">
                   <div>
                     <label className="mb-2 block text-xs font-medium text-slate-700">Folders</label>
-                    <div className="flex max-h-[96px] gap-2 overflow-x-auto overflow-y-hidden pb-2 pr-1 sm:max-h-[180px] sm:flex-wrap sm:overflow-y-auto sm:pb-0 lg:max-h-[220px]">
+                    <div className="space-y-2 sm:hidden">
+                      <select
+                        value={currentFolder || ""}
+                        onChange={(e) => selectDesignLibraryFolder(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-sky-400"
+                      >
+                        <option value="" disabled>
+                          Select a folder
+                        </option>
+                        {folders.map((folder) => (
+                          <option key={folder} value={folder}>
+                            {folder}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[11px] text-slate-500">
+                        Select a collection to open its shareable design URL.
+                      </p>
+                    </div>
+                    <div className="hidden max-h-[180px] gap-2 overflow-y-auto pr-1 sm:flex sm:flex-wrap lg:max-h-[220px]">
                       {folders.map((folder) => (
                         <button
                           key={folder}
@@ -4000,7 +4019,7 @@ const startCropPreviewPan = (event, mode = "move") => {
                         </button>
                       ))}
                     </div>
-                    <p className="mt-2 text-[11px] text-slate-500">
+                    <p className="mt-2 hidden text-[11px] text-slate-500 sm:block">
                       {folders.length} collections. Scroll this list to switch folders.
                     </p>
                   </div>
