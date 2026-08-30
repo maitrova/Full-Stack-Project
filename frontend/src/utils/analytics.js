@@ -16,6 +16,7 @@ const getProductSource = (item = {}) =>
 const getProductId = (item = {}, source = getProductSource(item)) =>
   source?._id ||
   source?.id ||
+  item.item_id ||
   item.dropproductId ||
   item.readymadeProductId ||
   item.designId ||
@@ -31,6 +32,7 @@ const getProductName = (item = {}, source = getProductSource(item)) =>
   source?.productName ||
   source?.designName ||
   source?.comboName ||
+  item.item_name ||
   item.title ||
   item.name ||
   item.productName ||
@@ -44,7 +46,9 @@ export const buildAnalyticsItem = (item = {}, overrides = {}) => {
   const price = toNumber(
     overrides.price ??
       overrides.item_price ??
+      item.item_price ??
       item.unitPrice ??
+      item.price ??
       source?.effectivePrice ??
       source?.price ??
       source?.basePrice,
@@ -54,8 +58,8 @@ export const buildAnalyticsItem = (item = {}, overrides = {}) => {
   return {
     item_id: String(overrides.item_id ?? overrides.id ?? getProductId(item, source)),
     item_name: String(overrides.item_name ?? overrides.name ?? getProductName(item, source)),
-    item_category: overrides.item_category ?? source?.category ?? item.category ?? "",
-    item_variant: overrides.item_variant ?? item.size ?? item.selectedSize ?? source?.size ?? "",
+    item_category: overrides.item_category ?? item.item_category ?? source?.category ?? item.category ?? "",
+    item_variant: overrides.item_variant ?? item.item_variant ?? item.size ?? item.selectedSize ?? source?.size ?? "",
     price,
     quantity,
     currency: overrides.currency ?? item.currency ?? source?.currency ?? DEFAULT_CURRENCY,
@@ -197,6 +201,30 @@ export const trackPurchase = ({
     payment_type: paymentType,
     items: analyticsItems,
   });
+};
+
+export const trackPurchaseOnce = (purchase = {}) => {
+  const transactionId = String(purchase.transactionId || purchase.transaction_id || "");
+
+  if (!transactionId) return false;
+
+  const storageKey = `ga4_purchase:${transactionId}`;
+
+  if (typeof window !== "undefined" && window.localStorage) {
+    try {
+      if (window.localStorage.getItem(storageKey)) return false;
+      window.localStorage.setItem(storageKey, "1");
+    } catch {
+      // If storage is blocked, still send the confirmed purchase.
+    }
+  }
+
+  trackPurchase({
+    ...purchase,
+    transactionId,
+  });
+
+  return true;
 };
 
 export const trackSearch = ({ searchTerm, source = "site_search", resultsCount } = {}) => {

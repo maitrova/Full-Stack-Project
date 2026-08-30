@@ -711,7 +711,7 @@ const createDesignLayer = (
 
 export default function DesignerPage() {
   const { slug } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -815,6 +815,34 @@ const getSizeBasePrice = (prod, size) => {
   const cropPreviewFrameRef = useRef(null);
   const cropDragStateRef = useRef(null);
   const customizerReturnPath = `${location.pathname}${location.search}`;
+  const requestedCollection = searchParams.get("collection") || "";
+  const shouldOpenLibraryFromUrlRef = useRef(searchParams.has("collection"));
+
+  const resolveFolderFromCollection = (collection, availableFolders = []) => {
+    if (!collection || !availableFolders.length) return null;
+    return (
+      availableFolders.find((folder) => folder === collection) ||
+      availableFolders.find(
+        (folder) => String(folder).toLowerCase() === String(collection).toLowerCase()
+      ) ||
+      null
+    );
+  };
+
+  const updateDesignLibraryCollectionUrl = (folder, { replace = false } = {}) => {
+    if (!folder) return;
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("collection", folder);
+    setSearchParams(nextParams, { replace });
+  };
+
+  const selectDesignLibraryFolder = (folder, options = {}) => {
+    if (!folder) return;
+    dispatch(setCurrentFolder(folder));
+    updateDesignLibraryCollectionUrl(folder, options);
+  };
+
   const promptLoginForRestrictedAction = (message) => {
     setSaveError(message);
     setSaveSuccess(false);
@@ -1312,12 +1340,38 @@ const finalUrl = rawUrl.startsWith("http")
     dispatch(fetchFolders());
   }, [dispatch]);
 
+  useEffect(() => {
+    if (!folders.length) return;
+
+    const folderFromUrl = resolveFolderFromCollection(requestedCollection, folders);
+    const nextFolder = folderFromUrl || currentFolder || folders[0];
+
+    if (nextFolder && currentFolder !== nextFolder) {
+      dispatch(setCurrentFolder(nextFolder));
+    }
+
+    if (!requestedCollection || !folderFromUrl) {
+      updateDesignLibraryCollectionUrl(nextFolder, { replace: true });
+    }
+  }, [dispatch, folders, requestedCollection, currentFolder]);
+
+  useEffect(() => {
+    if (!shouldOpenLibraryFromUrlRef.current || !requestedCollection || !folders.length) return;
+
+    const folderFromUrl = resolveFolderFromCollection(requestedCollection, folders);
+    if (folderFromUrl) {
+      setActiveTab(TABS.DESIGN_LIBRARY);
+      setIsLibraryModalOpen(true);
+      shouldOpenLibraryFromUrlRef.current = false;
+    }
+  }, [requestedCollection, folders]);
+
   // Fetch images when folder changes
   useEffect(() => {
-    if (activeTab === TABS.DESIGN_LIBRARY && currentFolder) {
+    if (currentFolder) {
       dispatch(fetchImages(currentFolder));
     }
-  }, [dispatch, currentFolder, activeTab]);
+  }, [dispatch, currentFolder]);
 
   useEffect(() => {
     if (slug) {
@@ -3924,7 +3978,7 @@ const startCropPreviewPan = (event, mode = "move") => {
                     <div className="space-y-2 sm:hidden">
                       <select
                         value={currentFolder || ""}
-                        onChange={(e) => dispatch(setCurrentFolder(e.target.value))}
+                        onChange={(e) => selectDesignLibraryFolder(e.target.value)}
                         className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-sky-400"
                       >
                         <option value="" disabled>
@@ -3945,7 +3999,7 @@ const startCropPreviewPan = (event, mode = "move") => {
                         <div className="space-y-2">
                           <select
                             value={currentFolder || ""}
-                            onChange={(e) => dispatch(setCurrentFolder(e.target.value))}
+                            onChange={(e) => selectDesignLibraryFolder(e.target.value)}
                             className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-sky-400"
                           >
                             <option value="" disabled>
@@ -3967,7 +4021,7 @@ const startCropPreviewPan = (event, mode = "move") => {
                             <button
                               key={folder}
                               type="button"
-                              onClick={() => dispatch(setCurrentFolder(folder))}
+                              onClick={() => selectDesignLibraryFolder(folder)}
                               className={`rounded-full border px-3 py-1.5 text-xs ${
                                 currentFolder === folder
                                   ? "border-sky-300 bg-sky-100 text-sky-700"

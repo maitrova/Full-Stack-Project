@@ -242,7 +242,13 @@ const Hero = () => {
   };
 
   const openCustomizer = ({ openLibrary = false } = {}) => {
-    navigate(`/products/${product?.slug || "hoodie"}/customize`, {
+    const params = new URLSearchParams();
+    if (selectedDesign?.folder) {
+      params.set("collection", selectedDesign.folder);
+    }
+    const queryString = params.toString();
+
+    navigate(`/products/${product?.slug || "hoodie"}/customize${queryString ? `?${queryString}` : ""}`, {
       state: {
         homepageCustomization: {
           color: selectedColor,

@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { trackPurchase } from "../utils/analytics.js";
 
 const getSuccessPayload = (locationState) => {
   const payload = locationState?.orderSuccess;
@@ -14,7 +13,7 @@ export default function OrderSuccessPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const successPayload = getSuccessPayload(location.state);
-  const hasTrackedPurchaseRef = useRef(false);
+  const hasTrackedMetaPurchaseRef = useRef(false);
 
   useEffect(() => {
     if (!successPayload) {
@@ -23,18 +22,9 @@ export default function OrderSuccessPage() {
   }, [navigate, successPayload]);
 
   useEffect(() => {
-    if (!successPayload || hasTrackedPurchaseRef.current) {
+    if (!successPayload || hasTrackedMetaPurchaseRef.current) {
       return;
     }
-
-    trackPurchase({
-      transactionId: successPayload.orderId,
-      items: Array.isArray(successPayload.items) ? successPayload.items : [],
-      value: Number(successPayload.totalAmount || 0),
-      currency: "INR",
-      paymentType: successPayload.paymentLabel || "",
-    });
-    hasTrackedPurchaseRef.current = true;
 
     if (typeof window !== "undefined" && typeof window.fbq === "function") {
       const trackedItems = Array.isArray(successPayload.items) ? successPayload.items : [];
@@ -52,7 +42,7 @@ export default function OrderSuccessPage() {
         num_items: Number(successPayload.itemCount || trackedItems.length || 0),
         order_id: String(successPayload.orderId),
       });
-      hasTrackedPurchaseRef.current = true;
+      hasTrackedMetaPurchaseRef.current = true;
     }
   }, [successPayload]);
 
