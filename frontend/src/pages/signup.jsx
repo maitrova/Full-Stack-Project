@@ -3,7 +3,7 @@ import { FiUser, FiPhone, FiMail, FiLock, FiEye, FiEyeOff } from "react-icons/fi
 import { useDispatch, useSelector } from "react-redux";
 import { registerUser, googleLogin } from "../redux/slices/Userslice.js";
 import { GoogleLogin } from "@react-oauth/google";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 
 const SignupPage = () => {
   const [formData, setFormData] = useState({
@@ -23,15 +23,23 @@ const SignupPage = () => {
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const { userInfo, status, error } = useSelector((state) => state.user);
 
   // ✅ Redirect after ANY signup (normal or Google)
   useEffect(() => {
     if (userInfo) {
-      navigate("/");
+      const fromState = location.state?.from;
+      const redirectTo =
+        typeof fromState === "string"
+          ? fromState
+          : fromState?.pathname
+            ? `${fromState.pathname}${fromState.search || ""}${fromState.hash || ""}`
+            : "/";
+      navigate(redirectTo, { replace: true });
     }
-  }, [userInfo, navigate]);
+  }, [userInfo, location.state, navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

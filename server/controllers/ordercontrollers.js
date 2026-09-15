@@ -17,6 +17,7 @@ import {
   buildReviewLookupKey,
   getReviewTargetFromOrderItem,
 } from "../services/reviewService.js";
+import { sendWhatsAppOrderUpdateSafely } from "../services/whatsappOrderService.js";
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -805,6 +806,7 @@ export const cancelMyOrder = async (req, res) => {
     } catch (emailError) {
       console.error("cancelMyOrder email error:", emailError.response?.body || emailError);
     }
+    await sendWhatsAppOrderUpdateSafely(order, "CANCELLED");
 
     const [orderWithReviews] = await attachReviewMetaToOrders([order.toObject()], userId);
     const [orderWithReturnMeta] = attachReturnMetaToOrders(req, [orderWithReviews]);
@@ -904,6 +906,7 @@ export const adminCancelOrder = async (req, res) => {
     } catch (emailError) {
       console.error("adminCancelOrder email error:", emailError.response?.body || emailError);
     }
+    await sendWhatsAppOrderUpdateSafely(order, "CANCELLED");
 
     const shaped = {
       ...order.toObject(),
@@ -1628,6 +1631,7 @@ export const adminUpdateOrderStatus = async (req, res) => {
     } catch (emailError) {
       console.error("adminUpdateOrderStatus email error:", emailError.response?.body || emailError);
     }
+    await sendWhatsAppOrderUpdateSafely(order, orderStatus);
 
     return res.status(200).json({ message: "Order status updated", order });
   } catch (err) {
@@ -1691,7 +1695,10 @@ export const adminBulkUpdateOrderStatus = async (req, res) => {
       ordersToUpdate.map(async (order) => {
         order.orderStatus = orderStatus;
         order.deliveredAt = orderStatus === "DELIVERED" ? new Date() : null;
-        await sendOrderStatusEmail(order, order.user);
+        await Promise.all([
+          sendOrderStatusEmail(order, order.user),
+          sendWhatsAppOrderUpdateSafely(order, orderStatus),
+        ]);
       })
     );
 

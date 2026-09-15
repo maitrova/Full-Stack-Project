@@ -5,6 +5,7 @@ import Header from "./components/Header.jsx";
 import Breadcrumbs from "./components/Breadcrumbs.jsx";
 import Footer from "./components/Footer.jsx";
 import AIShoppingChat from "./components/AIShoppingChat.jsx";
+import WhatsAppConnect from "./pages/WhatsAppConnect.jsx";
 import ProductList from "./pages/ProductList.jsx";
 import Homepage from "./pages/Homepage.jsx";
 import AdminDesignsPage from "./pages/AdminDesignsPage.jsx";
@@ -135,6 +136,7 @@ function App() {
       <GtmRouteTracker />
       <CanonicalTag />
       <Routes>
+        <Route path="/whatsapp-connect" element={<WhatsAppConnect />} />
         {/* Auth pages without header */}
         <Route path="/login" element={
           <AuthLayout>

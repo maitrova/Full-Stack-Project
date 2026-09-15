@@ -1,5 +1,6 @@
 import Order from "../models/Order.js";
 import { sendOrderStatusEmail } from "../services/orderEmailService.js";
+import { sendWhatsAppOrderUpdateSafely } from "../services/whatsappOrderService.js";
 
 
 
@@ -53,10 +54,14 @@ export const updateOrderStatus = async (req, res) => {
       }
 
       order.orderStatus = orderStatus;
+      order.deliveredAt = orderStatus === "DELIVERED" ? new Date() : null;
+      order.statusHistory = order.statusHistory || [];
+      order.statusHistory.push({ status: orderStatus, at: new Date() });
       await order.save();
 
       // 🔥 Send Email Immediately (No Queue)
       await sendOrderStatusEmail(order, order.user);
+      await sendWhatsAppOrderUpdateSafely(order, orderStatus);
 
       updatedCount++;
     }

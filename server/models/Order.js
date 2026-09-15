@@ -80,6 +80,10 @@ const orderSchema = new mongoose.Schema(
     default: "PROCESSING",
     index: true,
   },
+    statusHistory: [{
+      status: { type: String, required: true },
+      at: { type: Date, default: Date.now },
+    }],
     deliveredAt: { type: Date, default: null },
 
     returnRequest: {
@@ -133,6 +137,7 @@ const orderSchema = new mongoose.Schema(
       razorpayOrderId: String,
       razorpayPaymentId: String,
       razorpaySignature: String,
+      failureReason: { type: String, default: "" },
       status: { type: String, default: "CREATED" },
       refundStatus: {
         type: String,
@@ -167,6 +172,9 @@ const orderSchema = new mongoose.Schema(
     invoiceDate: Date,
     invoicePdfUrl: String,
     inventoryAdjustedAt: { type: Date, default: null },
+    confirmationSentAt: { type: Date, default: null },
+    postOrderFinalizingAt: { type: Date, default: null },
+    postOrderFinalizedAt: { type: Date, default: null },
 
       },
   { timestamps: true }

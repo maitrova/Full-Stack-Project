@@ -29,3 +29,10 @@ to run the server : npm start
 visit the localhost found in the terminal
 
 uodatred 
+
+
+activate the env with thiscommand Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+
+start the3 backend with python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+

@@ -15,6 +15,7 @@ import {
 } from "../services/couponService.js";
 import { getReadymadePricing } from "../utils/readymadePricing.js";
 import HeaderBannerSettings from "../models/HeaderBannerSettings.js";
+import { sendWhatsAppOrderUpdateSafely } from "../services/whatsappOrderService.js";
 
 const toPaise = (rupees) => Math.round(Number(rupees) * 100);
 const getRefId = (value) => value?._id || value || null;
@@ -392,6 +393,32 @@ const createOrderDocFromCart = async ({
 };
 
 const finalizePostOrderFlow = async ({ orderDoc, userId }) => {
+  const now = new Date();
+  const leaseCutoff = new Date(now.getTime() - 5 * 60 * 1000);
+  const claimedOrder = await Order.findOneAndUpdate(
+    {
+      _id: orderDoc._id,
+      postOrderFinalizedAt: null,
+      $or: [
+        { postOrderFinalizingAt: null },
+        { postOrderFinalizingAt: { $exists: false } },
+        { postOrderFinalizingAt: { $lt: leaseCutoff } },
+      ],
+    },
+    { $set: { postOrderFinalizingAt: now } },
+    { new: true }
+  );
+
+  if (!claimedOrder) {
+    return Cart.findOneAndUpdate(
+      { user: userId, status: "ACTIVE" },
+      { $setOnInsert: { user: userId, status: "ACTIVE", items: [] } },
+      { upsert: true, new: true }
+    );
+  }
+  orderDoc = claimedOrder;
+
+  try {
   if (!orderDoc.inventoryAdjustedAt) {
     await applyInventoryForOrder(orderDoc);
     orderDoc.inventoryAdjustedAt = new Date();
@@ -404,11 +431,18 @@ const finalizePostOrderFlow = async ({ orderDoc, userId }) => {
     orderId: orderDoc._id,
   });
 
-  const populatedOrder = await Order.findById(orderDoc._id).populate("user");
-  await Promise.all([
-    sendOrderStatusEmail(populatedOrder, populatedOrder.user),
-    sendAdminOrderNotification(populatedOrder, populatedOrder.user),
-  ]);
+  if (!orderDoc.confirmationSentAt) {
+    const populatedOrder = await Order.findById(orderDoc._id).populate("user");
+    const notificationResults = await Promise.allSettled([
+      sendOrderStatusEmail(populatedOrder, populatedOrder.user),
+      sendAdminOrderNotification(populatedOrder, populatedOrder.user),
+      sendWhatsAppOrderUpdateSafely(populatedOrder, "ORDER_CONFIRMED"),
+    ]);
+    notificationResults
+      .filter((entry) => entry.status === "rejected")
+      .forEach((entry) => console.error("Post-order notification failed:", entry.reason));
+    orderDoc.confirmationSentAt = new Date();
+  }
 
   await Cart.findOneAndUpdate(
     { _id: orderDoc.cart, user: userId, status: "ACTIVE" },
@@ -416,11 +450,22 @@ const finalizePostOrderFlow = async ({ orderDoc, userId }) => {
     { new: true }
   );
 
-  return Cart.findOneAndUpdate(
+  const activeCart = await Cart.findOneAndUpdate(
     { user: userId, status: "ACTIVE" },
     { $setOnInsert: { user: userId, status: "ACTIVE", items: [] } },
     { upsert: true, new: true }
   );
+  orderDoc.postOrderFinalizedAt = orderDoc.postOrderFinalizedAt || new Date();
+  orderDoc.postOrderFinalizingAt = null;
+  await orderDoc.save();
+  return activeCart;
+  } catch (error) {
+    await Order.updateOne(
+      { _id: orderDoc._id, postOrderFinalizedAt: null },
+      { $set: { postOrderFinalizingAt: null } }
+    );
+    throw error;
+  }
 };
 
 const getRazorpayWebhookSecret = () =>
@@ -439,7 +484,9 @@ const verifyRazorpayWebhookSignature = (rawBody, signature) => {
     .update(rawBody)
     .digest("hex");
 
-  return expectedSignature === signature;
+  const expected = Buffer.from(expectedSignature, "utf8");
+  const received = Buffer.from(String(signature), "utf8");
+  return expected.length === received.length && crypto.timingSafeEqual(expected, received);
 };
 
 const mapWebhookRefundStatus = (status = "") => {
@@ -622,42 +669,18 @@ export const verifyRazorpayPayment = async (req, res) => {
 
     await orderDoc.save();
 
-    let shouldSendConfirmationEmail = false;
-
-    if (!orderDoc.inventoryAdjustedAt) {
-      try {
-        await applyInventoryForOrder(orderDoc);
-      } catch (inventoryError) {
-        console.error("Inventory adjustment failed:", inventoryError);
-        return res.status(inventoryError.statusCode || 409).json({
-          message:
-            inventoryError.code === "INSUFFICIENT_STOCK"
-              ? "Payment verified, but one or more items are out of stock. Please contact support."
-              : "Payment verified, but inventory update failed.",
-        });
-      }
-
-      orderDoc.orderStatus = "PROCESSING";
-      orderDoc.inventoryAdjustedAt = new Date();
-      await orderDoc.save();
-      shouldSendConfirmationEmail = true;
+    let newActiveCart;
+    try {
+      newActiveCart = await finalizePostOrderFlow({ orderDoc, userId });
+    } catch (inventoryError) {
+      console.error("Post-payment finalization failed:", inventoryError);
+      return res.status(inventoryError.statusCode || 409).json({
+        message:
+          inventoryError.code === "INSUFFICIENT_STOCK"
+            ? "Payment verified, but one or more items are out of stock. Please contact support."
+            : "Payment verified, but order finalization needs attention.",
+      });
     }
-
-    await redeemCouponForOrder({
-      couponSnapshot: orderDoc.coupon,
-      userId,
-      orderId: orderDoc._id,
-    });
-
-    if (shouldSendConfirmationEmail) {
-      const populatedOrder = await Order.findById(orderDoc._id).populate("user");
-      await Promise.all([
-        sendOrderStatusEmail(populatedOrder, populatedOrder.user),
-        sendAdminOrderNotification(populatedOrder, populatedOrder.user),
-      ]);
-    }
-
-    const newActiveCart = await finalizePostOrderFlow({ orderDoc, userId });
 
     return res.status(200).json({
       message: alreadyVerified ? "Payment already verified" : "Payment verified",
@@ -694,6 +717,43 @@ export const handleRazorpayWebhook = async (req, res) => {
     }
 
     const eventName = String(event?.event || "").toLowerCase();
+    const paymentEvents = ["payment.captured", "payment.failed", "order.paid"];
+    if (paymentEvents.includes(eventName)) {
+      const paymentEntity = event?.payload?.payment?.entity || {};
+      const razorpayOrderEntity = event?.payload?.order?.entity || {};
+      const razorpayOrderId = paymentEntity.order_id || razorpayOrderEntity.id;
+      const localOrderId = paymentEntity?.notes?.orderId || razorpayOrderEntity?.notes?.orderId;
+      const query = localOrderId
+        ? { _id: localOrderId }
+        : { "payment.razorpayOrderId": razorpayOrderId };
+      const order = await Order.findOne(query).populate("user");
+      if (!order) {
+        console.warn("[razorpay-webhook] Order not found for payment event", eventName, razorpayOrderId);
+        return res.status(200).json({ message: "Order not found" });
+      }
+
+      if (eventName === "payment.failed") {
+        if (order.status !== "PAID") {
+          order.status = "FAILED";
+          order.payment.status = "FAILED";
+          order.payment.razorpayPaymentId = paymentEntity.id || order.payment.razorpayPaymentId;
+          order.payment.failureReason = paymentEntity.error_description || paymentEntity.error_reason || "Payment failed";
+          await order.save();
+          await sendWhatsAppOrderUpdateSafely(order, "PAYMENT_FAILED");
+        }
+        return res.status(200).json({ message: "Payment failure recorded" });
+      }
+
+      order.status = "PAID";
+      order.payment.status = "PAID";
+      order.payment.failureReason = "";
+      order.payment.razorpayOrderId = razorpayOrderId || order.payment.razorpayOrderId;
+      order.payment.razorpayPaymentId = paymentEntity.id || order.payment.razorpayPaymentId;
+      await order.save();
+      await finalizePostOrderFlow({ orderDoc: order, userId: order.user?._id || order.user });
+      return res.status(200).json({ message: "Payment event processed" });
+    }
+
     if (!["refund.created", "refund.processed", "refund.failed"].includes(eventName)) {
       return res.status(200).json({ message: "Webhook ignored" });
     }
@@ -758,6 +818,10 @@ export const handleRazorpayWebhook = async (req, res) => {
         );
       }
     }
+    await sendWhatsAppOrderUpdateSafely(
+      order,
+      nextRefundStatus === "PAID" ? "REFUND_PAID" : nextRefundStatus === "FAILED" ? "REFUND_FAILED" : "REFUND_PROCESSING"
+    );
 
     return res.status(200).json({ message: "Webhook processed" });
   } catch (err) {

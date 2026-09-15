@@ -272,7 +272,7 @@ const LoginPage = () => {
           {/* Signup Link */}
           <div className="text-center text-sm text-gray-600 mt-6">
             Don't have an account?{' '}
-            <Link to="/register" className="text-purple-600 font-medium hover:text-purple-800">
+            <Link to="/register" state={{ from: location.state?.from }} className="text-purple-600 font-medium hover:text-purple-800">
               Sign up
             </Link>
           </div>
