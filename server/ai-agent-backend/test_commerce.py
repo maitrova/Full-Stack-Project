@@ -21,12 +21,13 @@ class CommerceTests(unittest.IsolatedAsyncioTestCase):
             whatsapp_account_links=self.account_links,
         ))
         self.service._linked = AsyncMock(return_value={"user": "customer"})
-        self.service._request = AsyncMock(return_value=(201, {}))
+        self.service._request = AsyncMock(return_value=(201, {"checkout_url": "https://shop.example/whatsapp-connect?token=" + "a" * 43}))
         self.product = SimpleNamespace(id="p", name="White Shirt", currency="INR", attributes={"sizes": ["M"], "variants": [{"size": "M", "stock": 3, "effective_price": 120.0}]})
         self.tools = SimpleNamespace(get_product_details=AsyncMock(return_value=self.product))
         self.conv = {"external_customer_ref": "test", "selected_product_id": "p"}
         self.settings = patch("app.services.whatsapp_commerce.settings", SimpleNamespace(
             ecommerce_storefront_url="https://shop.example",
+            ecommerce_api_url="https://api.shop.example/api",
             whatsapp_checkout_links_per_hour=10,
         ))
         self.settings.start()
@@ -47,8 +48,8 @@ class CommerceTests(unittest.IsolatedAsyncioTestCase):
         reply = await self.service.handle("my order status", self.conv, {}, self.tools, "b")
         self.assertIn("whatsapp-connect", reply[0])
         self.assertIn("token=", reply[0])
-        self.link_requests.insert_one.assert_awaited_once()
-        self.service._request.assert_not_awaited()
+        self.link_requests.insert_one.assert_not_awaited()
+        self.assertEqual(self.service._request.await_args.args[1], "/link/request")
 
     async def test_unlinked_confirm_creates_one_tap_cart_handoff(self):
         self.service._linked.return_value = None
@@ -58,12 +59,12 @@ class CommerceTests(unittest.IsolatedAsyncioTestCase):
         reply = await self.service.handle("confirm", self.conv, state, self.tools, "b")
 
         self.assertIn("whatsapp-connect?token=", reply[0])
-        request = self.link_requests.insert_one.await_args.args[0]
+        request = self.service._request.await_args.args[3]
         self.assertEqual(request["purchase"]["product_id"], "p")
         self.assertEqual(request["purchase"]["quantity"], 1)
         self.assertEqual(request["return_path"], "/checkout")
         self.assertNotIn("purchase", state)
-        self.service._request.assert_not_awaited()
+        self.link_requests.insert_one.assert_not_awaited()
 
     async def test_changed_price_requires_reconfirmation(self):
         state = {}
@@ -161,16 +162,42 @@ class CommerceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("securely", reply[0])
         self.assertIn("Never send", reply[0])
 
-    async def test_retry_checkout_revalidates_and_creates_fresh_operation(self):
+    async def test_retry_checkout_revalidates_and_preserves_operation(self):
         previous = {"product_id": "p", "size": "M", "quantity": 1, "expected_price": 100, "operation_id": "old"}
         state = {"last_checkout_purchase": previous}
 
         reply = await self.service.handle("send link again", self.conv, state, self.tools, "b")
 
         self.assertIn("whatsapp-connect?token=", reply[0])
-        refreshed = self.link_requests.insert_one.await_args.args[0]["purchase"]
+        refreshed = self.service._request.await_args.args[3]["purchase"]
         self.assertEqual(refreshed["expected_price"], 120.0)
-        self.assertNotEqual(refreshed["operation_id"], "old")
+        self.assertEqual(refreshed["operation_id"], "old")
+
+    async def test_local_api_cannot_issue_a_production_checkout_link(self):
+        with patch("app.services.whatsapp_commerce.settings", SimpleNamespace(
+            ecommerce_api_url="http://127.0.0.1:5000/api", whatsapp_checkout_links_per_hour=10,
+        )):
+            reply = await self.service._link_message("account", "https://shop.example", recipient="test")
+        self.assertIn("local store API", reply)
+        self.service._request.assert_not_awaited()
+        self.link_requests.insert_one.assert_not_awaited()
+
+    async def test_link_service_failure_does_not_send_a_fake_link(self):
+        self.service._request.return_value = (503, {"message": "Store unavailable"})
+        reply = await self.service._link_message("account", "https://shop.example", recipient="test")
+        self.assertIn("Store unavailable", reply)
+        self.assertNotIn("whatsapp-connect?token=", reply)
+
+    async def test_wrong_storefront_is_not_sent_to_customer(self):
+        self.service._request.return_value = (201, {"checkout_url": "https://other.example/whatsapp-connect?token=" + "a" * 43})
+        reply = await self.service._link_message("account", "https://shop.example", recipient="test")
+        self.assertIn("don't match", reply)
+
+    async def test_expired_link_message_reissues_without_duplicate_operation(self):
+        state = {"last_checkout_purchase": {"product_id": "p", "size": "M", "quantity": 1, "operation_id": "original"}}
+        reply = await self.service.handle("link has expired", self.conv, state, self.tools, "b")
+        self.assertIn("whatsapp-connect?token=", reply[0])
+        self.assertEqual(self.service._request.await_args.args[3]["purchase"]["operation_id"], "original")
 
     async def test_queue_splits_messages(self):
         collection = SimpleNamespace(insert_one=AsyncMock())

@@ -7,6 +7,7 @@ from fastapi import HTTPException, status
 from app.ai.intent_parser import IntentParser
 from app.ai.product_image_analyzer import ProductImageAnalyzer
 from app.ai.response_generator import ResponseGenerator
+from app.ai.store_knowledge import StoreKnowledge
 from app.repositories.business_repository import BusinessRepository
 from app.repositories.conversation_repository import ConversationRepository
 from app.repositories.message_repository import MessageRepository
@@ -90,6 +91,8 @@ class SalesAgent:
         updated_state = self._merge_conversation_state(conversation.get("conversation_state", {}), intent)
         if image_analysis:
             updated_state["last_image_analysis"] = image_analysis
+        store_question = StoreKnowledge.is_store_question(payload.message) or intent.intent == "store_question"
+        store_context = await StoreKnowledge(self.commerce.db if self.commerce else None).load(business, payload.message, include_all=intent.intent == "store_question")
         order_request = self._is_order_request(payload.message)
         follow_up = self._detect_follow_up(payload.message, conversation, updated_state)
         retry_options = self._is_retry_options_request(payload.message) and updated_state.get("last_search_had_results") is False
@@ -101,9 +104,18 @@ class SalesAgent:
         if not presentation:
             presentation = await self._presentation_request(business_id, payload.message, conversation, updated_state)
 
-        if presentation:
+        if store_question and not presentation:
+            selected_id = updated_state.get("selected_product_id") or conversation.get("selected_product_id")
+            if selected_id:
+                selected_product = await self.product_tools.get_product_details(business_id, str(selected_id))
+            ai_text = StoreKnowledge.fallback(store_context)
+            response_goal = "answer the store question from verified store information; acknowledge any missing facts"
+        elif presentation:
             ai_text, products, media_mode = presentation
             response_goal = "product photos or link"
+        elif re.fullmatch(r"(?:this|that|same) (?:product|item|one)", payload.message.lower().strip()) and not follow_up:
+            ai_text = "Which one do you mean? Reply to its photo or send the option number, and I'll help with that item."
+            response_goal = "clarify an ambiguous product reference without repeating recommendations"
         elif retry_options:
             retry_intent = self._intent_from_state(updated_state, intent)
             products, relaxed_summary = await self._search_relaxed_options(business_id, retry_intent)
@@ -253,6 +265,7 @@ class SalesAgent:
             products=products,
             selected_product=selected_product,
             response_goal=response_goal,
+            store_context=store_context,
         )
 
         updated_state["recent_turns"] = (updated_state.get("recent_turns", []) + [
@@ -556,6 +569,10 @@ class SalesAgent:
         if any(
             re.search(rf"\b{re.escape(phrase)}\b", text)
             for phrase in [
+                "this product",
+                "that product",
+                "this item",
+                "that item",
                 "this one",
                 "that one",
                 "same one",
@@ -768,7 +785,7 @@ class SalesAgent:
 
     def _build_response(self, intent: IntentResult, products: list[ProductPublic]) -> str:
         if intent.intent != "product_search":
-            return "Sure. What product are you looking for? Send the budget or color also if you have one."
+            return "I can help with products, delivery, returns, payments, or your order. What would you like to know?"
 
         missing_questions = self._missing_questions(intent)
         if missing_questions and self._should_ask_clarifying(intent, products):
@@ -878,14 +895,15 @@ class SalesAgent:
         lines = [
             f"{product.name}",
             f"Price is {product.currency} {int(price)}.",
-            f"Stock left: {product.stock}.",
+            "It's in stock." if product.stock > 0 else "It's currently out of stock.",
         ]
         if product.description:
             lines.append(product.description)
         if product.attributes:
-            readable_attributes = ", ".join(f"{key}: {value}" for key, value in product.attributes.items())
-            lines.append(readable_attributes)
-        lines.append("Want me to keep this aside or show similar options?")
+            readable_attributes = ", ".join(f"{key.replace('_', ' ')}: {value}" for key, value in product.attributes.items() if key in {"color", "fabric", "material", "fit", "sizes", "brand", "care"})
+            if readable_attributes:
+                lines.append(readable_attributes)
+        lines.append("Would you like the product link?")
         return "\n".join(lines)
 
     def _build_stock_response(self, stock_result: dict) -> str:

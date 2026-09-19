@@ -35,9 +35,18 @@ Maitrova URL configuration (agent environment):
 ```dotenv
 ECOMMERCE_STOREFRONT_URL=https://www.maitrova.in
 ECOMMERCE_PUBLIC_URL=https://maitrova.in/api/outputs
-# For local Node on port 5000; change for separate production containers/hosts:
-ECOMMERCE_API_URL=http://127.0.0.1:5000/api
+# Must be the SAME backend used by the deployed storefront, not local Node:
+ECOMMERCE_API_URL=https://maitrova.in/api
 ```
+Configure `ECOMMERCE_STOREFRONT_URL=https://www.maitrova.in` on the Node backend
+as well. Deploy the Node backend before restarting/updating the agent: the agent
+now calls `POST /api/whatsapp-commerce/link/request` using the shared commerce
+key. Node creates and hashes the token in its own database, and returns the secure
+URL; the agent no longer inserts checkout tokens into its local MongoDB. A local
+API plus a deployed storefront is rejected instead of sending a broken link.
+For fully local HTTPS staging/tunnel setups, point both services and the browser
+to the matching staging backend; do not mix production checkout with local data.
+
 The image URL is NOT the commerce API URL. Generate a random commerce key locally
 (`python -c "import secrets; print(secrets.token_hex(32))"`) and save the same value
 as `WHATSAPP_COMMERCE_KEY` in Node's `.env` and the agent's `.env`. Do not share it
@@ -75,9 +84,12 @@ operation IDs do not increment quantities twice; ambiguous failed operations are
 held for inspection, not blindly replayed. Payment, shipping address and final
 order creation take place on the existing authenticated checkout website.
 Cancellation/return requests link to the account's order page for submission.
+Fresh-link requests keep the confirmed cart operation ID, and previously issued
+links remain valid until their own 15-minute expiry. Reissuing a link must not
+invalidate an in-progress login or add the same confirmed purchase twice.
 Payment questions route to authenticated Razorpay/COD checkout and explicitly tell
 customers never to send an OTP, UPI PIN, or card details in WhatsApp. Expired-link
-retries revalidate stock and price and create a fresh idempotent cart operation.
+retries revalidate stock and price and create a fresh token for the same cart operation.
 
 Razorpay must POST to `/api/payment/webhooks/razorpay`. The raw-body route verifies
 the signature before JSON parsing. `payment.captured` and `order.paid` recover a

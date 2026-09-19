@@ -1,6 +1,6 @@
 import express from "express";
 import mongoose from "mongoose";
-import { createHash, timingSafeEqual } from "crypto";
+import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { protect } from "../middleware/authMiddleware.js";
 import User from "../models/authmodel.js";
 import Order from "../models/Order.js";
@@ -68,7 +68,7 @@ router.post("/link/complete", protect, async (req, res) => {
   );
   const request = result?.value || result;
   if (!request?.account || !/^[a-f0-9]{64}$/.test(request.account)) {
-    return res.status(400).json({ message: "This checkout link has expired or was already used" });
+    return res.status(400).json({ code: "CHECKOUT_LINK_UNAVAILABLE", message: "This checkout link is unavailable on this store, expired, or was already used. Request a new link in WhatsApp. If a new link also fails immediately, the store team must check the agent's API configuration." });
   }
 
   await links().updateOne(
@@ -111,6 +111,53 @@ router.use((req, res, next) => {
   const received = String(req.headers["x-commerce-key"] || "");
   if (!expected || Buffer.byteLength(received) !== Buffer.byteLength(expected) || !timingSafeEqual(Buffer.from(received), Buffer.from(expected))) return res.sendStatus(401);
   next();
+});
+
+// Issue tokens on the same backend/database that will complete them. This must
+// precede linked-account middleware because the customer is not linked yet.
+router.post("/link/request", async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  const account = String(req.headers["x-whatsapp-account"] || "");
+  const { recipient, purchase, return_path: returnPath } = req.body || {};
+  if (!/^[a-f0-9]{64}$/.test(account) || !/^\d{7,15}$/.test(String(recipient || ""))) {
+    return res.status(400).json({ message: "Invalid WhatsApp account or recipient" });
+  }
+  if (purchase && (
+    !mongoose.isValidObjectId(purchase.product_id) ||
+    !["XS", "S", "M", "L", "XL", "XXL"].includes(purchase.size) ||
+    !Number.isInteger(purchase.quantity) || purchase.quantity < 1 || purchase.quantity > 20 ||
+    !Number.isFinite(purchase.expected_price) || purchase.expected_price < 0 ||
+    !/^[a-f0-9]{32,64}$/.test(purchase.operation_id || "")
+  )) {
+    return res.status(400).json({ message: "Invalid confirmed purchase" });
+  }
+  let origin;
+  try {
+    const configured = new URL(process.env.ECOMMERCE_STOREFRONT_URL || process.env.FRONTEND_URL || "");
+    if (configured.protocol !== "https:" || configured.username || configured.password) throw new Error();
+    origin = configured.origin;
+  } catch {
+    return res.status(503).json({ message: "Secure checkout requires the public HTTPS storefront URL on the commerce backend." });
+  }
+  if (await isRateLimited("link-request", account, 10, 60 * 60 * 1000)) {
+    return res.status(429).json({ message: "Too many secure links were requested. Please wait and try again later." });
+  }
+  const token = randomBytes(32).toString("base64url");
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 15 * 60 * 1000);
+  await linkRequests().createIndex("expiresAt", { expireAfterSeconds: 0 });
+  await linkRequests().insertOne({
+    _id: hash(token), account, recipient: String(recipient),
+    purchase: purchase ? {
+      product_id: purchase.product_id, size: purchase.size, quantity: purchase.quantity,
+      expected_price: purchase.expected_price, operation_id: purchase.operation_id,
+    } : null,
+    return_path: ["/checkout", "/cart", "/orders"].includes(returnPath) ? returnPath : "/checkout",
+    created_at: now, expiresAt,
+  });
+  // Do not delete earlier links: another message/retry must not invalidate a
+  // customer's in-progress login. Cart operation IDs keep refreshes idempotent.
+  return res.status(201).json({ checkout_url: `${origin}/whatsapp-connect?token=${token}`, expiresAt });
 });
 
 router.use(async (req, res, next) => {

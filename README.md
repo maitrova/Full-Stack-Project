@@ -36,3 +36,8 @@ activate the env with thiscommand Set-ExecutionPolicy -Scope Process -ExecutionP
 
 start the3 backend with python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
+
+
+# build docker image 
+# we need to add extra step in a deploy.yml .github folder 
+# we need to add eextra helm chart for ai -agent 

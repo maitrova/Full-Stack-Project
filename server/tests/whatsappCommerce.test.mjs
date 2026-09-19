@@ -30,9 +30,12 @@ async function setup() {
     updateOne: async ({_id}, update) => Object.assign(receipts.get(_id), update.$set),
   };
   const checkoutCollection = {
-    findOneAndUpdate: async ({_id}, update) => {
+    createIndex: async () => {},
+    insertOne: async doc => { checkoutRequests.set(doc._id, {...doc}); },
+    findOneAndUpdate: async ({_id, expiresAt, $or}, update) => {
       const record = checkoutRequests.get(_id);
-      if (!record) return null;
+      if (!record || record.expiresAt <= expiresAt.$gt) return null;
+      if (record.consumed_by && record.consumed_by !== $or[1].consumed_by) return null;
       Object.assign(record, update.$set);
       return record;
     },
@@ -82,7 +85,7 @@ async function setup() {
     '../utils/readymadePricing.js': {getReadymadePricing: () => ({effectivePrice: 120})},
     '../controllers/cartController.js': {addToCart: async (req, res) => {additions++; res.status(201).json({message: 'Added'});}},
   };
-  const context = vm.createContext({Buffer, process: {env: {WHATSAPP_COMMERCE_KEY: 'test-only'}}, Date});
+  const context = vm.createContext({Buffer, URL, process: {env: {WHATSAPP_COMMERCE_KEY: 'test-only', ECOMMERCE_STOREFRONT_URL: 'https://shop.example'}}, Date});
   const source = await readFile(new URL('../routes/whatsappCommerce.js', import.meta.url), 'utf8');
   const module = new vm.SourceTextModule(source, {context});
   await module.link(specifier => {
@@ -96,9 +99,9 @@ async function setup() {
   const request = () => ({user: {_id: 'owner'}, body: {product_id: 'a'.repeat(24), size: 'M', quantity: 2, expected_price: 120, operation_id: 'b'.repeat(32)}});
   const seedCheckout = (token, document) => {
     const id = crypto.createHash('sha256').update(token).digest('hex');
-    checkoutRequests.set(id, {...document, _id: id, expiresAt: new Date(Date.now() + 60000)});
+    checkoutRequests.set(id, {_id: id, expiresAt: new Date(Date.now() + 60000), ...document});
   };
-  return {handlers, middleware, response, request, additions: () => additions, seedCheckout, setStock: v => stock = v, setLinked: v => linkedUser = v, orderFilter: () => orderFilter, orderIdFilter: () => orderIdFilter, subscriptions};
+  return {handlers, middleware, response, request, additions: () => additions, seedCheckout, checkoutRequests, setStock: v => stock = v, setLinked: v => linkedUser = v, orderFilter: () => orderFilter, orderIdFilter: () => orderIdFilter, subscriptions};
 }
 
 test('cart retry replays receipt, including after stock changes', async () => {
@@ -200,4 +203,66 @@ test('cart mutation is rate limited', async () => {
 
   assert.equal(blocked.code, 429);
   assert.equal(s.additions(), 30);
+});
+
+test('backend-issued links complete on its database and refreshes do not add twice', async () => {
+  const s = await setup();
+  const issue = s.handlers.get('POST /link/request')[0];
+  const complete = s.handlers.get('POST /link/complete')[1];
+  const purchase = s.request().body;
+  const tokens = [];
+  for (let i = 0; i < 2; i++) {
+    const res = s.response();
+    await issue({headers: {'x-whatsapp-account': 'c'.repeat(64)}, body: {recipient: '919876543210', purchase, return_path: '/checkout'}}, res);
+    assert.equal(res.code, 201);
+    const url = new URL(res.body.checkout_url);
+    assert.equal(url.origin, 'https://shop.example');
+    tokens.push(url.searchParams.get('token'));
+  }
+  assert.notEqual(tokens[0], tokens[1]);
+  assert.equal(s.checkoutRequests.size, 2);
+  for (const token of tokens) {
+    const stored = s.checkoutRequests.get(crypto.createHash('sha256').update(token).digest('hex'));
+    assert.ok(stored.expiresAt > new Date());
+    assert.equal(JSON.stringify(stored).includes(token), false);
+    const res = s.response();
+    await complete({user: {_id: 'owner'}, body: {token}}, res);
+    assert.equal(res.code, 201);
+  }
+  assert.equal(s.additions(), 1);
+});
+
+test('expired, missing, and other-user tokens cannot mutate the cart', async () => {
+  const s = await setup();
+  const complete = s.handlers.get('POST /link/complete')[1];
+  const token = 'x'.repeat(43);
+  for (const doc of [null, {account: 'c'.repeat(64), expiresAt: new Date(Date.now() - 1)}, {account: 'c'.repeat(64), consumed_by: 'someone-else'}]) {
+    if (doc) s.seedCheckout(token, doc);
+    const res = s.response();
+    await complete({user: {_id: 'owner'}, body: {token}}, res);
+    assert.equal(res.code, 400);
+    assert.equal(res.body.code, 'CHECKOUT_LINK_UNAVAILABLE');
+  }
+  assert.equal(s.additions(), 0);
+});
+
+test('token issuer validates account, recipient, purchase, and rate limit', async () => {
+  const s = await setup();
+  const issue = s.handlers.get('POST /link/request')[0];
+  const req = {headers: {'x-whatsapp-account': 'c'.repeat(64)}, body: {recipient: '919876543210', purchase: s.request().body}};
+  for (const invalid of [
+    {...req, headers: {}},
+    {...req, body: {...req.body, recipient: 'bad'}},
+    {...req, body: {...req.body, purchase: {...req.body.purchase, quantity: 21}}},
+  ]) {
+    const res = s.response();
+    await issue(invalid, res);
+    assert.equal(res.code, 400);
+  }
+  assert.equal(s.checkoutRequests.size, 0);
+  for (let i = 0; i < 10; i++) await issue(req, s.response());
+  const blocked = s.response();
+  await issue(req, blocked);
+  assert.equal(blocked.code, 429);
+  assert.equal(s.checkoutRequests.size, 10);
 });

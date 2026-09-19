@@ -4,11 +4,12 @@ import html
 import re
 import secrets
 from datetime import datetime, timedelta, timezone
-from urllib.parse import quote
+from urllib.parse import parse_qs, urlsplit
 
 import httpx
 from pymongo import ReturnDocument
 from app.config.settings import settings
+from app.ai.store_knowledge import StoreKnowledge
 
 
 class WhatsAppCommerce:
@@ -121,7 +122,7 @@ class WhatsAppCommerce:
             return result(
                 "Payment is completed securely on the Maitrova website through Razorpay, or by COD when the selected products are eligible. Never send a UPI PIN, OTP, or card details in WhatsApp. Complete your product selection and I will send the secure checkout link."
             )
-        if re.search(r"\b(new link|retry checkout|continue checkout|send (?:the )?link again)\b", text):
+        if re.search(r"\b(new link|fresh link|retry checkout|continue checkout|send (?:the )?link again|link (?:has |is )?(?:been )?expired|expired link|link not working)\b", text):
             pending = state.get("last_checkout_purchase")
             if pending:
                 return result(await self._checkout_retry_message(account, origin, conversation, state, product_tools, business_id, pending))
@@ -129,16 +130,6 @@ class WhatsAppCommerce:
         if text in {"checkout", "my cart", "show cart", "open cart"}:
             destination = "/checkout" if text == "checkout" else "/cart"
             return result(f"Open securely and sign in with your store account:\n{origin}{destination}" if origin.startswith("https://") else "The public store URL is not configured. Please ask the store team for help.")
-        if re.search(r"\b(shipping|return policy|refund policy|cancellation policy|delivery policy|payment methods)\b", text):
-            topic = "return|refund" if re.search(r"return|refund", text) else "cancel" if "cancel" in text else "payment" if "payment" in text else "shipping|delivery"
-            docs = await self.db.companydocuments.find({"name": {"$regex": topic, "$options": "i"}}).limit(2).to_list(2)
-            parts = []
-            for doc in docs:
-                content = re.sub(r"<[^>]+>", " ", re.sub(r"<(script|style)\b[^>]*>.*?</\1>", "", doc.get("content", ""), flags=re.S | re.I))
-                content = re.sub(r"\s+", " ", html.unescape(content)).strip()
-                if content:
-                    parts.append(f"{doc['name']}: {content[:1800]}" + (" … (ask the team for the full policy)" if len(content) > 1800 else ""))
-            return result("\n".join(parts) if parts else "I don't have a published answer for that policy. Send 'human' and I'll flag this for the store team.")
         if re.search(r"\b(custom product|customise|customize|custom design)\b", text) and not state.get("purchase"):
             return result(f"Create and price your custom product securely on the website:\n{origin}/customproducts" if origin.startswith("https://") else "The custom-product page is not configured yet.")
         if re.search(r"\b(combo|bundle|pack offer)\b", text) and not state.get("purchase"):
@@ -159,6 +150,9 @@ class WhatsAppCommerce:
                     return result(product.name + "\n" + "\n".join(f"{v['size']}: {v['stock']} available, {product.currency} {v['effective_price']:g}" for v in variants))
                 if product:
                     return result((product.description or "Those details aren't listed for this product.")[:2000] + "\nIf that doesn't answer your question, send 'human' to ask the store team.")
+        # A policy question must not advance an unfinished purchase.
+        if StoreKnowledge.is_store_question(message):
+            return None
         # Customers often say "I want this" after the agent has shown one product.
         # Support common Telugu wording as well as the English purchase verbs.
         buy = bool(re.search(
@@ -258,7 +252,8 @@ class WhatsAppCommerce:
         if not variant or quantity < 1 or quantity > 20 or int(variant.get("stock") or 0) < quantity:
             state.pop("last_checkout_purchase", None)
             return "That size or quantity is no longer available. Please choose an in-stock option again."
-        refreshed = {**pending, "expected_price": variant["effective_price"], "operation_id": secrets.token_hex(16)}
+        # Reissuing a link is not a second purchase: retain the cart operation ID.
+        refreshed = {**pending, "expected_price": variant["effective_price"], "operation_id": pending.get("operation_id") or secrets.token_hex(16)}
         state["last_checkout_purchase"] = refreshed
         return await self._link_message(
             account,
@@ -286,22 +281,27 @@ class WhatsAppCommerce:
         if int(limit_record.get("count") or 0) > getattr(settings, "whatsapp_checkout_links_per_hour", 10):
             return "Too many secure links were requested. Please wait and try again later, or send 'human' for help."
 
-        raw_token = secrets.token_urlsafe(32)
-        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        requests = self.db.whatsapp_link_requests
-        await requests.delete_many({"account": account, "consumed_at": {"$exists": False}})
-        await requests.insert_one(
-            {
-                "_id": token_hash,
-                "account": account,
-                "recipient": recipient,
-                "purchase": purchase,
-                "return_path": return_path if return_path in {"/checkout", "/cart", "/orders"} else "/checkout",
-                "created_at": now,
-                "expiresAt": now + timedelta(minutes=15),
-            }
-        )
-        link = f"{origin}/whatsapp-connect?token={quote(raw_token)}"
+        api_host = urlsplit(settings.ecommerce_api_url).hostname
+        store_host = urlsplit(origin).hostname
+        local_hosts = {"localhost", "127.0.0.1", "::1"}
+        if api_host in local_hosts and store_host not in local_hosts:
+            return (
+                "I can't create a working checkout link yet: the agent is connected to a local store API "
+                "but the checkout website is deployed. Ask the store team to set ECOMMERCE_API_URL "
+                "to the backend used by this website."
+            )
+        status, data = await self._request("POST", "/link/request", account, {
+            "recipient": recipient, "purchase": purchase, "return_path": return_path,
+        })
+        if status != 201:
+            return "I couldn't create a secure checkout link. " + str(data.get("message") or "Please ask the store team to check the checkout service.")
+        link = str(data.get("checkout_url") or "")
+        parsed = urlsplit(link)
+        tokens = parse_qs(parsed.query).get("token", [])
+        if ((parsed.scheme, parsed.netloc) != (urlsplit(origin).scheme, urlsplit(origin).netloc)
+                or parsed.path != "/whatsapp-connect" or parsed.fragment
+                or len(tokens) != 1 or not re.fullmatch(r"[A-Za-z0-9_-]{40,128}", tokens[0])):
+            return "The agent and store checkout addresses don't match. Please ask the store team to check both storefront URL settings."
         if purchase:
             return f"Perfect — tap this secure link to continue:\n{link}\nOnce you sign in, I’ll add the confirmed item to your cart and take you to checkout. It expires in 15 minutes. You’ll receive order updates here; send STOP anytime to turn them off."
         return f"To keep your order details private, open this secure link:\n{link}\nIt expires in 15 minutes. You’ll receive order updates here; send STOP anytime to turn them off."

@@ -2,13 +2,14 @@ name: Build and Push Docker Images
 
 on:
   push:
-    branches: [ rem-back2 ]
+    branches: [ rem-ai-agent ]
   workflow_dispatch:
 
 env:
   DOCKER_USERNAME: maitrova
   BACKEND_IMAGE: maitrova/crud-backend
   FRONTEND_IMAGE: maitrova/crud-frontend
+  AI_AGENT_IMAGE: maitrova/ai-agent
 
 jobs:
   build_and_push:
@@ -16,6 +17,7 @@ jobs:
     outputs:
       backend_tag: ${{ steps.tags.outputs.backend }}
       frontend_tag: ${{ steps.tags.outputs.frontend }}
+      ai_agent_tag: ${{ steps.tags.outputs.ai_agent }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -34,6 +36,7 @@ jobs:
         run: |
           echo "backend=b${{ github.run_number }}" >> $GITHUB_OUTPUT
           echo "frontend=f${{ github.run_number }}" >> $GITHUB_OUTPUT
+          echo "ai_agent=a${{ github.run_number }}" >> $GITHUB_OUTPUT
 
       - name: Build and push backend image
         uses: docker/build-push-action@v6
@@ -64,11 +67,24 @@ jobs:
           cache-from: type=registry,ref=${{ env.FRONTEND_IMAGE }}:latest
           cache-to: type=inline
 
+      - name: Build and push AI agent image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server/ai-agent-backend
+          file: ./server/ai-agent-backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.AI_AGENT_IMAGE }}:latest
+            ${{ env.AI_AGENT_IMAGE }}:${{ steps.tags.outputs.ai_agent }}
+          cache-from: type=registry,ref=${{ env.AI_AGENT_IMAGE }}:latest
+          cache-to: type=inline
+
       - name: Output tags
         run: |
           echo "✅ Images pushed successfully!"
           echo "Backend: ${{ env.BACKEND_IMAGE }}:${{ steps.tags.outputs.backend }}"
           echo "Frontend: ${{ env.FRONTEND_IMAGE }}:${{ steps.tags.outputs.frontend }}"
+          echo "AI agent: ${{ env.AI_AGENT_IMAGE }}:${{ steps.tags.outputs.ai_agent }}"
 
   deploy_backend:
     needs: build_and_push
@@ -166,3 +182,51 @@ jobs:
               --atomic
             
             echo "✅ Frontend deployed successfully with tag ${{ needs.build_and_push.outputs.frontend_tag }}"
+
+  deploy_ai_agent:
+    needs: build_and_push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cleanup old AI agent Helm chart on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            rm -rf /tmp/ai-agent
+            echo "✅ Cleaned up old AI agent helm chart"
+
+      - name: Copy AI agent Helm chart to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          source: "helm-charts/ai-agent"
+          target: "/tmp/"
+          strip_components: 1
+
+      - name: Deploy AI agent to VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          port: ${{ secrets.VPS_PORT }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            set -e
+            helm upgrade --install ai-agent /tmp/ai-agent \
+              --namespace production \
+              --create-namespace \
+              --history-max 3 \
+              --set image.tag=${{ needs.build_and_push.outputs.ai_agent_tag }} \
+              --wait \
+              --atomic
+
+            echo "✅ AI agent deployed successfully with tag ${{ needs.build_and_push.outputs.ai_agent_tag }}"

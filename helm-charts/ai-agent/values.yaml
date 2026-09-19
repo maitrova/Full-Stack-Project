@@ -1,0 +1,83 @@
+name: ai-agent
+fullnameOverride: ai-agent
+
+replicaCount: 1
+
+image:
+  repository: maitrova/ai-agent
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+
+envVars:
+  APP_NAME: AI Sales Employee API
+  APP_ENV: development
+  DEBUG: "true"
+  LOG_LEVEL: INFO
+  API_PREFIX: /api
+  MONGODB_DB_NAME: ai_sales_employee
+  ECOMMERCE_MONGODB_DB_NAME: appdb
+  ECOMMERCE_PUBLIC_URL: https://maitrova.in/api/outputs
+  ECOMMERCE_STOREFRONT_URL: https://www.maitrova.in
+  ECOMMERCE_API_URL: https://maitrova.in/api
+  FRONTEND_ORIGIN: http://localhost:5173
+  GEMINI_MODEL: gemini-flash-lite-latest
+  JWT_ALGORITHM: HS256
+  JWT_ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+  WHATSAPP_GRAPH_API_VERSION: v25.0
+  WHATSAPP_MESSAGES_PER_MINUTE: "30"
+  WHATSAPP_CHECKOUT_LINKS_PER_HOUR: "10"
+
+# Set these values before deploying. They are rendered into the ai-agent Secret.
+envSecrets:
+  MONGODB_URL: ""
+  MONGOOSE_URL: ""
+  ECOMMERCE_MONGODB_URL: ""
+  JWT_SECRET: ""
+  GEMINI_API_KEY: ""
+  WHATSAPP_VERIFY_TOKEN: ""
+  WHATSAPP_ACCESS_TOKEN: ""
+  WHATSAPP_APP_SECRET: ""
+  WHATSAPP_COMMERCE_KEY: ""
+  WHATSAPP_PHONE_NUMBER_ID: ""
+  WHATSAPP_BUSINESS_ID: ""
+  WHATSAPP_WABA_ID: ""
+
+resources:
+  limits:
+    cpu: "1"
+    memory: 1Gi
+  requests:
+    cpu: "250m"
+    memory: 256Mi
+
+livenessProbe:
+  enabled: true
+  path: /api/health
+  initialDelaySeconds: 20
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  enabled: true
+  path: /api/health
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+pdb:
+  enabled: true
+  minAvailable: 1
