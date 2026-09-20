@@ -13,6 +13,24 @@ service:
   port: 8000
   targetPort: 8000
 
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: maitrova-cert
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: 1m
+  hosts:
+    - host: ai.maitrova.in
+      paths:
+        - path: /api/whatsapp/webhook
+          pathType: Exact
+  tls:
+    - secretName: ai-maitrova-tls
+      hosts:
+        - ai.maitrova.in
+
 envVars:
   APP_NAME: AI Sales Employee API
   APP_ENV: development
