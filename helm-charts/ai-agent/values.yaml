@@ -32,11 +32,14 @@ envVars:
   WHATSAPP_MESSAGES_PER_MINUTE: "30"
   WHATSAPP_CHECKOUT_LINKS_PER_HOUR: "10"
 
+# Reuse the backend's known-working MongoDB URI. The AI agent selects its own
+# databases through MONGODB_DB_NAME and ECOMMERCE_MONGODB_DB_NAME.
+databaseSecret:
+  name: backend-secret
+  key: MONGOOSE_URL
+
 # Set these values before deploying. They are rendered into the ai-agent Secret.
 envSecrets:
-  MONGODB_URL: ""
-  MONGOOSE_URL: ""
-  ECOMMERCE_MONGODB_URL: ""
   JWT_SECRET: ""
   GEMINI_API_KEY: ""
   WHATSAPP_VERIFY_TOKEN: ""

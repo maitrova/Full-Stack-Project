@@ -32,6 +32,15 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+            {{- with .Values.databaseSecret }}
+            {{- range tuple "MONGODB_URL" "MONGOOSE_URL" "ECOMMERCE_MONGODB_URL" }}
+            - name: {{ . }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.databaseSecret.name | quote }}
+                  key: {{ $.Values.databaseSecret.key | quote }}
+            {{- end }}
+            {{- end }}
             {{- range $key, $value := .Values.envSecrets }}
             - name: {{ $key }}
               valueFrom:

@@ -184,7 +184,7 @@ jobs:
             echo "✅ Frontend deployed successfully with tag ${{ needs.build_and_push.outputs.frontend_tag }}"
 
   deploy_ai_agent:
-    needs: build_and_push
+    needs: [build_and_push, deploy_backend]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
