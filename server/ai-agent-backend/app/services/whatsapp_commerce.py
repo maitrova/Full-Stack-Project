@@ -1,6 +1,7 @@
 """Account-scoped shopping actions. Model output never authorizes mutations."""
 import hashlib
 import html
+import logging
 import re
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -8,8 +9,11 @@ from urllib.parse import parse_qs, urlsplit
 
 import httpx
 from pymongo import ReturnDocument
+from pymongo.errors import PyMongoError
 from app.config.settings import settings
 from app.ai.store_knowledge import StoreKnowledge
+
+logger = logging.getLogger(__name__)
 
 
 class WhatsAppCommerce:
@@ -266,6 +270,8 @@ class WhatsAppCommerce:
     async def _link_message(self, account: str, origin: str, recipient: str | None = None, purchase: dict | None = None, return_path: str = "/checkout") -> str:
         if not origin.startswith("https://"):
             return "Account linking needs the public store URL configured. A store teammate can help."
+        if not re.fullmatch(r"\d{7,15}", str(recipient or "")):
+            return "I couldn't create the checkout link because the WhatsApp recipient is invalid. Please ask the store team for help."
 
         now = datetime.now(timezone.utc)
         hour_bucket = now.strftime("%Y%m%d%H")
@@ -281,21 +287,26 @@ class WhatsAppCommerce:
         if int(limit_record.get("count") or 0) > getattr(settings, "whatsapp_checkout_links_per_hour", 10):
             return "Too many secure links were requested. Please wait and try again later, or send 'human' for help."
 
-        api_host = urlsplit(settings.ecommerce_api_url).hostname
-        store_host = urlsplit(origin).hostname
-        local_hosts = {"localhost", "127.0.0.1", "::1"}
-        if api_host in local_hosts and store_host not in local_hosts:
-            return (
-                "I can't create a working checkout link yet: the agent is connected to a local store API "
-                "but the checkout website is deployed. Ask the store team to set ECOMMERCE_API_URL "
-                "to the backend used by this website."
-            )
-        status, data = await self._request("POST", "/link/request", account, {
-            "recipient": recipient, "purchase": purchase, "return_path": return_path,
-        })
-        if status != 201:
-            return "I couldn't create a secure checkout link. " + str(data.get("message") or "Please ask the store team to check the checkout service.")
-        link = str(data.get("checkout_url") or "")
+        # The AI agent and ecommerce backend intentionally share appdb. Writing
+        # the one-time request here avoids a network/auth dependency while the
+        # website still performs login, live price/stock checks, and cart writes.
+        token = secrets.token_urlsafe(32)
+        expires_at = now + timedelta(minutes=15)
+        try:
+            await self.db.whatsapp_link_requests.insert_one({
+                "_id": hashlib.sha256(token.encode()).hexdigest(),
+                "account": account,
+                "recipient": str(recipient),
+                "purchase": purchase,
+                "return_path": return_path if return_path in {"/checkout", "/cart", "/orders"} else "/checkout",
+                "created_at": now,
+                "expiresAt": expires_at,
+            })
+        except PyMongoError:
+            logger.exception("Could not persist WhatsApp checkout link")
+            return "I couldn't create a secure checkout link right now. Please try once more, or send 'human' for help."
+
+        link = f"{origin}/whatsapp-connect?token={token}"
         parsed = urlsplit(link)
         tokens = parse_qs(parsed.query).get("token", [])
         if ((parsed.scheme, parsed.netloc) != (urlsplit(origin).scheme, urlsplit(origin).netloc)
@@ -353,6 +364,15 @@ class WhatsAppCommerce:
         try:
             async with httpx.AsyncClient(timeout=20) as client:
                 response = await client.request(method, settings.ecommerce_api_url.rstrip("/") + "/whatsapp-commerce" + path, json=payload, headers={"x-commerce-key": settings.whatsapp_commerce_key, "x-whatsapp-account": account})
-            return response.status_code, response.json()
-        except (httpx.HTTPError, ValueError):
+            try:
+                data = response.json()
+            except ValueError:
+                data = {}
+            if response.status_code == 401 and not data.get("message"):
+                data["message"] = "The store checkout authorization is not configured correctly."
+            elif response.status_code >= 500 and not data.get("message"):
+                data["message"] = "The store checkout service returned an error."
+            return response.status_code, data
+        except httpx.HTTPError:
+            logger.exception("Store commerce request failed: %s %s", method, path)
             return 503, {"message": "The store service isn't responding. Please check your cart before retrying."}

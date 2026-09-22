@@ -32,6 +32,8 @@ class GeminiClient:
             ],
             "generationConfig": {
                 "maxOutputTokens": 500,
+                "temperature": 0.2,
+                "topP": 0.8,
             },
         }
 
@@ -99,6 +101,8 @@ class GeminiClient:
             ],
             "generationConfig": {
                 "maxOutputTokens": 500,
+                "temperature": 0.2,
+                "topP": 0.8,
             },
         }
 

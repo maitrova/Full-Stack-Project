@@ -65,3 +65,31 @@ class StoreAnswerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(result)
         self.assertEqual(state["purchase"], {"product_id": "shirt", "size": "M"})
         tools.get_product_details.assert_not_awaited()
+
+    async def test_generated_reply_with_invented_fact_uses_factual_draft(self):
+        client = SimpleNamespace(is_configured=True, generate_text=AsyncMock(return_value="Delivery takes 2 days."))
+        generator = ResponseGenerator(client)
+
+        result = await generator.generate(
+            "When will it arrive?",
+            IntentResult(),
+            "Delivery takes 5 days.",
+            {},
+            store_context={"published_information": [{"content": "Delivery takes 5 days."}]},
+        )
+
+        self.assertEqual(result, "Delivery takes 5 days.")
+
+    async def test_repeated_generated_reply_is_not_sent_again(self):
+        repeated = "Here are the same options again."
+        client = SimpleNamespace(is_configured=True, generate_text=AsyncMock(return_value=repeated))
+        generator = ResponseGenerator(client)
+
+        result = await generator.generate(
+            "show other options",
+            IntentResult(),
+            "No additional options are available right now.",
+            {"recent_turns": [{"reply": repeated}]},
+        )
+
+        self.assertEqual(result, "No additional options are available right now.")

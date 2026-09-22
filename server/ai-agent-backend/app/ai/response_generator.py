@@ -1,5 +1,7 @@
 import json
 import logging
+import re
+from difflib import SequenceMatcher
 
 from app.ai.gemini_client import GeminiClient
 from app.ai.language import detect_customer_language
@@ -45,7 +47,58 @@ class ResponseGenerator:
             return fallback_response
 
         cleaned_response = natural_response.strip()
-        return cleaned_response or fallback_response
+        if not cleaned_response or not self._is_grounded(
+            cleaned_response,
+            customer_message,
+            fallback_response,
+            products or [],
+            selected_product,
+            store_context or {},
+        ):
+            return fallback_response
+
+        recent_replies = [
+            str(turn.get("reply") or "")
+            for turn in conversation_state.get("recent_turns", [])
+            if isinstance(turn, dict)
+        ]
+        if any(self._similar(cleaned_response, previous) >= 0.9 for previous in recent_replies if previous):
+            if products:
+                return "I’ve shared the current options above. Tell me the option number, or what you want to change—budget, color, or size."
+            return fallback_response
+        return cleaned_response
+
+    @staticmethod
+    def _similar(left: str, right: str) -> float:
+        normalize = lambda value: re.sub(r"\s+", " ", value.lower()).strip()
+        return SequenceMatcher(None, normalize(left), normalize(right)).ratio()
+
+    def _is_grounded(
+        self,
+        response: str,
+        customer_message: str,
+        fallback_response: str,
+        products: list[ProductPublic],
+        selected_product: ProductPublic | None,
+        store_context: dict,
+    ) -> bool:
+        """Reject generated copy that adds URLs, numbers, or misses factual products."""
+        trusted = "\n".join([
+            customer_message,
+            fallback_response,
+            json.dumps(store_context, default=str),
+            json.dumps([self._product_for_prompt(product) for product in products], default=str),
+            json.dumps(self._product_for_prompt(selected_product), default=str),
+        ])
+        if not set(re.findall(r"https?://[^\s]+", response)).issubset(set(re.findall(r"https?://[^\s]+", trusted))):
+            return False
+        if not set(re.findall(r"(?<![A-Za-z])\d+(?:\.\d+)?", response)).issubset(
+            set(re.findall(r"(?<![A-Za-z])\d+(?:\.\d+)?", trusted))
+        ):
+            return False
+        if products and any(product.name in fallback_response and product.name not in response for product in products):
+            return False
+        return not self._has_ai_disclaimer(response)
 
     def _has_ai_disclaimer(self, response: str) -> bool:
         lowered = response.lower()
