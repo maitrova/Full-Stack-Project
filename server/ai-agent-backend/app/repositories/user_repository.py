@@ -11,6 +11,15 @@ class UserRepository:
         self.collection = database.users
 
     async def ensure_indexes(self) -> None:
+        # The ecommerce server owns this shared collection and may create the
+        # same unique index with extra options such as sparse/background.
+        # Reuse that compatible index instead of asking MongoDB to recreate
+        # `email_1` with a conflicting specification.
+        existing = (await self.collection.index_information()).get("email_1")
+        if existing is not None:
+            if existing.get("key") == [("email", ASCENDING)] and existing.get("unique") is True:
+                return
+            raise RuntimeError("The existing users.email index is incompatible with the AI agent")
         await self.collection.create_index([("email", ASCENDING)], unique=True)
 
     async def find_by_email(self, email: str) -> dict | None:
