@@ -37,7 +37,7 @@ envVars:
   DEBUG: "true"
   LOG_LEVEL: INFO
   API_PREFIX: /api
-  MONGODB_DB_NAME: ai_sales_employee
+  MONGODB_DB_NAME: appdb
   ECOMMERCE_MONGODB_DB_NAME: appdb
   ECOMMERCE_PUBLIC_URL: https://maitrova.in/api/outputs
   ECOMMERCE_STOREFRONT_URL: https://www.maitrova.in
@@ -50,8 +50,8 @@ envVars:
   WHATSAPP_MESSAGES_PER_MINUTE: "30"
   WHATSAPP_CHECKOUT_LINKS_PER_HOUR: "10"
 
-# Reuse the backend's known-working MongoDB URI. The AI agent selects its own
-# databases through MONGODB_DB_NAME and ECOMMERCE_MONGODB_DB_NAME.
+# Reuse the backend's MongoDB URI and appdb database so the ecommerce server
+# and AI agent share one database while keeping data in separate collections.
 databaseSecret:
   name: backend-secret
   key: MONGOOSE_URL

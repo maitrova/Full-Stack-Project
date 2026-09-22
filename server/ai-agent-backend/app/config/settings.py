@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     mongodb_url: str = "mongodb://localhost:27017"
-    mongodb_db_name: str = "ai_sales_employee"
+    mongodb_db_name: str = "appdb"
     # MONGOOSE_URL is used by the parent Node ecommerce server.
     mongoose_url: str | None = None
     ecommerce_mongodb_url: str | None = None
@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     def parse_debug(cls, value):
         if isinstance(value, str):
             normalized = value.strip().lower()
+            if normalized in {"release", "prod", "production"}:
+                return False
             if normalized in {"debug", "info", "warn", "warning", "error", "critical"}:
                 return normalized == "debug"
         return value
