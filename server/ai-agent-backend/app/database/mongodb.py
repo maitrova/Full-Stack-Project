@@ -16,7 +16,8 @@ ecommerce_database: AsyncIOMotorDatabase | None = None
 async def connect_to_mongo() -> None:
     global mongo_client, database, ecommerce_mongo_client, ecommerce_database
 
-    mongo_client = AsyncIOMotorClient(settings.mongodb_url, serverSelectionTimeoutMS=5000)
+    primary_url = settings.primary_mongodb_url
+    mongo_client = AsyncIOMotorClient(primary_url, serverSelectionTimeoutMS=5000)
     database = mongo_client[settings.mongodb_db_name]
 
     try:
@@ -26,9 +27,9 @@ async def connect_to_mongo() -> None:
         logger.exception("MongoDB connection failed")
         raise
 
-    ecommerce_url = settings.ecommerce_mongodb_url or settings.mongoose_url or settings.mongodb_url
+    ecommerce_url = settings.ecommerce_mongodb_url or settings.mongoose_url or primary_url
     ecommerce_db_name = settings.ecommerce_mongodb_db_name
-    if ecommerce_url == settings.mongodb_url:
+    if ecommerce_url == primary_url:
         ecommerce_mongo_client = mongo_client
     else:
         ecommerce_mongo_client = AsyncIOMotorClient(ecommerce_url, serverSelectionTimeoutMS=5000)

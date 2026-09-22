@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     api_prefix: str = "/api"
     log_level: str = "INFO"
 
-    mongodb_url: str = "mongodb://localhost:27017"
+    mongodb_url: str | None = None
     mongodb_db_name: str = "appdb"
     # MONGOOSE_URL is used by the parent Node ecommerce server.
     mongoose_url: str | None = None
@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.frontend_origin.split(",") if origin.strip()]
+
+    @property
+    def primary_mongodb_url(self) -> str:
+        """Use an AI-specific override, then the parent server connection."""
+        return self.mongodb_url or self.mongoose_url or "mongodb://localhost:27017/appdb"
 
     @field_validator("debug", mode="before")
     @classmethod
