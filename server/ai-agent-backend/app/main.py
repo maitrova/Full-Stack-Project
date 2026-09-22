@@ -30,7 +30,16 @@ async def lifespan(app: FastAPI):
     logger.info("Starting %s", settings.app_name)
     await connect_to_mongo()
     await UserRepository(get_database()).ensure_indexes()
-    await BusinessRepository(get_database()).ensure_indexes()
+    business_repository = BusinessRepository(get_database())
+    await business_repository.ensure_indexes()
+    if settings.whatsapp_business_id:
+        business, created = await business_repository.ensure_whatsapp_business(
+            business_id=settings.whatsapp_business_id,
+            business_name=settings.whatsapp_business_name,
+            business_type=settings.whatsapp_business_type,
+        )
+        if created:
+            logger.info("Created configured WhatsApp business %s", business["_id"])
     await ProductRepository(get_database()).ensure_indexes()
     await ConversationRepository(get_database()).ensure_indexes()
     await MessageRepository(get_database()).ensure_indexes()

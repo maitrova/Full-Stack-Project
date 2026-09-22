@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     whatsapp_phone_number_id: str | None = None
     whatsapp_graph_api_version: str = "v25.0"
     whatsapp_business_id: str | None = None
+    whatsapp_business_name: str = "Maitrova"
+    whatsapp_business_type: str = "ecommerce"
     whatsapp_waba_id: str | None = None
     whatsapp_messages_per_minute: int = 30
     whatsapp_checkout_links_per_hour: int = 10

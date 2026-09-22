@@ -13,6 +13,43 @@ class BusinessRepository:
     async def ensure_indexes(self) -> None:
         await self.collection.create_index([("owner_id", ASCENDING)], unique=True)
 
+    async def ensure_whatsapp_business(
+        self,
+        business_id: str,
+        business_name: str,
+        business_type: str,
+    ) -> tuple[dict, bool]:
+        """Create the configured WhatsApp tenant when it has not been set up yet.
+
+        WhatsApp processing has no signed-in application user, so the configured
+        business ObjectId is also used as its stable service owner id. The upsert
+        makes this safe when multiple API replicas start at the same time.
+        """
+        object_id = parse_object_id(business_id)
+        now = utc_now()
+        result = await self.collection.update_one(
+            {"_id": object_id},
+            {
+                "$setOnInsert": {
+                    "owner_id": object_id,
+                    "business_name": business_name,
+                    "business_type": business_type,
+                    "description": "WhatsApp AI sales agent",
+                    "phone": None,
+                    "email": None,
+                    "currency": "INR",
+                    "timezone": "Asia/Kolkata",
+                    "created_at": now,
+                    "updated_at": now,
+                }
+            },
+            upsert=True,
+        )
+        business = await self.collection.find_one({"_id": object_id})
+        if business is None:
+            raise RuntimeError("Configured WhatsApp business could not be loaded")
+        return business, result.upserted_id is not None
+
     async def find_by_owner_id(self, owner_id: str) -> dict | None:
         return await self.collection.find_one({"owner_id": parse_object_id(owner_id)})
 
