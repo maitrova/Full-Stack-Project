@@ -83,7 +83,13 @@ class SalesAgent:
             )
         image_analysis_failed = has_image and not image_analysis
 
-        parse_message = payload.message or self._image_analysis_to_search_text(image_analysis)
+        # A captionless WhatsApp image arrives with the internal placeholder
+        # "Photo enquiry". Search from the visual attributes, not that label.
+        parse_message = (
+            self._image_analysis_to_search_text(image_analysis)
+            if has_image and image_analysis
+            else payload.message or self._image_analysis_to_search_text(image_analysis)
+        )
         conversation = self._prepare_context(conversation, parse_message)
         intent = await self.intent_parser.parse(parse_message, conversation.get("conversation_state", {}))
         if image_analysis:
@@ -102,7 +108,9 @@ class SalesAgent:
         tool_calls = []
         response_goal = "answer"
         presentation = await self.commerce.handle(payload.message, conversation, updated_state, self.product_tools, business_id) if self.commerce else None
-        if not presentation:
+        # An uploaded customer image is input for vision/search. It must not be
+        # mistaken for a request to resend photos from the previous turn.
+        if not presentation and not has_image:
             presentation = await self._presentation_request(business_id, payload.message, conversation, updated_state)
 
         if image_analysis_failed and not presentation:
@@ -468,7 +476,10 @@ class SalesAgent:
             chosen = options[0]
         if chosen is None:
             if action == "photos" and options:
-                return "Here are photos of these options. Reply with the product number or name.", options, "recommendations"
+                photo_options = [product for product in options if product.images]
+                if photo_options:
+                    return "Here are photos of these options. Reply with the product number or name.", photo_options, "recommendations"
+                return "I don't have publicly accessible photos for those options right now. Reply with the product number for its details or link.", [], "none"
             if options:
                 state["pending_product_action"] = action
                 return "Which product? Reply with its number or name:\n" + "\n".join(f"{i}. {p.name}" for i, p in enumerate(options, 1)), [], "none"

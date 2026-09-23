@@ -33,6 +33,43 @@ class ProductActions(unittest.IsolatedAsyncioTestCase):
         result = await self.agent._presentation_request("business", "photos of black shirts", {}, {})
         self.assertIsNone(result)
 
+    async def test_photo_request_does_not_claim_images_when_catalogue_has_none(self):
+        products_without_images = [
+            SimpleNamespace(id="1", name="Shirt 1", images=[], attributes={}),
+            SimpleNamespace(id="2", name="Shirt 2", images=[], attributes={}),
+        ]
+        agent = SalesAgent(
+            None,
+            None,
+            None,
+            SimpleNamespace(
+                get_product_details=AsyncMock(
+                    side_effect=lambda business_id, product_id: next(
+                        product for product in products_without_images if product.id == product_id
+                    )
+                )
+            ),
+        )
+
+        result = await agent._presentation_request(
+            "business",
+            "show photos",
+            {"recommended_product_ids": ["1", "2"]},
+            {},
+        )
+
+        self.assertIn("don't have publicly accessible photos", result[0])
+        self.assertEqual(result[1], [])
+        self.assertEqual(result[2], "none")
+
+    def test_uploaded_image_search_uses_visual_attributes(self):
+        analysis = {"category": "shirt", "color": "blue", "fabric": "cotton"}
+        search_text = self.agent._image_analysis_to_search_text(analysis)
+
+        self.assertIn("shirt", search_text)
+        self.assertIn("blue", search_text)
+        self.assertIn("cotton", search_text)
+
     def test_captionless_whatsapp_image_is_processed(self):
         service = WhatsAppService.__new__(WhatsAppService)
         self.assertEqual(
