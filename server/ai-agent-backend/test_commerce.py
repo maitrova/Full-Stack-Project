@@ -139,6 +139,36 @@ class CommerceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("which size would you like?", reply[0])
         self.assertNotIn("quantity", state["purchase"])
 
+    async def test_bare_this_one_is_not_treated_as_purchase(self):
+        result = await self.service.handle("this one", self.conv, {}, self.tools, "b")
+
+        self.assertIsNone(result)
+        self.service._request.assert_not_awaited()
+
+    async def test_drop_product_purchase_opens_drop_page(self):
+        self.product.attributes.update({
+            "source_type": "drop",
+            "product_url": "https://shop.example/dropproducts/drop-id",
+        })
+
+        reply = await self.service.handle("buy this", self.conv, {}, self.tools, "b")
+
+        self.assertIn("/dropproducts/drop-id", reply[0])
+        self.service._request.assert_not_awaited()
+
+    async def test_customization_purchase_opens_designer(self):
+        self.product.attributes.update({
+            "source_type": "customization",
+            "customizable": True,
+            "product_url": "https://shop.example/products/custom-tee/customize",
+        })
+
+        reply = await self.service.handle("buy this", self.conv, {}, self.tools, "b")
+
+        self.assertIn("Open the designer", reply[0])
+        self.assertIn("/products/custom-tee/customize", reply[0])
+        self.service._request.assert_not_awaited()
+
     def test_public_image_prefix_is_not_duplicated(self):
         repo = EcommerceProductRepository.__new__(EcommerceProductRepository)
         with patch("app.repositories.ecommerce_product_repository.settings", SimpleNamespace(ecommerce_public_url="https://maitrova.in/api/outputs")):

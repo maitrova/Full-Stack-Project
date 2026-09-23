@@ -3,6 +3,7 @@ import logging
 import asyncio
 from contextlib import suppress
 from app.services.whatsapp_queue import worker
+from app.services.catalog_indexer import catalog_index_worker
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -52,13 +53,19 @@ async def lifespan(app: FastAPI):
     await get_ecommerce_database().whatsapp_link_rate_limits.create_index("expiresAt", expireAfterSeconds=0)
     await get_database().whatsapp_rate_limits.create_index("expires_at", expireAfterSeconds=0)
     await get_database().whatsapp_handoff_alerts.create_index([("business_id", 1), ("status", 1), ("created_at", -1)])
+    await get_database().ai_agent_metrics.create_index([("business_id", 1), ("created_at", -1)])
+    await get_database().ai_agent_metrics.create_index("created_at", expireAfterSeconds=15552000)
     whatsapp_worker = asyncio.create_task(worker(get_database()))
+    catalogue_worker = asyncio.create_task(catalog_index_worker(get_ecommerce_database()))
     try:
         yield
     finally:
         whatsapp_worker.cancel()
+        catalogue_worker.cancel()
         with suppress(asyncio.CancelledError):
             await whatsapp_worker
+        with suppress(asyncio.CancelledError):
+            await catalogue_worker
         await close_mongo_connection()
     logger.info("Stopped %s", settings.app_name)
 

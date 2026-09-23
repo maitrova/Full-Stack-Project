@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     frontend_origin: str = "http://localhost:5173"
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-flash-lite-latest"
+    gemini_embedding_model: str = "gemini-embedding-2"
+    gemini_embedding_dimensions: int = 768
+    catalogue_index_batch_size: int = 10
+    catalogue_index_interval_seconds: int = 60
 
     whatsapp_verify_token: str | None = None
     whatsapp_access_token: str | None = None

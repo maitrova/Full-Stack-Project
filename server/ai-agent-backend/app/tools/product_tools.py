@@ -58,6 +58,35 @@ class ProductTools:
                 intent.attributes,
             ]
         )
+
+    async def search_from_image(
+        self,
+        business_id: str,
+        intent: IntentResult,
+        image_analysis: dict,
+        image_embedding: list[float] | None,
+    ) -> list[ProductPublic]:
+        ranked_search = getattr(self.product_repository, "search_ranked_products", None)
+        if ranked_search is None:
+            return await self.search_from_intent(business_id, intent)
+        filters = {
+            "category": intent.category,
+            "min_price": intent.min_price,
+            "max_price": intent.max_price,
+            "color": intent.color,
+            "size": intent.size,
+            "occasion": intent.occasion,
+            "brand": intent.brand,
+            "attributes": intent.attributes,
+        }
+        products = await ranked_search(
+            business_id=business_id,
+            filters=filters,
+            image_analysis=image_analysis,
+            image_embedding=image_embedding,
+            limit=5,
+        )
+        return [ProductPublic.model_validate(object_id_to_str(product)) for product in products]
         return await self.search_products(
             ProductSearchParams(
                 business_id=business_id,

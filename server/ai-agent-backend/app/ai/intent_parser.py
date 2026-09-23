@@ -43,6 +43,9 @@ Rules:
 - Preserve known context if the new message is a follow-up.
 - Normalize category/color/occasion/brand to simple English words where possible.
 - Put extra flexible product filters inside attributes.
+- If the customer explicitly asks for customizable/custom-designed products, set attributes.catalog_type to "customization".
+- If the customer explicitly asks for drop products, set attributes.catalog_type to "drop product".
+- If the customer explicitly asks for ready-made products, set attributes.catalog_type to "readymade".
 - If a value is unknown, use null.
 
 Conversation state:
@@ -74,9 +77,17 @@ Customer message:
         category = self._first_match(
             text,
             [
+                "oversized t-shirt",
+                "oversized t shirt",
                 "t-shirt",
                 "t shirt",
                 "tee",
+                "hoodie",
+                "hoodies",
+                "sweatshirt",
+                "sweatshirts",
+                "crop top",
+                "crop tops",
                 "saree",
                 "dress",
                 "shoe",
@@ -101,6 +112,14 @@ Customer message:
             category = "shoe"
         if category in {"t shirt", "tee"}:
             category = "t-shirt"
+        if category == "oversized t shirt":
+            category = "oversized t-shirt"
+        if category == "hoodies":
+            category = "hoodie"
+        if category == "sweatshirts":
+            category = "sweatshirt"
+        if category == "crop tops":
+            category = "crop top"
         if category in {"handbag", "backpack"}:
             category = "bag"
         if category in {"accessories", "belt", "wallet", "sunglasses", "cap"}:
@@ -179,8 +198,15 @@ Customer message:
         if fabric:
             attributes["fabric"] = fabric
 
+        if re.search(r"\b(custom|customizable|customise|customize|customization|custom design)\b", text):
+            attributes["catalog_type"] = "customization"
+        elif re.search(r"\b(drop product|drop products|latest drop|new drop)\b", text):
+            attributes["catalog_type"] = "drop product"
+        elif re.search(r"\b(readymade|ready-made|ready made)\b", text):
+            attributes["catalog_type"] = "readymade"
+
         max_price = self._extract_max_price(text) or conversation_state.get("max_price")
-        intent = "product_search" if category or color or max_price or occasion else "general_question"
+        intent = "product_search" if category or color or max_price or occasion or attributes else "general_question"
 
         return IntentResult(
             intent=intent,

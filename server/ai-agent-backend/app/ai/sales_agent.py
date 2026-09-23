@@ -1,5 +1,8 @@
+import asyncio
 import logging
 import re
+import time
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from fastapi import HTTPException, status
@@ -43,6 +46,7 @@ class SalesAgent:
         self.commerce = commerce
 
     async def handle_chat(self, payload: AiChatRequest, current_user: UserPublic) -> AiChatResponse:
+        started_at = time.monotonic()
         business = await self.business_repository.find_by_owner_id(current_user.id)
         if business is None:
             raise HTTPException(
@@ -74,30 +78,61 @@ class SalesAgent:
         )
 
         image_analysis = {}
+        image_embedding = None
         if has_image:
-            image_analysis = await self.image_analyzer.analyze(
-                image_url=payload.image_url,
-                image_data=payload.image_data,
-                mime_type=payload.image_mime_type,
-                customer_message=payload.message,
+            catalog_categories = await self._catalog_category_names()
+            image_analysis, image_embedding = await asyncio.gather(
+                self.image_analyzer.analyze(
+                    image_url=payload.image_url,
+                    image_data=payload.image_data,
+                    mime_type=payload.image_mime_type,
+                    customer_message=payload.message,
+                    catalog_categories=catalog_categories,
+                ),
+                self.image_analyzer.embed(
+                    image_url=payload.image_url,
+                    image_data=payload.image_data,
+                    mime_type=payload.image_mime_type,
+                ),
             )
         image_analysis_failed = has_image and not image_analysis
 
+        # A customer may send the image first and ask "do you have this?" in
+        # the next message (or as a reply to that image). Reuse the latest
+        # visual attributes instead of treating "this one" as a cart command.
+        image_reference_question = self._is_image_reference_question(payload.message)
+        effective_image_analysis = image_analysis
+        image_product_choice = self._selected_image_product(
+            payload.message,
+            conversation.get("conversation_state", {}).get("last_image_analysis") or {},
+        )
+        if image_product_choice and not effective_image_analysis:
+            effective_image_analysis = image_product_choice
+        if image_reference_question and not effective_image_analysis:
+            effective_image_analysis = dict(
+                conversation.get("conversation_state", {}).get("last_image_analysis") or {}
+            )
+
         # A captionless WhatsApp image arrives with the internal placeholder
         # "Photo enquiry". Search from the visual attributes, not that label.
-        parse_message = (
-            self._image_analysis_to_search_text(image_analysis)
-            if has_image and image_analysis
-            else payload.message or self._image_analysis_to_search_text(image_analysis)
-        )
+        if effective_image_analysis and (has_image or image_reference_question or image_product_choice):
+            visual_search_text = self._image_analysis_to_search_text(effective_image_analysis)
+            customer_text = payload.message.strip()
+            parse_message = " ".join(
+                value
+                for value in [customer_text if customer_text.lower() != "photo enquiry" else "", visual_search_text]
+                if value
+            )
+        else:
+            parse_message = payload.message or self._image_analysis_to_search_text(effective_image_analysis)
         conversation = self._prepare_context(conversation, parse_message)
         intent = await self.intent_parser.parse(parse_message, conversation.get("conversation_state", {}))
-        if image_analysis:
-            intent = self._merge_image_analysis_into_intent(intent, image_analysis)
+        if effective_image_analysis:
+            intent = self._merge_image_analysis_into_intent(intent, effective_image_analysis)
 
         updated_state = self._merge_conversation_state(conversation.get("conversation_state", {}), intent)
-        if image_analysis:
-            updated_state["last_image_analysis"] = image_analysis
+        if effective_image_analysis:
+            updated_state["last_image_analysis"] = effective_image_analysis
         store_question = StoreKnowledge.is_store_question(payload.message) or intent.intent == "store_question"
         store_context = await StoreKnowledge(self.commerce.db if self.commerce else None).load(business, payload.message, include_all=intent.intent == "store_question")
         order_request = self._is_order_request(payload.message)
@@ -120,6 +155,15 @@ class SalesAgent:
             )
             response_goal = "report that image analysis failed without guessing what is in the image"
             tool_calls.append({"name": "analyze_product_image", "status": "failed"})
+        elif has_image and self._has_multiple_products(image_analysis) and not presentation:
+            ai_text = self._build_multiple_product_question(image_analysis)
+            response_goal = "ask which pictured product the customer means"
+            tool_calls.append({"name": "analyze_product_image", "status": "multiple_products"})
+        elif has_image and float(image_analysis.get("confidence") or 0) < 0.4 and not presentation:
+            product_type = image_analysis.get("product_type") or "item"
+            ai_text = f"I can see a possible {product_type}, but the image isn't clear enough to match confidently. Can you send a closer crop of the product?"
+            response_goal = "ask for a clearer product image because recognition confidence is low"
+            tool_calls.append({"name": "analyze_product_image", "status": "low_confidence"})
         elif store_question and not presentation:
             selected_id = updated_state.get("selected_product_id") or conversation.get("selected_product_id")
             if selected_id:
@@ -217,13 +261,25 @@ class SalesAgent:
             if products:
                 updated_state["recommended_product_ids"] = [product.id for product in products]
         elif intent.intent == "product_search":
-            products = await self.product_tools.search_from_intent(
-                business_id=business_id,
-                intent=intent,
-                query=payload.message,
-            )
+            if has_image and effective_image_analysis:
+                products = await self.product_tools.search_from_image(
+                    business_id=business_id,
+                    intent=intent,
+                    image_analysis=effective_image_analysis,
+                    image_embedding=image_embedding,
+                )
+            else:
+                products = await self.product_tools.search_from_intent(
+                    business_id=business_id,
+                    intent=intent,
+                    query=payload.message,
+                )
             if not products:
-                relaxed_products, relaxed_summary = await self._search_relaxed_options(business_id, intent)
+                relaxed_products, relaxed_summary = await self._search_relaxed_options(
+                    business_id,
+                    intent,
+                    allow_other_categories=not bool(effective_image_analysis),
+                )
                 products = relaxed_products
                 updated_state["recommended_product_ids"] = [product.id for product in products]
                 updated_state["selected_product_id"] = products[0].id if len(products) == 1 else None
@@ -241,8 +297,12 @@ class SalesAgent:
                         "relaxed_summary": relaxed_summary,
                     }
                 )
-                ai_text = self._build_relaxed_response(intent, relaxed_summary, products)
-                response_goal = "recommend close alternatives after the exact search failed"
+                if effective_image_analysis and not products:
+                    ai_text = self._build_image_no_match_response(effective_image_analysis)
+                    response_goal = "clearly report that the pictured product type is not in the catalogue"
+                else:
+                    ai_text = self._build_relaxed_response(intent, relaxed_summary, products)
+                    response_goal = "recommend close alternatives after the exact search failed"
             elif self._is_detail_request(payload.message) and products:
                 selected_product = products[0]
                 products = [selected_product]
@@ -263,14 +323,34 @@ class SalesAgent:
                         "result_count": len(products),
                     }
                 )
-                ai_text = self._build_response(intent, products)
-                response_goal = "recommend matching products"
+                if effective_image_analysis:
+                    ai_text = self._build_image_match_response(intent, products, effective_image_analysis)
+                    response_goal = "recommend visually ranked catalogue products with calibrated confidence"
+                else:
+                    ai_text = self._build_response(intent, products)
+                    response_goal = "recommend matching products"
         else:
             ai_text = self._build_response(intent, products)
             response_goal = "ask a helpful clarifying question"
 
-        if response_goal in {"recommend matching products", "recommend close alternatives after the exact search failed"}:
+        if response_goal in {
+            "recommend matching products",
+            "recommend visually ranked catalogue products with calibrated confidence",
+            "recommend close alternatives after the exact search failed",
+        }:
             updated_state["last_search_had_results"] = bool(products)
+
+        if products:
+            updated_state["option_product_ids"] = {
+                str(index): product.id for index, product in enumerate(products, start=1)
+            }
+            updated_state["last_search"] = {
+                "category": intent.category,
+                "color": intent.color,
+                "source_type": intent.attributes.get("catalog_type"),
+                "result_count": len(products),
+                "from_image": bool(effective_image_analysis),
+            }
 
         if not presentation and not image_analysis_failed:
             ai_text = await self.response_generator.generate(
@@ -338,6 +418,22 @@ class SalesAgent:
                 upsert=True,
             )
         refreshed_conversation = await self.conversation_repository.find_by_id(str(conversation["_id"]), business_id)
+
+        await self._record_metric(
+            business_id=business_id,
+            intent=intent,
+            result_count=len(products),
+            image_analysis=image_analysis,
+            had_image=has_image,
+            image_embedding_available=bool(image_embedding),
+            handoff_requested=bool(updated_state.get("handoff_requested")),
+            checkout_failure=(
+                "couldn't create a secure checkout link" in ai_text.lower()
+                or "store service isn't responding" in ai_text.lower()
+            ),
+            response_goal=response_goal,
+            latency_ms=round((time.monotonic() - started_at) * 1000),
+        )
 
         logger.info("AI chat handled for conversation %s with intent %s", conversation["_id"], intent.intent)
         return AiChatResponse(
@@ -532,18 +628,86 @@ class SalesAgent:
         if not image_analysis:
             return "Find similar products for this image"
         values = [
+            image_analysis.get("product_name_hint"),
+            image_analysis.get("visible_text"),
+            image_analysis.get("brand"),
             image_analysis.get("color"),
             image_analysis.get("fabric") or image_analysis.get("material"),
-            image_analysis.get("category"),
+            image_analysis.get("category") or image_analysis.get("product_type"),
             image_analysis.get("occasion"),
             image_analysis.get("style"),
         ]
         search_text = " ".join(str(value) for value in values if value)
         return search_text or "Find similar products for this image"
 
+    def _is_image_reference_question(self, message: str) -> bool:
+        text = message.lower().strip()
+        return bool(
+            re.search(r"\b(?:do|did|can)?\s*(?:u|you|we)\s+(?:have|sell|stock)\s+(?:this|it|this one)\b", text)
+            or re.search(r"\b(?:is|are)\s+(?:this|it)\s+(?:available|in stock)\b", text)
+            or text in {"u have this", "u have this one", "have this", "have this one"}
+        )
+
+    def _has_multiple_products(self, image_analysis: dict) -> bool:
+        try:
+            return int(image_analysis.get("product_count") or 1) > 1
+        except (TypeError, ValueError):
+            return False
+
+    def _selected_image_product(self, message: str, image_analysis: dict) -> dict | None:
+        products = image_analysis.get("products") or []
+        if not products or not self._has_multiple_products(image_analysis):
+            return None
+        match = re.fullmatch(r"(?:option\s*)?([1-5])", message.lower().strip())
+        if not match:
+            return None
+        index = int(match.group(1)) - 1
+        if index >= len(products) or not isinstance(products[index], dict):
+            return None
+        selected = dict(products[index])
+        selected["product_count"] = 1
+        selected["confidence"] = image_analysis.get("confidence")
+        return selected
+
+    def _build_multiple_product_question(self, image_analysis: dict) -> str:
+        descriptions = []
+        for index, product in enumerate((image_analysis.get("products") or [])[:5], start=1):
+            if not isinstance(product, dict):
+                continue
+            label = product.get("description") or " ".join(
+                str(product.get(key) or "") for key in ["color", "product_type"]
+            ).strip()
+            position = product.get("position")
+            descriptions.append(f"{index}. {label}" + (f" ({position})" if position else ""))
+        options = "\n" + "\n".join(descriptions) if descriptions else ""
+        return "I can see more than one product in the image. Which one should I check?" + options
+
+    def _build_image_match_response(
+        self,
+        intent: IntentResult,
+        products: list[ProductPublic],
+        image_analysis: dict,
+    ) -> str:
+        if not products:
+            return self._build_image_no_match_response(image_analysis)
+        top_score = float(products[0].attributes.get("match_score") or 0)
+        vision_confidence = float(image_analysis.get("confidence") or 0)
+        intro = (
+            "These are the closest matches to your image:"
+            if top_score >= 0.72 and vision_confidence >= 0.7
+            else "These look similar, but the exact design may differ:"
+        )
+        lines = [intro]
+        for index, product in enumerate(products, start=1):
+            price = product.sale_price if product.sale_price is not None else product.price
+            kind = product.attributes.get("source_type") or "product"
+            lines.append(f"{index}. {product.name} - {product.currency} {int(price)} - {kind}")
+        lines.append("Reply with the option number for photos, sizes, or the product link.")
+        return "\n".join(lines)
+
     def _merge_image_analysis_into_intent(self, intent: IntentResult, image_analysis: dict) -> IntentResult:
         attributes = dict(intent.attributes)
-        for key in ["material", "fabric", "style", "pattern", "work", "gender"]:
+        for key in ["material", "fabric"]:
             if image_analysis.get(key) and not attributes.get(key):
                 attributes[key] = image_analysis[key]
 
@@ -551,13 +715,13 @@ class SalesAgent:
             intent="product_search",
             language=intent.language,
             script=intent.script,
-            category=intent.category or image_analysis.get("category"),
+            category=image_analysis.get("category") or intent.category or image_analysis.get("product_type"),
             color=intent.color or image_analysis.get("color"),
             min_price=intent.min_price,
             max_price=intent.max_price,
             occasion=intent.occasion or image_analysis.get("occasion"),
             size=intent.size,
-            brand=intent.brand,
+            brand=intent.brand or image_analysis.get("brand"),
             attributes=attributes,
             confidence=max(intent.confidence, float(image_analysis.get("confidence") or 0.65)),
         )
@@ -730,7 +894,12 @@ class SalesAgent:
             confidence=current_intent.confidence,
         )
 
-    async def _search_relaxed_options(self, business_id: str, intent: IntentResult) -> tuple[list[ProductPublic], str]:
+    async def _search_relaxed_options(
+        self,
+        business_id: str,
+        intent: IntentResult,
+        allow_other_categories: bool = True,
+    ) -> tuple[list[ProductPublic], str]:
         attempts = [
             (
                 "the same category and budget, but relaxing color and occasion",
@@ -750,21 +919,24 @@ class SalesAgent:
                     business_id=business_id,
                     category=intent.category,
                     size=intent.size,
-                    brand=intent.brand,
-                    limit=5,
-                ),
-            ),
-            (
-                "nearby options from other categories",
-                ProductSearchParams(
-                    business_id=business_id,
-                    max_price=intent.max_price,
-                    color=intent.color,
-                    occasion=intent.occasion,
                     limit=5,
                 ),
             ),
         ]
+
+        if allow_other_categories:
+            attempts.append(
+                (
+                    "nearby options from other categories",
+                    ProductSearchParams(
+                        business_id=business_id,
+                        max_price=intent.max_price,
+                        color=intent.color,
+                        occasion=intent.occasion,
+                        limit=5,
+                    ),
+                )
+            )
 
         for summary, params in attempts:
             products = await self.product_tools.search_products(params)
@@ -773,11 +945,58 @@ class SalesAgent:
 
         return [], "broader catalogue"
 
+    async def _catalog_category_names(self) -> list[str]:
+        """Return only categories currently used by active ecommerce products."""
+        repository = getattr(self.product_tools, "product_repository", None)
+        category_loader = getattr(repository, "catalog_categories", None)
+        if category_loader:
+            try:
+                return await category_loader()
+            except Exception as exc:
+                logger.warning("Could not load unified catalogue categories: %s", exc.__class__.__name__)
+
+        if self.commerce is None or getattr(self.commerce, "db", None) is None:
+            return []
+
+        try:
+            database = self.commerce.db
+            category_ids = await database.readymadeproducts.distinct(
+                "category",
+                {"isActive": {"$ne": False}},
+            )
+            if not category_ids:
+                return []
+            documents = await database.categories.find(
+                {"_id": {"$in": category_ids}},
+                {"name": 1},
+            ).to_list(length=len(category_ids))
+            return sorted(
+                {
+                    str(document.get("name") or "").strip()
+                    for document in documents
+                    if str(document.get("name") or "").strip()
+                }
+            )
+        except Exception as exc:
+            logger.warning("Could not load catalogue categories for image analysis: %s", exc.__class__.__name__)
+            return []
+
     def _build_store_checkout_response(self, product: ProductPublic) -> str:
         product_url = product.attributes.get("product_url") if product.attributes else None
         if product_url:
             return f"Continue securely on the store to choose options, enter your address, and pay: {product_url}"
         return "Please open this product in the store to choose options, enter your address, and complete payment securely."
+
+    def _build_image_no_match_response(self, image_analysis: dict) -> str:
+        product_type = (
+            image_analysis.get("product_type")
+            or image_analysis.get("category")
+            or "product"
+        )
+        return (
+            f"I analyzed the image as a {product_type}, but I couldn't find a matching item "
+            "in the current store catalogue. You can send another image, or ask me to show the available categories."
+        )
 
     async def _get_or_create_conversation(self, conversation_id: str | None, business_id: str) -> dict:
         if conversation_id:
@@ -911,10 +1130,13 @@ class SalesAgent:
 
     def _build_detail_response(self, product: ProductPublic) -> str:
         price = product.sale_price if product.sale_price is not None else product.price
+        customizable = bool(product.attributes.get("customizable"))
         lines = [
             f"{product.name}",
-            f"Price is {product.currency} {int(price)}.",
-            "It's in stock." if product.stock > 0 else "It's currently out of stock.",
+            f"Starting price is {product.currency} {int(price)}." if customizable else f"Price is {product.currency} {int(price)}.",
+            ("It's available to customize." if customizable else "It's in stock.")
+            if product.stock > 0
+            else "It's currently out of stock.",
         ]
         if product.description:
             lines.append(product.description)
@@ -922,7 +1144,12 @@ class SalesAgent:
             readable_attributes = ", ".join(f"{key.replace('_', ' ')}: {value}" for key, value in product.attributes.items() if key in {"color", "fabric", "material", "fit", "sizes", "brand", "care"})
             if readable_attributes:
                 lines.append(readable_attributes)
-        lines.append("Would you like the product link?")
+        if customizable:
+            colors = product.attributes.get("colors") or []
+            if colors:
+                lines.append("Colors: " + ", ".join(str(value) for value in colors) + ".")
+            lines.append("You can add images and text in the designer; the final price depends on the selected size and design elements.")
+        lines.append("Would you like the designer link?" if customizable else "Would you like the product link?")
         return "\n".join(lines)
 
     def _build_stock_response(self, stock_result: dict) -> str:
@@ -932,6 +1159,45 @@ class SalesAgent:
         if stock_result["available"]:
             return f"Yes, {product.name} is available. Stock left: {stock_result['stock']}."
         return f"{product.name} is currently out of stock."
+
+    async def _record_metric(
+        self,
+        business_id: str,
+        intent: IntentResult,
+        result_count: int,
+        image_analysis: dict,
+        had_image: bool,
+        image_embedding_available: bool,
+        handoff_requested: bool,
+        checkout_failure: bool,
+        response_goal: str,
+        latency_ms: int,
+    ) -> None:
+        """Store operational counters without message text, media, or customer identifiers."""
+        try:
+            database = self.conversation_repository.collection.database
+            await database.ai_agent_metrics.insert_one(
+                {
+                    "business_id": parse_object_id(business_id),
+                    "intent": intent.intent,
+                    "category": intent.category,
+                    "source_type": intent.attributes.get("catalog_type"),
+                    "result_count": int(result_count),
+                    "empty_result": result_count == 0 and intent.intent == "product_search",
+                    "had_image": had_image,
+                    "image_analysis_failed": had_image and not bool(image_analysis),
+                    "image_product_type": image_analysis.get("product_type"),
+                    "image_confidence": image_analysis.get("confidence"),
+                    "image_embedding_available": image_embedding_available,
+                    "handoff_requested": handoff_requested,
+                    "checkout_failure": checkout_failure,
+                    "response_goal": response_goal,
+                    "latency_ms": latency_ms,
+                    "created_at": datetime.now(timezone.utc),
+                }
+            )
+        except Exception as exc:
+            logger.warning("AI metric write skipped: %s", exc.__class__.__name__)
 
     def _build_variant_response(self, selected_product: ProductPublic, variants: list[ProductPublic], filters: dict) -> str:
         filter_text = ", ".join(str(value) for key, value in filters.items() if key != "attributes" for value in [value])

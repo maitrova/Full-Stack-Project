@@ -134,8 +134,6 @@ class WhatsAppCommerce:
         if text in {"checkout", "my cart", "show cart", "open cart"}:
             destination = "/checkout" if text == "checkout" else "/cart"
             return result(f"Open securely and sign in with your store account:\n{origin}{destination}" if origin.startswith("https://") else "The public store URL is not configured. Please ask the store team for help.")
-        if re.search(r"\b(custom product|customise|customize|custom design)\b", text) and not state.get("purchase"):
-            return result(f"Create and price your custom product securely on the website:\n{origin}/customproducts" if origin.startswith("https://") else "The custom-product page is not configured yet.")
         if re.search(r"\b(combo|bundle|pack offer)\b", text) and not state.get("purchase"):
             return result(f"Browse current combo packs here:\n{origin}/combo-packs" if origin.startswith("https://") else "The combo-pack page is not configured yet.")
         if re.search(r"\b(compare|difference)\b", text):
@@ -149,6 +147,18 @@ class WhatsAppCommerce:
             selected = state.get("selected_product_id") or conversation.get("selected_product_id")
             if selected:
                 product = await product_tools.get_product_details(business_id, str(selected))
+                if product and re.search(r"\b(customize|customise|customization)\b", text):
+                    if product.attributes.get("customizable"):
+                        product_url = product.attributes.get("product_url")
+                        return result(
+                            f"Yes, you can customize {self._product_label(product)} here:\n{product_url}"
+                            if product_url
+                            else "This product is customizable, but its designer link is not configured yet."
+                        )
+                    return result(
+                        f"{self._product_label(product)} is sold as shown and is not customizable. "
+                        + (f"Browse customizable products here:\n{origin}/customproducts" if origin.startswith("https://") else "Ask the store team about custom options.")
+                    )
                 if product and re.search(r"\b(size|sizes|stock)\b", text):
                     variants = product.attributes.get("variants", [])
                     return result(product.name + "\n" + "\n".join(f"{v['size']}: {v['stock']} available, {product.currency} {v['effective_price']:g}" for v in variants))
@@ -160,7 +170,7 @@ class WhatsAppCommerce:
         # Customers often say "I want this" after the agent has shown one product.
         # Support common Telugu wording as well as the English purchase verbs.
         buy = bool(re.search(
-            r"\b(add to cart|buy|purchase|book|order|i want this|want this|need this|this one|idi kavali|naaku idi kavali|naku idi kavali|kavali|kaavali)\b|కావాలి|నాకు ఇది కావాలి",
+            r"\b(add to cart|buy|purchase|book|order|i want this|want this|need this|idi kavali|naaku idi kavali|naku idi kavali|kavali|kaavali)\b|కావాలి|నాకు ఇది కావాలి",
             text,
         ))
         purchase = state.get("purchase")
@@ -191,6 +201,15 @@ class WhatsAppCommerce:
         if not product:
             state.pop("purchase", None)
             return result("That product is no longer available. Please choose another product.")
+        source_type = product.attributes.get("source_type")
+        if source_type in {"drop", "customization"}:
+            state.pop("purchase", None)
+            product_url = product.attributes.get("product_url")
+            if not product_url:
+                return result("The product is available, but its store page is not configured yet. Please send 'human' for help.")
+            if source_type == "customization":
+                return result(f"Open the designer to choose the product, size, color, images, and text securely:\n{product_url}")
+            return result(f"Open this drop product to choose the available size and continue securely:\n{product_url}")
         size_match = re.search(r"\b(XXL|XL|XS|S|M|L)\b", message.upper())
         quantity = self._extract_quantity(
             message,

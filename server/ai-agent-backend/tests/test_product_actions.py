@@ -2,10 +2,13 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 import unittest
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
+from bson import ObjectId
 
+from app.ai.product_image_analyzer import ProductImageAnalyzer
 from app.ai.sales_agent import SalesAgent
 from app.repositories.ecommerce_product_repository import EcommerceProductRepository
+from app.schemas.ai import IntentResult
 from app.services.whatsapp_service import WhatsAppService
 
 
@@ -70,6 +73,57 @@ class ProductActions(unittest.IsolatedAsyncioTestCase):
         self.assertIn("blue", search_text)
         self.assertIn("cotton", search_text)
 
+    def test_image_availability_question_reuses_image_context(self):
+        self.assertTrue(self.agent._is_image_reference_question("Do u have this"))
+        self.assertTrue(self.agent._is_image_reference_question("U have this one"))
+        self.assertTrue(self.agent._is_image_reference_question("Is it available?"))
+        self.assertFalse(self.agent._is_image_reference_question("show this one"))
+
+    async def test_image_analyzer_uses_live_catalogue_categories(self):
+        client = SimpleNamespace(
+            is_configured=True,
+            generate_with_image=AsyncMock(
+                return_value='{"category":"Mens Hoodies","product_type":"hoodie","confidence":0.96}'
+            ),
+        )
+        analyzer = ProductImageAnalyzer(client)
+
+        result = await analyzer.analyze(
+            image_data="encoded",
+            mime_type="image/jpeg",
+            catalog_categories=["Mens Hoodies", "Women Crop Tops"],
+        )
+
+        prompt = client.generate_with_image.await_args.kwargs["prompt"]
+        self.assertIn('"Mens Hoodies"', prompt)
+        self.assertIn('"Women Crop Tops"', prompt)
+        self.assertEqual(result["category"], "Mens Hoodies")
+
+    async def test_catalogue_categories_only_include_active_product_categories(self):
+        cursor = SimpleNamespace(to_list=AsyncMock(return_value=[{"name": "Mens Hoodies"}, {"name": "T-Shirts"}]))
+        database = SimpleNamespace(
+            readymadeproducts=SimpleNamespace(distinct=AsyncMock(return_value=["hoodie-id", "shirt-id"])),
+            categories=SimpleNamespace(find=Mock(return_value=cursor)),
+        )
+        agent = SalesAgent(None, None, None, self.agent.product_tools, commerce=SimpleNamespace(db=database))
+
+        categories = await agent._catalog_category_names()
+
+        self.assertEqual(categories, ["Mens Hoodies", "T-Shirts"])
+
+    async def test_image_search_does_not_fall_back_to_unrelated_categories(self):
+        search_products = AsyncMock(side_effect=[[], [], self.products])
+        agent = SalesAgent(None, None, None, SimpleNamespace(search_products=search_products))
+
+        products, _ = await agent._search_relaxed_options(
+            "business",
+            IntentResult(intent="product_search", category="hoodie", color="black"),
+            allow_other_categories=False,
+        )
+
+        self.assertEqual(products, [])
+        self.assertEqual(search_products.await_count, 2)
+
     def test_captionless_whatsapp_image_is_processed(self):
         service = WhatsAppService.__new__(WhatsAppService)
         self.assertEqual(
@@ -129,6 +183,61 @@ class ProductActions(unittest.IsolatedAsyncioTestCase):
         with patch("app.repositories.ecommerce_product_repository.settings", SimpleNamespace(ecommerce_storefront_url="https://shop.example")):
             url = repo._product_url({"_id": "123", "title": "Blue & White Shirt"}, "Men", "Casual Shirts")
         self.assertEqual(url, "https://shop.example/products/men/casual-shirts/blue-and-white-shirt")
+
+    def test_drop_product_is_normalized_into_searchable_catalogue(self):
+        repo = EcommerceProductRepository.__new__(EcommerceProductRepository)
+        document = {
+            "_id": ObjectId(),
+            "name": "Limited Black Hoodie",
+            "category": "Hoodies",
+            "subCategory": "Limited Drop",
+            "images": [{"url": "drop.jpg"}],
+            "variants": [{"size": "M", "price": 1299, "stock": 4, "sku": "DROP-M"}],
+            "minPrice": 1299,
+        }
+        with patch(
+            "app.repositories.ecommerce_product_repository.settings",
+            SimpleNamespace(
+                ecommerce_public_url="https://shop.example/api/outputs",
+                ecommerce_storefront_url="https://shop.example",
+            ),
+        ):
+            product = repo._normalize_drop(document, str(ObjectId()))
+
+        self.assertEqual(product["attributes"]["source_type"], "drop")
+        self.assertEqual(product["attributes"]["product_url"], f"https://shop.example/dropproducts/{document['_id']}")
+        self.assertTrue(repo._matches(product, {"category": "hoodie", "attributes": {"catalog_type": "drop product"}}))
+
+    def test_customization_product_contains_designer_details(self):
+        repo = EcommerceProductRepository.__new__(EcommerceProductRepository)
+        document = {
+            "_id": ObjectId(),
+            "name": "Custom Oversized T-Shirt",
+            "slug": "custom-oversized-t-shirt",
+            "category": "apparel",
+            "subCategory": "T-Shirts",
+            "basePrice": 699,
+            "currency": "INR",
+            "colors": [{"label": "Black", "value": "#000000"}],
+            "sizePricing": [{"size": "M", "price": 799, "stock": 8}],
+            "views": [{"mockupUrl": "custom-front.png"}],
+        }
+        with patch(
+            "app.repositories.ecommerce_product_repository.settings",
+            SimpleNamespace(
+                ecommerce_public_url="https://shop.example/api/outputs",
+                ecommerce_storefront_url="https://shop.example",
+            ),
+        ):
+            product = repo._normalize_customization(document, str(ObjectId()))
+
+        self.assertTrue(product["attributes"]["customizable"])
+        self.assertIn("add your own images and text", product["description"])
+        self.assertEqual(
+            product["attributes"]["product_url"],
+            "https://shop.example/products/custom-oversized-t-shirt/customize",
+        )
+        self.assertTrue(repo._matches(product, {"attributes": {"catalog_type": "customization"}}))
 
 
 if __name__ == "__main__":
