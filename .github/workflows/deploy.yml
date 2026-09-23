@@ -214,18 +214,28 @@ jobs:
 
       - name: Deploy AI agent to VPS
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           port: ${{ secrets.VPS_PORT }}
           password: ${{ secrets.VPS_PASSWORD }}
+          envs: GEMINI_API_KEY
           script: |
             set -e
+            set --
+            if [ -n "${GEMINI_API_KEY:-}" ]; then
+              set -- --set-string "envSecrets.GEMINI_API_KEY=${GEMINI_API_KEY}"
+            else
+              echo "WARNING: GEMINI_API_KEY GitHub Actions secret is not configured; keeping the chart value"
+            fi
             helm upgrade --install ai-agent /tmp/ai-agent \
               --namespace production \
               --create-namespace \
               --history-max 3 \
               --set image.tag=${{ needs.build_and_push.outputs.ai_agent_tag }} \
+              "$@" \
               --wait \
               --atomic
 
