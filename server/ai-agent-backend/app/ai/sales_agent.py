@@ -81,6 +81,7 @@ class SalesAgent:
                 mime_type=payload.image_mime_type,
                 customer_message=payload.message,
             )
+        image_analysis_failed = has_image and not image_analysis
 
         parse_message = payload.message or self._image_analysis_to_search_text(image_analysis)
         conversation = self._prepare_context(conversation, parse_message)
@@ -104,7 +105,14 @@ class SalesAgent:
         if not presentation:
             presentation = await self._presentation_request(business_id, payload.message, conversation, updated_state)
 
-        if store_question and not presentation:
+        if image_analysis_failed and not presentation:
+            ai_text = (
+                "I received the image, but I couldn't analyze it right now. "
+                "Please resend it as a clear JPG or PNG. If it still fails, send 'human' for help."
+            )
+            response_goal = "report that image analysis failed without guessing what is in the image"
+            tool_calls.append({"name": "analyze_product_image", "status": "failed"})
+        elif store_question and not presentation:
             selected_id = updated_state.get("selected_product_id") or conversation.get("selected_product_id")
             if selected_id:
                 selected_product = await self.product_tools.get_product_details(business_id, str(selected_id))
@@ -256,7 +264,7 @@ class SalesAgent:
         if response_goal in {"recommend matching products", "recommend close alternatives after the exact search failed"}:
             updated_state["last_search_had_results"] = bool(products)
 
-        if not presentation:
+        if not presentation and not image_analysis_failed:
             ai_text = await self.response_generator.generate(
             customer_message=payload.message,
             intent=intent,

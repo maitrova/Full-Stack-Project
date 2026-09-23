@@ -33,6 +33,26 @@ class ProductActions(unittest.IsolatedAsyncioTestCase):
         result = await self.agent._presentation_request("business", "photos of black shirts", {}, {})
         self.assertIsNone(result)
 
+    def test_captionless_whatsapp_image_is_processed(self):
+        service = WhatsAppService.__new__(WhatsAppService)
+        self.assertEqual(
+            service._message_text({"type": "image", "image": {"id": "media-1", "mime_type": "image/jpeg"}}),
+            "Photo enquiry",
+        )
+
+    async def test_whatsapp_image_media_is_downloaded(self):
+        service = WhatsAppService.__new__(WhatsAppService)
+        service.client = SimpleNamespace(
+            get_media_as_base64=AsyncMock(return_value={"image_data": "encoded", "mime_type": "image/png"})
+        )
+
+        result = await service._message_image_payload(
+            {"type": "image", "image": {"id": "media-1", "mime_type": "image/png"}}
+        )
+
+        self.assertEqual(result, {"image_data": "encoded", "mime_type": "image/png"})
+        service.client.get_media_as_base64.assert_awaited_once_with("media-1", "image/png")
+
     async def test_numbered_images_and_gallery(self):
         service = WhatsAppService.__new__(WhatsAppService)
         service.client = SimpleNamespace(send_image=AsyncMock())

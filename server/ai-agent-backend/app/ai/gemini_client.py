@@ -40,12 +40,14 @@ class GeminiClient:
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(
                 url,
-                params={"key": self.api_key},
                 headers={
                     "Content-Type": "application/json",
+                    "x-goog-api-key": self.api_key,
                 },
                 json=payload,
             )
+            if response.is_error:
+                self._log_api_error(response, "text")
             response.raise_for_status()
             data = response.json()
 
@@ -109,10 +111,11 @@ class GeminiClient:
         async with httpx.AsyncClient(timeout=45) as client:
             response = await client.post(
                 url,
-                params={"key": self.api_key},
-                headers={"Content-Type": "application/json"},
+                headers={"Content-Type": "application/json", "x-goog-api-key": self.api_key},
                 json=payload,
             )
+            if response.is_error:
+                self._log_api_error(response, "vision")
             response.raise_for_status()
             data = response.json()
 
@@ -121,3 +124,13 @@ class GeminiClient:
         except (KeyError, IndexError, TypeError) as exc:
             logger.warning("Unexpected Gemini vision response shape")
             raise RuntimeError("Invalid Gemini vision response") from exc
+
+    @staticmethod
+    def _log_api_error(response: httpx.Response, operation: str) -> None:
+        try:
+            error = response.json().get("error", {})
+            reason = error.get("status") or "unknown"
+        except (ValueError, AttributeError):
+            reason = "non_json_response"
+        # Never log the API key, response URL query, or provider response body.
+        logger.warning("Gemini %s request rejected: HTTP %s (%s)", operation, response.status_code, reason)

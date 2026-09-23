@@ -105,7 +105,8 @@ class WhatsAppClient:
 
         headers = {"Authorization": f"Bearer {self.access_token}"}
         metadata_url = f"https://graph.facebook.com/{self.graph_api_version}/{media_id}"
-        async with httpx.AsyncClient(timeout=30) as client:
+        # Meta media URLs may redirect to a short-lived CDN URL.
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
             metadata_response = await client.get(metadata_url, headers=headers)
             try:
                 metadata_response.raise_for_status()
@@ -127,6 +128,9 @@ class WhatsAppClient:
                 raise
 
         mime_type = fallback_mime_type or metadata.get("mime_type") or media_response.headers.get("content-type") or "image/jpeg"
+        if not mime_type.lower().startswith("image/"):
+            logger.warning("WhatsApp media %s is not an image (%s)", media_id, mime_type)
+            return None
         return {
             "image_data": base64.b64encode(media_response.content).decode("ascii"),
             "mime_type": mime_type.split(";")[0],
