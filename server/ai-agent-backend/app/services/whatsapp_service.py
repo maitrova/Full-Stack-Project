@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import hashlib
 import logging
@@ -240,26 +241,25 @@ class WhatsAppService:
                             processed += 1
                             continue
 
-                        image_payload = await self._message_image_payload(message)
-                        ai_response = await self.sales_agent.handle_external_chat(
-                            business=business,
-                            message=text,
-                            channel="whatsapp",
-                            external_customer_ref=from_phone,
-                            customer_name=contacts_by_wa_id.get(from_phone),
-                            image_data=image_payload.get("image_data") if image_payload else None,
-                            image_mime_type=image_payload.get("mime_type") if image_payload else None,
-                            inbound_metadata={
-                                "whatsapp_message_id": whatsapp_message_id,
-                                "whatsapp_timestamp": message.get("timestamp"),
-                                "whatsapp_type": message.get("type"),
-                                "whatsapp_media_id": self._message_media_id(message),
-                                "whatsapp_media_mime_type": image_payload.get("mime_type") if image_payload else None,
-                                "whatsapp_quoted_message_id": quoted_message_id,
-                                "whatsapp_quoted_product_id": quoted_product_id,
-                            },
-                            quoted_product_id=quoted_product_id,
-                        )
+                        if message.get("type") == "image":
+                            await self._acknowledge_image(from_phone, whatsapp_message_id)
+                        try:
+                            ai_response = await asyncio.wait_for(self._process_inbound_chat(
+                                business=business,
+                                message=message,
+                                text=text,
+                                from_phone=from_phone,
+                                customer_name=contacts_by_wa_id.get(from_phone),
+                                quoted_message_id=quoted_message_id,
+                                quoted_product_id=quoted_product_id,
+                            ), timeout=110 if message.get("type") == "image" else None)
+                        except Exception as exc:
+                            if message.get("type") != "image":
+                                raise
+                            logger.warning("WhatsApp image processing failed (%s)", type(exc).__name__)
+                            await self._send_image_failure(from_phone, whatsapp_message_id, type(exc).__name__)
+                            processed += 1
+                            continue
                         await self.deliveries.update_one({"_id": whatsapp_message_id}, {"$set": {"response": ai_response.model_dump(mode="json")}}, upsert=True)
                         await self._deliver(from_phone, whatsapp_message_id, ai_response)
                         processed += 1
@@ -268,6 +268,60 @@ class WhatsAppService:
                         raise
 
         return {"status": "ok", "processed": processed}
+
+    async def _acknowledge_image(self, to: str, message_id: str) -> None:
+        delivery = await self.deliveries.find_one({"_id": message_id}) or {}
+        if delivery.get("image_ack_sent"):
+            return
+        sent = await self.client.send_text(to, "Thanks for the photo. I'm checking it against our catalogue.", message_id)
+        if not sent:
+            raise RuntimeError("WhatsApp sender is not configured")
+        await self.deliveries.update_one(
+            {"_id": message_id}, {"$set": {"image_ack_sent": True}}, upsert=True,
+        )
+
+    async def _send_image_failure(self, to: str, message_id: str, error_type: str) -> None:
+        sent = await self.client.send_text(
+            to,
+            "I couldn't finish checking your photo right now. Tell me the product name or type "
+            "and color, and I'll help you search. You can also send 'human' to speak with our team.",
+            message_id,
+        )
+        if not sent:
+            raise RuntimeError("WhatsApp sender is not configured")
+        await self.deliveries.update_one(
+            {"_id": message_id},
+            {"$set": {"complete": True, "text_sent": True, "processing_error": error_type}},
+            upsert=True,
+        )
+
+    async def _process_inbound_chat(
+        self, *, business, message, text, from_phone, customer_name,
+        quoted_message_id, quoted_product_id,
+    ):
+        image_payload = await asyncio.wait_for(self._message_image_payload(message), timeout=20)
+        if message.get("type") == "image" and not image_payload:
+            # Do not silently turn a failed photo download into a text enquiry.
+            raise RuntimeError("WhatsApp image media unavailable")
+        return await self.sales_agent.handle_external_chat(
+            business=business,
+            message=text,
+            channel="whatsapp",
+            external_customer_ref=from_phone,
+            customer_name=customer_name,
+            image_data=image_payload.get("image_data") if image_payload else None,
+            image_mime_type=image_payload.get("mime_type") if image_payload else None,
+            inbound_metadata={
+                "whatsapp_message_id": message.get("id"),
+                "whatsapp_timestamp": message.get("timestamp"),
+                "whatsapp_type": message.get("type"),
+                "whatsapp_media_id": self._message_media_id(message),
+                "whatsapp_media_mime_type": image_payload.get("mime_type") if image_payload else None,
+                "whatsapp_quoted_message_id": quoted_message_id,
+                "whatsapp_quoted_product_id": quoted_product_id,
+            },
+            quoted_product_id=quoted_product_id,
+        )
 
     async def _rate_limited(self, from_phone: str) -> bool:
         now = datetime.now(timezone.utc)

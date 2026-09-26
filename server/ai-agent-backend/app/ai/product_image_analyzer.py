@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import re
@@ -53,12 +54,12 @@ Customer text:
 {customer_message or ""}
 """
         try:
-            text = await self.gemini_client.generate_with_image(
+            text = await asyncio.wait_for(self.gemini_client.generate_with_image(
                 prompt=prompt,
                 image_url=image_url,
                 image_data=image_data,
                 mime_type=mime_type,
-            )
+            ), timeout=35)
             return self._load_json(text)
         except Exception as exc:
             logger.warning("Gemini image analysis failed; continuing without image attributes: %s", exc.__class__.__name__)
@@ -73,11 +74,11 @@ Customer text:
         if not self.gemini_client.is_configured:
             return None
         try:
-            return await self.gemini_client.embed_content(
+            return await asyncio.wait_for(self.gemini_client.embed_content(
                 image_url=image_url,
                 image_data=image_data,
                 mime_type=mime_type,
-            )
+            ), timeout=8)
         except Exception as exc:
             logger.warning("Gemini image embedding failed; using attribute search: %s", exc.__class__.__name__)
             return None
