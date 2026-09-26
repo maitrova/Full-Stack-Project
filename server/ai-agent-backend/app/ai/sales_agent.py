@@ -108,7 +108,7 @@ class SalesAgent:
         )
         if image_product_choice and not effective_image_analysis:
             effective_image_analysis = image_product_choice
-        if image_reference_question and not effective_image_analysis:
+        if image_reference_question and not has_image and not effective_image_analysis:
             effective_image_analysis = dict(
                 conversation.get("conversation_state", {}).get("last_image_analysis") or {}
             )
@@ -131,6 +131,8 @@ class SalesAgent:
             intent = self._merge_image_analysis_into_intent(intent, effective_image_analysis)
 
         updated_state = self._merge_conversation_state(conversation.get("conversation_state", {}), intent)
+        if image_analysis_failed:
+            updated_state.pop("last_image_analysis", None)
         if effective_image_analysis:
             updated_state["last_image_analysis"] = effective_image_analysis
         store_question = StoreKnowledge.is_store_question(payload.message) or intent.intent == "store_question"
@@ -150,8 +152,10 @@ class SalesAgent:
 
         if image_analysis_failed and not presentation:
             ai_text = (
-                "I received the image, but I couldn't analyze it right now. "
-                "Please resend it as a clear JPG or PNG. If it still fails, send 'human' for help."
+                "Thanks for the photo. Image analysis is temporarily unavailable, "
+                "so I can't reliably identify the item yet. Tell me the product type, "
+                "color, or any name printed on it, and I'll search our catalogue. "
+                "You can also send 'human' to speak with our team."
             )
             response_goal = "report that image analysis failed without guessing what is in the image"
             tool_calls.append({"name": "analyze_product_image", "status": "failed"})
