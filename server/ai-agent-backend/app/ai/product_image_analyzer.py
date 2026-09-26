@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import math
 import re
 from typing import Any
 
@@ -38,6 +39,7 @@ Store catalogue categories:
 
 Rules:
 - Use simple English values.
+- Attribute values must be strings or null, never arrays or objects. confidence must be a number from 0 to 1.
 - When the product clearly belongs to one of the store catalogue categories, copy that category exactly into category.
 - If it does not match any listed store category, set category to null. Never force it into an unrelated category.
 - Put the general object type (for example hoodie, shoe, phone, chair, or handbag) in product_type even when category is null.
@@ -45,6 +47,7 @@ Rules:
 - Extract useful readable product/brand/design text into visible_text. Ignore prices, discounts, timestamps, buttons, and website navigation.
 - Distinguish hoodies (hood attached), sweatshirts (no hood), and t-shirts. Do not classify a hoodie as a t-shirt.
 - For screenshots or advertisements, ignore surrounding website/chat UI and analyze the main advertised product.
+- Gallery thumbnails and front/back views of the same item are one product, not multiple purchasable products.
 - Set product_count to the number of distinct purchasable products visible. If there is more than one, include a short products array with each item's position, product_type, color, and description.
 - If unsure, use null and lower confidence.
 - Do not identify a real person.
@@ -93,4 +96,38 @@ Customer text:
         if not match:
             raise ValueError("No JSON object found in image analysis response")
         parsed = json.loads(match.group(0))
-        return parsed if isinstance(parsed, dict) else {}
+        if not isinstance(parsed, dict) or not parsed:
+            return {}
+        return self._normalize_analysis(parsed)
+
+    @staticmethod
+    def _normalize_analysis(parsed: dict) -> dict[str, Any]:
+        # Provider JSON is untrusted: arrays/objects cannot be passed to the
+        # string fields in IntentResult, and malformed confidence must not crash chat.
+        fields = (
+            "category", "product_type", "product_name_hint", "visible_text", "brand",
+            "color", "material", "fabric", "occasion", "style", "pattern", "work",
+            "gender", "description", "position",
+        )
+        result = {}
+        for key in fields:
+            value = parsed.get(key)
+            if isinstance(value, list):
+                value = ", ".join(item.strip() for item in value if isinstance(item, str) and item.strip())
+            result[key] = value.strip()[:1000] if isinstance(value, str) and value.strip() else None
+        try:
+            confidence = float(parsed.get("confidence") or 0)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        result["confidence"] = max(0.0, min(1.0, confidence)) if math.isfinite(confidence) else 0.0
+        products = parsed.get("products")
+        result["products"] = [
+            {key: item[key].strip()[:1000] for key in fields if isinstance(item.get(key), str)}
+            for item in (products if isinstance(products, list) else [])[:5]
+            if isinstance(item, dict) and any(isinstance(item.get(key), str) and item[key].strip() for key in fields)
+        ]
+        try:
+            result["product_count"] = max(1, int(parsed.get("product_count") or 1))
+        except (TypeError, ValueError, OverflowError):
+            result["product_count"] = max(1, len(result["products"]))
+        return result

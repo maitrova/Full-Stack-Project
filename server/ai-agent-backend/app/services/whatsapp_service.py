@@ -2,6 +2,7 @@ import asyncio
 import base64
 import hashlib
 import logging
+import traceback
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -256,7 +257,11 @@ class WhatsAppService:
                         except Exception as exc:
                             if message.get("type") != "image":
                                 raise
-                            logger.warning("WhatsApp image processing failed (%s)", type(exc).__name__)
+                            # Log code locations, not exception text which may include
+                            # customer data, signed media URLs or provider credentials.
+                            frames = traceback.extract_tb(exc.__traceback__)[-6:]
+                            locations = " -> ".join(f"{frame.name}:{frame.lineno}" for frame in frames)
+                            logger.warning("WhatsApp image processing failed (%s) at %s", type(exc).__name__, locations)
                             await self._send_image_failure(from_phone, whatsapp_message_id, type(exc).__name__)
                             processed += 1
                             continue
@@ -299,10 +304,18 @@ class WhatsAppService:
         self, *, business, message, text, from_phone, customer_name,
         quoted_message_id, quoted_product_id,
     ):
+        if message.get("type") == "image":
+            await self.deliveries.update_one(
+                {"_id": message.get("id")}, {"$set": {"processing_stage": "media_download"}}, upsert=True,
+            )
         image_payload = await asyncio.wait_for(self._message_image_payload(message), timeout=20)
         if message.get("type") == "image" and not image_payload:
             # Do not silently turn a failed photo download into a text enquiry.
             raise RuntimeError("WhatsApp image media unavailable")
+        if image_payload:
+            await self.deliveries.update_one(
+                {"_id": message.get("id")}, {"$set": {"processing_stage": "image_agent"}}, upsert=True,
+            )
         return await self.sales_agent.handle_external_chat(
             business=business,
             message=text,

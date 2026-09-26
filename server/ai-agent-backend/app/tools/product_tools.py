@@ -58,6 +58,21 @@ class ProductTools:
                 intent.attributes,
             ]
         )
+        return await self.search_products(
+            ProductSearchParams(
+                business_id=business_id,
+                query=None if has_structured_filters else query,
+                category=intent.category,
+                min_price=intent.min_price,
+                max_price=intent.max_price,
+                color=intent.color,
+                size=intent.size,
+                occasion=intent.occasion,
+                brand=intent.brand,
+                attributes=intent.attributes,
+                limit=5,
+            )
+        )
 
     async def search_from_image(
         self,
@@ -87,21 +102,6 @@ class ProductTools:
             limit=5,
         )
         return [ProductPublic.model_validate(object_id_to_str(product)) for product in products]
-        return await self.search_products(
-            ProductSearchParams(
-                business_id=business_id,
-                query=None if has_structured_filters else query,
-                category=intent.category,
-                min_price=intent.min_price,
-                max_price=intent.max_price,
-                color=intent.color,
-                size=intent.size,
-                occasion=intent.occasion,
-                brand=intent.brand,
-                attributes=intent.attributes,
-                limit=5,
-            )
-        )
 
     async def get_product_details(self, business_id: str, product_id: str) -> ProductPublic | None:
         product = await self.product_repository.find_by_id(product_id, business_id)

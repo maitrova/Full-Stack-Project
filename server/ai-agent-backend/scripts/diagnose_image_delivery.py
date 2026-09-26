@@ -26,6 +26,11 @@ async def main():
             "created_at": 1, "completed_at": 1,
         }).sort("created_at", -1).limit(8).to_list(8)
         print(json.dumps({"recent_jobs": jobs}, default=str))
+        deliveries = await db.whatsapp_deliveries.find(
+            {"image_ack_sent": True},
+            {"_id": 0, "processing_stage": 1, "processing_error": 1, "complete": 1, "text_sent": 1},
+        ).sort("$natural", -1).limit(8).to_list(8)
+        print(json.dumps({"recent_image_deliveries": deliveries}, default=str))
         statuses = await db.conversations.aggregate([
             {"$group": {"_id": "$status", "count": {"$sum": 1}}}
         ]).to_list(20)
