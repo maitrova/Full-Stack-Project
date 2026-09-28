@@ -1,4 +1,5 @@
 import unittest
+import httpx
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -42,6 +43,19 @@ class ImageDeliveryTests(unittest.IsolatedAsyncioTestCase):
         await self.run_webhook()
         self.assertEqual(self.service.client.send_text.await_count, 2)
         self.assertEqual(self.service.deliveries.update_one.await_args.args[1]["$set"]["processing_error"], "TimeoutError")
+
+    async def test_media_authentication_error_is_preserved_without_credentials(self):
+        request = httpx.Request("GET", "https://graph.facebook.com/media?token=secret")
+        error = httpx.HTTPStatusError("secret provider details", request=request,
+                                      response=httpx.Response(401, request=request))
+        self.service.client.get_media_as_base64 = AsyncMock(side_effect=error)
+        self.service._message_image_payload = WhatsAppService._message_image_payload.__get__(self.service)
+        await self.run_webhook()
+        updates = [call.args[1]["$set"] for call in self.service.deliveries.update_one.await_args_list]
+        self.assertTrue(any(update.get("processing_http_status") == 401 for update in updates))
+        self.assertTrue(any(update.get("processing_error") == "HTTPStatusError" for update in updates))
+        self.assertNotIn("secret", str(updates))
+        self.service.sales_agent.handle_external_chat.assert_not_awaited()
 
     async def test_successful_image_reaches_delivery(self):
         self.service._message_image_payload.return_value = {"image_data": "encoded", "mime_type": "image/png"}

@@ -98,7 +98,7 @@ class GeminiClient:
             },
         }
 
-        async with httpx.AsyncClient(timeout=45) as client:
+        async with httpx.AsyncClient(timeout=20) as client:
             for attempt in range(2):
                 try:
                     response = await client.post(

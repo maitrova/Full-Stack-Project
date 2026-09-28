@@ -62,7 +62,7 @@ Customer text:
                 image_url=image_url,
                 image_data=image_data,
                 mime_type=mime_type,
-            ), timeout=35)
+            ), timeout=50)
             return self._load_json(text)
         except Exception as exc:
             logger.warning("Gemini image analysis failed; continuing without image attributes: %s", exc.__class__.__name__)

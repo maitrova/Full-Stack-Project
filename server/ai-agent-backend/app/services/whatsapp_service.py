@@ -100,6 +100,19 @@ class WhatsAppClient:
                 raise
             return response.json()
 
+    @staticmethod
+    async def _get_media_with_retry(client, url, headers):
+        for attempt in range(2):
+            try:
+                response = await client.get(url, headers=headers)
+            except httpx.TransportError:
+                if attempt:
+                    raise
+            else:
+                if response.status_code not in {429, 500, 502, 503, 504} or attempt:
+                    return response
+            await asyncio.sleep(0.5)
+
     async def get_media_as_base64(self, media_id: str, fallback_mime_type: str | None = None) -> dict[str, str] | None:
         if not self.access_token:
             logger.warning("WhatsApp media download skipped because access token is missing")
@@ -108,12 +121,12 @@ class WhatsAppClient:
         headers = {"Authorization": f"Bearer {self.access_token}"}
         metadata_url = f"https://graph.facebook.com/{self.graph_api_version}/{media_id}"
         # Meta media URLs may redirect to a short-lived CDN URL.
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-            metadata_response = await client.get(metadata_url, headers=headers)
+        async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+            metadata_response = await self._get_media_with_retry(client, metadata_url, headers)
             try:
                 metadata_response.raise_for_status()
             except httpx.HTTPStatusError:
-                logger.error("WhatsApp media metadata fetch failed: %s", metadata_response.text)
+                logger.error("WhatsApp media metadata fetch failed: HTTP %s", metadata_response.status_code)
                 raise
 
             metadata = metadata_response.json()
@@ -122,11 +135,11 @@ class WhatsAppClient:
                 logger.warning("WhatsApp media metadata did not include a download URL")
                 return None
 
-            media_response = await client.get(media_url, headers=headers)
+            media_response = await self._get_media_with_retry(client, media_url, headers)
             try:
                 media_response.raise_for_status()
             except httpx.HTTPStatusError:
-                logger.error("WhatsApp media download failed: %s", media_response.text)
+                logger.error("WhatsApp media download failed: HTTP %s", media_response.status_code)
                 raise
 
         mime_type = fallback_mime_type or metadata.get("mime_type") or media_response.headers.get("content-type") or "image/jpeg"
@@ -253,7 +266,7 @@ class WhatsAppService:
                                 customer_name=contacts_by_wa_id.get(from_phone),
                                 quoted_message_id=quoted_message_id,
                                 quoted_product_id=quoted_product_id,
-                            ), timeout=110 if message.get("type") == "image" else None)
+                            ), timeout=165 if message.get("type") == "image" else None)
                         except Exception as exc:
                             if message.get("type") != "image":
                                 raise
@@ -262,6 +275,13 @@ class WhatsAppService:
                             frames = traceback.extract_tb(exc.__traceback__)[-6:]
                             locations = " -> ".join(f"{frame.name}:{frame.lineno}" for frame in frames)
                             logger.warning("WhatsApp image processing failed (%s) at %s", type(exc).__name__, locations)
+                            failure_details = {"processing_error_location": locations}
+                            if isinstance(exc, httpx.HTTPStatusError):
+                                failure_details["processing_http_status"] = exc.response.status_code
+                                logger.warning("WhatsApp image request failed with HTTP %s", exc.response.status_code)
+                            await self.deliveries.update_one(
+                                {"_id": whatsapp_message_id}, {"$set": failure_details}, upsert=True,
+                            )
                             await self._send_image_failure(from_phone, whatsapp_message_id, type(exc).__name__)
                             processed += 1
                             continue
@@ -308,7 +328,9 @@ class WhatsAppService:
             await self.deliveries.update_one(
                 {"_id": message.get("id")}, {"$set": {"processing_stage": "media_download"}}, upsert=True,
             )
-        image_payload = await asyncio.wait_for(self._message_image_payload(message), timeout=20)
+        # Metadata lookup and binary download are separate requests, each with
+        # one transient retry. Do not cancel a valid download after 20 seconds.
+        image_payload = await asyncio.wait_for(self._message_image_payload(message), timeout=45)
         if message.get("type") == "image" and not image_payload:
             # Do not silently turn a failed photo download into a text enquiry.
             raise RuntimeError("WhatsApp image media unavailable")
@@ -515,8 +537,10 @@ class WhatsAppService:
         try:
             return await self.client.get_media_as_base64(media_id, image.get("mime_type"))
         except Exception as exc:
-            logger.warning("WhatsApp image media could not be downloaded; continuing with text only: %s", exc.__class__.__name__)
-            return None
+            logger.warning("WhatsApp image media download failed: %s", exc.__class__.__name__)
+            # Preserve the actual failure for the delivery record and retry/error
+            # handling; returning None obscures authentication and download errors.
+            raise
 
     async def _send_recommended_product_images(self, to: str, products: list[Any], gallery: bool = False, delivery_id=None) -> None:
         sent = 0
