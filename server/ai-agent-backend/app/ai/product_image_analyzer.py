@@ -23,6 +23,11 @@ class ProductImageAnalyzer:
         catalog_categories: list[str] | None = None,
     ) -> dict[str, Any]:
         if not self.gemini_client.is_configured:
+            logger.error(
+                "Gemini image analysis is disabled because GEMINI_API_KEY is not configured "
+                "(model=%s)",
+                getattr(self.gemini_client, "model", "unknown"),
+            )
             return {}
 
         category_options = json.dumps(catalog_categories or [], ensure_ascii=False)
