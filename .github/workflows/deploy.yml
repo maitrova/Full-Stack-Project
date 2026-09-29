@@ -224,12 +224,12 @@ jobs:
           envs: GEMINI_API_KEY
           script: |
             set -e
-            set --
-            if [ -n "${GEMINI_API_KEY:-}" ]; then
-              set -- --set-string "envSecrets.GEMINI_API_KEY=${GEMINI_API_KEY}"
-            else
-              echo "WARNING: GEMINI_API_KEY GitHub Actions secret is not configured; keeping the chart value"
+            if [ -z "${GEMINI_API_KEY:-}" ]; then
+              echo "ERROR: GEMINI_API_KEY GitHub Actions secret is required for the AI agent deployment" >&2
+              exit 1
             fi
+            set --
+            set -- --set-string "envSecrets.GEMINI_API_KEY=${GEMINI_API_KEY}"
             helm upgrade --install ai-agent /tmp/ai-agent \
               --namespace production \
               --create-namespace \

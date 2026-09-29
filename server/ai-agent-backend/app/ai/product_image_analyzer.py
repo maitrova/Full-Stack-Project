@@ -65,7 +65,16 @@ Customer text:
             ), timeout=50)
             return self._load_json(text)
         except Exception as exc:
-            logger.warning("Gemini image analysis failed; continuing without image attributes: %s", exc.__class__.__name__)
+            status_code = getattr(getattr(exc, "response", None), "status_code", None)
+            logger.warning(
+                "Gemini image analysis failed; continuing without image attributes "
+                "(error_type=%s, status=%s, model=%s, mime_type=%s, inline_image=%s)",
+                exc.__class__.__name__,
+                status_code or "n/a",
+                getattr(self.gemini_client, "model", "unknown"),
+                mime_type or "unknown",
+                bool(image_data),
+            )
             return {}
 
     async def embed(

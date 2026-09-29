@@ -77,7 +77,7 @@ class GeminiClient:
                 if model_index < len(models) - 1:
                     logger.info("Gemini %s model %s unavailable; trying fallback", operation, model)
         if response.is_error:
-            self._log_api_error(response, operation)
+            self._log_api_error(response, operation, model)
         response.raise_for_status()
         data = response.json()
         text = data.get("output_text") or "".join(
@@ -165,11 +165,17 @@ class GeminiClient:
         return resolved_mime_type, resolved_image_data
 
     @staticmethod
-    def _log_api_error(response: httpx.Response, operation: str) -> None:
+    def _log_api_error(response: httpx.Response, operation: str, model: str | None = None) -> None:
         try:
             error = response.json().get("error", {})
             reason = error.get("status") or "unknown"
         except (ValueError, AttributeError):
             reason = "non_json_response"
         # Never log the API key, response URL query, or provider response body.
-        logger.warning("Gemini %s request rejected: HTTP %s (%s)", operation, response.status_code, reason)
+        logger.warning(
+            "Gemini %s request rejected: HTTP %s (%s), model=%s",
+            operation,
+            response.status_code,
+            reason,
+            model or "unknown",
+        )

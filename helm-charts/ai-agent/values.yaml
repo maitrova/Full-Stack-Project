@@ -6,7 +6,7 @@ replicaCount: 1
 image:
   repository: maitrova/ai-agent
   tag: latest
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 service:
   type: ClusterIP
@@ -33,8 +33,8 @@ ingress:
 
 envVars:
   APP_NAME: AI Sales Employee API
-  APP_ENV: development
-  DEBUG: "true"
+  APP_ENV: production
+  DEBUG: "false"
   LOG_LEVEL: INFO
   API_PREFIX: /api
   MONGODB_DB_NAME: appdb
@@ -42,7 +42,7 @@ envVars:
   ECOMMERCE_PUBLIC_URL: https://maitrova.in/api/outputs
   ECOMMERCE_STOREFRONT_URL: https://www.maitrova.in
   ECOMMERCE_API_URL: https://maitrova.in/api
-  FRONTEND_ORIGIN: http://localhost:5173
+  FRONTEND_ORIGIN: https://www.maitrova.in
   GEMINI_MODEL: gemini-3.1-flash-lite
   JWT_ALGORITHM: HS256
   JWT_ACCESS_TOKEN_EXPIRE_MINUTES: "60"
@@ -56,10 +56,10 @@ databaseSecret:
   name: backend-secret
   key: MONGOOSE_URL
 
-# Set these values before deploying. They are rendered into the ai-agent Secret.
+# Non-provider secrets are rendered into the ai-agent Secret.
+# GEMINI_API_KEY is supplied by the deploy workflow from GitHub Actions secrets.
 envSecrets:
   JWT_SECRET: "hemanth"
-  GEMINI_API_KEY: "AQ.Ab8RN6J887X-8r6HAKIj7DltZfcZ9Wsd2pwpduME2mr1sMRKhw"
   WHATSAPP_VERIFY_TOKEN: "9d80f52f11e34589949dc7ab6c1df33a"
   WHATSAPP_ACCESS_TOKEN: "EAAtOYebWxSoBSVbQaKeefqrSkirBlPY73S8ZAIU1csY2FrKq0knBxZBZAUyJU9PXEkNEX3LKMCt6lBCZB6w2CoA9DTmEbZCKzkL4kuOclZBKP1SSZBM0aeEXeZA8XJbVIWbUF2vrkFktquNOFYKrCEUgwW4iebj00IbXR9BitZBu5EI9F8dePamaCZC46VdAN8vPblJ91g4OsvlySXPHvI6LZAhNdgZBZBR5ZBIzDwzMu6SAOj"
   WHATSAPP_APP_SECRET: "6d9c3a848d0ac061b4fab5fb974acad8"
