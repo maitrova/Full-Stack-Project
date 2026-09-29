@@ -14,6 +14,11 @@ class GeminiClient:
     def __init__(self, api_key: str | None = None, model: str | None = None):
         self.api_key = settings.gemini_api_key if api_key is None else api_key
         self.model = settings.gemini_model if model is None else model
+        logger.info(
+            "Gemini client configured=%s model=%s",
+            bool(self.api_key),
+            self.model,
+        )
 
     @property
     def is_configured(self) -> bool:
