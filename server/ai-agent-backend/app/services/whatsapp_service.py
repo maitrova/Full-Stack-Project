@@ -1,13 +1,17 @@
 import asyncio
 import base64
 import hashlib
+import io
 import logging
 import traceback
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlsplit
 
 import httpx
 from fastapi import HTTPException, status
+from PIL import Image, ImageOps
 from pymongo import ReturnDocument
 
 from app.ai.sales_agent import SalesAgent
@@ -77,12 +81,22 @@ class WhatsAppClient:
             logger.warning("WhatsApp image send skipped because access token or phone number id is missing")
             return None
 
+        local_path = self._local_product_image(image_url)
+        image_reference = {"link": image_url}
+        if local_path:
+            image_reference = {"id": await self._upload_local_image(local_path)}
+        elif urlsplit(image_url).path.lower().endswith(".webp"):
+            try:
+                image_reference = {"id": await self._upload_remote_image(image_url)}
+            except (httpx.HTTPError, OSError, ValueError):
+                logger.warning("Could not convert remote WebP for WhatsApp; using public link")
+
         payload: dict[str, Any] = {
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
             "to": to,
             "type": "image",
-            "image": {"link": image_url},
+            "image": image_reference,
         }
         if caption:
             payload["image"]["caption"] = caption[:1024]
@@ -99,6 +113,64 @@ class WhatsAppClient:
                 logger.error("WhatsApp image send failed: %s", response.text)
                 raise
             return response.json()
+
+    def _local_product_image(self, image_url: str) -> Path | None:
+        path = unquote(urlsplit(image_url).path).replace("\\", "/")
+        marker = "/api/outputs/" if "/api/outputs/" in path else "/outputs/" if "/outputs/" in path else None
+        if not marker:
+            return None
+        relative = path.split(marker, 1)[1]
+        root = (
+            Path(settings.ecommerce_outputs_path).resolve()
+            if settings.ecommerce_outputs_path
+            else (Path(__file__).resolve().parents[3] / "outputs").resolve()
+        )
+        candidate = (root / relative).resolve()
+        if not candidate.is_relative_to(root) or not candidate.is_file():
+            return None
+        return candidate
+
+    async def _upload_local_image(self, path: Path) -> str:
+        """Convert catalogue formats to JPEG and upload them to Meta before sending."""
+        return await self._upload_image_bytes(path.read_bytes(), path.stem)
+
+    async def _upload_remote_image(self, image_url: str) -> str:
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            response = await client.get(image_url)
+            response.raise_for_status()
+            if len(response.content) > 10 * 1024 * 1024:
+                raise ValueError("Catalogue image is too large for WhatsApp conversion")
+        return await self._upload_image_bytes(response.content, Path(urlsplit(image_url).path).stem)
+
+    async def _upload_image_bytes(self, source_bytes: bytes, filename: str) -> str:
+        with Image.open(io.BytesIO(source_bytes)) as source:
+            image = ImageOps.exif_transpose(source)
+            if image.mode in {"RGBA", "LA"}:
+                background = Image.new("RGB", image.size, "white")
+                background.paste(image.convert("RGBA"), mask=image.convert("RGBA").getchannel("A"))
+                image = background
+            else:
+                image = image.convert("RGB")
+            image.thumbnail((4096, 4096))
+            output = io.BytesIO()
+            image.save(output, format="JPEG", quality=90, optimize=True)
+
+        url = f"https://graph.facebook.com/{self.graph_api_version}/{self.phone_number_id}/media"
+        headers = {"Authorization": f"Bearer {self.access_token}"}
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(
+                url,
+                headers=headers,
+                data={"messaging_product": "whatsapp", "type": "image/jpeg"},
+                files={"file": (filename + ".jpg", output.getvalue(), "image/jpeg")},
+            )
+            if response.is_error:
+                logger.error("WhatsApp media upload failed: HTTP %s", response.status_code)
+            response.raise_for_status()
+            media_id = response.json().get("id")
+            if not media_id:
+                raise RuntimeError("WhatsApp media upload did not return a media id")
+            return str(media_id)
 
     @staticmethod
     async def _get_media_with_retry(client, url, headers):

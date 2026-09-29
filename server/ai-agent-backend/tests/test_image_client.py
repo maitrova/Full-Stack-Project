@@ -15,19 +15,19 @@ class ImageClientTests(unittest.IsolatedAsyncioTestCase):
 
     @staticmethod
     def success():
-        return httpx.Response(200, json={"candidates": [{"finishReason": "STOP", "content": {"parts": [
-            {"thought": True, "text": "internal reasoning"},
-            {"text": '{"product_type":'}, {"text": '"hoodie"}'},
-        ]}}]})
+        return httpx.Response(200, json={"steps": [{"type": "model_output", "content": [
+            {"type": "text", "text": '{"product_type":'},
+            {"type": "text", "text": '"hoodie"}'},
+        ]}]})
 
     async def test_data_uri_takes_priority_over_url_and_collects_answer_parts(self):
         def handler(request):
             self.assertEqual(request.method, "POST")
             payload = json.loads(request.content)
-            image = payload["contents"][0]["parts"][1]["inline_data"]
-            self.assertEqual(image, {"mime_type": "image/png", "data": "aGVsbG8="})
-            self.assertEqual(payload["generationConfig"]["responseMimeType"], "application/json")
-            self.assertGreaterEqual(payload["generationConfig"]["maxOutputTokens"], 4096)
+            self.assertEqual(request.url.path, "/v1beta/interactions")
+            image = payload["input"][1]
+            self.assertEqual(image, {"type": "image", "mime_type": "image/png", "data": "aGVsbG8="})
+            self.assertFalse(payload["store"])
             return self.success()
 
         result = await self.generate(handler, image_data="data:image/png;base64,aGVsbG8=", image_url="https://expired.example/image")
@@ -70,11 +70,12 @@ class ImageClientTests(unittest.IsolatedAsyncioTestCase):
             await self.generate(handler, image_data="aGVsbG8=")
         self.assertEqual(len(calls), 1)
 
-    async def test_truncated_json_is_not_used(self):
-        with self.assertRaisesRegex(RuntimeError, "token limit"):
-            await self.generate(lambda request: httpx.Response(200, json={"candidates": [
-                {"finishReason": "MAX_TOKENS", "content": {"parts": [{"text": '{"product_type":'}]}}
-            ]}), image_data="aGVsbG8=")
+    async def test_missing_model_output_is_not_used(self):
+        with self.assertRaisesRegex(RuntimeError, "Invalid Gemini vision response"):
+            await self.generate(
+                lambda request: httpx.Response(200, json={"steps": [{"type": "model_output", "content": []}]}),
+                image_data="aGVsbG8=",
+            )
 
 
 if __name__ == "__main__":

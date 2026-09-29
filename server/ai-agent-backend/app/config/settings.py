@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     ecommerce_mongodb_url: str | None = None
     ecommerce_mongodb_db_name: str = "appdb"
     ecommerce_public_url: str | None = None
+    ecommerce_outputs_path: str | None = None
     ecommerce_storefront_url: str | None = None
     ecommerce_api_url: str = "http://127.0.0.1:5000/api"
     whatsapp_commerce_key: str | None = None
@@ -32,7 +33,7 @@ class Settings(BaseSettings):
 
     frontend_origin: str = "http://localhost:5173"
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-flash-lite-latest"
+    gemini_model: str = "gemini-3.1-flash-lite"
     gemini_embedding_model: str = "gemini-embedding-2"
     gemini_embedding_dimensions: int = 768
     catalogue_index_batch_size: int = 10

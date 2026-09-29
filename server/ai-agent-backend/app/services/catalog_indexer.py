@@ -65,10 +65,24 @@ class CatalogIndexer:
                         catalog_categories=catalog_categories,
                         customer_message=product.get("name"),
                     )
-                embedding = await self.gemini_client.embed_content(
-                    text=self._index_text(product),
-                    image_url=image_url,
-                )
+                embedding = None
+                try:
+                    embedding = await self.gemini_client.embed_content(
+                        text=self._index_text(product),
+                        image_url=image_url,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Catalogue image embedding failed; retrying with metadata only: %s",
+                        exc.__class__.__name__,
+                    )
+                    try:
+                        embedding = await self.gemini_client.embed_content(text=self._index_text(product))
+                    except Exception as fallback_exc:
+                        logger.warning(
+                            "Catalogue metadata embedding failed; retaining visual attributes: %s",
+                            fallback_exc.__class__.__name__,
+                        )
                 await self.index.update_one(
                     {
                         "product_id": str(product["_id"]),
@@ -80,7 +94,7 @@ class CatalogIndexer:
                             "fingerprint": fingerprint,
                             "embedding": embedding,
                             "search_attributes": self._safe_attributes(extracted_attributes),
-                            "dimensions": len(embedding),
+                            "dimensions": len(embedding) if embedding else 0,
                             "updated_at": datetime.now(timezone.utc),
                         }
                     },

@@ -14,7 +14,17 @@ from app.services.whatsapp_service import WhatsAppService
 
 class ProductActions(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        self.products = [SimpleNamespace(id=str(i), name=f"Shirt {i}", images=[f"https://images.example/{i}/a.jpg", f"https://images.example/{i}/b.jpg"], attributes={"product_url": f"https://store.example/readymade/{i}"}) for i in range(1, 4)]
+        self.products = [SimpleNamespace(
+            id=str(i),
+            name=f"Shirt {i}",
+            description="",
+            price=500,
+            sale_price=None,
+            currency="INR",
+            stock=10,
+            images=[f"https://images.example/{i}/a.jpg", f"https://images.example/{i}/b.jpg"],
+            attributes={"product_url": f"https://store.example/readymade/{i}"},
+        ) for i in range(1, 4)]
         self.agent = SalesAgent(None, None, None, SimpleNamespace(get_product_details=AsyncMock(side_effect=lambda b, p: next(x for x in self.products if x.id == p))))
         self.conversation = {"recommended_product_ids": ["1", "2", "3"]}
 
@@ -31,6 +41,16 @@ class ProductActions(unittest.IsolatedAsyncioTestCase):
         result = await self.agent._presentation_request("business", "photos of Shirt 2", self.conversation, {})
         self.assertEqual(result[1][0].id, "2")
         self.assertEqual(result[2], "gallery")
+
+    async def test_bare_option_selection_returns_details_and_main_image(self):
+        state = {}
+
+        result = await self.agent._presentation_request("business", "1", self.conversation, state)
+
+        self.assertIn("Shirt 1", result[0])
+        self.assertEqual([product.id for product in result[1]], ["1"])
+        self.assertEqual(result[2], "recommendations")
+        self.assertEqual(state["selected_product_id"], "1")
 
     async def test_new_photo_search_continues(self):
         result = await self.agent._presentation_request("business", "photos of black shirts", {}, {})

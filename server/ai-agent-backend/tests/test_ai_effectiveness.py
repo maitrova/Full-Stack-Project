@@ -69,6 +69,16 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("closest matches", reply)
 
+    def test_strong_visual_match_reports_stock_and_uses_visual_label(self):
+        item = product(score=0.86)
+        item.attributes["match_components"] = {"visual": 0.94}
+        item.attributes["search_attributes"] = {"product_name_hint": "maroon basketball graphic t-shirt"}
+        reply = self.agent._build_image_match_response(
+            IntentResult(intent="product_search"), [item], {"confidence": 0.95}
+        )
+        self.assertIn("this product is in stock", reply)
+        self.assertIn("maroon basketball graphic t-shirt", reply)
+
     def test_multiple_products_are_clarified(self):
         analysis = {
             "product_count": 2,
@@ -91,6 +101,34 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(parser._parse_with_rules("show customization products", {}).attributes["catalog_type"], "customization")
         self.assertEqual(parser._parse_with_rules("show latest drop products", {}).attributes["catalog_type"], "drop product")
         self.assertEqual(parser._parse_with_rules("show readymade products", {}).attributes["catalog_type"], "readymade")
+
+    def test_natural_language_is_mapped_to_safe_commerce_actions(self):
+        parser = IntentParser(SimpleNamespace(is_configured=False))
+
+        add = parser._parse_with_rules("Could you put this one in my basket for me?", {})
+        confirm = parser._parse_with_rules(
+            "Sounds good, please do it",
+            {"purchase": {"product_id": "shirt"}},
+        )
+        changed_mind = parser._parse_with_rules(
+            "Actually not now, I changed my mind",
+            {"purchase": {"product_id": "shirt"}},
+        )
+        photos = parser._parse_with_rules("Can I see a few more pictures of it?", {})
+
+        self.assertEqual((add.intent, add.action), ("commerce_action", "add_to_cart"))
+        self.assertEqual(confirm.action, "confirm_cart")
+        self.assertEqual(changed_mind.action, "decline_cart")
+        self.assertEqual(photos.action, "product_photos")
+
+    def test_transient_action_is_not_saved_as_conversation_context(self):
+        next_state = self.agent._merge_conversation_state(
+            {"selected_product_id": "shirt"},
+            IntentResult(intent="commerce_action", action="add_to_cart"),
+        )
+
+        self.assertNotIn("action", next_state)
+        self.assertEqual(next_state["selected_product_id"], "shirt")
 
     def test_indexer_discards_unapproved_generated_fields(self):
         indexer = CatalogIndexer.__new__(CatalogIndexer)
@@ -127,6 +165,24 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Starting price", reply)
         self.assertIn("final price depends", reply)
         self.assertIn("designer link", reply)
+
+    def test_product_details_hide_description_and_format_catalogue_data(self):
+        item = product(name="ai agent", category="apparel")
+        item.description = "<p>Internal catalogue description&nbsp;</p>"
+        item.attributes.update({
+            "brand": "Maitrova",
+            "sizes": ["S", "M"],
+            "search_attributes": {"product_name_hint": "plain tan t-shirt"},
+        })
+
+        reply = self.agent._build_detail_response(item)
+
+        self.assertTrue(reply.startswith("Plain tan t-shirt\n"))
+        self.assertNotIn("Internal catalogue", reply)
+        self.assertNotIn("<p>", reply)
+        self.assertIn("Brand: Maitrova", reply)
+        self.assertIn("Sizes: S, M", reply)
+        self.assertIn("Reply 'link'", reply)
 
 
 if __name__ == "__main__":

@@ -68,12 +68,24 @@ class EcommerceProductRepository:
             if score < 0.24:
                 continue
             enriched = {**product, "attributes": {**product.get("attributes", {})}}
+            enriched["attributes"]["search_attributes"] = indexed.get("search_attributes") or {}
             enriched["attributes"]["match_score"] = round(score, 4)
             enriched["attributes"]["match_components"] = components
             ranked.append((score, enriched))
 
         ranked.sort(key=lambda item: (-item[0], -item[1]["stock"], self._display_price(item[1])))
-        return [product for _, product in ranked[:limit]]
+        results = [product for _, product in ranked[:limit]]
+        if len(results) > 1:
+            top_score = float(results[0]["attributes"].get("match_score") or 0)
+            next_score = float(results[1]["attributes"].get("match_score") or 0)
+            top_visual = float(
+                (results[0]["attributes"].get("match_components") or {}).get("visual") or 0
+            )
+            # When the uploaded image is visually much closer to one catalogue
+            # item, return that exact item instead of confusing it with alternatives.
+            if top_score >= 0.78 and top_visual >= 0.72 and top_score - next_score >= 0.08:
+                return results[:1]
+        return results
 
     def _hybrid_score(
         self,

@@ -144,11 +144,24 @@ class SalesAgent:
         selected_product = None
         tool_calls = []
         response_goal = "answer"
-        presentation = await self.commerce.handle(payload.message, conversation, updated_state, self.product_tools, business_id) if self.commerce else None
+        presentation = await self.commerce.handle(
+            payload.message,
+            conversation,
+            updated_state,
+            self.product_tools,
+            business_id,
+            intent=intent,
+        ) if self.commerce else None
         # An uploaded customer image is input for vision/search. It must not be
         # mistaken for a request to resend photos from the previous turn.
         if not presentation and not has_image:
-            presentation = await self._presentation_request(business_id, payload.message, conversation, updated_state)
+            presentation = await self._presentation_request(
+                business_id,
+                payload.message,
+                conversation,
+                updated_state,
+                intent_action=intent.action,
+            )
 
         if image_analysis_failed and not presentation:
             ai_text = (
@@ -487,6 +500,7 @@ class SalesAgent:
             quoted_state = dict(conversation.get("conversation_state", {}))
             if str(quoted_state.get("selected_product_id") or "") != str(quoted_product_id):
                 quoted_state.pop("purchase", None)
+                quoted_state.pop("last_declined_purchase", None)
             quoted_state["selected_product_id"] = str(quoted_product_id)
             quoted_state["recommended_product_ids"] = [str(quoted_product_id)]
             conversation["selected_product_id"] = str(quoted_product_id)
@@ -535,21 +549,21 @@ class SalesAgent:
         # Explicit requests for another category or filter should trigger a fresh search.
         if restart or category_changed or changed_filter:
             state.pop("purchase", None)
-            for key in ["selected_product_id", "recommended_product_ids", "pending_product_action", "last_search_had_results", "last_offer_type", "last_image_analysis", "last_order_id"]:
+            for key in ["selected_product_id", "recommended_product_ids", "pending_product_action", "last_declined_purchase", "last_search_had_results", "last_offer_type", "last_image_analysis", "last_order_id"]:
                 state.pop(key, None)
             conversation["selected_product_id"] = None
             conversation["recommended_product_ids"] = []
         conversation["conversation_state"] = state
         return conversation
 
-    async def _presentation_request(self, business_id, message, conversation, state):
+    async def _presentation_request(self, business_id, message, conversation, state, intent_action=None):
         text = message.lower().strip()
         if text in {"thanks", "thank you", "thank you!", "thanks!", "thankyou"}:
             return "You're welcome!", [], "none"
         if text in {"hi", "hello", "hey"}:
             return "Hi! What are you looking for today?", [], "none"
-        wants_link = bool(re.search(r"\b(link|url|website)\b", text))
-        wants_photos = bool(re.search(r"\b(photos?|pictures?|images?|pics?)\b", text))
+        wants_link = intent_action == "product_link" or bool(re.search(r"\b(link|url|website)\b", text))
+        wants_photos = intent_action == "product_photos" or bool(re.search(r"\b(photos?|pictures?|images?|pics?)\b", text))
         pending = state.get("pending_product_action")
         ids = conversation.get("recommended_product_ids", []) or state.get("recommended_product_ids", [])
         options = await self._load_recommended_products(business_id, ids)
@@ -695,17 +709,24 @@ class SalesAgent:
         if not products:
             return self._build_image_no_match_response(image_analysis)
         top_score = float(products[0].attributes.get("match_score") or 0)
+        top_visual = float((products[0].attributes.get("match_components") or {}).get("visual") or 0)
         vision_confidence = float(image_analysis.get("confidence") or 0)
-        intro = (
-            "These are the closest matches to your image:"
-            if top_score >= 0.72 and vision_confidence >= 0.7
-            else "These look similar, but the exact design may differ:"
-        )
+        exact_match = top_score >= 0.78 and top_visual >= 0.72 and vision_confidence >= 0.7
+        if exact_match and products[0].stock > 0:
+            intro = "Yes, this product is in stock:"
+        elif exact_match:
+            intro = "We have this product, but it is currently out of stock:"
+        elif top_score >= 0.72 and vision_confidence >= 0.7:
+            intro = "These are the closest matches to your image:"
+        else:
+            intro = "These look similar, but the exact design may differ:"
         lines = [intro]
         for index, product in enumerate(products, start=1):
             price = product.sale_price if product.sale_price is not None else product.price
             kind = product.attributes.get("source_type") or "product"
-            lines.append(f"{index}. {product.name} - {product.currency} {int(price)} - {kind}")
+            visual_label = (product.attributes.get("search_attributes") or {}).get("product_name_hint")
+            label = str(visual_label or product.name).strip()
+            lines.append(f"{index}. {label} - {product.currency} {int(price)} - {kind}")
         lines.append("Reply with the option number for photos, sizes, or the product link.")
         return "\n".join(lines)
 
@@ -1017,7 +1038,7 @@ class SalesAgent:
     def _merge_conversation_state(self, current_state: dict, intent: IntentResult) -> dict:
         next_state = dict(current_state)
         for key, value in intent.model_dump().items():
-            if key in {"intent", "confidence", "attributes"}:
+            if key in {"intent", "action", "confidence", "attributes"}:
                 continue
             if value is not None:
                 next_state[key] = value
@@ -1135,26 +1156,38 @@ class SalesAgent:
     def _build_detail_response(self, product: ProductPublic) -> str:
         price = product.sale_price if product.sale_price is not None else product.price
         customizable = bool(product.attributes.get("customizable"))
+        name = self._product_display_name(product)
         lines = [
-            f"{product.name}",
+            name,
             f"Starting price is {product.currency} {int(price)}." if customizable else f"Price is {product.currency} {int(price)}.",
-            ("It's available to customize." if customizable else "It's in stock.")
+            ("Available to customize." if customizable else "In stock.")
             if product.stock > 0
-            else "It's currently out of stock.",
+            else "Currently out of stock.",
         ]
-        if product.description:
-            lines.append(product.description)
         if product.attributes:
-            readable_attributes = ", ".join(f"{key.replace('_', ' ')}: {value}" for key, value in product.attributes.items() if key in {"color", "fabric", "material", "fit", "sizes", "brand", "care"})
-            if readable_attributes:
-                lines.append(readable_attributes)
+            for key in ("brand", "color", "fabric", "material", "fit", "sizes", "care"):
+                value = product.attributes.get(key)
+                if not value:
+                    continue
+                display_value = ", ".join(str(item) for item in value) if isinstance(value, (list, tuple, set)) else str(value)
+                lines.append(f"{key.replace('_', ' ').title()}: {display_value}")
         if customizable:
             colors = product.attributes.get("colors") or []
             if colors:
                 lines.append("Colors: " + ", ".join(str(value) for value in colors) + ".")
             lines.append("You can add images and text in the designer; the final price depends on the selected size and design elements.")
-        lines.append("Would you like the designer link?" if customizable else "Would you like the product link?")
+        lines.append(
+            "Reply 'designer link' to customize it, or 'photos' for more images."
+            if customizable
+            else "Reply 'link' for the product link, or 'photos' for more images."
+        )
         return "\n".join(lines)
+
+    @staticmethod
+    def _product_display_name(product: ProductPublic) -> str:
+        visual_name = (product.attributes.get("search_attributes") or {}).get("product_name_hint")
+        name = str(visual_name or product.name).strip()
+        return name[:1].upper() + name[1:] if name else "Product"
 
     def _build_stock_response(self, stock_result: dict) -> str:
         product = stock_result["product"]

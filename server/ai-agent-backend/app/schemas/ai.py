@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -22,6 +22,20 @@ class AiChatRequest(BaseModel):
 
 class IntentResult(BaseModel):
     intent: str = "general_question"
+    action: Literal[
+        "add_to_cart",
+        "confirm_cart",
+        "decline_cart",
+        "product_photos",
+        "product_link",
+        "check_stock",
+        "show_sizes",
+        "track_order",
+        "show_cart",
+        "checkout",
+        "retry_checkout",
+        "human_handoff",
+    ] | None = None
     language: str = "English"
     script: str = "Latin"
     category: str | None = None

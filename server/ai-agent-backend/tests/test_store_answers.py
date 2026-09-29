@@ -1,6 +1,6 @@
 import unittest
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 from app.ai.sales_agent import SalesAgent
 from app.ai.store_knowledge import StoreKnowledge
@@ -65,6 +65,94 @@ class StoreAnswerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(result)
         self.assertEqual(state["purchase"], {"product_id": "shirt", "size": "M"})
         tools.get_product_details.assert_not_awaited()
+
+    async def test_customer_can_accept_same_in_stock_cart_quote_after_saying_no(self):
+        product = SimpleNamespace(
+            id="shirt",
+            name="ai agent",
+            currency="INR",
+            attributes={
+                "source_type": "readymade",
+                "sizes": ["M"],
+                "variants": [{"size": "M", "stock": 99, "effective_price": 500}],
+                "search_attributes": {"product_name_hint": "plain tan t-shirt"},
+            },
+        )
+        commerce = WhatsAppCommerce(SimpleNamespace())
+        commerce._linked = AsyncMock(return_value=True)
+        commerce._request = AsyncMock(return_value=(201, {}))
+        state = {
+            "selected_product_id": "shirt",
+            "purchase": {
+                "product_id": "shirt",
+                "size": "M",
+                "quantity": 1,
+                "confirmed_quote": 500,
+                "operation_id": "operation",
+            },
+        }
+        conversation = {"external_customer_ref": "919999999999", "selected_product_id": "shirt"}
+        tools = SimpleNamespace(get_product_details=AsyncMock(return_value=product))
+
+        with patch(
+            "app.services.whatsapp_commerce.settings",
+            SimpleNamespace(ecommerce_storefront_url="https://shop.example"),
+        ):
+            declined = await commerce.handle("no", conversation, state, tools, "business")
+            accepted = await commerce.handle("yes add to the cart", conversation, state, tools, "business")
+
+        self.assertIn("haven't added", declined[0])
+        self.assertIn("it’s in your cart", accepted[0])
+        self.assertNotIn("unavailable", accepted[0])
+        commerce._request.assert_awaited_once()
+        self.assertEqual(commerce._request.await_args.args[3]["product_id"], "shirt")
+        self.assertEqual(commerce._request.await_args.args[3]["size"], "M")
+        self.assertNotIn("purchase", state)
+        self.assertNotIn("last_declined_purchase", state)
+
+    async def test_structured_natural_language_confirmation_executes_verified_cart_action(self):
+        product = SimpleNamespace(
+            id="shirt",
+            name="Tan shirt",
+            currency="INR",
+            attributes={
+                "source_type": "readymade",
+                "sizes": ["M"],
+                "variants": [{"size": "M", "stock": 12, "effective_price": 500}],
+            },
+        )
+        commerce = WhatsAppCommerce(SimpleNamespace())
+        commerce._linked = AsyncMock(return_value=True)
+        commerce._request = AsyncMock(return_value=(201, {}))
+        state = {
+            "selected_product_id": "shirt",
+            "last_declined_purchase": {
+                "product_id": "shirt",
+                "size": "M",
+                "quantity": 1,
+                "confirmed_quote": 500,
+                "operation_id": "operation",
+            },
+        }
+        conversation = {"external_customer_ref": "919999999999", "selected_product_id": "shirt"}
+        tools = SimpleNamespace(get_product_details=AsyncMock(return_value=product))
+        intent = IntentResult(intent="commerce_action", action="confirm_cart")
+
+        with patch(
+            "app.services.whatsapp_commerce.settings",
+            SimpleNamespace(ecommerce_storefront_url="https://shop.example"),
+        ):
+            response = await commerce.handle(
+                "Sounds good, please do it",
+                conversation,
+                state,
+                tools,
+                "business",
+                intent=intent,
+            )
+
+        self.assertIn("it’s in your cart", response[0])
+        commerce._request.assert_awaited_once()
 
     async def test_generated_reply_with_invented_fact_uses_factual_draft(self):
         client = SimpleNamespace(is_configured=True, generate_text=AsyncMock(return_value="Delivery takes 2 days."))

@@ -73,11 +73,14 @@ class WhatsAppCommerce:
     @staticmethod
     def _product_label(product) -> str:
         """Keep WhatsApp replies readable when catalogue titles are very long."""
-        name = re.sub(r"\s+", " ", str(product.name or "this item")).strip()
+        visual_name = ((getattr(product, "attributes", {}) or {}).get("search_attributes") or {}).get("product_name_hint")
+        name = re.sub(r"\s+", " ", str(visual_name or product.name or "this item")).strip()
+        name = name[:1].upper() + name[1:] if name else "This item"
         return name if len(name) <= 90 else name[:87].rstrip() + "…"
 
-    async def handle(self, message, conversation, state, product_tools, business_id):
+    async def handle(self, message, conversation, state, product_tools, business_id, intent=None):
         text = message.lower().strip()
+        action = getattr(intent, "action", None)
         account = hashlib.sha256(f"{business_id}:{conversation.get('external_customer_ref')}".encode()).hexdigest()
         origin = (settings.ecommerce_storefront_url or "").rstrip("/")
         result = lambda reply, products=None: (reply, products or [], "none")
@@ -89,14 +92,14 @@ class WhatsAppCommerce:
             await self.db.whatsapp_account_links.delete_one({"_id": account})
             state.pop("purchase", None)
             return result("WhatsApp order updates and connected-account access are turned off. Message us again anytime to shop.")
-        if re.search(r"\b(human|real person|speak to staff|talk to staff|agent please)\b", text):
+        if action == "human_handoff" or re.search(r"\b(human|real person|speak to staff|talk to staff|agent please)\b", text):
             state["handoff_requested"] = True
             return result("I've marked this conversation for the store team. They'll reply here when available.")
         if text in {"disconnect", "unlink", "disconnect account"}:
             await self.db.whatsapp_account_links.delete_one({"_id": account})
             state.pop("purchase", None)
             return result("Your store account is disconnected from this WhatsApp chat.")
-        if re.search(r"\b(my orders?|order status|track|tracking|payment status|where is my|my delivery)\b", text):
+        if action == "track_order" or re.search(r"\b(my orders?|order status|track|tracking|payment status|where is my|my delivery)\b", text):
             if not await self._linked(account):
                 return result(await self._link_message(account, origin, recipient=conversation.get("external_customer_ref"), return_path="/orders"))
             order_id_match = re.search(r"\b[a-f0-9]{24}\b", text)
@@ -126,13 +129,13 @@ class WhatsAppCommerce:
             return result(
                 "Payment is completed securely on the Maitrova website through Razorpay, or by COD when the selected products are eligible. Never send a UPI PIN, OTP, or card details in WhatsApp. Complete your product selection and I will send the secure checkout link."
             )
-        if re.search(r"\b(new link|fresh link|retry checkout|continue checkout|send (?:the )?link again|link (?:has |is )?(?:been )?expired|expired link|link not working)\b", text):
+        if action == "retry_checkout" or re.search(r"\b(new link|fresh link|retry checkout|continue checkout|send (?:the )?link again|link (?:has |is )?(?:been )?expired|expired link|link not working)\b", text):
             pending = state.get("last_checkout_purchase")
             if pending:
                 return result(await self._checkout_retry_message(account, origin, conversation, state, product_tools, business_id, pending))
             return result("No problem. Tell me the product, size, and quantity again and I’ll create a fresh checkout link.")
-        if text in {"checkout", "my cart", "show cart", "open cart"}:
-            destination = "/checkout" if text == "checkout" else "/cart"
+        if action in {"checkout", "show_cart"} or text in {"checkout", "my cart", "show cart", "open cart"}:
+            destination = "/checkout" if action == "checkout" or text == "checkout" else "/cart"
             return result(f"Open securely and sign in with your store account:\n{origin}{destination}" if origin.startswith("https://") else "The public store URL is not configured. Please ask the store team for help.")
         if re.search(r"\b(combo|bundle|pack offer)\b", text) and not state.get("purchase"):
             return result(f"Browse current combo packs here:\n{origin}/combo-packs" if origin.startswith("https://") else "The combo-pack page is not configured yet.")
@@ -143,7 +146,13 @@ class WhatsAppCommerce:
             if len(products) < 2:
                 return result("Show me which two products you'd like to compare first.")
             return result("\n".join(f"{p.name}: {p.currency} {p.sale_price if p.sale_price is not None else p.price:g}; sizes {', '.join(p.attributes.get('sizes', [])) or 'none in stock'}; {p.stock} left." for p in products))
-        if not state.get("purchase") and re.search(r"\b(size|sizes|stock|material|fabric|customize|customise|customization)\b", text) and not re.search(r"\b(buy|cart|order|purchase)\b", text):
+        if not state.get("purchase") and (
+            action in {"show_sizes", "check_stock"}
+            or (
+                re.search(r"\b(size|sizes|stock|material|fabric|customize|customise|customization)\b", text)
+                and not re.search(r"\b(buy|cart|order|purchase)\b", text)
+            )
+        ):
             selected = state.get("selected_product_id") or conversation.get("selected_product_id")
             if selected:
                 product = await product_tools.get_product_details(business_id, str(selected))
@@ -159,7 +168,7 @@ class WhatsAppCommerce:
                         f"{self._product_label(product)} is sold as shown and is not customizable. "
                         + (f"Browse customizable products here:\n{origin}/customproducts" if origin.startswith("https://") else "Ask the store team about custom options.")
                     )
-                if product and re.search(r"\b(size|sizes|stock)\b", text):
+                if product and (action in {"show_sizes", "check_stock"} or re.search(r"\b(size|sizes|stock)\b", text)):
                     variants = product.attributes.get("variants", [])
                     return result(product.name + "\n" + "\n".join(f"{v['size']}: {v['stock']} available, {product.currency} {v['effective_price']:g}" for v in variants))
                 if product:
@@ -169,17 +178,21 @@ class WhatsAppCommerce:
             return None
         # Customers often say "I want this" after the agent has shown one product.
         # Support common Telugu wording as well as the English purchase verbs.
-        buy = bool(re.search(
-            r"\b(add to cart|buy|purchase|book|order|i want this|want this|need this|idi kavali|naaku idi kavali|naku idi kavali|kavali|kaavali)\b|కావాలి|నాకు ఇది కావాలి",
+        buy = action in {"add_to_cart", "confirm_cart"} or bool(re.search(
+            r"\b(add(?: it| this| the item)? to (?:the )?cart|buy|purchase|book|order|i want this|want this|need this|idi kavali|naaku idi kavali|naku idi kavali|kavali|kaavali)\b|కావాలి|నాకు ఇది కావాలి",
             text,
         ))
         purchase = state.get("purchase")
         continuing_purchase = bool(purchase)
-        if not buy and not purchase:
-            return None
-        if text in {"cancel", "no", "never mind", "stop", "nahi", "వద్దు"}:
+        if action == "decline_cart" or text in {"cancel", "no", "never mind", "stop", "nahi", "వద్దు"}:
+            if purchase:
+                state["last_declined_purchase"] = dict(purchase)
+            elif action == "decline_cart":
+                state.pop("last_declined_purchase", None)
             state.pop("purchase", None)
             return result("Okay, I haven't added anything to your cart.")
+        if not buy and not purchase:
+            return None
         if not purchase:
             product_id = state.get("selected_product_id") or conversation.get("selected_product_id")
             ids = conversation.get("recommended_product_ids", [])
@@ -195,7 +208,14 @@ class WhatsAppCommerce:
                 return result("The public store URL is not configured. Please ask the store team for help.")
             if not product_id:
                 return result("Which one would you like? You can tell me its name or option number.")
-            purchase = {"product_id": str(product_id), "operation_id": secrets.token_hex(16)}
+            declined = state.get("last_declined_purchase") or {}
+            if str(declined.get("product_id") or "") == str(product_id):
+                purchase = dict(declined)
+                purchase["operation_id"] = purchase.get("operation_id") or secrets.token_hex(16)
+                continuing_purchase = True
+            else:
+                purchase = {"product_id": str(product_id), "operation_id": secrets.token_hex(16)}
+            state.pop("last_declined_purchase", None)
             state["purchase"] = purchase
         product = await product_tools.get_product_details(business_id, purchase["product_id"])
         if not product:
@@ -233,7 +253,10 @@ class WhatsAppCommerce:
             return result("That size and quantity aren’t available together right now. Please try another size or quantity (up to 20).")
         price = variant["effective_price"]
         confirmations = {"confirm", "yes", "yes confirm", "haan", "ha", "avunu", "sare", "हाँ", "అవును", "సరే"}
-        is_confirmation = text in confirmations or bool(re.search(r"\b(?:please )?confirm(?: chey| cheyyi)?\b|కన్ఫర్మ్ చేయి", text))
+        is_confirmation = action == "confirm_cart" or text in confirmations or bool(re.search(
+            r"\b(?:please )?confirm(?: chey| cheyyi)?\b|\byes[, ]+(?:please[, ]+)?add(?: it| this| the item)? to (?:the )?cart\b|కన్ఫర్మ్ చేయి",
+            text,
+        ))
         if purchase.get("confirmed_quote") != price or not is_confirmation:
             purchase["confirmed_quote"] = price
             return result(
@@ -256,6 +279,7 @@ class WhatsAppCommerce:
         status, data = await self._request("POST", "/cart", account, {**purchase, "expected_price": price})
         if status in {200, 201}:
             state.pop("purchase", None)
+            state.pop("last_declined_purchase", None)
             return result(f"All set — it’s in your cart. You can finish your address and payment securely here:\n{origin}/checkout")
         if status == 401:
             checkout_purchase = {**purchase, "expected_price": price}
@@ -358,6 +382,14 @@ class WhatsAppCommerce:
         # number words as substrings and retain boundaries for Latin words.
         for number_word, value in self._NUMBER_WORDS.items():
             if number_word.isascii():
+                # Hindi "do" means two, but in English it is usually a verb
+                # ("please do it"). Only treat it as a quantity when it stands
+                # alone or directly describes purchasable units.
+                if number_word == "do" and not re.fullmatch(
+                    r"do(?:\s+(?:pieces?|pcs?|items?|shirts?|units?))?",
+                    text,
+                ):
+                    continue
                 if re.search(rf"\b{re.escape(number_word)}\b", text):
                     return value
             elif number_word in text:

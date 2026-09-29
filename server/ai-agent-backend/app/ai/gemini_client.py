@@ -23,40 +23,7 @@ class GeminiClient:
         if not self.api_key:
             raise RuntimeError("Gemini API key is not configured")
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
-        payload: dict[str, Any] = {
-            "contents": [
-                {
-                    "role": "user",
-                    "parts": [{"text": prompt}],
-                }
-            ],
-            "generationConfig": {
-                "maxOutputTokens": 500,
-                "temperature": 0.2,
-                "topP": 0.8,
-            },
-        }
-
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.post(
-                url,
-                headers={
-                    "Content-Type": "application/json",
-                    "x-goog-api-key": self.api_key,
-                },
-                json=payload,
-            )
-            if response.is_error:
-                self._log_api_error(response, "text")
-            response.raise_for_status()
-            data = response.json()
-
-        try:
-            return data["candidates"][0]["content"]["parts"][0]["text"]
-        except (KeyError, IndexError, TypeError) as exc:
-            logger.warning("Unexpected Gemini response shape")
-            raise RuntimeError("Invalid Gemini response") from exc
+        return await self._create_interaction(prompt, "text")
 
     async def generate_with_image(
         self,
@@ -74,66 +41,56 @@ class GeminiClient:
             image_url, image_data, mime_type
         )
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
-        payload: dict[str, Any] = {
-            "contents": [
-                {
-                    "role": "user",
-                    "parts": [
-                        {"text": prompt},
-                        {
-                            "inline_data": {
-                                "mime_type": resolved_mime_type,
-                                "data": resolved_image_data,
-                            }
-                        },
-                    ],
-                }
+        return await self._create_interaction(
+            [
+                {"type": "text", "text": prompt},
+                {"type": "image", "mime_type": resolved_mime_type, "data": resolved_image_data},
             ],
-            "generationConfig": {
-                "maxOutputTokens": 4096,
-                "responseMimeType": "application/json",
-                "temperature": 0.2,
-                "topP": 0.8,
-            },
-        }
+            "vision",
+        )
 
-        async with httpx.AsyncClient(timeout=20) as client:
-            for attempt in range(2):
-                try:
-                    response = await client.post(
-                        url,
-                        headers={"Content-Type": "application/json", "x-goog-api-key": self.api_key},
-                        json=payload,
-                    )
-                except httpx.TransportError:
-                    if attempt:
-                        raise
-                    await asyncio.sleep(1)
-                    continue
-                if response.status_code in {429, 500, 502, 503, 504} and not attempt:
-                    await asyncio.sleep(1)
-                    continue
-                break
-            if response.is_error:
-                self._log_api_error(response, "vision")
-            response.raise_for_status()
-            data = response.json()
-
-        try:
-            candidate = data["candidates"][0]
-            if candidate.get("finishReason") == "MAX_TOKENS":
-                raise RuntimeError("Gemini image analysis exceeded output token limit")
-            text = "".join(
-                part.get("text", "") for part in candidate["content"]["parts"]
-                if not part.get("thought")
-            ).strip()
-            if not text:
-                raise RuntimeError("Gemini returned no image analysis text")
-            return text
-        except (KeyError, IndexError, TypeError) as exc:
-            logger.warning("Unexpected Gemini vision response shape")
-            raise RuntimeError("Invalid Gemini vision response") from exc
+    async def _create_interaction(self, input_data: str | list[dict[str, Any]], operation: str) -> str:
+        """Use Google's current stateless API for text and multimodal understanding."""
+        url = "https://generativelanguage.googleapis.com/v1beta/interactions"
+        models = list(dict.fromkeys([self.model, "gemini-3.1-flash-lite", "gemini-3.8-flash"]))
+        async with httpx.AsyncClient(timeout=45) as client:
+            for model_index, model in enumerate(models):
+                payload = {"model": model, "input": input_data, "store": False}
+                for attempt in range(2):
+                    try:
+                        response = await client.post(
+                            url,
+                            headers={"Content-Type": "application/json", "x-goog-api-key": self.api_key},
+                            json=payload,
+                        )
+                    except httpx.TransportError:
+                        if attempt or model_index == len(models) - 1:
+                            raise
+                        await asyncio.sleep(1)
+                        break
+                    if response.status_code in {429, 500, 502, 503, 504} and not attempt:
+                        await asyncio.sleep(1)
+                        continue
+                    break
+                if not response.is_error or response.status_code not in {404, 429, 500, 502, 503, 504}:
+                    break
+                if model_index < len(models) - 1:
+                    logger.info("Gemini %s model %s unavailable; trying fallback", operation, model)
+        if response.is_error:
+            self._log_api_error(response, operation)
+        response.raise_for_status()
+        data = response.json()
+        text = data.get("output_text") or "".join(
+            content.get("text", "")
+            for step in data.get("steps", [])
+            if step.get("type") == "model_output"
+            for content in step.get("content", [])
+            if content.get("type") == "text"
+        )
+        if not isinstance(text, str) or not text.strip():
+            logger.warning("Unexpected Gemini %s interaction response shape", operation)
+            raise RuntimeError(f"Invalid Gemini {operation} response")
+        return text.strip()
 
     async def embed_content(
         self,
