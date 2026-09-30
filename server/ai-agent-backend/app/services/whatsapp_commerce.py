@@ -78,6 +78,55 @@ class WhatsAppCommerce:
         name = name[:1].upper() + name[1:] if name else "This item"
         return name if len(name) <= 90 else name[:87].rstrip() + "…"
 
+    @staticmethod
+    def _variant(product, size: str | None = None):
+        if not size:
+            return None
+        return next(
+            (variant for variant in product.attributes.get("variants", []) if variant.get("size") == size),
+            None,
+        )
+
+    @classmethod
+    def _price_reply(cls, product, size: str | None = None) -> str:
+        """Answer price questions directly from live catalogue data."""
+        currency = product.currency or "INR"
+        variant = cls._variant(product, size)
+        if size and variant:
+            price = variant["effective_price"]
+            availability = "It's in stock." if int(variant.get("stock") or 0) > 0 else "That size is out of stock."
+            return f"Size {size} is {currency} {price:g}. {availability}"
+        if size:
+            sizes = product.attributes.get("sizes", [])
+            available = ", ".join(sizes) if sizes else "none"
+            return f"Size {size} isn't available for this product. Available sizes: {available}."
+
+        variants = product.attributes.get("variants", [])
+        prices = sorted({variant["effective_price"] for variant in variants if int(variant.get("stock") or 0) > 0})
+        price = product.sale_price if product.sale_price is not None else product.price
+        price_text = (
+            f"Prices start at {currency} {prices[0]:g}."
+            if len(prices) > 1
+            else f"It's {currency} {(prices[0] if prices else price):g}."
+        )
+        sizes = product.attributes.get("sizes", [])
+        return price_text + (f" Available sizes: {', '.join(sizes)}." if sizes else "")
+
+    @staticmethod
+    def _referenced_product_id(text: str, conversation: dict, state: dict) -> str | None:
+        ids = conversation.get("recommended_product_ids", []) or state.get("recommended_product_ids", [])
+        match = re.search(r"\b(?:option|product|number)\s*#?\s*([1-5])\b", text)
+        index = int(match[1]) - 1 if match else None
+        if index is None:
+            for position, word in enumerate(["first", "second", "third", "fourth", "fifth"]):
+                if re.search(rf"\b{word}\b", text):
+                    index = position
+                    break
+        if index is not None and index < len(ids):
+            return str(ids[index])
+        selected = state.get("selected_product_id") or conversation.get("selected_product_id")
+        return str(selected) if selected else None
+
     async def handle(self, message, conversation, state, product_tools, business_id, intent=None):
         text = message.lower().strip()
         action = getattr(intent, "action", None)
@@ -172,14 +221,23 @@ class WhatsAppCommerce:
                     variants = product.attributes.get("variants", [])
                     return result(product.name + "\n" + "\n".join(f"{v['size']}: {v['stock']} available, {product.currency} {v['effective_price']:g}" for v in variants))
                 if product:
-                    return result((product.description or "Those details aren't listed for this product.")[:2000] + "\nIf that doesn't answer your question, send 'human' to ask the store team.")
+                    requested_details = []
+                    for key in ("material", "fabric"):
+                        if re.search(rf"\b{key}\b", text):
+                            value = product.attributes.get(key)
+                            if value:
+                                requested_details.append(f"{key.title()}: {value}")
+                    if requested_details:
+                        return result("\n".join(requested_details))
+                    return result("That detail isn't listed for this product. Send 'human' if you'd like the store team to check it.")
         # A policy question must not advance an unfinished purchase.
         if StoreKnowledge.is_store_question(message):
             return None
+        asks_price = action == "check_price" or bool(re.search(r"\b(?:price|cost|rate|how much)\b", text))
         # Customers often say "I want this" after the agent has shown one product.
         # Support common Telugu wording as well as the English purchase verbs.
         buy = action in {"add_to_cart", "confirm_cart"} or bool(re.search(
-            r"\b(add(?: it| this| the item)? to (?:the )?cart|buy|purchase|book|order|i want this|want this|need this|idi kavali|naaku idi kavali|naku idi kavali|kavali|kaavali)\b|కావాలి|నాకు ఇది కావాలి",
+            r"\b(add(?: it| this| the item)? to (?:the )?cart|buy|purchase|book|order|i want (?:this|that|option(?: number)?\s*[1-5])|want this|need this|idi kavali|naaku idi kavali|naku idi kavali|kavali|kaavali)\b|కావాలి|నాకు ఇది కావాలి",
             text,
         ))
         purchase = state.get("purchase")
@@ -191,10 +249,24 @@ class WhatsAppCommerce:
                 state.pop("last_declined_purchase", None)
             state.pop("purchase", None)
             return result("Okay, I haven't added anything to your cart.")
+        if asks_price and not buy and not purchase:
+            product_id = self._referenced_product_id(text, conversation, state)
+            previous_purchase = state.get("last_checkout_purchase") or {}
+            product_id = product_id or previous_purchase.get("product_id")
+            if not product_id:
+                return result("Which product do you mean? Reply to its photo or send its option number.")
+            product = await product_tools.get_product_details(business_id, str(product_id))
+            if not product:
+                return result("I can't find that product in the current catalogue. Please choose another one.")
+            size_match = re.search(r"\b(XXL|XL|XS|S|M|L)\b", message.upper())
+            size = size_match[1] if size_match else None
+            if not size and str(previous_purchase.get("product_id") or "") == str(product_id):
+                size = previous_purchase.get("size")
+            return result(self._price_reply(product, size))
         if not buy and not purchase:
             return None
         if not purchase:
-            product_id = state.get("selected_product_id") or conversation.get("selected_product_id")
+            product_id = self._referenced_product_id(text, conversation, state)
             ids = conversation.get("recommended_product_ids", [])
             choice = re.search(r"\b(?:option|product|number)\s*#?\s*([1-5])\b", text)
             if not choice:
@@ -242,10 +314,14 @@ class WhatsAppCommerce:
             purchase["quantity"] = quantity
             purchase.pop("confirmed_quote", None)
         if not purchase.get("size"):
+            if asks_price:
+                return result(self._price_reply(product) + " Which size would you like?")
             return result("Sure — which size would you like? Available: " + ", ".join(product.attributes.get("sizes", [])))
         if not purchase.get("quantity"):
+            if asks_price:
+                return result(self._price_reply(product, purchase["size"]) + " How many would you like?")
             return result(f"Great, size {purchase['size']}. How many would you like?")
-        variant = next((v for v in product.attributes.get("variants", []) if v["size"] == purchase["size"]), None)
+        variant = self._variant(product, purchase["size"])
         quantity = purchase["quantity"]
         if quantity < 1 or quantity > 20 or not variant or variant["stock"] < quantity:
             purchase.pop("quantity", None)
@@ -260,9 +336,8 @@ class WhatsAppCommerce:
         if purchase.get("confirmed_quote") != price or not is_confirmation:
             purchase["confirmed_quote"] = price
             return result(
-                f"Just checking before I add it: {quantity} × {self._product_label(product)} "
-                f"in size {purchase['size']} at {product.currency} {price:g} each. "
-                "Would you like me to add it to your cart?"
+                f"{quantity} × {self._product_label(product)}, size {purchase['size']} — "
+                f"{product.currency} {price:g} each. Would you like me to add it to your cart?"
             )
         if not await self._linked(account):
             checkout_purchase = {**purchase, "expected_price": price}
@@ -357,7 +432,7 @@ class WhatsAppCommerce:
                 or len(tokens) != 1 or not re.fullmatch(r"[A-Za-z0-9_-]{40,128}", tokens[0])):
             return "The agent and store checkout addresses don't match. Please ask the store team to check both storefront URL settings."
         if purchase:
-            return f"Perfect — tap this secure link to continue:\n{link}\nOnce you sign in, I’ll add the confirmed item to your cart and take you to checkout. It expires in 15 minutes. You’ll receive order updates here; send STOP anytime to turn them off."
+            return f"Sign in securely to add the item and continue to checkout:\n{link}\nThis link expires in 15 minutes. Send STOP anytime to turn off order updates."
         return f"To keep your order details private, open this secure link:\n{link}\nIt expires in 15 minutes. You’ll receive order updates here; send STOP anytime to turn them off."
 
     def _extract_quantity(self, message: str, allow_conversational: bool = False) -> int | None:

@@ -28,6 +28,7 @@ class IntentResult(BaseModel):
         "decline_cart",
         "product_photos",
         "product_link",
+        "check_price",
         "check_stock",
         "show_sizes",
         "track_order",
