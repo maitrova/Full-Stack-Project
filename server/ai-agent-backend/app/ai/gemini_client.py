@@ -171,11 +171,16 @@ class GeminiClient:
 
     @staticmethod
     def _log_api_error(response: httpx.Response, operation: str, model: str | None = None) -> None:
+        if response.status_code == 401:
+            reason = "unauthorized_api_key"
+        else:
+            reason = None
         try:
-            error = response.json().get("error", {})
-            reason = error.get("status") or "unknown"
+            if reason is None:
+                error = response.json().get("error", {})
+                reason = error.get("status") or "unknown"
         except (ValueError, AttributeError):
-            reason = "non_json_response"
+            reason = reason or "non_json_response"
         # Never log the API key, response URL query, or provider response body.
         logger.warning(
             "Gemini %s request rejected: HTTP %s (%s), model=%s",

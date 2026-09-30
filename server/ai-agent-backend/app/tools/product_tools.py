@@ -1,10 +1,15 @@
 from dataclasses import dataclass, field
+import logging
 from typing import Any
+
+from pydantic import ValidationError
 
 from app.repositories.product_repository import ProductRepository
 from app.schemas.ai import IntentResult
 from app.schemas.product import ProductPublic
 from app.utils.object_id import object_id_to_str
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -26,6 +31,24 @@ class ProductTools:
     def __init__(self, product_repository: ProductRepository):
         self.product_repository = product_repository
 
+    @staticmethod
+    def _validated_product(product: dict) -> ProductPublic | None:
+        try:
+            return ProductPublic.model_validate(object_id_to_str(product))
+        except ValidationError as exc:
+            logger.warning(
+                "Skipping invalid catalogue product %s (%s validation issue%s)",
+                str(product.get("_id") or "unknown"),
+                exc.error_count(),
+                "s" if exc.error_count() != 1 else "",
+            )
+            return None
+
+    @classmethod
+    def _validated_products(cls, products: list[dict]) -> list[ProductPublic]:
+        validated = [cls._validated_product(product) for product in products]
+        return [product for product in validated if product is not None]
+
     async def search_products(self, params: ProductSearchParams) -> list[ProductPublic]:
         filters = {
             "query": params.query,
@@ -43,7 +66,7 @@ class ProductTools:
             filters=filters,
             limit=params.limit,
         )
-        return [ProductPublic.model_validate(object_id_to_str(product)) for product in products]
+        return self._validated_products(products)
 
     async def search_from_intent(self, business_id: str, intent: IntentResult, query: str | None = None) -> list[ProductPublic]:
         has_structured_filters = any(
@@ -101,13 +124,13 @@ class ProductTools:
             image_embedding=image_embedding,
             limit=5,
         )
-        return [ProductPublic.model_validate(object_id_to_str(product)) for product in products]
+        return self._validated_products(products)
 
     async def get_product_details(self, business_id: str, product_id: str) -> ProductPublic | None:
         product = await self.product_repository.find_by_id(product_id, business_id)
         if product is None:
             return None
-        return ProductPublic.model_validate(object_id_to_str(product))
+        return self._validated_product(product)
 
     async def check_stock(self, business_id: str, product_id: str) -> dict:
         product = await self.get_product_details(business_id, product_id)
@@ -142,11 +165,9 @@ class ProductTools:
             filters=filters,
             limit=10,
         )
-        return [
-            ProductPublic.model_validate(object_id_to_str(variant))
-            for variant in variants
-            if str(variant["_id"]) != product_id
-        ]
+        return self._validated_products([
+            variant for variant in variants if str(variant["_id"]) != product_id
+        ])
 
     async def recommend_alternatives(
         self,
@@ -166,4 +187,4 @@ class ProductTools:
             max_price=max_price,
             limit=5,
         )
-        return [ProductPublic.model_validate(object_id_to_str(item)) for item in alternatives]
+        return self._validated_products(alternatives)

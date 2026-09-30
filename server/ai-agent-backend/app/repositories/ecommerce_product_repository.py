@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timezone
+import html
 import math
 from typing import Any
 import re
@@ -19,6 +20,17 @@ class EcommerceProductRepository:
         self.collection = database.readymadeproducts
         self.drop_collection = database.dropproducts
         self.customization_collection = database.products
+
+    @staticmethod
+    def _clean_description(value: Any) -> str | None:
+        if value is None:
+            return None
+        cleaned = re.sub(
+            r"<(script|style)\b[^>]*>.*?</\1>", " ", str(value), flags=re.IGNORECASE | re.DOTALL,
+        )
+        cleaned = re.sub(r"<[^>]+>", " ", cleaned)
+        cleaned = re.sub(r"\s+", " ", html.unescape(cleaned)).strip()
+        return cleaned[:2000] or None
 
     async def search_products(self, business_id: str, filters: dict, limit: int = 5) -> list[dict]:
         products = await self._load_catalogue(business_id)
@@ -279,7 +291,7 @@ class EcommerceProductRepository:
             "_id": document["_id"],
             "business_id": parse_object_id(business_id),
             "name": str(document.get("title") or "Product"),
-            "description": document.get("description") or None,
+            "description": self._clean_description(document.get("description")),
             "category": category,
             "price": price,
             "sale_price": sale_price,
@@ -319,7 +331,7 @@ class EcommerceProductRepository:
             "_id": document["_id"],
             "business_id": parse_object_id(business_id),
             "name": str(document.get("name") or "Drop Product"),
-            "description": document.get("description") or None,
+            "description": self._clean_description(document.get("description")),
             "category": category,
             "price": price,
             "sale_price": sale_price,
@@ -373,7 +385,7 @@ class EcommerceProductRepository:
             "_id": document["_id"],
             "business_id": parse_object_id(business_id),
             "name": str(document.get("name") or "Custom Product"),
-            "description": description,
+            "description": self._clean_description(description),
             "category": category,
             "price": price,
             "sale_price": None,
