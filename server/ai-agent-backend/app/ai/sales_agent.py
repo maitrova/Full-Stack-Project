@@ -131,6 +131,18 @@ class SalesAgent:
             intent = self._merge_image_analysis_into_intent(intent, effective_image_analysis)
 
         updated_state = self._merge_conversation_state(conversation.get("conversation_state", {}), intent)
+        image_lookup = bool(has_image or (effective_image_analysis and (image_reference_question or image_product_choice)))
+        if image_lookup:
+            # A new visual enquiry must not inherit an older product selection.
+            # Otherwise commerce can ask the customer to choose from stale options
+            # before the uploaded image has been searched.
+            for key in (
+                "selected_product_id", "recommended_product_ids", "option_product_ids",
+                "option_products", "pending_product_action", "purchase", "last_declined_purchase",
+            ):
+                updated_state.pop(key, None)
+            conversation["selected_product_id"] = None
+            conversation["recommended_product_ids"] = []
         self._apply_product_option(intent.product_option, conversation, updated_state)
         if image_analysis_failed:
             updated_state.pop("last_image_analysis", None)
@@ -145,14 +157,16 @@ class SalesAgent:
         selected_product = None
         tool_calls = []
         response_goal = "answer"
-        presentation = await self.commerce.handle(
-            payload.message,
-            conversation,
-            updated_state,
-            self.product_tools,
-            business_id,
-            intent=intent,
-        ) if self.commerce else None
+        presentation = None
+        if self.commerce and not image_lookup:
+            presentation = await self.commerce.handle(
+                payload.message,
+                conversation,
+                updated_state,
+                self.product_tools,
+                business_id,
+                intent=intent,
+            )
         # An uploaded customer image is input for vision/search. It must not be
         # mistaken for a request to resend photos from the previous turn.
         if not presentation and not has_image:
