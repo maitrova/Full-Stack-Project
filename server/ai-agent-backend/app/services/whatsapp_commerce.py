@@ -88,6 +88,38 @@ class WhatsAppCommerce:
         )
 
     @classmethod
+    def _extract_size(cls, message: str, product) -> str | None:
+        variants = product.attributes.get("variants", [])
+        by_normalized = {
+            re.sub(r"[^A-Z0-9]", "", str(variant.get("size") or "").upper()): str(variant.get("size"))
+            for variant in variants
+            if variant.get("size")
+        }
+        lowered = message.lower().strip()
+        aliases = [
+            (r"\bextra\s+extra\s+large\b", "XXL"),
+            (r"\bextra\s+large\b", "XL"),
+            (r"\bextra\s+small\b", "XS"),
+            (r"\bmedium\b", "M"),
+            (r"\blarge\b", "L"),
+            (r"\bsmall\b", "S"),
+        ]
+        for pattern, normalized in aliases:
+            if re.search(pattern, lowered) and normalized in by_normalized:
+                return by_normalized[normalized]
+        for normalized, original in sorted(by_normalized.items(), key=lambda item: len(item[0]), reverse=True):
+            escaped = re.escape(str(original))
+            if re.fullmatch(rf"\s*(?:size\s*)?{escaped}\s*", message, re.IGNORECASE):
+                return original
+            if re.search(rf"\bsize\s*[:=-]?\s*{escaped}\b", message, re.IGNORECASE):
+                return original
+            if normalized in {"XS", "S", "M", "L", "XL", "XXL", "XXXL"} and re.search(
+                rf"\b{re.escape(normalized)}\b", message.upper()
+            ):
+                return original
+        return None
+
+    @classmethod
     def _price_reply(cls, product, size: str | None = None) -> str:
         """Answer price questions directly from live catalogue data."""
         currency = product.currency or "INR"
@@ -233,10 +265,12 @@ class WhatsAppCommerce:
         # A policy question must not advance an unfinished purchase.
         if StoreKnowledge.is_store_question(message):
             return None
+        if state.get("purchase") and text in {"hi", "hello", "hey", "thanks", "thank you", "thankyou"}:
+            return None
         asks_price = action == "check_price" or bool(re.search(r"\b(?:price|cost|rate|how much)\b", text))
         # Customers often say "I want this" after the agent has shown one product.
         # Support common Telugu wording as well as the English purchase verbs.
-        buy = action in {"add_to_cart", "confirm_cart"} or bool(re.search(
+        buy = bool(getattr(intent, "wants_to_buy", False)) or action in {"add_to_cart", "confirm_cart"} or bool(re.search(
             r"\b(add(?: it| this| the item)? to (?:the )?cart|buy|purchase|book|order|i want (?:this|that|option(?: number)?\s*[1-5])|want this|need this|idi kavali|naaku idi kavali|naku idi kavali|kavali|kaavali)\b|కావాలి|నాకు ఇది కావాలి",
             text,
         ))
@@ -258,8 +292,7 @@ class WhatsAppCommerce:
             product = await product_tools.get_product_details(business_id, str(product_id))
             if not product:
                 return result("I can't find that product in the current catalogue. Please choose another one.")
-            size_match = re.search(r"\b(XXL|XL|XS|S|M|L)\b", message.upper())
-            size = size_match[1] if size_match else None
+            size = self._extract_size(message, product)
             if not size and str(previous_purchase.get("product_id") or "") == str(product_id):
                 size = previous_purchase.get("size")
             return result(self._price_reply(product, size))
@@ -302,31 +335,58 @@ class WhatsAppCommerce:
             if source_type == "customization":
                 return result(f"Open the designer to choose the product, size, color, images, and text securely:\n{product_url}")
             return result(f"Open this drop product to choose the available size and continue securely:\n{product_url}")
-        size_match = re.search(r"\b(XXL|XL|XS|S|M|L)\b", message.upper())
-        quantity = self._extract_quantity(
-            message,
-            allow_conversational=continuing_purchase and bool(purchase.get("size") or size_match),
+        selected_size = self._extract_size(message, product)
+        available_variants = [
+            variant for variant in product.attributes.get("variants", [])
+            if int(variant.get("stock") or 0) > 0
+        ]
+        if not purchase.get("size") and not selected_size and len(available_variants) == 1:
+            selected_size = str(available_variants[0]["size"])
+        size_only_reply = bool(
+            selected_size
+            and re.fullmatch(rf"\s*(?:size\s*)?{re.escape(selected_size)}\s*", message, re.IGNORECASE)
         )
-        if size_match:
-            purchase["size"] = size_match[1]
+        quantity = None if size_only_reply else self._extract_quantity(
+            message, allow_conversational=continuing_purchase and bool(purchase.get("size") or selected_size),
+        )
+        if selected_size:
+            purchase["size"] = selected_size
             purchase.pop("confirmed_quote", None)
         if quantity is not None:
             purchase["quantity"] = quantity
             purchase.pop("confirmed_quote", None)
         if not purchase.get("size"):
+            if not product.attributes.get("variants"):
+                state.pop("purchase", None)
+                product_url = product.attributes.get("product_url")
+                return result(
+                    f"Choose the available option on the product page:\n{product_url}"
+                    if product_url
+                    else "This product doesn't have a purchasable size configured. Send 'human' for help."
+                )
             if asks_price:
                 return result(self._price_reply(product) + " Which size would you like?")
             return result("Sure — which size would you like? Available: " + ", ".join(product.attributes.get("sizes", [])))
+        variant = self._variant(product, purchase["size"])
+        if not variant or int(variant.get("stock") or 0) < 1:
+            unavailable_size = purchase.pop("size", None)
+            purchase.pop("quantity", None)
+            purchase.pop("confirmed_quote", None)
+            sizes = ", ".join(product.attributes.get("sizes", [])) or "none"
+            return result(f"Size {unavailable_size} is out of stock. Available sizes: {sizes}.")
         if not purchase.get("quantity"):
             if asks_price:
                 return result(self._price_reply(product, purchase["size"]) + " How many would you like?")
             return result(f"Great, size {purchase['size']}. How many would you like?")
-        variant = self._variant(product, purchase["size"])
         quantity = purchase["quantity"]
-        if quantity < 1 or quantity > 20 or not variant or variant["stock"] < quantity:
+        if quantity < 1 or quantity > 20:
             purchase.pop("quantity", None)
             purchase.pop("confirmed_quote", None)
-            return result("That size and quantity aren’t available together right now. Please try another size or quantity (up to 20).")
+            return result("Please choose a quantity from 1 to 20.")
+        if int(variant["stock"]) < quantity:
+            purchase.pop("quantity", None)
+            purchase.pop("confirmed_quote", None)
+            return result(f"Only {variant['stock']} are available in size {purchase['size']}. How many would you like?")
         price = variant["effective_price"]
         confirmations = {"confirm", "yes", "yes confirm", "haan", "ha", "avunu", "sare", "हाँ", "అవును", "సరే"}
         is_confirmation = action == "confirm_cart" or text in confirmations or bool(re.search(

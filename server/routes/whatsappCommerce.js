@@ -14,6 +14,13 @@ const links = () => mongoose.connection.db.collection("whatsapp_account_links");
 const linkRequests = () => mongoose.connection.db.collection("whatsapp_link_requests");
 const subscriptions = () => mongoose.connection.db.collection("whatsapp_order_subscriptions");
 const rateLimits = () => mongoose.connection.db.collection("whatsapp_commerce_rate_limits");
+const isValidSizeValue = (value) => (
+  typeof value === "string"
+  && value.length >= 1
+  && value.length <= 32
+  && value.trim() === value
+  && !/[\u0000-\u001f\u007f]/.test(value)
+);
 
 const isRateLimited = async (scope, subject, limit, windowMs) => {
   const now = Date.now();
@@ -124,7 +131,7 @@ router.post("/link/request", async (req, res) => {
   }
   if (purchase && (
     !mongoose.isValidObjectId(purchase.product_id) ||
-    !["XS", "S", "M", "L", "XL", "XXL"].includes(purchase.size) ||
+    !isValidSizeValue(purchase.size) ||
     !Number.isInteger(purchase.quantity) || purchase.quantity < 1 || purchase.quantity > 20 ||
     !Number.isFinite(purchase.expected_price) || purchase.expected_price < 0 ||
     !/^[a-f0-9]{32,64}$/.test(purchase.operation_id || "")
@@ -201,7 +208,7 @@ const addLinkedCartItem = async (req, res) => {
     return res.status(429).json({ message: "Too many cart requests. Please wait a minute." });
   }
   const { product_id: productId, size, quantity, operation_id: operationId } = req.body || {};
-  if (!mongoose.isValidObjectId(productId) || !["XS", "S", "M", "L", "XL", "XXL"].includes(size) || !Number.isInteger(quantity) || quantity < 1 || quantity > 20 || !/^[a-f0-9]{32,64}$/.test(operationId || "")) {
+  if (!mongoose.isValidObjectId(productId) || !isValidSizeValue(size) || !Number.isInteger(quantity) || quantity < 1 || quantity > 20 || !/^[a-f0-9]{32,64}$/.test(operationId || "")) {
     return res.status(400).json({ message: "Choose a valid product, size and quantity (1–20)" });
   }
   const receipts = mongoose.connection.db.collection("whatsapp_cart_operations");

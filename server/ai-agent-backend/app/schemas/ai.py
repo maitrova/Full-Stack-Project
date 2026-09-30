@@ -46,6 +46,8 @@ class IntentResult(BaseModel):
     occasion: str | None = None
     size: str | None = None
     brand: str | None = None
+    product_option: int | None = Field(default=None, ge=1, le=5)
+    wants_to_buy: bool = False
     attributes: dict[str, Any] = Field(default_factory=dict)
     confidence: float = 0.0
 

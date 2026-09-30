@@ -131,6 +131,7 @@ class SalesAgent:
             intent = self._merge_image_analysis_into_intent(intent, effective_image_analysis)
 
         updated_state = self._merge_conversation_state(conversation.get("conversation_state", {}), intent)
+        self._apply_product_option(intent.product_option, conversation, updated_state)
         if image_analysis_failed:
             updated_state.pop("last_image_analysis", None)
         if effective_image_analysis:
@@ -161,6 +162,7 @@ class SalesAgent:
                 conversation,
                 updated_state,
                 intent_action=intent.action,
+                intent_option=intent.product_option,
             )
 
         if image_analysis_failed and not presentation:
@@ -361,6 +363,10 @@ class SalesAgent:
             updated_state["option_product_ids"] = {
                 str(index): product.id for index, product in enumerate(products, start=1)
             }
+            updated_state["option_products"] = [
+                {"option": index, "name": product.name}
+                for index, product in enumerate(products, start=1)
+            ]
             updated_state["last_search"] = {
                 "category": intent.category,
                 "color": intent.color,
@@ -549,14 +555,16 @@ class SalesAgent:
         # Explicit requests for another category or filter should trigger a fresh search.
         if restart or category_changed or changed_filter:
             state.pop("purchase", None)
-            for key in ["selected_product_id", "recommended_product_ids", "pending_product_action", "last_declined_purchase", "last_search_had_results", "last_offer_type", "last_image_analysis", "last_order_id"]:
+            for key in ["selected_product_id", "recommended_product_ids", "option_product_ids", "option_products", "pending_product_action", "last_declined_purchase", "last_search_had_results", "last_offer_type", "last_image_analysis", "last_order_id"]:
                 state.pop(key, None)
             conversation["selected_product_id"] = None
             conversation["recommended_product_ids"] = []
         conversation["conversation_state"] = state
         return conversation
 
-    async def _presentation_request(self, business_id, message, conversation, state, intent_action=None):
+    async def _presentation_request(
+        self, business_id, message, conversation, state, intent_action=None, intent_option=None,
+    ):
         text = message.lower().strip()
         if text in {"thanks", "thank you", "thank you!", "thanks!", "thankyou"}:
             return "You're welcome!", [], "none"
@@ -569,8 +577,10 @@ class SalesAgent:
         options = await self._load_recommended_products(business_id, ids)
         selected = conversation.get("selected_product_id") or state.get("selected_product_id")
         # Resolve only explicit numbers/ordinals here; a bare 'one' is ambiguous.
-        match = re.fullmatch(r"[1-5]", text) or re.search(r"\b(?:option|number|product)\s*([1-5])\b", text)
-        index = int(match.group(match.lastindex or 0)) - 1 if match else None
+        match = re.fullmatch(r"[1-5]", text) or re.search(
+            r"\b(?:option(?: number)?|number|product)\s*#?\s*([1-5])\b", text,
+        )
+        index = intent_option - 1 if intent_option else (int(match.group(match.lastindex or 0)) - 1 if match else None)
         if index is None:
             for word, value in [("first", 0), ("second", 1), ("third", 2), ("fourth", 3), ("fifth", 4)]:
                 if re.search(rf"\b{word}\b", text):
@@ -582,7 +592,7 @@ class SalesAgent:
         if not action and not chosen:
             return None
         # Let stock, alternatives, variants, and order handling keep their normal routing.
-        if not action and chosen and text not in {chosen.name.lower(), str((index or 0) + 1), "first", "second", "third", "fourth", "fifth"}:
+        if not action and chosen and index is None and text != chosen.name.lower():
             return None
         if chosen is None and selected:
             chosen = await self.product_tools.get_product_details(business_id, str(selected))
@@ -747,9 +757,26 @@ class SalesAgent:
             occasion=intent.occasion or image_analysis.get("occasion"),
             size=intent.size,
             brand=intent.brand or image_analysis.get("brand"),
+            product_option=intent.product_option,
+            wants_to_buy=intent.wants_to_buy,
             attributes=attributes,
             confidence=max(intent.confidence, float(image_analysis.get("confidence") or 0.65)),
         )
+
+    @staticmethod
+    def _apply_product_option(product_option: int | None, conversation: dict, state: dict) -> None:
+        if not product_option:
+            return
+        ids = conversation.get("recommended_product_ids", []) or state.get("recommended_product_ids", [])
+        index = product_option - 1
+        if index < 0 or index >= len(ids):
+            return
+        selected = str(ids[index])
+        purchase = state.get("purchase") or {}
+        if purchase and str(purchase.get("product_id") or "") != selected:
+            state.pop("purchase", None)
+            state.pop("last_declined_purchase", None)
+        state["selected_product_id"] = selected
 
     def _resolve_reference(self, text: str, recommended_ids: list[str], selected_product_id: str | None) -> str | None:
         ordinal_matches = [
@@ -768,7 +795,10 @@ class SalesAgent:
             if re.search(rf"\b{word}\b", text) and index < len(recommended_ids):
                 return recommended_ids[index]
 
-        numeric_match = re.search(r"\b([1-5])\b", text)
+        numeric_match = (
+            re.fullmatch(r"([1-5])", text)
+            or re.search(r"\b(?:option|number|product)\s*#?\s*([1-5])\b", text)
+        )
         if numeric_match:
             index = int(numeric_match.group(1)) - 1
             if index < len(recommended_ids):
@@ -806,7 +836,9 @@ class SalesAgent:
         if color:
             filters["color"] = color
 
-        size_match = re.search(r"\b(xs|s|m|l|xl|xxl|xxxl|[5-9]|1[0-2])\b", text)
+        size_match = re.search(r"\b(xs|s|m|l|xl|xxl|xxxl)\b", text)
+        if not size_match:
+            size_match = re.search(r"\bsize\s*([5-9]|1[0-2])\b", text)
         if size_match:
             filters["size"] = size_match.group(1)
 
@@ -1038,7 +1070,7 @@ class SalesAgent:
     def _merge_conversation_state(self, current_state: dict, intent: IntentResult) -> dict:
         next_state = dict(current_state)
         for key, value in intent.model_dump().items():
-            if key in {"intent", "action", "confidence", "attributes"}:
+            if key in {"intent", "action", "confidence", "attributes", "product_option", "wants_to_buy"}:
                 continue
             if value is not None:
                 next_state[key] = value
