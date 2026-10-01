@@ -410,6 +410,7 @@ class WhatsAppService:
             await self.deliveries.update_one(
                 {"_id": message.get("id")}, {"$set": {"processing_stage": "image_agent"}}, upsert=True,
             )
+        admin_media_id = await self._store_admin_media(business, message, image_payload)
         return await self.sales_agent.handle_external_chat(
             business=business,
             message=text,
@@ -424,6 +425,7 @@ class WhatsAppService:
                 "whatsapp_type": message.get("type"),
                 "whatsapp_media_id": self._message_media_id(message),
                 "whatsapp_media_mime_type": image_payload.get("mime_type") if image_payload else None,
+                "admin_media_id": admin_media_id,
                 "whatsapp_quoted_message_id": quoted_message_id,
                 "whatsapp_quoted_product_id": quoted_product_id,
             },
@@ -475,6 +477,7 @@ class WhatsAppService:
                     "whatsapp_timestamp": message.get("timestamp"),
                     "whatsapp_type": message.get("type"),
                     "whatsapp_media_id": self._message_media_id(message),
+                    "admin_media_id": await self._store_admin_media_for_handoff(business, message),
                     "handoff_paused_ai": True,
                 },
             },
@@ -487,6 +490,51 @@ class WhatsAppService:
             )
         logger.info("Stored WhatsApp message %s without AI reply because conversation is in handoff", message.get("id"))
         return True
+
+    async def _store_admin_media_for_handoff(self, business: dict, message: dict[str, Any]) -> str | None:
+        if message.get("type") != "image":
+            return None
+        try:
+            payload = await self._message_image_payload(message)
+            return await self._store_admin_media(business, message, payload)
+        except Exception as exc:
+            logger.warning("Could not retain handoff image for admin inbox: %s", exc.__class__.__name__)
+            return None
+
+    async def _store_admin_media(
+        self,
+        business: dict,
+        message: dict[str, Any],
+        image_payload: dict[str, str] | None,
+    ) -> str | None:
+        if not image_payload or not image_payload.get("image_data"):
+            return None
+        media_id = str(message.get("id") or self._message_media_id(message) or "").strip()
+        if not media_id:
+            return None
+        try:
+            raw = base64.b64decode(image_payload["image_data"], validate=True)
+            if not raw:
+                return None
+            now = datetime.now(timezone.utc)
+            await self.deliveries.database.whatsapp_admin_media.update_one(
+                {"_id": media_id},
+                {
+                    "$set": {
+                        "business_id": business["_id"],
+                        "content_type": image_payload.get("mime_type") or "image/jpeg",
+                        "data": raw,
+                        "updated_at": now,
+                        "expires_at": now + timedelta(days=180),
+                    },
+                    "$setOnInsert": {"created_at": now},
+                },
+                upsert=True,
+            )
+            return media_id
+        except (ValueError, TypeError) as exc:
+            logger.warning("Could not retain image for admin inbox: %s", exc.__class__.__name__)
+            return None
 
     def _business_object_id(self):
         return parse_object_id(settings.whatsapp_business_id)

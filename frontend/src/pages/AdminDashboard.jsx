@@ -314,6 +314,10 @@ const AdminDashboard = () => {
   };
 
   const handleTabChange = (tab) => {
+    if (tab === 'whatsappChats') {
+      navigate('/whatsappchat');
+      return;
+    }
     if (tab === 'comboPacks') {
       navigate('/adminpage/combo-packs');
     } else if (location.pathname === '/adminpage/combo-packs') {
@@ -765,6 +769,7 @@ const AdminDashboard = () => {
 
   const sidebarItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
+    { id: 'whatsappChats', label: 'WhatsApp Chats', icon: <MessageSquareText className="w-5 h-5" /> },
     { id: 'allProducts', label: 'All Products', icon: <Package className="w-5 h-5" /> },
     { id: 'comboPacks', label: 'Combo Packs', icon: <ShoppingBag className="w-5 h-5" /> },
     { id: 'designs', label: 'Designs', icon: <Palette className="w-5 h-5" /> },

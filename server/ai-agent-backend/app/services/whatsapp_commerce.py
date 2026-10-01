@@ -175,7 +175,10 @@ class WhatsAppCommerce:
             return result("WhatsApp order updates and connected-account access are turned off. Message us again anytime to shop.")
         if action == "human_handoff" or re.search(r"\b(human|real person|speak to staff|talk to staff|agent please)\b", text):
             state["handoff_requested"] = True
-            return result("I've marked this conversation for the store team. They'll reply here when available.")
+            return result(
+                "I've shared your request with the store team. They can contact you on WhatsApp "
+                "from a team member's number when available."
+            )
         if text in {"disconnect", "unlink", "disconnect account"}:
             await self.db.whatsapp_account_links.delete_one({"_id": account})
             state.pop("purchase", None)
@@ -270,10 +273,32 @@ class WhatsAppCommerce:
         asks_price = action == "check_price" or bool(re.search(r"\b(?:price|cost|rate|how much)\b", text))
         # Customers often say "I want this" after the agent has shown one product.
         # Support common Telugu wording as well as the English purchase verbs.
-        buy = bool(getattr(intent, "wants_to_buy", False)) or action in {"add_to_cart", "confirm_cart"} or bool(re.search(
+        explicit_buy = bool(re.search(
             r"\b(add(?: it| this| the item)? to (?:the )?cart|buy|purchase|book|order|i want (?:this|that|option(?: number)?\s*[1-5])|want this|need this|idi kavali|naaku idi kavali|naku idi kavali|kavali|kaavali)\b|కావాలి|నాకు ఇది కావాలి",
             text,
         ))
+        has_search_requirements = bool(
+            intent
+            and (
+                intent.category or intent.color or intent.size or intent.brand
+                or intent.min_price is not None or intent.max_price is not None
+                or intent.occasion or intent.attributes
+            )
+        )
+        discovery_request = bool(
+            intent
+            and not explicit_buy
+            and not getattr(intent, "product_option", None)
+            and (
+                intent.intent == "product_search"
+                or (action in {None, "add_to_cart"} and has_search_requirements)
+            )
+        )
+        buy = not discovery_request and (
+            explicit_buy
+            or action in {"add_to_cart", "confirm_cart"}
+            or bool(getattr(intent, "wants_to_buy", False) and intent.intent == "commerce_action")
+        )
         purchase = state.get("purchase")
         continuing_purchase = bool(purchase)
         if action == "decline_cart" or text in {"cancel", "no", "never mind", "stop", "nahi", "వద్దు"}:

@@ -42,6 +42,7 @@ import aiPreferenceRouter from "./routes/aiPreferenceRoutes.js";
 import aiBehaviorRouter from "./routes/aiBehaviorRoutes.js";
 import aiChatRouter from "./routes/aiChatRoutes.js";
 import whatsappCommerce from "./routes/whatsappCommerce.js";
+import whatsappChatAdminRouter from "./routes/whatsappChatAdminRoutes.js";
 
 import colorselection from './routes/adminColorRoutes.js';
 import companypdfs from './routes/companyPdfRoutes.js';
@@ -156,6 +157,7 @@ app.use("/api/ai", aiBehaviorRouter);
 app.use("/api/ai", aiPreferenceRouter);
 app.use("/api/ai", aiChatRouter);
 app.use("/api/whatsapp-commerce", whatsappCommerce);
+app.use("/api/admin/whatsapp-chats", whatsappChatAdminRouter);
 // Error handling
 app.use((err, req, res, next) => {
   console.error("Server error:", err);

@@ -3,14 +3,18 @@ import logging
 import re
 import time
 from datetime import datetime, timezone
+from difflib import get_close_matches
 from types import SimpleNamespace
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+import httpx
 from fastapi import HTTPException, status
 
 from app.ai.intent_parser import IntentParser
 from app.ai.product_image_analyzer import ProductImageAnalyzer
 from app.ai.response_generator import ResponseGenerator
 from app.ai.store_knowledge import StoreKnowledge
+from app.config.settings import settings
 from app.repositories.business_repository import BusinessRepository
 from app.repositories.conversation_repository import ConversationRepository
 from app.repositories.message_repository import MessageRepository
@@ -130,7 +134,23 @@ class SalesAgent:
         if effective_image_analysis:
             intent = self._merge_image_analysis_into_intent(intent, effective_image_analysis)
 
+        customization_request = self._is_customization_request(payload.message, has_image=has_image)
+        previous_catalog_type = str(
+            (conversation.get("conversation_state", {}).get("attributes") or {}).get("catalog_type") or ""
+        ).lower()
+        explicit_catalog_type = str(intent.attributes.get("catalog_type") or "").lower()
+        continuing_customization = (
+            previous_catalog_type == "customization"
+            and intent.intent == "product_search"
+            and explicit_catalog_type not in {"readymade", "drop", "drop product"}
+        )
+        if customization_request or continuing_customization:
+            intent.intent = "product_search"
+            intent.attributes["catalog_type"] = "customization"
+            intent.wants_to_buy = False
+
         updated_state = self._merge_conversation_state(conversation.get("conversation_state", {}), intent)
+        self._remember_customer_preferences(updated_state, payload.message, intent)
         image_lookup = bool(has_image or (effective_image_analysis and (image_reference_question or image_product_choice)))
         if image_lookup:
             # A new visual enquiry must not inherit an older product selection.
@@ -150,6 +170,10 @@ class SalesAgent:
             updated_state["last_image_analysis"] = effective_image_analysis
         store_question = StoreKnowledge.is_store_question(payload.message) or intent.intent == "store_question"
         store_context = await StoreKnowledge(self.commerce.db if self.commerce else None).load(business, payload.message, include_all=intent.intent == "store_question")
+        design_library_request = (
+            intent.action == "browse_designs"
+            or self._is_design_library_request(payload.message)
+        )
         order_request = self._is_order_request(payload.message)
         follow_up = self._detect_follow_up(payload.message, conversation, updated_state)
         retry_options = self._is_retry_options_request(payload.message) and updated_state.get("last_search_had_results") is False
@@ -158,7 +182,14 @@ class SalesAgent:
         tool_calls = []
         response_goal = "answer"
         presentation = None
-        if self.commerce and not image_lookup:
+        if design_library_request and not image_lookup:
+            presentation = await self._design_library_presentation(
+                business_id,
+                payload.message,
+                conversation,
+                updated_state,
+            )
+        if self.commerce and not image_lookup and not presentation:
             presentation = await self.commerce.handle(
                 payload.message,
                 conversation,
@@ -179,7 +210,7 @@ class SalesAgent:
                 intent_option=intent.product_option,
             )
 
-        if image_analysis_failed and not presentation:
+        if image_analysis_failed and not presentation and not customization_request:
             ai_text = (
                 "Thanks for the photo. Image analysis is temporarily unavailable, "
                 "so I can't reliably identify the item yet. Tell me the product type, "
@@ -188,11 +219,11 @@ class SalesAgent:
             )
             response_goal = "report that image analysis failed without guessing what is in the image"
             tool_calls.append({"name": "analyze_product_image", "status": "failed"})
-        elif has_image and self._has_multiple_products(image_analysis) and not presentation:
+        elif has_image and self._has_multiple_products(image_analysis) and not presentation and not customization_request:
             ai_text = self._build_multiple_product_question(image_analysis)
             response_goal = "ask which pictured product the customer means"
             tool_calls.append({"name": "analyze_product_image", "status": "multiple_products"})
-        elif has_image and float(image_analysis.get("confidence") or 0) < 0.4 and not presentation:
+        elif has_image and float(image_analysis.get("confidence") or 0) < 0.4 and not presentation and not customization_request:
             product_type = image_analysis.get("product_type") or "item"
             ai_text = f"I can see a possible {product_type}, but the image isn't clear enough to match confidently. Can you send a closer crop of the product?"
             response_goal = "ask for a clearer product image because recognition confidence is low"
@@ -330,7 +361,13 @@ class SalesAgent:
                         "relaxed_summary": relaxed_summary,
                     }
                 )
-                if effective_image_analysis and not products:
+                if intent.attributes.get("catalog_type") == "customization":
+                    ai_text = self._build_customization_response(
+                        products,
+                        reference_received=bool(has_image or effective_image_analysis),
+                    )
+                    response_goal = "guide the customer from a customization request to a customizable base product"
+                elif effective_image_analysis and not products:
                     ai_text = self._build_image_no_match_response(effective_image_analysis)
                     response_goal = "clearly report that the pictured product type is not in the catalogue"
                 else:
@@ -356,7 +393,13 @@ class SalesAgent:
                         "result_count": len(products),
                     }
                 )
-                if effective_image_analysis:
+                if intent.attributes.get("catalog_type") == "customization":
+                    ai_text = self._build_customization_response(
+                        products,
+                        reference_received=bool(has_image or effective_image_analysis),
+                    )
+                    response_goal = "guide the customer from a customization request to a customizable base product"
+                elif effective_image_analysis:
                     ai_text = self._build_image_match_response(intent, products, effective_image_analysis)
                     response_goal = "recommend visually ranked catalogue products with calibrated confidence"
                 else:
@@ -370,6 +413,7 @@ class SalesAgent:
             "recommend matching products",
             "recommend visually ranked catalogue products with calibrated confidence",
             "recommend close alternatives after the exact search failed",
+            "guide the customer from a customization request to a customizable base product",
         }:
             updated_state["last_search_had_results"] = bool(products)
 
@@ -389,7 +433,7 @@ class SalesAgent:
                 "from_image": bool(effective_image_analysis),
             }
 
-        if not presentation and not image_analysis_failed:
+        if not presentation and (not image_analysis_failed or customization_request):
             ai_text = await self.response_generator.generate(
             customer_message=payload.message,
             intent=intent,
@@ -403,7 +447,7 @@ class SalesAgent:
 
         updated_state["recent_turns"] = (updated_state.get("recent_turns", []) + [
             {"customer": payload.message[:1000], "reply": ai_text[:1500]}
-        ])[-4:]
+        ])[-12:]
         ai_message = await self.message_repository.create_message(
             business_id=business_id,
             conversation_id=str(conversation["_id"]),
@@ -424,19 +468,40 @@ class SalesAgent:
             },
         )
 
+        is_customization_lead = bool(
+            customization_request
+            or continuing_customization
+            or design_library_request
+            or intent.attributes.get("catalog_type") == "customization"
+            or updated_state.get("customization_interest")
+        )
+        if is_customization_lead:
+            updated_state["customization_interest"] = True
+        conversation_updates = {
+            "status": "handoff" if updated_state.get("handoff_requested") else conversation.get("status", "open"),
+            "current_intent": intent.intent,
+            "conversation_state": updated_state,
+            "recommended_product_ids": updated_state.get("recommended_product_ids", [product.id for product in products]),
+            "selected_product_id": updated_state.get("selected_product_id"),
+            "updated_at": ai_message["created_at"],
+            "last_message_at": ai_message["created_at"],
+        }
+        if is_customization_lead:
+            conversation_updates.update({
+                "lead_type": "customization",
+                "lead_status": conversation.get("lead_status") or "new",
+                "lead_updated_at": ai_message["created_at"],
+            })
+        elif updated_state.get("handoff_requested"):
+            conversation_updates.update({
+                "lead_type": conversation.get("lead_type") or "general",
+                "lead_status": conversation.get("lead_status") or "new",
+                "lead_updated_at": ai_message["created_at"],
+            })
+
         await self.conversation_repository.collection.update_one(
             {"_id": conversation["_id"], "business_id": business["_id"]},
-            {
-                "$set": {
-                    "status": "handoff" if updated_state.get("handoff_requested") else conversation.get("status", "open"),
-                    "current_intent": intent.intent,
-                    "conversation_state": updated_state,
-                    "recommended_product_ids": updated_state.get("recommended_product_ids", [product.id for product in products]),
-                    "selected_product_id": updated_state.get("selected_product_id"),
-                    "updated_at": ai_message["created_at"],
-                    "last_message_at": ai_message["created_at"],
-                }
-            },
+            {"$set": conversation_updates},
         )
         if updated_state.get("handoff_requested"):
             await self.conversation_repository.collection.database.whatsapp_handoff_alerts.update_one(
@@ -448,6 +513,7 @@ class SalesAgent:
                         "conversation_id": conversation["_id"],
                         "customer_name": conversation.get("customer_name"),
                         "external_customer_ref": conversation.get("external_customer_ref"),
+                        "lead_type": "customization" if is_customization_lead else "general",
                         "status": "open",
                         "created_at": ai_message["created_at"],
                     },
@@ -562,9 +628,17 @@ class SalesAgent:
         explicit = self.intent_parser._parse_with_rules(message, {})
         text = message.lower().strip()
         restart = bool(re.search(r"\b(start over|new search|forget that|forget previous|something else)\b", text))
+        forget_preferences = bool(re.search(r"\b(forget (?:my |all |the )?(?:preferences|taste|history|previous)|clear (?:my )?(?:preferences|history))\b", text))
         category_changed = bool(explicit.category and explicit.category != state.get("category"))
+        previous_catalog_type = (state.get("attributes") or {}).get("catalog_type")
+        explicit_catalog_type = explicit.attributes.get("catalog_type")
         if restart or category_changed:
-            state = {"recent_turns": state.get("recent_turns", [])}
+            state = {
+                "recent_turns": state.get("recent_turns", []),
+                **({} if forget_preferences else {"customer_preferences": state.get("customer_preferences", {})}),
+            }
+            if category_changed and previous_catalog_type and not explicit_catalog_type:
+                state["attributes"] = {"catalog_type": previous_catalog_type}
         changed_filter = any(getattr(explicit, key) is not None and getattr(explicit, key) != state.get(key) for key in ["category", "color", "max_price", "occasion"])
         # Explicit requests for another category or filter should trigger a fresh search.
         if restart or category_changed or changed_filter:
@@ -634,6 +708,8 @@ class SalesAgent:
             if wants_link:
                 reply += "\n" + str(chosen.attributes.get("product_url") or "The store link is not configured yet.")
             return reply, [chosen], "gallery" if chosen.images else "none"
+        if chosen.attributes.get("customizable"):
+            return self._build_customization_selection_response(chosen), [chosen], "recommendations"
         return self._build_detail_response(chosen), [chosen], "recommendations"
 
     def _detect_follow_up(self, message: str, conversation: dict, conversation_state: dict) -> dict | None:
@@ -689,6 +765,159 @@ class SalesAgent:
             or re.search(r"\b(?:is|are)\s+(?:this|it)\s+(?:available|in stock)\b", text)
             or text in {"u have this", "u have this one", "have this", "have this one"}
         )
+
+    def _is_customization_request(self, message: str, has_image: bool = False) -> bool:
+        """Recognize natural custom-design requests without requiring exact keywords."""
+        text = self.intent_parser._normalize_text(message).strip()
+        if re.search(
+            r"\b(custom|customized|customised|customizable|customisable|customise|customize|"
+            r"customization|customisation|personalize|personalise|own design)\b",
+            text,
+        ):
+            return True
+        if re.search(
+            r"\b(?:add|put|print|upload|use)\b.{0,35}\b(?:my |our )?"
+            r"(?:image|photo|picture|logo|text|name|design)\b",
+            text,
+        ):
+            return True
+        if re.search(
+            r"\b(?:make|create|design|recreate|print)\b.{0,35}\b(?:this|that|same|similar|like this|design)\b",
+            text,
+        ):
+            return True
+        return has_image and bool(
+            re.search(r"\b(?:i |we )?(?:want|need|would like).{0,20}\b(?:like|same as)\s+(?:this|that)\b", text)
+        )
+
+    @staticmethod
+    def _is_design_library_request(message: str) -> bool:
+        text = message.lower().strip()
+        return bool(
+            re.search(
+                r"\b(?:design library|design collections?|design folders?|design templates?|"
+                r"ready designs?|available designs?|artwork library)\b",
+                text,
+            )
+            or re.search(
+                r"\b(?:what|which|show|share|send|view|browse|have|available)\b.{0,35}"
+                r"\b(?:designs?|artworks?|templates?|collections?)\b",
+                text,
+            )
+            or re.search(
+                r"\b(?:designs?|artworks?|templates?)\b.{0,35}"
+                r"\b(?:have|available|show|share|send|view|browse)\b",
+                text,
+            )
+        )
+
+    async def _design_library_presentation(
+        self,
+        business_id: str,
+        message: str,
+        conversation: dict,
+        state: dict,
+    ) -> tuple[str, list[ProductPublic], str]:
+        selected_id = conversation.get("selected_product_id") or state.get("selected_product_id")
+        base_product = None
+        if selected_id:
+            candidate = await self.product_tools.get_product_details(business_id, str(selected_id))
+            if candidate and candidate.attributes.get("customizable") and candidate.stock > 0:
+                base_product = candidate
+
+        if base_product is None:
+            custom_products = await self.product_tools.search_products(
+                ProductSearchParams(
+                    business_id=business_id,
+                    attributes={"catalog_type": "customization"},
+                    limit=5,
+                )
+            )
+            base_product = next(
+                (
+                    product
+                    for product in custom_products
+                    if product.stock > 0 and product.attributes.get("product_url")
+                ),
+                None,
+            )
+
+        base_url = base_product.attributes.get("product_url") if base_product else None
+        if not base_url:
+            origin = (settings.ecommerce_storefront_url or "").rstrip("/")
+            fallback_url = f"{origin}/customproducts" if origin.startswith("https://") else None
+            reply = "I couldn't load a product for the design library right now."
+            if fallback_url:
+                reply += f" You can browse customizable products here:\n{fallback_url}"
+            else:
+                reply += " Send 'human' and our team will help you."
+            return reply, [], "none"
+
+        folders = await self._load_design_library_folders()
+        if not folders:
+            return (
+                "Open the custom designer here, then choose Design Library to view the available designs:\n"
+                f"{base_url}",
+                [],
+                "none",
+            )
+
+        requested_folder = self._match_design_folder(message, folders)
+        if requested_folder:
+            folder_url = self._design_collection_url(base_url, requested_folder)
+            return (
+                f"Here is our {requested_folder} design collection:\n{folder_url}\n"
+                "Open it to preview a design on the product and customize it.",
+                [],
+                "none",
+            )
+
+        visible_folders = folders[:6]
+        lines = ["Here are our design collections. Open any one to view its designs:"]
+        for index, folder in enumerate(visible_folders, start=1):
+            lines.append(f"{index}. {folder}\n{self._design_collection_url(base_url, folder)}")
+        if len(folders) > len(visible_folders):
+            lines.append("Tell me the collection name if you want another one.")
+        return "\n".join(lines), [], "none"
+
+    async def _load_design_library_folders(self) -> list[str]:
+        url = settings.ecommerce_api_url.rstrip("/") + "/designuploads/folders"
+        try:
+            async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                payload = response.json()
+            folders = payload.get("folders") if isinstance(payload, dict) else []
+            return [str(folder).strip() for folder in folders or [] if str(folder).strip()]
+        except (httpx.HTTPError, OSError, ValueError) as exc:
+            logger.warning("Design library folders unavailable: %s", exc.__class__.__name__)
+            return []
+
+    @staticmethod
+    def _match_design_folder(message: str, folders: list[str]) -> str | None:
+        text = message.lower()
+        direct = next((folder for folder in folders if folder.lower() in text), None)
+        if direct:
+            return direct
+        candidate = re.sub(
+            r"\b(?:what|which|show|share|send|view|browse|have|available|designs?|artworks?|"
+            r"templates?|collections?|folders?|library|do|you|me|the|your|our)\b",
+            " ",
+            text,
+        )
+        candidate = re.sub(r"\s+", " ", candidate).strip()
+        if not candidate:
+            return None
+        normalized = {folder.lower(): folder for folder in folders}
+        match = get_close_matches(candidate, list(normalized), n=1, cutoff=0.62)
+        return normalized[match[0]] if match else None
+
+    @staticmethod
+    def _design_collection_url(base_url: str, folder: str) -> str:
+        parts = urlsplit(base_url)
+        query = dict(parse_qsl(parts.query, keep_blank_values=True))
+        query["collection"] = folder
+        return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
     def _has_multiple_products(self, image_analysis: dict) -> bool:
         try:
@@ -971,6 +1200,11 @@ class SalesAgent:
         intent: IntentResult,
         allow_other_categories: bool = True,
     ) -> tuple[list[ProductPublic], str]:
+        # Catalogue type is a hard boundary. A customization request may relax
+        # color/category details, but must never turn into ready-made results.
+        source_attributes = {}
+        if intent.attributes.get("catalog_type"):
+            source_attributes["catalog_type"] = intent.attributes["catalog_type"]
         attempts = [
             (
                 "the same category and budget, but relaxing color and occasion",
@@ -981,6 +1215,7 @@ class SalesAgent:
                     max_price=intent.max_price,
                     size=intent.size,
                     brand=intent.brand,
+                    attributes=source_attributes,
                     limit=5,
                 ),
             ),
@@ -990,6 +1225,7 @@ class SalesAgent:
                     business_id=business_id,
                     category=intent.category,
                     size=intent.size,
+                    attributes=source_attributes,
                     limit=5,
                 ),
             ),
@@ -1004,6 +1240,7 @@ class SalesAgent:
                         max_price=intent.max_price,
                         color=intent.color,
                         occasion=intent.occasion,
+                        attributes=source_attributes,
                         limit=5,
                     ),
                 )
@@ -1092,6 +1329,38 @@ class SalesAgent:
             next_state["attributes"] = {**next_state.get("attributes", {}), **intent.attributes}
         return next_state
 
+    def _remember_customer_preferences(self, state: dict, message: str, intent: IntentResult) -> None:
+        """Keep a compact durable taste profile without replaying the full chat history."""
+        if intent.intent != "product_search":
+            return
+        explicit = self.intent_parser._parse_with_rules(message, {})
+        preferences = dict(state.get("customer_preferences") or {})
+
+        def remember(key: str, value) -> None:
+            if value is None or value == "":
+                return
+            values = list(preferences.get(key) or [])
+            normalized = str(value).strip()
+            values = [item for item in values if str(item).lower() != normalized.lower()]
+            preferences[key] = ([normalized] + values)[:8]
+
+        remember("categories", explicit.category)
+        remember("colors", explicit.color)
+        remember("occasions", explicit.occasion)
+        remember("brands", explicit.brand)
+        if explicit.max_price is not None:
+            preferences["latest_budget_max"] = explicit.max_price
+        for key in ("fabric", "catalog_type"):
+            remember(f"{key}s", explicit.attributes.get(key))
+
+        # The model can recognize natural size wording that the fallback parser
+        # does not. Store it only when this message contains an explicit size cue.
+        if intent.size and re.search(r"\b(?:size|xs|s|m|l|xl|xxl|small|medium|large)\b", message.lower()):
+            remember("sizes", intent.size)
+        if preferences:
+            preferences["updated_at"] = datetime.now(timezone.utc).isoformat()
+            state["customer_preferences"] = preferences
+
     def _build_response(self, intent: IntentResult, products: list[ProductPublic]) -> str:
         if intent.intent != "product_search":
             return "I can help with products, delivery, returns, payments, or your order. What would you like to know?"
@@ -1133,6 +1402,56 @@ class SalesAgent:
             lines.append(f"{index}. {product.name} - {product.currency} {int(price)} - {stock_text}{reason}")
 
         lines.append("Want details for any one?")
+        return "\n".join(lines)
+
+    def _build_customization_response(
+        self,
+        products: list[ProductPublic],
+        reference_received: bool = False,
+    ) -> str:
+        if not products:
+            return (
+                "I can help with a custom design, but I couldn't find a customizable base product "
+                "for this request right now. Send 'human' and our team can check it with you."
+            )
+
+        if reference_received:
+            intro = (
+                "Yes, we can use this as your design reference. Choose a customizable base product below; "
+                "after you choose, I'll send its designer link."
+            )
+        else:
+            intro = (
+                "Yes, you can create your own design. Choose a base product below; after you choose, "
+                "I'll send its designer link."
+            )
+        lines = [intro]
+        for index, product in enumerate(products, start=1):
+            price = product.sale_price if product.sale_price is not None else product.price
+            colors = product.attributes.get("colors") or []
+            color_text = f" - colors: {', '.join(str(value) for value in colors[:4])}" if colors else ""
+            stock_text = "available" if product.stock > 0 else "out of stock"
+            lines.append(
+                f"{index}. {product.name} - starts at {product.currency} {int(price)} - {stock_text}{color_text}"
+            )
+        lines.append(
+            "Reply with the option number. In the designer you can choose size and color, then add your image or text."
+        )
+        return "\n".join(lines)
+
+    def _build_customization_selection_response(self, product: ProductPublic) -> str:
+        price = product.sale_price if product.sale_price is not None else product.price
+        url = product.attributes.get("product_url")
+        lines = [product.name, f"Starting price: {product.currency} {int(price)}."]
+        if product.stock <= 0:
+            lines.append("This base product is currently out of stock.")
+            return "\n".join(lines)
+        lines.append("Choose the size and color, then add your image or text in the designer.")
+        if url:
+            lines.append(str(url))
+            lines.append("If you sent a reference here, upload it again in the designer so it is attached to your product.")
+        else:
+            lines.append("The designer link is not configured yet. Send 'human' and our team will help you.")
         return "\n".join(lines)
 
     def _build_relaxed_response(self, intent: IntentResult, relaxed_summary: str, products: list[ProductPublic]) -> str:

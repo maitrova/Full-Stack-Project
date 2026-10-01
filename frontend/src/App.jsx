@@ -48,6 +48,7 @@ import BlogDetailPage from "./pages/BlogDetailPage.jsx";
 import OrderSuccessPage from "./pages/OrderSuccessPage.jsx";
 import ComboPacksPage from "./pages/ComboPacksPage.jsx";
 import ComboPackDetailPage from "./pages/ComboPackDetailPage.jsx";
+import WhatsAppChatAdmin from "./pages/WhatsAppChatAdmin.jsx";
 // You'll need to create this
 
 // Layout component with header for all pages except auth
@@ -193,6 +194,12 @@ function App() {
               <AdminDashboard />
             </AdminRoute>
           </MainLayout>
+        } />
+
+        <Route path="/whatsappchat" element={
+          <AdminRoute>
+            <WhatsAppChatAdmin />
+          </AdminRoute>
         } />
 
         <Route path="/publish-design" element={

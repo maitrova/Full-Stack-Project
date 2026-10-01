@@ -52,6 +52,7 @@ async def lifespan(app: FastAPI):
     await get_ecommerce_database().whatsapp_notification_log.create_index("sentAt", expireAfterSeconds=15552000)
     await get_ecommerce_database().whatsapp_link_rate_limits.create_index("expiresAt", expireAfterSeconds=0)
     await get_database().whatsapp_rate_limits.create_index("expires_at", expireAfterSeconds=0)
+    await get_database().whatsapp_admin_media.create_index("expires_at", expireAfterSeconds=0)
     await get_database().whatsapp_handoff_alerts.create_index([("business_id", 1), ("status", 1), ("created_at", -1)])
     await get_database().ai_agent_metrics.create_index([("business_id", 1), ("created_at", -1)])
     await get_database().ai_agent_metrics.create_index("created_at", expireAfterSeconds=15552000)
