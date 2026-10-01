@@ -134,6 +134,8 @@ app.use('/api/payment', paymentrouter);
 app.use('/api/orders',orderroutes)
 app.use('/api/cart',cartrouter);
 app.use('/api/searchproduct', searchproductroute);  
+// Keep specific admin routes before /api/admin/:id in admincontrols.js.
+app.use("/api/admin/whatsapp-chats", whatsappChatAdminRouter);
 app.use('/api/admin',adminrouter);
 app.use("/api/admin/excel-export", exportrouter);
 app.use('/api/email',emailrouter);
@@ -157,7 +159,6 @@ app.use("/api/ai", aiBehaviorRouter);
 app.use("/api/ai", aiPreferenceRouter);
 app.use("/api/ai", aiChatRouter);
 app.use("/api/whatsapp-commerce", whatsappCommerce);
-app.use("/api/admin/whatsapp-chats", whatsappChatAdminRouter);
 // Error handling
 app.use((err, req, res, next) => {
   console.error("Server error:", err);
