@@ -477,13 +477,23 @@ class EcommerceProductRepository:
         return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
 
     def _public_image_url(self, value: str) -> str | None:
+        value = value.strip()
         if value.lower().startswith(("http://", "https://")):
             return value
+
+        relative = value.lstrip("/")
+        # Customization mockups and masks live in the frontend's public folder,
+        # rather than the ecommerce API's outputs directory.
+        if relative.startswith(("mockups/", "masks/")):
+            storefront = settings.ecommerce_storefront_url
+            if not storefront or not storefront.lower().startswith(("http://", "https://")):
+                return None
+            return urljoin(storefront.rstrip("/") + "/", relative)
+
         if not settings.ecommerce_public_url:
             return None
         base = settings.ecommerce_public_url.rstrip("/")
         parts = urlsplit(base)
-        relative = value.lstrip("/")
         base_path = parts.path.strip("/")
         if base_path and relative.startswith(base_path + "/"):
             relative = relative[len(base_path) + 1:]
