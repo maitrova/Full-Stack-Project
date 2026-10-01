@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Bot,
   CheckCircle2,
+  ChevronLeft,
   Clock3,
   ExternalLink,
   Loader2,
@@ -92,6 +93,7 @@ export default function WhatsAppChatAdmin() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [leadNote, setLeadNote] = useState("");
+  const [mobilePane, setMobilePane] = useState("list");
 
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
@@ -189,19 +191,22 @@ export default function WhatsAppChatAdmin() {
   const messages = detail?.messages || [];
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
-      <header className="border-b border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-6">
+    <main className="min-h-screen bg-[#f0f2f5] text-slate-900">
+      <header className="border-b border-emerald-900/10 bg-[#075e54] px-4 py-3 text-white shadow-sm sm:px-6">
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <Link to="/adminpage" className="rounded-xl border border-slate-200 p-2 text-slate-600 hover:bg-slate-50" aria-label="Back to admin">
+            <Link to="/adminpage" className="rounded-full bg-white/10 p-2 text-white hover:bg-white/20" aria-label="Back to admin">
               <ArrowLeft className="h-5 w-5" />
             </Link>
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#075e54] shadow-sm">
+              <MessageCircle className="h-5 w-5" />
+            </span>
             <div>
               <h1 className="text-xl font-bold sm:text-2xl">WhatsApp chats</h1>
-              <p className="text-sm text-slate-500">Monitor AI conversations and manage customer leads.</p>
+              <p className="text-sm text-emerald-50/80">AI conversations and customer leads</p>
             </div>
           </div>
-          <button onClick={() => loadChats()} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50">
+          <button onClick={() => loadChats()} className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20">
             <RefreshCw className="h-4 w-4" /> Refresh
           </button>
         </div>
@@ -210,34 +215,34 @@ export default function WhatsAppChatAdmin() {
       <section className="mx-auto max-w-[1600px] p-3 sm:p-6">
         {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
-        <div className="mb-4 grid gap-3 sm:grid-cols-3">
+        <div className="mb-4 grid grid-cols-3 gap-2 sm:gap-3">
           {[
             ["all", "All chats", stats.all, MessageCircle],
             ["customization", "Customization leads", stats.customization, Paintbrush],
             ["handoff", "Team requested", stats.handoff, Users],
           ].map(([id, label, count, Icon]) => (
-            <button key={id} onClick={() => setActiveView(id)} className={`flex items-center justify-between rounded-2xl border p-4 text-left transition ${activeView === id ? "border-emerald-500 bg-emerald-50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}>
-              <span className="flex items-center gap-3"><Icon className="h-5 w-5" /><span className="font-semibold">{label}</span></span>
+            <button key={id} onClick={() => { setActiveView(id); setMobilePane("list"); }} className={`flex min-w-0 items-center justify-between rounded-xl border p-2.5 text-left transition sm:rounded-2xl sm:p-4 ${activeView === id ? "border-[#25d366] bg-emerald-50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}>
+              <span className="flex min-w-0 items-center gap-2 sm:gap-3"><Icon className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /><span className="truncate text-xs font-semibold sm:text-base">{label}</span></span>
               <span className="rounded-full bg-white px-2.5 py-1 text-sm font-bold shadow-sm">{count}</span>
             </button>
           ))}
         </div>
 
-        <div className="grid min-h-[720px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:grid-cols-[360px_minmax(0,1fr)_300px]">
-          <aside className="border-b border-slate-200 lg:border-b-0 lg:border-r">
-            <div className="border-b border-slate-200 p-3">
-              <label className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2">
+        <div className="grid min-h-[720px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.08)] lg:h-[calc(100vh-190px)] lg:min-h-[620px] lg:grid-cols-[340px_minmax(0,1fr)_290px]">
+          <aside className={`${mobilePane === "chat" ? "hidden" : "block"} border-b border-slate-200 bg-white lg:block lg:border-b-0 lg:border-r`}>
+            <div className="border-b border-slate-100 bg-[#f0f2f5] p-3">
+              <label className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 shadow-sm">
                 <Search className="h-4 w-4 text-slate-400" />
                 <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full bg-transparent text-sm outline-none" placeholder="Search name, number, or message" />
               </label>
             </div>
-            <div className="max-h-[660px] overflow-y-auto">
+            <div className="max-h-[660px] overflow-y-auto lg:h-[calc(100%-57px)] lg:max-h-none">
               {loading ? (
                 <div className="flex items-center justify-center gap-2 p-8 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading chats</div>
               ) : filtered.length === 0 ? (
                 <p className="p-8 text-center text-sm text-slate-500">No chats in this view.</p>
               ) : filtered.map((item) => (
-                <button key={item._id} onClick={() => setSelectedId(item._id)} className={`w-full border-b border-slate-100 p-4 text-left transition hover:bg-slate-50 ${selectedId === item._id ? "bg-emerald-50" : ""}`}>
+                <button key={item._id} onClick={() => { setSelectedId(item._id); setMobilePane("chat"); }} className={`w-full border-b border-slate-100 p-4 text-left transition hover:bg-slate-50 ${selectedId === item._id ? "bg-[#f0f2f5]" : ""}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate font-semibold">{item.customer_name || phoneLabel(item.external_customer_ref)}</p>
@@ -256,24 +261,39 @@ export default function WhatsAppChatAdmin() {
             </div>
           </aside>
 
-          <section className="flex min-h-[620px] flex-col bg-[#efeae2]">
+          <section
+            className={`${mobilePane === "list" ? "hidden" : "flex"} min-h-[620px] flex-col lg:flex`}
+            style={{
+              backgroundColor: "#efeae2",
+              backgroundImage: "radial-gradient(circle at 12px 12px, rgba(17,94,89,.055) 1.5px, transparent 1.5px)",
+              backgroundSize: "24px 24px",
+            }}
+          >
             {!selectedId ? (
               <div className="m-auto text-center text-slate-500"><MessageCircle className="mx-auto mb-3 h-10 w-10" /><p>Select a conversation.</p></div>
             ) : detailLoading && !detail ? (
               <div className="m-auto flex items-center gap-2 text-slate-500"><Loader2 className="h-5 w-5 animate-spin" /> Loading conversation</div>
             ) : (
               <>
-                <div className="border-b border-slate-200 bg-white px-4 py-3">
-                  <p className="font-semibold">{selectedConversation?.customer_name || phoneLabel(selectedConversation?.external_customer_ref)}</p>
-                  <p className="text-xs text-slate-500">{phoneLabel(selectedConversation?.external_customer_ref)} · AI {selectedConversation?.status === "handoff" ? "paused for team" : selectedConversation?.status || "open"}</p>
+                <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-slate-200 bg-[#f0f2f5] px-3 py-2.5 sm:px-4">
+                  <button onClick={() => setMobilePane("list")} className="rounded-full p-1.5 text-slate-600 hover:bg-slate-200 lg:hidden" aria-label="Back to conversations">
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#d9fdd3] font-bold text-[#075e54]">
+                    {(selectedConversation?.customer_name || "C").slice(0, 1).toUpperCase()}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{selectedConversation?.customer_name || phoneLabel(selectedConversation?.external_customer_ref)}</p>
+                    <p className="truncate text-xs text-slate-500">{phoneLabel(selectedConversation?.external_customer_ref)} · AI {selectedConversation?.status === "handoff" ? "paused for team" : selectedConversation?.status || "open"}</p>
+                  </div>
                 </div>
-                <div className="flex-1 space-y-3 overflow-y-auto p-4">
+                <div className="flex-1 space-y-2 overflow-y-auto p-3 sm:p-5">
                   {messages.map((message) => {
                     const customer = message.sender === "customer";
                     const human = message.sender === "human";
                     return (
                       <div key={message._id} className={`flex ${customer ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[85%] rounded-2xl px-3 py-2 shadow-sm ${customer ? "rounded-br-sm bg-[#d9fdd3]" : human ? "rounded-bl-sm bg-amber-50" : "rounded-bl-sm bg-white"}`}>
+                        <div className={`max-w-[88%] rounded-lg px-3 py-2 shadow-[0_1px_2px_rgba(15,23,42,.12)] sm:max-w-[78%] ${customer ? "rounded-tr-none bg-[#d9fdd3]" : human ? "rounded-tl-none border border-amber-200 bg-amber-50" : "rounded-tl-none bg-white"}`}>
                           <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
                             {customer ? <UserRound className="h-3 w-3" /> : human ? <Users className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
                             {customer ? "Customer" : human ? "Team" : "AI"}
@@ -292,7 +312,7 @@ export default function WhatsAppChatAdmin() {
             )}
           </section>
 
-          <aside className="border-t border-slate-200 p-4 lg:border-l lg:border-t-0">
+          <aside className={`${mobilePane === "list" ? "hidden" : "block"} border-t border-slate-200 bg-white p-4 lg:block lg:overflow-y-auto lg:border-l lg:border-t-0`}>
             {selectedConversation ? (
               <div className="space-y-5">
                 <div>

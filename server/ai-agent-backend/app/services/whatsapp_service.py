@@ -3,6 +3,7 @@ import base64
 import hashlib
 import io
 import logging
+import re
 import traceback
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -67,6 +68,84 @@ class WhatsAppClient:
                 response.raise_for_status()
             except httpx.HTTPStatusError:
                 logger.error("WhatsApp send failed: %s", response.text)
+                raise
+            return response.json()
+
+    async def send_reply_buttons(
+        self,
+        to: str,
+        body: str,
+        titles: list[str],
+        reply_to_message_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        if not self.is_configured:
+            return None
+        buttons = [
+            {
+                "type": "reply",
+                "reply": {"id": f"reply_{index}", "title": str(title)[:20]},
+            }
+            for index, title in enumerate(titles[:3], start=1)
+        ]
+        payload: dict[str, Any] = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to,
+            "type": "interactive",
+            "interactive": {
+                "type": "button",
+                "body": {"text": body[:1024]},
+                "action": {"buttons": buttons},
+            },
+        }
+        if reply_to_message_id:
+            payload["context"] = {"message_id": reply_to_message_id}
+        return await self._send_message_payload(payload)
+
+    async def send_option_list(
+        self,
+        to: str,
+        body: str,
+        products: list[Any],
+        reply_to_message_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        if not self.is_configured:
+            return None
+        rows = [
+            {
+                "id": f"option_{index}",
+                "title": f"Option {index}",
+                "description": str(product.name)[:72],
+            }
+            for index, product in enumerate(products[:5], start=1)
+        ]
+        payload: dict[str, Any] = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to,
+            "type": "interactive",
+            "interactive": {
+                "type": "list",
+                "body": {"text": body[:1024]},
+                "action": {
+                    "button": "Choose product",
+                    "sections": [{"title": "Available options", "rows": rows}],
+                },
+            },
+        }
+        if reply_to_message_id:
+            payload["context"] = {"message_id": reply_to_message_id}
+        return await self._send_message_payload(payload)
+
+    async def _send_message_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        url = f"https://graph.facebook.com/{self.graph_api_version}/{self.phone_number_id}/messages"
+        headers = {"Authorization": f"Bearer {self.access_token}", "Content-Type": "application/json"}
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.post(url, json=payload, headers=headers)
+            try:
+                response.raise_for_status()
+            except httpx.HTTPStatusError:
+                logger.error("WhatsApp interactive send failed: %s", response.text)
                 raise
             return response.json()
 
@@ -564,20 +643,45 @@ class WhatsAppService:
     async def _deliver(self, to, message_id, response):
         delivery = await self.deliveries.find_one({"_id": message_id}) or {}
         if not delivery.get("text_sent"):
-            sent = await self.client.send_text(to, response.ai_message.content, message_id)
+            sent, outbound_kind = await self._send_primary_response(to, message_id, response)
             if not sent:
                 raise RuntimeError("WhatsApp sender is not configured")
             await self._remember_outbound_context(
                 sent,
                 to,
                 self._product_ids_mentioned(response),
-                "text",
+                outbound_kind,
             )
             await self.deliveries.update_one({"_id": message_id}, {"$set": {"text_sent": True}})
         mode = response.ai_message.metadata.get("media_mode", "recommendations")
         if mode != "none":
             await self._send_recommended_product_images(to, response.recommended_products, gallery=mode == "gallery", delivery_id=message_id)
         await self.deliveries.update_one({"_id": message_id}, {"$set": {"complete": True}})
+
+    async def _send_primary_response(self, to: str, message_id: str, response) -> tuple[dict | None, str]:
+        body = response.ai_message.content
+        products = response.recommended_products
+        state = response.conversation.conversation_state or {}
+        try:
+            if len(body) <= 1024 and state.get("purchase") and re.search(
+                r"\b(?:would you like me to add|add it to your cart|confirm)\b",
+                body.lower(),
+            ):
+                return await self.client.send_reply_buttons(to, body, ["Yes, add it", "No"], message_id), "buttons"
+            if len(body) <= 1024 and 2 <= len(products) <= 3 and re.search(
+                r"\b(?:option|choose|which one|reply with)\b",
+                body.lower(),
+            ):
+                titles = [f"Option {index}" for index in range(1, len(products) + 1)]
+                return await self.client.send_reply_buttons(to, body, titles, message_id), "buttons"
+            if len(body) <= 1024 and 4 <= len(products) <= 5 and re.search(
+                r"\b(?:option|choose|which one|reply with)\b",
+                body.lower(),
+            ):
+                return await self.client.send_option_list(to, body, products, message_id), "list"
+        except httpx.HTTPStatusError:
+            logger.warning("Interactive WhatsApp reply failed; falling back to text")
+        return await self.client.send_text(to, body, message_id), "text"
 
     def _message_text(self, message: dict[str, Any]) -> str | None:
         message_type = message.get("type")
