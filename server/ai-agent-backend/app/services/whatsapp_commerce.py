@@ -326,7 +326,7 @@ class WhatsAppCommerce:
                 return result("Show me which two products you'd like to compare first.")
             return result("\n".join(f"{p.name}: {p.currency} {p.sale_price if p.sale_price is not None else p.price:g}; sizes {', '.join(p.attributes.get('sizes', [])) or 'none in stock'}; {p.stock} left." for p in products))
         product_fact_request = self._requested_product_fact(text)
-        if not state.get("purchase") and (
+        if (
             action in {"show_sizes", "check_stock"}
             or product_fact_request
             or (
@@ -334,7 +334,12 @@ class WhatsAppCommerce:
                 and not re.search(r"\b(buy|cart|order|purchase)\b", text)
             )
         ):
-            selected = state.get("selected_product_id") or conversation.get("selected_product_id")
+            pending_product = state.get("purchase") or {}
+            selected = (
+                pending_product.get("product_id")
+                or state.get("selected_product_id")
+                or conversation.get("selected_product_id")
+            )
             if selected:
                 product = await product_tools.get_product_details(business_id, str(selected))
                 if product and re.search(r"\b(customize|customise|customization)\b", text):
@@ -356,6 +361,13 @@ class WhatsAppCommerce:
                     return result(product.name + "\n" + "\n".join(f"{v['size']}: {v['stock']} available, {product.currency} {v['effective_price']:g}" for v in variants), [product])
                 if product and product_fact_request:
                     return result(self._product_fact_reply(product, product_fact_request), [product])
+        if state.get("purchase") and (
+            action in {"product_photos", "product_link"}
+            or re.search(r"\b(?:details?|tell me more|more about|show me more)\b", text)
+        ):
+            # Product information can interrupt a pending cart quote. The
+            # sales-agent follow-up branch answers it without discarding the quote.
+            return None
         # A policy question must not advance an unfinished purchase.
         if StoreKnowledge.is_store_question(message):
             return None
@@ -404,7 +416,7 @@ class WhatsAppCommerce:
                 state.pop("last_declined_purchase", None)
             state.pop("purchase", None)
             return result("Okay, I haven't added anything to your cart.")
-        if asks_price and not buy and not purchase:
+        if asks_price and not buy:
             product_id = self._referenced_product_id(text, conversation, state)
             previous_purchase = state.get("last_checkout_purchase") or {}
             product_id = product_id or previous_purchase.get("product_id")

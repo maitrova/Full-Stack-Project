@@ -60,7 +60,7 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
     def test_shirt_category_does_not_match_tshirts_or_sweatshirts(self):
         repo = EcommerceProductRepository.__new__(EcommerceProductRepository)
         formal_shirt = product(
-            name="White Cotton Formal Shirt",
+            name="White Cotton Checks Formal Shirt",
             category="Men Shirts",
         ).model_dump(by_alias=True)
         tshirt = product(
@@ -76,6 +76,10 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(repo._matches(tshirt, {"category": "shirt", "attributes": {}}))
         self.assertFalse(repo._matches(sweatshirt, {"category": "shirt", "attributes": {}}))
         self.assertTrue(repo._matches(tshirt, {"category": "t-shirt", "attributes": {}}))
+        self.assertTrue(repo._matches(
+            formal_shirt,
+            {"category": "shirt", "attributes": {"pattern": "checked"}},
+        ))
 
     def test_catalogue_copy_exposes_verified_product_facts(self):
         repo = EcommerceProductRepository.__new__(EcommerceProductRepository)
@@ -139,6 +143,45 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
         parser = IntentParser(SimpleNamespace(is_configured=False))
         self.assertEqual(parser._parse_with_rules("I need white shirts", {}).category, "shirt")
         self.assertEqual(parser._parse_with_rules("I need white t-shirts", {}).category, "t-shirt")
+
+    def test_check_shirt_request_extracts_pattern_filter(self):
+        parser = IntentParser(SimpleNamespace(is_configured=False))
+        intent = parser._parse_with_rules("I want check shirts", {})
+
+        self.assertEqual(intent.category, "shirt")
+        self.assertEqual(intent.attributes["pattern"], "check")
+
+    async def test_model_cannot_turn_category_discovery_into_cart_action(self):
+        client = SimpleNamespace(
+            is_configured=True,
+            generate_text=AsyncMock(return_value=(
+                '{"intent":"commerce_action","action":"add_to_cart","category":"shirt",'
+                '"wants_to_buy":true,"attributes":{},"confidence":0.9}'
+            )),
+        )
+        parser = IntentParser(client)
+
+        intent = await parser.parse("I want check shirts", {})
+
+        self.assertEqual(intent.intent, "product_search")
+        self.assertIsNone(intent.action)
+        self.assertFalse(intent.wants_to_buy)
+        self.assertEqual(intent.attributes["pattern"], "check")
+
+    async def test_inherited_category_does_not_turn_details_into_new_search(self):
+        client = SimpleNamespace(
+            is_configured=True,
+            generate_text=AsyncMock(return_value=(
+                '{"intent":"general_question","action":null,"category":null,'
+                '"wants_to_buy":false,"attributes":{},"confidence":0.9}'
+            )),
+        )
+        parser = IntentParser(client)
+
+        intent = await parser.parse("Show me the details", {"category": "shirt"})
+
+        self.assertEqual(intent.intent, "general_question")
+        self.assertIsNone(intent.action)
 
     def test_natural_language_is_mapped_to_safe_commerce_actions(self):
         parser = IntentParser(SimpleNamespace(is_configured=False))

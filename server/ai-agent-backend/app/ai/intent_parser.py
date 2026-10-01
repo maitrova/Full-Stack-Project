@@ -22,6 +22,25 @@ class IntentParser:
                 intent.language = language_info["language"]
                 intent.script = language_info["script"]
                 normalized = self._normalize_text(message)
+                # Parse without stored filters when deciding whether this turn
+                # explicitly starts a new search. Inherited category context
+                # must not turn "show details" into another browse request.
+                rule_intent = self._parse_with_rules(message, {})
+                explicit_discovery = bool(
+                    rule_intent.intent == "product_search"
+                    and not re.search(r"\b(?:this|that|it|option|product)\b", normalized)
+                )
+                if explicit_discovery:
+                    # A category/filter request is browsing even if the model
+                    # occasionally interprets "I want" as an immediate cart action.
+                    intent.intent = "product_search"
+                    intent.action = None
+                    intent.wants_to_buy = False
+                    for key in ("category", "color", "min_price", "max_price", "occasion", "size", "brand"):
+                        rule_value = getattr(rule_intent, key)
+                        if rule_value is not None:
+                            setattr(intent, key, rule_value)
+                    intent.attributes = {**intent.attributes, **rule_intent.attributes}
                 pending_purchase = bool(conversation_state.get("purchase"))
                 simple_number = bool(re.fullmatch(r"\s*(?:[1-5]|one|two|three|four|five)\s*", normalized))
                 if pending_purchase and simple_number:
@@ -31,7 +50,7 @@ class IntentParser:
                         normalized,
                         allow_bare_cardinal=bool(conversation_state.get("recommended_product_ids")),
                     )
-                if not intent.wants_to_buy:
+                if not intent.wants_to_buy and not explicit_discovery:
                     intent.wants_to_buy = self._detect_purchase_interest(normalized, intent.action)
                 intent.category = self._normalize_category(intent.category)
                 return intent
@@ -233,6 +252,16 @@ Customer message:
         )
         if fabric:
             attributes["fabric"] = fabric
+
+        pattern = self._first_match(
+            text,
+            [
+                "acid wash", "graphic printed", "typography", "checkered", "checked",
+                "checks", "check", "striped", "solid", "plain", "printed",
+            ],
+        )
+        if pattern:
+            attributes["pattern"] = "check" if pattern in {"check", "checks", "checked", "checkered"} else pattern
 
         if re.search(
             r"\b(custom|customized|customised|customizable|customisable|customise|customize|"

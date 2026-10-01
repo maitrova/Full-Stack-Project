@@ -467,8 +467,13 @@ class EcommerceProductRepository:
         size = str(filters.get("size") or "").strip().upper()
         if size and size not in product.get("attributes", {}).get("sizes", []):
             return False
-        for value in (filters.get("attributes") or {}).values():
-            if value and str(value).lower() not in searchable:
+        for key, value in (filters.get("attributes") or {}).items():
+            normalized_value = str(value or "").lower()
+            if key == "pattern" and normalized_value in {"check", "checks", "checked", "checkered"}:
+                if not re.search(r"\bcheck(?:s|ed|ered)?\b", searchable):
+                    return False
+                continue
+            if value and normalized_value not in searchable:
                 return False
         price = self._display_price(product)
         if filters.get("min_price") is not None and price < float(filters["min_price"]):

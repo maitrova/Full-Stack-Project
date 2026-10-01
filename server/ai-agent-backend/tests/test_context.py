@@ -23,6 +23,24 @@ class ContextTests(unittest.TestCase):
         result = self.agent._prepare_context(self.old, "send its link")
         self.assertEqual(result["selected_product_id"], "old")
 
+    def test_explicit_same_category_search_clears_pending_purchase(self):
+        conversation = {
+            "selected_product_id": "old-shirt",
+            "recommended_product_ids": ["old-shirt"],
+            "conversation_state": {
+                "category": "shirt",
+                "selected_product_id": "old-shirt",
+                "recommended_product_ids": ["old-shirt"],
+                "purchase": {"product_id": "old-shirt", "size": "S", "quantity": 1},
+            },
+        }
+
+        result = self.agent._prepare_context(conversation, "I want check shirts")
+
+        self.assertIsNone(result["selected_product_id"])
+        self.assertNotIn("purchase", result["conversation_state"])
+        self.assertNotIn("recommended_product_ids", result["conversation_state"])
+
     def test_no_substring_reference(self):
         self.assertIsNone(self.agent._resolve_reference("white shirts", ["old"], "old"))
         self.assertIsNone(self.agent._resolve_reference("another one", ["old", "new"], None))

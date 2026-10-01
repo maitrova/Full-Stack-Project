@@ -106,6 +106,31 @@ class StoreAnswerTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("is listed as Cotton", response[0])
 
+    async def test_details_interrupt_pending_cart_quote_without_repeating_it(self):
+        commerce = WhatsAppCommerce(SimpleNamespace())
+        state = {
+            "selected_product_id": "shirt",
+            "purchase": {
+                "product_id": "shirt",
+                "size": "S",
+                "quantity": 1,
+                "confirmed_quote": 899,
+            },
+        }
+        tools = SimpleNamespace(get_product_details=AsyncMock())
+
+        response = await commerce.handle(
+            "Show me the details",
+            {"selected_product_id": "shirt", "external_customer_ref": "919999999999"},
+            state,
+            tools,
+            "business",
+        )
+
+        self.assertIsNone(response)
+        self.assertEqual(state["purchase"]["product_id"], "shirt")
+        tools.get_product_details.assert_not_awaited()
+
     async def test_customer_can_accept_same_in_stock_cart_quote_after_saying_no(self):
         product = SimpleNamespace(
             id="shirt",

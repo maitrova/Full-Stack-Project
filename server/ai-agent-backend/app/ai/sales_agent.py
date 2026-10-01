@@ -675,18 +675,22 @@ class SalesAgent:
         restart = bool(re.search(r"\b(start over|new search|forget that|forget previous|something else)\b", text))
         forget_preferences = bool(re.search(r"\b(forget (?:my |all |the )?(?:preferences|taste|history|previous)|clear (?:my )?(?:preferences|history))\b", text))
         category_changed = bool(explicit.category and explicit.category != state.get("category"))
+        explicit_category_search = bool(
+            explicit.category
+            and not re.search(r"\b(?:this|that|it|option|product)\b", text)
+        )
         previous_catalog_type = (state.get("attributes") or {}).get("catalog_type")
         explicit_catalog_type = explicit.attributes.get("catalog_type")
-        if restart or category_changed:
+        if restart or category_changed or explicit_category_search:
             state = {
                 "recent_turns": state.get("recent_turns", []),
                 **({} if forget_preferences else {"customer_preferences": state.get("customer_preferences", {})}),
             }
-            if category_changed and previous_catalog_type and not explicit_catalog_type:
+            if (category_changed or explicit_category_search) and previous_catalog_type and not explicit_catalog_type:
                 state["attributes"] = {"catalog_type": previous_catalog_type}
         changed_filter = any(getattr(explicit, key) is not None and getattr(explicit, key) != state.get(key) for key in ["category", "color", "max_price", "occasion"])
         # Explicit requests for another category or filter should trigger a fresh search.
-        if restart or category_changed or changed_filter:
+        if restart or category_changed or explicit_category_search or changed_filter:
             state.pop("purchase", None)
             for key in ["selected_product_id", "recommended_product_ids", "option_product_ids", "option_products", "pending_product_action", "last_declined_purchase", "last_search_had_results", "last_offer_type", "last_image_analysis", "last_order_id"]:
                 state.pop(key, None)
