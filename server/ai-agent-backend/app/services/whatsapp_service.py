@@ -24,6 +24,7 @@ from app.repositories.message_repository import MessageRepository
 from app.repositories.ecommerce_product_repository import EcommerceProductRepository
 from app.tools.product_tools import ProductTools
 from app.services.whatsapp_commerce import WhatsAppCommerce
+from app.services.remote_media import fetch_remote_image
 from app.schemas.ai import AiChatResponse
 from app.utils.object_id import parse_object_id
 
@@ -214,12 +215,8 @@ class WhatsAppClient:
         return await self._upload_image_bytes(path.read_bytes(), path.stem)
 
     async def _upload_remote_image(self, image_url: str) -> str:
-        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
-            response = await client.get(image_url)
-            response.raise_for_status()
-            if len(response.content) > 10 * 1024 * 1024:
-                raise ValueError("Catalogue image is too large for WhatsApp conversion")
-        return await self._upload_image_bytes(response.content, Path(urlsplit(image_url).path).stem)
+        content, _, final_url = await fetch_remote_image(image_url)
+        return await self._upload_image_bytes(content, Path(urlsplit(final_url).path).stem)
 
     async def _upload_image_bytes(self, source_bytes: bytes, filename: str) -> str:
         with Image.open(io.BytesIO(source_bytes)) as source:
@@ -358,6 +355,20 @@ class WhatsAppService:
                     if whatsapp_message_id and await self._message_already_processed(whatsapp_message_id):
                         logger.info("Skipping duplicate WhatsApp message %s", whatsapp_message_id)
                         continue
+                    if whatsapp_message_id:
+                        await self.deliveries.update_one(
+                            {"_id": whatsapp_message_id},
+                            {
+                                "$set": {"updated_at": datetime.now(timezone.utc)},
+                                "$setOnInsert": {
+                                    "business_id": business["_id"],
+                                    "inbound_messages": 1,
+                                    "outbound_messages": 0,
+                                    "created_at": datetime.now(timezone.utc),
+                                },
+                            },
+                            upsert=True,
+                        )
 
                     # Every genuine inbound message opens/refreshes Meta's 24-hour
                     # customer-service window for built-in transactional text.
@@ -377,7 +388,7 @@ class WhatsAppService:
                         if whatsapp_message_id:
                             await self.deliveries.update_one(
                                 {"_id": whatsapp_message_id},
-                                {"$set": {"complete": True, "rate_limited": True}},
+                                {"$set": {"complete": True, "rate_limited": True}, "$inc": {"outbound_messages": 1}},
                                 upsert=True,
                             )
                         processed += 1
@@ -453,7 +464,7 @@ class WhatsAppService:
         if not sent:
             raise RuntimeError("WhatsApp sender is not configured")
         await self.deliveries.update_one(
-            {"_id": message_id}, {"$set": {"image_ack_sent": True}}, upsert=True,
+            {"_id": message_id}, {"$set": {"image_ack_sent": True}, "$inc": {"outbound_messages": 1}}, upsert=True,
         )
 
     async def _send_image_failure(self, to: str, message_id: str, error_type: str) -> None:
@@ -467,7 +478,7 @@ class WhatsAppService:
             raise RuntimeError("WhatsApp sender is not configured")
         await self.deliveries.update_one(
             {"_id": message_id},
-            {"$set": {"complete": True, "text_sent": True, "processing_error": error_type}},
+            {"$set": {"complete": True, "text_sent": True, "processing_error": error_type}, "$inc": {"outbound_messages": 1}},
             upsert=True,
         )
 
@@ -652,7 +663,10 @@ class WhatsAppService:
                 self._product_ids_mentioned(response),
                 outbound_kind,
             )
-            await self.deliveries.update_one({"_id": message_id}, {"$set": {"text_sent": True}})
+            await self.deliveries.update_one(
+                {"_id": message_id},
+                {"$set": {"text_sent": True}, "$inc": {"outbound_messages": 1}},
+            )
         mode = response.ai_message.metadata.get("media_mode", "recommendations")
         if mode != "none":
             await self._send_recommended_product_images(to, response.recommended_products, gallery=mode == "gallery", delivery_id=message_id)
@@ -786,7 +800,10 @@ class WhatsAppService:
                         raise RuntimeError("WhatsApp sender is not configured")
                     await self._remember_outbound_context(sent_response, to, [str(product.id)], "product_image")
                     if delivery_id:
-                        await self.deliveries.update_one({"_id": delivery_id}, {"$addToSet": {"sent_images": image_url}})
+                        await self.deliveries.update_one(
+                            {"_id": delivery_id},
+                            {"$addToSet": {"sent_images": image_url}, "$inc": {"outbound_messages": 1}},
+                        )
                     sent += 1
                     seen_image_urls.add(image_url)
                 except Exception as exc:

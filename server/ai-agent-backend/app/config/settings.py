@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     ecommerce_outputs_path: str | None = None
     ecommerce_storefront_url: str | None = None
     ecommerce_api_url: str = "http://127.0.0.1:5000/api"
+    remote_image_allowed_hosts: str = ""
+    remote_image_max_bytes: int = 10 * 1024 * 1024
     whatsapp_commerce_key: str | None = None
     whatsapp_app_secret: str | None = None
 
@@ -36,6 +38,14 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-3.1-flash-lite"
     gemini_embedding_model: str = "gemini-embedding-2"
     gemini_embedding_dimensions: int = 768
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-4.1-mini"
+    merchant_prompt_version: str = "2026-10-01"
+    merchant_prompt_instructions: str = ""
+    gemini_input_cost_per_million: float = 0.0
+    gemini_output_cost_per_million: float = 0.0
+    openai_input_cost_per_million: float = 0.0
+    openai_output_cost_per_million: float = 0.0
     catalogue_index_batch_size: int = 10
     catalogue_index_interval_seconds: int = 60
 

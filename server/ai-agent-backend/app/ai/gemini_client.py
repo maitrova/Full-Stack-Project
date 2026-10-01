@@ -6,6 +6,8 @@ from typing import Any
 import httpx
 
 from app.config.settings import settings
+from app.services.remote_media import fetch_remote_image
+from app.ai.usage import record_usage
 
 logger = logging.getLogger(__name__)
 
@@ -22,13 +24,23 @@ class GeminiClient:
 
     @property
     def is_configured(self) -> bool:
+        return bool(self.api_key or settings.openai_api_key)
+
+    @property
+    def supports_embeddings(self) -> bool:
         return bool(self.api_key)
 
     async def generate_text(self, prompt: str) -> str:
-        if not self.api_key:
-            raise RuntimeError("Gemini API key is not configured")
-
-        return await self._create_interaction(prompt, "text")
+        if self.api_key:
+            try:
+                return await self._create_interaction(prompt, "text")
+            except Exception as exc:
+                if not settings.openai_api_key:
+                    raise
+                logger.warning("Gemini text unavailable; trying secondary provider: %s", exc.__class__.__name__)
+        if settings.openai_api_key:
+            return await self._create_openai_response(prompt, "text")
+        raise RuntimeError("No AI provider is configured")
 
     async def generate_with_image(
         self,
@@ -37,8 +49,6 @@ class GeminiClient:
         image_data: str | None = None,
         mime_type: str | None = None,
     ) -> str:
-        if not self.api_key:
-            raise RuntimeError("Gemini API key is not configured")
         if not image_url and not image_data:
             raise ValueError("image_url or image_data is required")
 
@@ -46,13 +56,27 @@ class GeminiClient:
             image_url, image_data, mime_type
         )
 
-        return await self._create_interaction(
-            [
-                {"type": "text", "text": prompt},
-                {"type": "image", "mime_type": resolved_mime_type, "data": resolved_image_data},
-            ],
-            "vision",
-        )
+        gemini_input = [
+            {"type": "text", "text": prompt},
+            {"type": "image", "mime_type": resolved_mime_type, "data": resolved_image_data},
+        ]
+        if self.api_key:
+            try:
+                return await self._create_interaction(gemini_input, "vision")
+            except Exception as exc:
+                if not settings.openai_api_key:
+                    raise
+                logger.warning("Gemini vision unavailable; trying secondary provider: %s", exc.__class__.__name__)
+        if settings.openai_api_key:
+            openai_input = [{
+                "role": "user",
+                "content": [
+                    {"type": "input_text", "text": prompt},
+                    {"type": "input_image", "image_url": f"data:{resolved_mime_type};base64,{resolved_image_data}"},
+                ],
+            }]
+            return await self._create_openai_response(openai_input, "vision")
+        raise RuntimeError("No AI provider is configured")
 
     async def _create_interaction(self, input_data: str | list[dict[str, Any]], operation: str) -> str:
         """Use Google's current stateless API for text and multimodal understanding."""
@@ -85,6 +109,7 @@ class GeminiClient:
             self._log_api_error(response, operation, model)
         response.raise_for_status()
         data = response.json()
+        record_usage("gemini", model, operation, data.get("usage") or data.get("usageMetadata"))
         text = data.get("output_text") or "".join(
             content.get("text", "")
             for step in data.get("steps", [])
@@ -95,6 +120,30 @@ class GeminiClient:
         if not isinstance(text, str) or not text.strip():
             logger.warning("Unexpected Gemini %s interaction response shape", operation)
             raise RuntimeError(f"Invalid Gemini {operation} response")
+        return text.strip()
+
+    async def _create_openai_response(self, input_data: Any, operation: str) -> str:
+        payload = {"model": settings.openai_model, "input": input_data, "store": False}
+        async with httpx.AsyncClient(timeout=60) as client:
+            response = await client.post(
+                "https://api.openai.com/v1/responses",
+                headers={"Authorization": f"Bearer {settings.openai_api_key}", "Content-Type": "application/json"},
+                json=payload,
+            )
+        if response.is_error:
+            logger.warning("Secondary AI provider %s request rejected: HTTP %s", operation, response.status_code)
+        response.raise_for_status()
+        data = response.json()
+        record_usage("openai", settings.openai_model, operation, data.get("usage"))
+        text = data.get("output_text") or "".join(
+            content.get("text", "")
+            for item in data.get("output", [])
+            if item.get("type") == "message"
+            for content in item.get("content", [])
+            if content.get("type") == "output_text"
+        )
+        if not isinstance(text, str) or not text.strip():
+            raise RuntimeError(f"Invalid secondary provider {operation} response")
         return text.strip()
 
     async def embed_content(
@@ -138,6 +187,7 @@ class GeminiClient:
                 self._log_api_error(response, "embedding")
             response.raise_for_status()
             data = response.json()
+        record_usage("gemini", model, "embedding", data.get("usage") or data.get("usageMetadata"))
 
         values = (data.get("embedding") or {}).get("values")
         if not values:
@@ -156,11 +206,8 @@ class GeminiClient:
         resolved_mime_type = mime_type or "image/jpeg"
         resolved_image_data = image_data
         if image_url and not resolved_image_data:
-            async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
-                response = await client.get(image_url)
-                response.raise_for_status()
-                resolved_mime_type = response.headers.get("content-type", resolved_mime_type).split(";")[0]
-                resolved_image_data = base64.b64encode(response.content).decode("ascii")
+            content, resolved_mime_type, _ = await fetch_remote_image(image_url)
+            resolved_image_data = base64.b64encode(content).decode("ascii")
         if resolved_image_data and resolved_image_data.startswith("data:"):
             header, resolved_image_data = resolved_image_data.split(",", 1)
             if ";base64" in header:

@@ -34,6 +34,8 @@ class IntentResult(BaseModel):
         "show_sizes",
         "track_order",
         "show_cart",
+        "remove_from_cart",
+        "update_cart_quantity",
         "checkout",
         "retry_checkout",
         "human_handoff",

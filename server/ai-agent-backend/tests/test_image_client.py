@@ -1,6 +1,6 @@
 import json
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 
@@ -43,7 +43,8 @@ class ImageClientTests(unittest.IsolatedAsyncioTestCase):
             return httpx.Response(200, content=b"image bytes", headers={"content-type": "image/png; charset=binary"})
 
         client = httpx.AsyncClient(transport=httpx.MockTransport(handler), follow_redirects=True)
-        with patch("app.ai.gemini_client.httpx.AsyncClient", return_value=client):
+        with patch("app.services.remote_media.validate_remote_image_url", new=AsyncMock(side_effect=lambda url: url)), \
+             patch("app.services.remote_media.httpx.AsyncClient", return_value=client):
             mime, data = await GeminiClient(api_key="test")._resolve_image("https://images.example/image", None, None)
         self.assertEqual(mime, "image/png")
         self.assertTrue(data)

@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import logging
 import re
 import time
@@ -14,6 +15,7 @@ from app.ai.intent_parser import IntentParser
 from app.ai.product_image_analyzer import ProductImageAnalyzer
 from app.ai.response_generator import ResponseGenerator
 from app.ai.store_knowledge import StoreKnowledge
+from app.ai.usage import consume_usage, start_usage_tracking
 from app.config.settings import settings
 from app.repositories.business_repository import BusinessRepository
 from app.repositories.conversation_repository import ConversationRepository
@@ -50,6 +52,7 @@ class SalesAgent:
         self.commerce = commerce
 
     async def handle_chat(self, payload: AiChatRequest, current_user: UserPublic) -> AiChatResponse:
+        start_usage_tracking()
         started_at = time.monotonic()
         business = await self.business_repository.find_by_owner_id(current_user.id)
         if business is None:
@@ -443,6 +446,7 @@ class SalesAgent:
             selected_product=selected_product,
             response_goal=response_goal,
             store_context=store_context,
+                merchant_prompt=business.get("ai_prompt_config"),
         )
 
         updated_state["recent_turns"] = (updated_state.get("recent_turns", []) + [
@@ -464,6 +468,7 @@ class SalesAgent:
                     "recommended_product_ids": [product.id for product in products],
                     "recommended_products": [self._product_card(product) for product in products],
                     "selected_product_id": updated_state.get("selected_product_id"),
+                    "merchant_prompt_version": (business.get("ai_prompt_config") or {}).get("version") or settings.merchant_prompt_version,
                 },
             },
         )
@@ -520,8 +525,26 @@ class SalesAgent:
                 },
                 upsert=True,
             )
+        if tool_calls:
+            try:
+                await self.conversation_repository.collection.database.ai_action_audit.insert_many([
+                    {
+                        "business_id": business["_id"],
+                        "conversation_id": conversation["_id"],
+                        "customer_id": conversation.get("customer_id"),
+                        "channel": conversation.get("channel"),
+                        "action": str(call.get("name") or "unknown"),
+                        "arguments": {key: value for key, value in call.items() if key not in {"name", "error"}},
+                        "outcome": "failed" if call.get("status") == "failed" else "completed",
+                        "created_at": datetime.now(timezone.utc),
+                    }
+                    for call in tool_calls
+                ])
+            except Exception as exc:
+                logger.warning("AI action audit write skipped: %s", exc.__class__.__name__)
         refreshed_conversation = await self.conversation_repository.find_by_id(str(conversation["_id"]), business_id)
 
+        provider_usage = consume_usage()
         await self._record_metric(
             business_id=business_id,
             intent=intent,
@@ -536,6 +559,7 @@ class SalesAgent:
             ),
             response_goal=response_goal,
             latency_ms=round((time.monotonic() - started_at) * 1000),
+            provider_usage=provider_usage,
         )
 
         logger.info("AI chat handled for conversation %s with intent %s", conversation["_id"], intent.intent)
@@ -561,6 +585,19 @@ class SalesAgent:
         quoted_product_id: str | None = None,
     ) -> AiChatResponse:
         business_id = str(business["_id"])
+        account_ref = hashlib.sha256(f"{business_id}:{external_customer_ref}".encode()).hexdigest()
+        linked_identity = (
+            await self.commerce.db.whatsapp_account_links.find_one(
+                {"_id": account_ref, "expiresAt": {"$gt": datetime.now(timezone.utc)}}
+            )
+            if self.commerce else None
+        )
+        canonical_customer_id = (
+            str(linked_identity["user"])
+            if linked_identity and linked_identity.get("user")
+            else None
+        )
+        canonical_ref = f"user:{canonical_customer_id}" if canonical_customer_id else f"whatsapp:{account_ref}"
         conversation = await self.conversation_repository.find_by_external_customer_ref(
             business_id=business_id,
             channel=channel,
@@ -571,16 +608,24 @@ class SalesAgent:
                 business_id=business_id,
                 payload={
                     "channel": channel,
-                    "customer_id": None,
+                    "customer_id": canonical_customer_id,
                     "external_customer_ref": external_customer_ref,
                     "customer_name": customer_name,
+                    "canonical_customer_ref": canonical_ref,
                 },
             )
-        elif customer_name and not conversation.get("customer_name"):
+        elif (customer_name and not conversation.get("customer_name")) or (canonical_customer_id and not conversation.get("customer_id")):
             await self.conversation_repository.collection.update_one(
                 {"_id": conversation["_id"], "business_id": business["_id"]},
-                {"$set": {"customer_name": customer_name}},
+                {"$set": {
+                    **({"customer_name": customer_name} if customer_name else {}),
+                    **({"customer_id": parse_object_id(canonical_customer_id)} if canonical_customer_id else {}),
+                    "canonical_customer_ref": canonical_ref,
+                }},
             )
+            if canonical_customer_id:
+                conversation["customer_id"] = parse_object_id(canonical_customer_id)
+            conversation["canonical_customer_ref"] = canonical_ref
 
         if quoted_product_id:
             quoted_state = dict(conversation.get("conversation_state", {}))
@@ -1574,6 +1619,7 @@ class SalesAgent:
         checkout_failure: bool,
         response_goal: str,
         latency_ms: int,
+        provider_usage: list[dict] | None = None,
     ) -> None:
         """Store operational counters without message text, media, or customer identifiers."""
         try:
@@ -1595,6 +1641,11 @@ class SalesAgent:
                     "checkout_failure": checkout_failure,
                     "response_goal": response_goal,
                     "latency_ms": latency_ms,
+                    "provider_usage": provider_usage or [],
+                    "input_tokens": sum(item.get("input_tokens", 0) for item in provider_usage or []),
+                    "output_tokens": sum(item.get("output_tokens", 0) for item in provider_usage or []),
+                    "total_tokens": sum(item.get("total_tokens", 0) for item in provider_usage or []),
+                    "estimated_cost_usd": round(sum(item.get("estimated_cost_usd", 0) for item in provider_usage or []), 8),
                     "created_at": datetime.now(timezone.utc),
                 }
             )

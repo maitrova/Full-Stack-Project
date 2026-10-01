@@ -75,6 +75,15 @@ async def retry_failed_jobs(
     return await conversation_service.retry_failed_jobs(current_user)
 
 
+@router.get("/customer/{customer_id}/history")
+async def customer_history(
+    customer_id: str,
+    current_user: UserPublic = Depends(get_current_user),
+    conversation_service: ConversationService = Depends(get_conversation_service),
+):
+    return await conversation_service.customer_history(customer_id, current_user)
+
+
 @router.get("/{conversation_id}", response_model=ConversationDetail, response_model_by_alias=False)
 async def get_conversation(
     conversation_id: str,

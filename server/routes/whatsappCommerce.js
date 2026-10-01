@@ -4,7 +4,8 @@ import { createHash, randomBytes, timingSafeEqual } from "crypto";
 import { protect } from "../middleware/authMiddleware.js";
 import User from "../models/authmodel.js";
 import Order from "../models/Order.js";
-import { addToCart } from "../controllers/cartController.js";
+import { addToCart, removeCartItem, updateCartItemQty } from "../controllers/cartController.js";
+import { Cart } from "../models/Cart.js";
 import ReadymadeProduct from "../models/readymadeproducts.js";
 import { getReadymadePricing } from "../utils/readymadePricing.js";
 
@@ -14,6 +15,7 @@ const links = () => mongoose.connection.db.collection("whatsapp_account_links");
 const linkRequests = () => mongoose.connection.db.collection("whatsapp_link_requests");
 const subscriptions = () => mongoose.connection.db.collection("whatsapp_order_subscriptions");
 const rateLimits = () => mongoose.connection.db.collection("whatsapp_commerce_rate_limits");
+const actionAudit = () => mongoose.connection.db.collection("ai_action_audit");
 const isValidSizeValue = (value) => (
   typeof value === "string"
   && value.length >= 1
@@ -203,6 +205,83 @@ router.get("/orders/:orderId", async (req, res) => {
   return res.json({ order });
 });
 
+const activeCart = (userId) => Cart.findOne({ user: userId, status: "ACTIVE" })
+  .populate("items.readymadeProduct", "title name variants")
+  .populate("items.dropproduct", "name title variants")
+  .populate("items.design", "name title")
+  .populate("items.comboPack", "name title");
+
+const cartRows = (cart) => (cart?.items || []).map((item, index) => {
+  const source = item.readymadeProduct || item.dropproduct || item.design || item.comboPack || {};
+  return {
+    item_id: String(item._id),
+    option: index + 1,
+    name: source.title || source.name || item.comboName || "Cart item",
+    size: item.size || null,
+    quantity: Number(item.qty || 0),
+    unit_price: Number(item.unitPrice || 0),
+    currency: item.currency || "INR",
+  };
+});
+
+router.get("/cart", async (req, res) => {
+  if (await isRateLimited("cart-read", req.whatsappAccountRef, 60, 60 * 1000)) {
+    return res.status(429).json({ message: "Too many cart requests. Please wait a minute." });
+  }
+  const cart = await activeCart(req.user._id);
+  res.set("Cache-Control", "no-store");
+  return res.json({ items: cartRows(cart) });
+});
+
+const captureController = async (controller, req) => {
+  let statusCode = 200;
+  let result;
+  const response = {
+    status(code) { statusCode = code; return this; },
+    json(body) { result = body; return this; },
+    cookie() { return this; },
+    clearCookie() { return this; },
+  };
+  await controller(req, response);
+  return { statusCode, result };
+};
+
+router.patch("/cart/items/:itemId", async (req, res) => {
+  const quantity = Number(req.body?.quantity);
+  const operationId = String(req.body?.operation_id || "");
+  if (!mongoose.isValidObjectId(req.params.itemId) || !Number.isInteger(quantity) || quantity < 1 || quantity > 20 || !/^[a-f0-9]{32,64}$/.test(operationId)) {
+    return res.status(400).json({ message: "Choose a valid cart item and quantity (1–20)." });
+  }
+  if (await isRateLimited("cart-edit", req.whatsappAccountRef, 30, 60 * 1000)) {
+    return res.status(429).json({ message: "Too many cart requests. Please wait a minute." });
+  }
+  req.body = { qty: quantity };
+  const { statusCode, result } = await captureController(updateCartItemQty, req);
+  await actionAudit().insertOne({
+    business_action: "cart_quantity_update", channel: "whatsapp", account: req.whatsappAccountRef,
+    actor_user_id: req.user._id, target_id: req.params.itemId, arguments: { quantity }, operation_id: operationId,
+    outcome: statusCode < 400 ? "success" : "rejected", http_status: statusCode, created_at: new Date(),
+  });
+  return res.status(statusCode).json({ message: result?.message || "Cart update failed", items: cartRows(result?.cart) });
+});
+
+router.delete("/cart/items/:itemId", async (req, res) => {
+  const operationId = String(req.body?.operation_id || "");
+  if (!mongoose.isValidObjectId(req.params.itemId) || !/^[a-f0-9]{32,64}$/.test(operationId)) {
+    return res.status(400).json({ message: "Choose a valid cart item." });
+  }
+  if (await isRateLimited("cart-remove", req.whatsappAccountRef, 30, 60 * 1000)) {
+    return res.status(429).json({ message: "Too many cart requests. Please wait a minute." });
+  }
+  const { statusCode, result } = await captureController(removeCartItem, req);
+  await actionAudit().insertOne({
+    business_action: "cart_item_remove", channel: "whatsapp", account: req.whatsappAccountRef,
+    actor_user_id: req.user._id, target_id: req.params.itemId, arguments: {}, operation_id: operationId,
+    outcome: statusCode < 400 ? "success" : "rejected", http_status: statusCode, created_at: new Date(),
+  });
+  return res.status(statusCode).json({ message: result?.message || "Cart removal failed", items: cartRows(result?.cart) });
+});
+
 const addLinkedCartItem = async (req, res) => {
   if (await isRateLimited("cart", req.whatsappAccountRef || req.user?._id, 30, 60 * 1000)) {
     return res.status(429).json({ message: "Too many cart requests. Please wait a minute." });
@@ -246,6 +325,11 @@ const addLinkedCartItem = async (req, res) => {
   await addToCart(req, capturedResponse);
   const response = { message: result?.message || "Cart update needs checking" };
   if (statusCode < 500) await receipts.updateOne({ _id: id }, { $set: { status: "complete", httpStatus: statusCode, response } });
+  await actionAudit().insertOne({
+    business_action: "cart_item_add", channel: "whatsapp", account: req.whatsappAccountRef,
+    actor_user_id: req.user._id, target_id: productId, arguments: { size, quantity }, operation_id: operationId,
+    outcome: statusCode < 400 ? "success" : "rejected", http_status: statusCode, created_at: new Date(),
+  });
   res.status(statusCode).json({ ...response, redirectTo: req.whatsappReturnPath || undefined });
 };
 

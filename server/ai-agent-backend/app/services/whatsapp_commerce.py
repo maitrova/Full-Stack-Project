@@ -218,9 +218,54 @@ class WhatsAppCommerce:
             if pending:
                 return result(await self._checkout_retry_message(account, origin, conversation, state, product_tools, business_id, pending))
             return result("No problem. Tell me the product, size, and quantity again and I’ll create a fresh checkout link.")
-        if action in {"checkout", "show_cart"} or text in {"checkout", "my cart", "show cart", "open cart"}:
-            destination = "/checkout" if action == "checkout" or text == "checkout" else "/cart"
-            return result(f"Open securely and sign in with your store account:\n{origin}{destination}" if origin.startswith("https://") else "The public store URL is not configured. Please ask the store team for help.")
+        cart_action = action in {"show_cart", "remove_from_cart", "update_cart_quantity"} or text in {"my cart", "show cart", "open cart"}
+        if cart_action:
+            if not await self._linked(account):
+                return result(await self._link_message(account, origin, recipient=conversation.get("external_customer_ref"), return_path="/cart"))
+            cart_status, cart_data = await self._request("GET", "/cart", account)
+            if cart_status == 401:
+                return result(await self._link_message(account, origin, recipient=conversation.get("external_customer_ref"), return_path="/cart"))
+            if cart_status != 200:
+                return result(cart_data.get("message") or "I couldn't load your cart just now.")
+            items = cart_data.get("items") or []
+            if not items:
+                return result("Your cart is empty.")
+            if action == "show_cart" or text in {"my cart", "show cart", "open cart"}:
+                rows = [
+                    f"{item['option']}. {item['name']}" +
+                    (f", size {item['size']}" if item.get("size") else "") +
+                    f" — quantity {item['quantity']}, {item['currency']} {item['unit_price']:g} each"
+                    for item in items
+                ]
+                return result("Your cart:\n" + "\n".join(rows) + "\nYou can say ‘remove item 2’ or ‘change item 1 quantity to 3’.")
+
+            item_index = self._cart_item_index(text)
+            if item_index is None and len(items) == 1:
+                item_index = 0
+            if item_index is None or item_index >= len(items):
+                return result("Which cart item do you mean? Send its cart option number.")
+            item = items[item_index]
+            operation_id = secrets.token_hex(16)
+            if action == "remove_from_cart":
+                mutation_status, mutation_data = await self._request(
+                    "DELETE", f"/cart/items/{item['item_id']}", account, {"operation_id": operation_id}
+                )
+                if mutation_status == 200:
+                    return result(f"Removed {item['name']} from your cart.")
+                return result(mutation_data.get("message") or "I couldn't remove that cart item.")
+
+            quantity = self._quantity_for_cart_edit(text)
+            if quantity is None:
+                return result(f"What quantity would you like for {item['name']}? Choose 1 to 20.")
+            mutation_status, mutation_data = await self._request(
+                "PATCH", f"/cart/items/{item['item_id']}", account,
+                {"quantity": quantity, "operation_id": operation_id},
+            )
+            if mutation_status == 200:
+                return result(f"Updated {item['name']} to quantity {quantity}.")
+            return result(mutation_data.get("message") or "I couldn't update that cart item.")
+        if action == "checkout" or text == "checkout":
+            return result(f"Open securely and sign in with your store account:\n{origin}/checkout" if origin.startswith("https://") else "The public store URL is not configured. Please ask the store team for help.")
         if re.search(r"\b(combo|bundle|pack offer)\b", text) and not state.get("purchase"):
             return result(f"Browse current combo packs here:\n{origin}/combo-packs" if origin.startswith("https://") else "The combo-pack page is not configured yet.")
         if re.search(r"\b(compare|difference)\b", text):
@@ -566,12 +611,32 @@ class WhatsAppCommerce:
 
         return None
 
+    @staticmethod
+    def _cart_item_index(text: str) -> int | None:
+        match = re.search(r"\b(?:item|option|product|number|no)\s*#?\s*([1-5])\b", text)
+        if match:
+            return int(match[1]) - 1
+        for index, word in enumerate(("first", "second", "third", "fourth", "fifth")):
+            if re.search(rf"\b{word}\b", text):
+                return index
+        return None
+
+    @staticmethod
+    def _quantity_for_cart_edit(text: str) -> int | None:
+        matches = re.findall(r"\b(?:to|as|qty|quantity)\s*[:=]?\s*(\d{1,2})\b", text)
+        if not matches:
+            matches = re.findall(r"\b(\d{1,2})\s*(?:pieces?|pcs?|units?)\b", text)
+        quantity = int(matches[-1]) if matches else None
+        return quantity if quantity is not None and 1 <= quantity <= 20 else None
+
     async def _linked(self, account):
         return await self.db.whatsapp_account_links.find_one({"_id": account, "expiresAt": {"$gt": datetime.now(timezone.utc)}})
 
     async def _request(self, method, path, account, payload=None):
         if not settings.whatsapp_commerce_key:
             return 503, {"message": "Store account actions are not configured yet. Please ask the store team."}
+        status_code = 503
+        data = {"message": "The store service isn't responding. Please check your cart before retrying."}
         try:
             async with httpx.AsyncClient(timeout=20) as client:
                 response = await client.request(method, settings.ecommerce_api_url.rstrip("/") + "/whatsapp-commerce" + path, json=payload, headers={"x-commerce-key": settings.whatsapp_commerce_key, "x-whatsapp-account": account})
@@ -583,7 +648,26 @@ class WhatsAppCommerce:
                 data["message"] = "The store checkout authorization is not configured correctly."
             elif response.status_code >= 500 and not data.get("message"):
                 data["message"] = "The store checkout service returned an error."
-            return response.status_code, data
+            status_code = response.status_code
+            return status_code, data
         except httpx.HTTPError:
             logger.exception("Store commerce request failed: %s %s", method, path)
-            return 503, {"message": "The store service isn't responding. Please check your cart before retrying."}
+            return status_code, data
+        finally:
+            try:
+                await self.db.ai_action_audit.insert_one({
+                    "business_action": "commerce_api_request",
+                    "channel": "whatsapp",
+                    "account": account,
+                    "method": method,
+                    "path": path,
+                    "arguments": {
+                        key: value for key, value in (payload or {}).items()
+                        if key not in {"expected_price", "operation_id"}
+                    },
+                    "outcome": "success" if status_code < 400 else "rejected",
+                    "http_status": status_code,
+                    "created_at": datetime.now(timezone.utc),
+                })
+            except PyMongoError:
+                logger.warning("Commerce action audit write skipped")

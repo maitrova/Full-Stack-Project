@@ -24,7 +24,7 @@ class ProductImageAnalyzer:
     ) -> dict[str, Any]:
         if not self.gemini_client.is_configured:
             logger.error(
-                "Gemini image analysis is disabled because GEMINI_API_KEY is not configured "
+                "Image analysis is disabled because no AI provider is configured "
                 "(model=%s)",
                 getattr(self.gemini_client, "model", "unknown"),
             )
@@ -88,7 +88,7 @@ Customer text:
         image_data: str | None = None,
         mime_type: str | None = None,
     ) -> list[float] | None:
-        if not self.gemini_client.is_configured:
+        if not getattr(self.gemini_client, "supports_embeddings", self.gemini_client.is_configured):
             return None
         try:
             return await asyncio.wait_for(self.gemini_client.embed_content(

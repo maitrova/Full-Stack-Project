@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from fastapi import HTTPException, status
 
 from app.repositories.business_repository import BusinessRepository
+from app.database.mongodb import get_ecommerce_database
 from app.repositories.conversation_repository import ConversationRepository
 from app.repositories.message_repository import MessageRepository
 from app.schemas.conversation import (
@@ -18,7 +19,7 @@ from app.schemas.conversation import (
 )
 from app.schemas.user import UserPublic
 from app.services.whatsapp_service import WhatsAppClient
-from app.utils.object_id import object_id_to_str
+from app.utils.object_id import object_id_to_str, parse_object_id
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,29 @@ class ConversationService:
         business = await self._get_owned_business(current_user)
         conversations = await self.conversation_repository.list_conversations(str(business["_id"]))
         return [ConversationPublic.model_validate(object_id_to_str(conversation)) for conversation in conversations]
+
+    async def customer_history(self, customer_id: str, current_user: UserPublic) -> dict:
+        business = await self._get_owned_business(current_user)
+        conversations = await self.conversation_repository.list_by_customer_id(
+            str(business["_id"]), customer_id
+        )
+        history = []
+        for conversation in conversations:
+            messages = await self.message_repository.list_by_conversation(
+                str(business["_id"]), str(conversation["_id"]), limit=200
+            )
+            history.append({
+                "conversation": object_id_to_str(conversation),
+                "messages": [object_id_to_str(message) for message in messages],
+            })
+        website_sessions = await get_ecommerce_database().aichatsessions.find(
+            {"user": parse_object_id(customer_id)}
+        ).sort("lastMessageAt", -1).limit(100).to_list(length=100)
+        return {
+            "customer_id": customer_id,
+            "conversations": history,
+            "website_sessions": [object_id_to_str(session) for session in website_sessions],
+        }
 
     async def list_handoffs(self, current_user: UserPublic) -> list[dict]:
         business = await self._get_owned_business(current_user)

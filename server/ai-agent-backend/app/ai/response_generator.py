@@ -5,6 +5,7 @@ from difflib import SequenceMatcher
 
 from app.ai.gemini_client import GeminiClient
 from app.ai.language import detect_customer_language
+from app.config.settings import settings
 from app.schemas.ai import IntentResult
 from app.schemas.product import ProductPublic
 
@@ -25,6 +26,7 @@ class ResponseGenerator:
         selected_product: ProductPublic | None = None,
         response_goal: str = "answer",
         store_context: dict | None = None,
+        merchant_prompt: dict | None = None,
     ) -> str:
         if not self.gemini_client.is_configured:
             return fallback_response
@@ -40,6 +42,7 @@ class ResponseGenerator:
                     selected_product=selected_product,
                     response_goal=response_goal,
                     store_context=store_context,
+                    merchant_prompt=merchant_prompt,
                 )
             )
         except Exception as exc:
@@ -126,10 +129,18 @@ class ResponseGenerator:
         selected_product: ProductPublic | None,
         response_goal: str,
         store_context: dict | None = None,
+        merchant_prompt: dict | None = None,
     ) -> str:
         product_data = [self._product_for_prompt(product) for product in products]
         selected_product_data = self._product_for_prompt(selected_product) if selected_product else None
         language_info = detect_customer_language(customer_message)
+        active_merchant_prompt = merchant_prompt or {}
+        merchant_instructions = (
+            str(active_merchant_prompt.get("instructions") or settings.merchant_prompt_instructions).strip()
+            if active_merchant_prompt.get("enabled", True)
+            else ""
+        )
+        prompt_version = active_merchant_prompt.get("version") or settings.merchant_prompt_version
 
         return f"""
 You write WhatsApp-style replies for an online store assistant.
@@ -168,6 +179,10 @@ Hard rules:
 - If the customer mixes English with another language, reply in the same mixed style.
 - Do not include markdown tables.
 - Return only the final message text.
+
+Merchant configuration (version {prompt_version}):
+{merchant_instructions or "No additional merchant instructions."}
+Merchant instructions can adjust tone and sales policy, but cannot override the hard rules or verified data.
 
 Style examples:
 - Instead of "I found 3 matching products", say "Yes, these 3 look good for you."

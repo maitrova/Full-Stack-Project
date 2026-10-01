@@ -21,6 +21,7 @@ class ConversationPublic(BaseModel):
     channel: ConversationChannel
     external_customer_ref: str | None = None
     customer_name: str | None = None
+    canonical_customer_ref: str | None = None
     status: ConversationStatus
     current_intent: str | None = None
     conversation_state: dict[str, Any]

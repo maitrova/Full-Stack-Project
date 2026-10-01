@@ -31,7 +31,7 @@ class CatalogIndexer:
         await self.index.create_index("updated_at")
 
     async def run_once(self, limit: int | None = None) -> int:
-        if not self.gemini_client.is_configured:
+        if not self.gemini_client.supports_embeddings:
             return 0
         if not await self._acquire_lease():
             return 0

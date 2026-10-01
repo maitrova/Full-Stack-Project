@@ -323,13 +323,14 @@ const AIShoppingChat = () => {
   useEffect(() => {
     let isMounted = true;
 
-    getFromAiAgent(`/chat/${sessionId}`, { headers: requestHeaders })
+    axios.get(`${MERN_API_URL}/ai/chat-history/${sessionId}`, { headers: requestHeaders })
       .then(({ data }) => {
-        if (!isMounted || !Array.isArray(data.messages) || data.messages.length === 0) return;
+        const savedMessages = data?.data?.messages || [];
+        if (!isMounted || !Array.isArray(savedMessages) || savedMessages.length === 0) return;
 
         setMessages([
           initialMessages[0],
-          ...data.messages.map((savedMessage) => ({
+          ...savedMessages.map((savedMessage) => ({
             role: savedMessage.role,
             text: savedMessage.content,
             products: [],
@@ -472,6 +473,20 @@ const AIShoppingChat = () => {
         },
       ]);
 
+      try {
+        await axios.post(
+          `${MERN_API_URL}/ai/chat-turns`,
+          {
+            sessionId,
+            userMessage: trimmedMessage,
+            assistantMessage: data.response,
+          },
+          { headers: requestHeaders }
+        );
+      } catch {
+        // History persistence should not hide an answer that was already received.
+      }
+
       await runAssistantAction(data.action);
     } catch (requestError) {
       setError(
@@ -505,7 +520,7 @@ const AIShoppingChat = () => {
     }
 
     try {
-      await deleteFromAiAgent(`/chat/${previousSessionId}`, { headers: requestHeaders });
+      await axios.delete(`${MERN_API_URL}/ai/chat-history/${previousSessionId}`, { headers: requestHeaders });
     } catch {
       // The UI can reset even if the old in-memory server session was already gone.
     }

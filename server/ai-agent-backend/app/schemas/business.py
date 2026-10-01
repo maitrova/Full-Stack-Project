@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from typing import Any
 
 
 class BusinessBase(BaseModel):
@@ -34,3 +35,15 @@ class BusinessPublic(BusinessBase):
     updated_at: datetime
 
     model_config = ConfigDict(populate_by_name=True)
+
+
+class MerchantPromptUpdate(BaseModel):
+    instructions: str = Field(default="", max_length=4000)
+    enabled: bool = True
+
+
+class MerchantPromptPublic(BaseModel):
+    version: int = Field(ge=1)
+    instructions: str
+    enabled: bool
+    updated_at: datetime

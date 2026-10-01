@@ -216,12 +216,13 @@ jobs:
         uses: appleboy/ssh-action@v1.2.0
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           port: ${{ secrets.VPS_PORT }}
           password: ${{ secrets.VPS_PASSWORD }}
-          envs: GEMINI_API_KEY
+          envs: GEMINI_API_KEY,OPENAI_API_KEY
           script: |
             set -e
             if [ -z "${GEMINI_API_KEY:-}" ]; then
@@ -230,6 +231,9 @@ jobs:
             fi
             set --
             set -- --set-string "envSecrets.GEMINI_API_KEY=${GEMINI_API_KEY}"
+            if [ -n "${OPENAI_API_KEY:-}" ]; then
+              set -- "$@" --set-string "envSecrets.OPENAI_API_KEY=${OPENAI_API_KEY}"
+            fi
             helm upgrade --install ai-agent /tmp/ai-agent \
               --namespace production \
               --create-namespace \

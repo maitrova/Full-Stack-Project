@@ -56,7 +56,8 @@ Rules:
 - Use intent "general_question" for greetings and other conversation.
 - Use intent "commerce_action" when the customer wants the agent to perform or continue an action.
 - Allowed action values: add_to_cart, confirm_cart, decline_cart, product_photos, product_link,
-  browse_designs, check_price, check_stock, show_sizes, track_order, show_cart, checkout, retry_checkout,
+  browse_designs, check_price, check_stock, show_sizes, track_order, show_cart, remove_from_cart,
+  update_cart_quantity, checkout, retry_checkout,
   human_handoff.
 - Use browse_designs when the customer asks what ready designs, artwork templates, design folders, or
   design collections are available, including natural wording and minor spelling mistakes.
@@ -64,6 +65,8 @@ Rules:
   "go ahead with this one" can mean add_to_cart. "Yes, do it" can mean confirm_cart only when
   conversation state contains a pending purchase. "Not now" can mean decline_cart in that context.
 - Never use confirm_cart unless the customer is approving a pending, already quoted cart action.
+- Use remove_from_cart when the customer asks to delete or remove an existing cart item.
+- Use update_cart_quantity when the customer asks to change the quantity of an existing cart item.
 - Use check_price when the customer asks the price, cost, or "how much" for a product. A message may
   also express purchase interest; the commerce flow will answer the price before requesting missing details.
 - Set product_option to 1-5 when the customer refers to a displayed option, even with informal wording,
@@ -356,6 +359,10 @@ Customer message:
             return "retry_checkout"
         if re.search(r"\b(?:show|open|view|what(?:'s| is) in) (?:my |the )?(?:cart|basket)\b", text):
             return "show_cart"
+        if re.search(r"\b(?:remove|delete|take out)\b.{0,35}\b(?:cart|basket|item|product|option)\b|\b(?:remove|delete)\s+(?:the\s+)?(?:first|second|third|fourth|fifth|[1-5])\b", text):
+            return "remove_from_cart"
+        if re.search(r"\b(?:change|update|set|make)\b.{0,35}\b(?:qty|quantity|pieces?|items?|units?)\b|\b(?:qty|quantity)\b.{0,20}\b(?:to|as)\s*\d+\b", text):
+            return "update_cart_quantity"
         if re.search(r"\b(?:checkout|check out|proceed to pay|go to payment)\b", text):
             return "checkout"
         if re.search(

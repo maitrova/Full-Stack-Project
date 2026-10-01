@@ -18,6 +18,9 @@ class ConversationRepository:
         await self.collection.create_index(
             [("business_id", ASCENDING), ("channel", ASCENDING), ("external_customer_ref", ASCENDING)]
         )
+        await self.collection.create_index(
+            [("business_id", ASCENDING), ("customer_id", ASCENDING), ("last_message_at", DESCENDING)]
+        )
 
     async def create_conversation(self, business_id: str, payload: dict) -> dict:
         now = utc_now()
@@ -28,6 +31,7 @@ class ConversationRepository:
             "channel": payload.get("channel", "web"),
             "external_customer_ref": payload.get("external_customer_ref"),
             "customer_name": payload.get("customer_name"),
+            "canonical_customer_ref": payload.get("canonical_customer_ref"),
             "status": "open",
             "current_intent": None,
             "conversation_state": {},
@@ -67,6 +71,13 @@ class ConversationRepository:
                 "external_customer_ref": external_customer_ref,
             }
         )
+
+    async def list_by_customer_id(self, business_id: str, customer_id: str, limit: int = 100) -> list[dict]:
+        cursor = self.collection.find({
+            "business_id": parse_object_id(business_id),
+            "customer_id": parse_object_id(customer_id),
+        }).sort([("last_message_at", DESCENDING), ("created_at", DESCENDING)]).limit(limit)
+        return await cursor.to_list(length=limit)
 
     async def touch_last_message(self, conversation_id: str, business_id: str) -> None:
         now = utc_now()

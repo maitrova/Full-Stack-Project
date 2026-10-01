@@ -53,6 +53,12 @@ async def ai_metrics(
             "handoff_requests": 0,
             "checkout_failures": 0,
             "catalogue_embeddings": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "estimated_cost_usd": 0,
+            "whatsapp_inbound_messages": 0,
+            "whatsapp_outbound_messages": 0,
         }
     since = datetime.now(timezone.utc) - timedelta(hours=24)
     rows = await database.ai_agent_metrics.aggregate([
@@ -69,6 +75,10 @@ async def ai_metrics(
             "handoff_requests": {"$sum": {"$cond": ["$handoff_requested", 1, 0]}},
             "checkout_failures": {"$sum": {"$cond": ["$checkout_failure", 1, 0]}},
             "average_latency_ms": {"$avg": "$latency_ms"},
+            "input_tokens": {"$sum": "$input_tokens"},
+            "output_tokens": {"$sum": "$output_tokens"},
+            "total_tokens": {"$sum": "$total_tokens"},
+            "estimated_cost_usd": {"$sum": "$estimated_cost_usd"},
         }},
     ]).to_list(length=1)
     summary = rows[0] if rows else {}
@@ -77,4 +87,16 @@ async def ai_metrics(
     summary["catalogue_embeddings"] = await get_ecommerce_database().ai_product_search_index.count_documents(
         {"embedding_model": settings.gemini_embedding_model}
     )
+    message_rows = await database.whatsapp_deliveries.aggregate([
+        {"$match": {"business_id": business["_id"], "created_at": {"$gte": since}}},
+        {"$group": {
+            "_id": None,
+            "whatsapp_inbound_messages": {"$sum": "$inbound_messages"},
+            "whatsapp_outbound_messages": {"$sum": "$outbound_messages"},
+        }},
+    ]).to_list(length=1)
+    summary.update({
+        "whatsapp_inbound_messages": (message_rows[0] if message_rows else {}).get("whatsapp_inbound_messages", 0),
+        "whatsapp_outbound_messages": (message_rows[0] if message_rows else {}).get("whatsapp_outbound_messages", 0),
+    })
     return summary
