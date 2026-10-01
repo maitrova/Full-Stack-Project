@@ -145,6 +145,56 @@ class WhatsAppCommerce:
         return price_text + (f" Available sizes: {', '.join(sizes)}." if sizes else "")
 
     @staticmethod
+    def _requested_product_fact(text: str) -> tuple[str, str | None] | None:
+        field_patterns = {
+            "fabric": r"\b(?:fabric|material|made of)\b",
+            "brand": r"\bbrand\b",
+            "color": r"\bcolou?r\b",
+            "fit": r"\b(?:fit|fitting)\b",
+            "sleeve": r"\bsleeves?\b",
+            "pattern": r"\b(?:pattern|what print|which print)\b",
+            "style": r"\bstyle\b|\b(?:is|it|this|that)\b.{0,12}\b(?:formal|casual|party wear|sportswear|streetwear)\b",
+            "rating": r"\brating\b",
+            "review_count": r"\b(?:review count|how many reviews)\b",
+            "size_chart": r"\bsize chart\b",
+            "payment_options": r"\b(?:payment options?|cod|cash on delivery)\b",
+        }
+        for key, pattern in field_patterns.items():
+            if re.search(pattern, text):
+                return key, None
+
+        fabrics = [
+            "organic cotton", "cotton blend", "poly cotton", "polyester", "linen",
+            "denim", "rayon", "silk", "satin", "nylon", "wool", "cotton",
+        ]
+        mentioned = next((value for value in fabrics if re.search(rf"\b{re.escape(value)}\b", text)), None)
+        if mentioned and re.search(r"\b(?:is|are|made|it|this|that)\b", text):
+            return "fabric", mentioned
+        return None
+
+    @classmethod
+    def _product_fact_reply(cls, product, request: tuple[str, str | None]) -> str:
+        key, expected = request
+        value = product.attributes.get(key)
+        if key == "payment_options":
+            value = product.attributes.get("payment_options") or []
+        if not value:
+            label = key.replace("_", " ")
+            return f"The {label} isn't listed for this product. Send 'human' if you'd like the store team to check it."
+
+        display = ", ".join(str(item) for item in value) if isinstance(value, (list, tuple, set)) else str(value)
+        if expected:
+            if expected.lower() in display.lower():
+                return f"Yes, {cls._product_label(product)} is listed as {display}."
+            return f"No, this product is listed as {display}."
+        labels = {
+            "fabric": "Fabric", "brand": "Brand", "color": "Color", "fit": "Fit",
+            "sleeve": "Sleeves", "pattern": "Pattern", "style": "Style", "rating": "Rating",
+            "review_count": "Reviews", "size_chart": "Size chart", "payment_options": "Payment options",
+        }
+        return f"{labels.get(key, key.title())}: {display}."
+
+    @staticmethod
     def _referenced_product_id(text: str, conversation: dict, state: dict) -> str | None:
         ids = conversation.get("recommended_product_ids", []) or state.get("recommended_product_ids", [])
         match = re.search(r"\b(?:option|product|number)\s*#?\s*([1-5])\b", text)
@@ -275,8 +325,10 @@ class WhatsAppCommerce:
             if len(products) < 2:
                 return result("Show me which two products you'd like to compare first.")
             return result("\n".join(f"{p.name}: {p.currency} {p.sale_price if p.sale_price is not None else p.price:g}; sizes {', '.join(p.attributes.get('sizes', [])) or 'none in stock'}; {p.stock} left." for p in products))
+        product_fact_request = self._requested_product_fact(text)
         if not state.get("purchase") and (
             action in {"show_sizes", "check_stock"}
+            or product_fact_request
             or (
                 re.search(r"\b(size|sizes|stock|material|fabric|customize|customise|customization)\b", text)
                 and not re.search(r"\b(buy|cart|order|purchase)\b", text)
@@ -291,25 +343,19 @@ class WhatsAppCommerce:
                         return result(
                             f"Yes, you can customize {self._product_label(product)} here:\n{product_url}"
                             if product_url
-                            else "This product is customizable, but its designer link is not configured yet."
+                            else "This product is customizable, but its designer link is not configured yet.",
+                            [product],
                         )
                     return result(
                         f"{self._product_label(product)} is sold as shown and is not customizable. "
-                        + (f"Browse customizable products here:\n{origin}/customproducts" if origin.startswith("https://") else "Ask the store team about custom options.")
+                        + (f"Browse customizable products here:\n{origin}/customproducts" if origin.startswith("https://") else "Ask the store team about custom options."),
+                        [product],
                     )
                 if product and (action in {"show_sizes", "check_stock"} or re.search(r"\b(size|sizes|stock)\b", text)):
                     variants = product.attributes.get("variants", [])
-                    return result(product.name + "\n" + "\n".join(f"{v['size']}: {v['stock']} available, {product.currency} {v['effective_price']:g}" for v in variants))
-                if product:
-                    requested_details = []
-                    for key in ("material", "fabric"):
-                        if re.search(rf"\b{key}\b", text):
-                            value = product.attributes.get(key)
-                            if value:
-                                requested_details.append(f"{key.title()}: {value}")
-                    if requested_details:
-                        return result("\n".join(requested_details))
-                    return result("That detail isn't listed for this product. Send 'human' if you'd like the store team to check it.")
+                    return result(product.name + "\n" + "\n".join(f"{v['size']}: {v['stock']} available, {product.currency} {v['effective_price']:g}" for v in variants), [product])
+                if product and product_fact_request:
+                    return result(self._product_fact_reply(product, product_fact_request), [product])
         # A policy question must not advance an unfinished purchase.
         if StoreKnowledge.is_store_question(message):
             return None
@@ -318,10 +364,15 @@ class WhatsAppCommerce:
         asks_price = action == "check_price" or bool(re.search(r"\b(?:price|cost|rate|how much)\b", text))
         # Customers often say "I want this" after the agent has shown one product.
         # Support common Telugu wording as well as the English purchase verbs.
+        affirmative_add_request = bool(re.fullmatch(
+            r"(?:yes|yeah|yep|sure|ok(?:ay)?|haan|ha|avunu|sare)[,!. ]+"
+            r"(?:please[,!. ]+)?(?:add|put)(?: it| this| the item)?(?: to (?:the )?(?:cart|basket))?[,!. ]*",
+            text,
+        ))
         explicit_buy = bool(re.search(
             r"\b(add(?: it| this| the item)? to (?:the )?cart|buy|purchase|book|order|i want (?:this|that|option(?: number)?\s*[1-5])|want this|need this|idi kavali|naaku idi kavali|naku idi kavali|kavali|kaavali)\b|కావాలి|నాకు ఇది కావాలి",
             text,
-        ))
+        )) or bool(affirmative_add_request and (state.get("purchase") or state.get("last_declined_purchase")))
         has_search_requirements = bool(
             intent
             and (
@@ -459,7 +510,7 @@ class WhatsAppCommerce:
             return result(f"Only {variant['stock']} are available in size {purchase['size']}. How many would you like?")
         price = variant["effective_price"]
         confirmations = {"confirm", "yes", "yes confirm", "haan", "ha", "avunu", "sare", "हाँ", "అవును", "సరే"}
-        is_confirmation = action == "confirm_cart" or text in confirmations or bool(re.search(
+        is_confirmation = action == "confirm_cart" or text in confirmations or affirmative_add_request or bool(re.search(
             r"\b(?:please )?confirm(?: chey| cheyyi)?\b|\byes[, ]+(?:please[, ]+)?add(?: it| this| the item)? to (?:the )?cart\b|కన్ఫర్మ్ చేయి",
             text,
         ))

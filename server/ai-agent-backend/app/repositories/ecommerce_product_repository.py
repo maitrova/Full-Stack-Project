@@ -286,6 +286,9 @@ class EcommerceProductRepository:
         sizes = [str(item.get("size")) for item in variants if item.get("size") and int(item.get("stock") or 0) > 0]
         stock = sum(int(item.get("stock") or 0) for item in variants) if variants else int(document.get("stock") or 0)
         now = datetime.now(timezone.utc)
+        inferred_attributes = self._infer_merchandise_attributes(
+            document.get("title"), document.get("description"), category, subcategory
+        )
 
         return {
             "_id": document["_id"],
@@ -305,15 +308,55 @@ class EcommerceProductRepository:
                 "sizes": sizes,
                 "variants": [{"size": str(v.get("size")), "stock": int(v.get("stock") or 0), "effective_price": round(float(v.get("price") or price) * (sale_price / price if sale_price is not None and price else 1), 2)} for v in variants],
                 "payment_options": document.get("paymentOptions") or [],
+                "rating": document.get("rating"),
+                "review_count": document.get("reviewCount"),
+                "size_chart": self._public_image_url(str(document.get("sizeChart"))) if document.get("sizeChart") else None,
                 "product_url": self._product_url(document, category, subcategory),
                 "source_type": "readymade",
                 "customizable": False,
+                **inferred_attributes,
             },
             "status": "active",
             "tags": [value for value in [category, subcategory, brand, "readymade", *sizes] if value],
             "created_at": document.get("createdAt") or now,
             "updated_at": document.get("updatedAt") or now,
         }
+
+    @staticmethod
+    def _infer_merchandise_attributes(*values: Any) -> dict[str, Any]:
+        """Expose facts that are explicitly present in merchant product copy."""
+        text = " ".join(str(value or "") for value in values).lower()
+        groups = {
+            "fabric": [
+                "organic cotton", "cotton blend", "poly cotton", "polyester", "linen",
+                "denim", "rayon", "silk", "satin", "nylon", "wool", "cotton",
+            ],
+            "fit": ["oversized fit", "slim fit", "regular fit", "relaxed fit", "loose fit"],
+            "sleeve": ["full sleeve", "long sleeve", "half sleeve", "short sleeve", "sleeveless"],
+            "pattern": [
+                "checked", "checks", "striped", "solid", "plain", "graphic printed",
+                "printed", "typography", "acid wash",
+            ],
+            "style": ["formal", "casual", "party wear", "sportswear", "streetwear"],
+        }
+        inferred = {}
+        for key, candidates in groups.items():
+            match = next(
+                (candidate for candidate in candidates if re.search(rf"\b{re.escape(candidate)}\b", text)),
+                None,
+            )
+            if match:
+                inferred[key] = match.title()
+        colors = [
+            color.title() for color in (
+                "navy blue", "dark blue", "white", "black", "maroon", "red", "blue",
+                "green", "yellow", "pink", "purple", "grey", "brown", "cream", "orange",
+            )
+            if re.search(rf"\b{re.escape(color)}\b", text)
+        ]
+        if colors:
+            inferred["color"] = ", ".join(dict.fromkeys(colors))
+        return inferred
 
     def _normalize_drop(self, document: dict, business_id: str) -> dict:
         variants = document.get("variants") or []
@@ -415,7 +458,7 @@ class EcommerceProductRepository:
         if query and not all(token in searchable for token in query.split()):
             return False
         category = str(filters.get("category") or "").strip().lower()
-        if category and category not in searchable:
+        if category and not self._category_matches(product, category):
             return False
         for key in ["color", "occasion", "brand"]:
             value = str(filters.get(key) or "").strip().lower()
@@ -433,6 +476,38 @@ class EcommerceProductRepository:
         if filters.get("max_price") is not None and price > float(filters["max_price"]):
             return False
         return True
+
+    @classmethod
+    def _category_matches(cls, product: dict, requested: str) -> bool:
+        """Match garment categories without treating `shirt` as `t-shirt`."""
+        requested_tokens = cls._category_tokens(requested)
+        if not requested_tokens:
+            return True
+        attributes = product.get("attributes") or {}
+        category_text = " ".join(
+            str(value or "")
+            for value in (product.get("category"), attributes.get("sub_category"), product.get("name"))
+        )
+        product_tokens = cls._category_tokens(category_text)
+        if "shirt" in requested_tokens:
+            return "shirt" in product_tokens
+        if "tshirt" in requested_tokens:
+            return "tshirt" in product_tokens
+        if "sweatshirt" in requested_tokens:
+            return "sweatshirt" in product_tokens
+        return requested_tokens.issubset(product_tokens) or requested.lower() in category_text.lower()
+
+    @staticmethod
+    def _category_tokens(value: str) -> set[str]:
+        normalized = str(value).lower()
+        normalized = re.sub(r"\bt\s*[- ]\s*shirts?\b", " tshirt ", normalized)
+        normalized = re.sub(r"\btees?\b", " tshirt ", normalized)
+        tokens = set(re.findall(r"[a-z0-9]+", normalized))
+        aliases = {
+            "shirts": "shirt", "tshirts": "tshirt", "hoodies": "hoodie",
+            "sweatshirts": "sweatshirt", "shoes": "shoe",
+        }
+        return {aliases.get(token, token) for token in tokens}
 
     def _display_price(self, product: dict) -> float:
         value = product.get("sale_price") if product.get("sale_price") is not None else product.get("price")

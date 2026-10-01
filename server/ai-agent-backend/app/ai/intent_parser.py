@@ -33,6 +33,7 @@ class IntentParser:
                     )
                 if not intent.wants_to_buy:
                     intent.wants_to_buy = self._detect_purchase_interest(normalized, intent.action)
+                intent.category = self._normalize_category(intent.category)
                 return intent
             except Exception as exc:
                 logger.warning("Gemini intent parsing failed; using fallback parser: %s", exc.__class__.__name__)
@@ -158,22 +159,7 @@ Customer message:
                 "cap",
             ],
         ) or conversation_state.get("category")
-        if category == "shoes":
-            category = "shoe"
-        if category in {"t shirt", "tee"}:
-            category = "t-shirt"
-        if category == "oversized t shirt":
-            category = "oversized t-shirt"
-        if category == "hoodies":
-            category = "hoodie"
-        if category == "sweatshirts":
-            category = "sweatshirt"
-        if category == "crop tops":
-            category = "crop top"
-        if category in {"handbag", "backpack"}:
-            category = "bag"
-        if category in {"accessories", "belt", "wallet", "sunglasses", "cap"}:
-            category = "accessory"
+        category = self._normalize_category(category)
 
         color = self._first_match(
             text,
@@ -289,6 +275,24 @@ Customer message:
             attributes=attributes,
             confidence=0.55,
         )
+
+    @staticmethod
+    def _normalize_category(category: str | None) -> str | None:
+        if not category:
+            return None
+        value = re.sub(r"\s+", " ", str(category).lower().replace("_", " ")).strip()
+        aliases = {
+            "shirts": "shirt", "men shirt": "shirt", "mens shirt": "shirt",
+            "men's shirt": "shirt", "men shirts": "shirt", "mens shirts": "shirt",
+            "men's shirts": "shirt", "t shirt": "t-shirt", "t shirts": "t-shirt",
+            "t-shirts": "t-shirt", "tee": "t-shirt", "tees": "t-shirt",
+            "oversized t shirt": "oversized t-shirt", "oversized t shirts": "oversized t-shirt",
+            "hoodies": "hoodie", "sweatshirts": "sweatshirt", "crop tops": "crop top",
+            "shoes": "shoe", "handbag": "bag", "handbags": "bag", "backpack": "bag",
+            "backpacks": "bag", "accessories": "accessory", "belt": "accessory",
+            "wallet": "accessory", "sunglasses": "accessory", "cap": "accessory",
+        }
+        return aliases.get(value, value)
 
     @staticmethod
     def _extract_product_option(text: str, allow_bare_cardinal: bool = False) -> int | None:

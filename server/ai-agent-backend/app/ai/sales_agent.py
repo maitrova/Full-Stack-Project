@@ -345,7 +345,7 @@ class SalesAgent:
                 relaxed_products, relaxed_summary = await self._search_relaxed_options(
                     business_id,
                     intent,
-                    allow_other_categories=not bool(effective_image_analysis),
+                    allow_other_categories=not bool(effective_image_analysis or intent.category),
                 )
                 products = relaxed_products
                 updated_state["recommended_product_ids"] = [product.id for product in products]

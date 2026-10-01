@@ -66,6 +66,46 @@ class StoreAnswerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(state["purchase"], {"product_id": "shirt", "size": "M"})
         tools.get_product_details.assert_not_awaited()
 
+    async def test_selected_product_fabric_question_uses_verified_catalogue_fact(self):
+        product = SimpleNamespace(
+            id="shirt",
+            name="Maitrova White Blue Checks Shirt",
+            attributes={"fabric": "Cotton", "variants": []},
+        )
+        commerce = WhatsAppCommerce(SimpleNamespace())
+        tools = SimpleNamespace(get_product_details=AsyncMock(return_value=product))
+        state = {"selected_product_id": "shirt"}
+
+        response = await commerce.handle(
+            "What is the fabric?",
+            {"selected_product_id": "shirt", "external_customer_ref": "919999999999"},
+            state,
+            tools,
+            "business",
+        )
+
+        self.assertEqual(response[0], "Fabric: Cotton.")
+        self.assertEqual(response[1], [product])
+
+    async def test_customer_fabric_word_does_not_start_variant_search(self):
+        product = SimpleNamespace(
+            id="shirt",
+            name="Maitrova White Blue Checks Shirt",
+            attributes={"fabric": "Cotton", "variants": []},
+        )
+        commerce = WhatsAppCommerce(SimpleNamespace())
+        tools = SimpleNamespace(get_product_details=AsyncMock(return_value=product))
+
+        response = await commerce.handle(
+            "It is cotton",
+            {"selected_product_id": "shirt", "external_customer_ref": "919999999999"},
+            {"selected_product_id": "shirt"},
+            tools,
+            "business",
+        )
+
+        self.assertIn("is listed as Cotton", response[0])
+
     async def test_customer_can_accept_same_in_stock_cart_quote_after_saying_no(self):
         product = SimpleNamespace(
             id="shirt",
@@ -99,7 +139,7 @@ class StoreAnswerTests(unittest.IsolatedAsyncioTestCase):
             SimpleNamespace(ecommerce_storefront_url="https://shop.example"),
         ):
             declined = await commerce.handle("no", conversation, state, tools, "business")
-            accepted = await commerce.handle("yes add to the cart", conversation, state, tools, "business")
+            accepted = await commerce.handle("Yes, add it", conversation, state, tools, "business")
 
         self.assertIn("haven't added", declined[0])
         self.assertIn("it’s in your cart", accepted[0])

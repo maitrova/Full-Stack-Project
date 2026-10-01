@@ -84,7 +84,7 @@ class WhatsAppClient:
         buttons = [
             {
                 "type": "reply",
-                "reply": {"id": f"reply_{index}", "title": str(title)[:20]},
+                "reply": {"id": self._reply_button_id(str(title), index), "title": str(title)[:20]},
             }
             for index, title in enumerate(titles[:3], start=1)
         ]
@@ -102,6 +102,16 @@ class WhatsAppClient:
         if reply_to_message_id:
             payload["context"] = {"message_id": reply_to_message_id}
         return await self._send_message_payload(payload)
+
+    @staticmethod
+    def _reply_button_id(title: str, index: int) -> str:
+        normalized = re.sub(r"[^a-z0-9]+", " ", title.lower()).strip()
+        if normalized.startswith("yes") and "add" in normalized:
+            return "confirm_cart"
+        if normalized in {"no", "cancel", "not now"}:
+            return "decline_cart"
+        option = re.fullmatch(r"option ([1-5])", normalized)
+        return f"option_{option[1]}" if option else f"reply_{index}"
 
     async def send_option_list(
         self,
@@ -706,7 +716,13 @@ class WhatsAppService:
         if message_type == "interactive":
             interactive = message.get("interactive", {})
             if interactive.get("type") == "button_reply":
-                return interactive.get("button_reply", {}).get("title", "").strip()
+                reply = interactive.get("button_reply", {})
+                reply_id = str(reply.get("id") or "")
+                if reply_id == "confirm_cart":
+                    return "yes confirm"
+                if reply_id == "decline_cart":
+                    return "no"
+                return reply.get("title", "").strip()
             if interactive.get("type") == "list_reply":
                 return interactive.get("list_reply", {}).get("title", "").strip()
         if message_type == "image":

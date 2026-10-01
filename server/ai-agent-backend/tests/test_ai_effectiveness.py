@@ -57,6 +57,39 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(components["category"], 0)
         self.assertEqual(components["visual"], 0)
 
+    def test_shirt_category_does_not_match_tshirts_or_sweatshirts(self):
+        repo = EcommerceProductRepository.__new__(EcommerceProductRepository)
+        formal_shirt = product(
+            name="White Cotton Formal Shirt",
+            category="Men Shirts",
+        ).model_dump(by_alias=True)
+        tshirt = product(
+            name="White Round Neck T-Shirt",
+            category="Men T-Shirts",
+        ).model_dump(by_alias=True)
+        sweatshirt = product(
+            name="White Sweatshirt",
+            category="Men Sweatshirts",
+        ).model_dump(by_alias=True)
+
+        self.assertTrue(repo._matches(formal_shirt, {"category": "shirt", "attributes": {}}))
+        self.assertFalse(repo._matches(tshirt, {"category": "shirt", "attributes": {}}))
+        self.assertFalse(repo._matches(sweatshirt, {"category": "shirt", "attributes": {}}))
+        self.assertTrue(repo._matches(tshirt, {"category": "t-shirt", "attributes": {}}))
+
+    def test_catalogue_copy_exposes_verified_product_facts(self):
+        repo = EcommerceProductRepository.__new__(EcommerceProductRepository)
+        facts = repo._infer_merchandise_attributes(
+            "Maitrova White Blue Checks Formal Shirt for Men | Cotton Slim Fit Long Sleeve"
+        )
+
+        self.assertEqual(facts["fabric"], "Cotton")
+        self.assertEqual(facts["fit"], "Slim Fit")
+        self.assertEqual(facts["sleeve"], "Long Sleeve")
+        self.assertEqual(facts["pattern"], "Checks")
+        self.assertEqual(facts["color"], "White, Blue")
+        self.assertEqual(facts["style"], "Formal")
+
     def test_medium_confidence_reply_discloses_design_may_differ(self):
         reply = self.agent._build_image_match_response(
             IntentResult(intent="product_search"), [product(score=0.5)], {"confidence": 0.65}
@@ -101,6 +134,11 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(parser._parse_with_rules("show customization products", {}).attributes["catalog_type"], "customization")
         self.assertEqual(parser._parse_with_rules("show latest drop products", {}).attributes["catalog_type"], "drop product")
         self.assertEqual(parser._parse_with_rules("show readymade products", {}).attributes["catalog_type"], "readymade")
+
+    def test_plural_shirts_normalizes_separately_from_tshirts(self):
+        parser = IntentParser(SimpleNamespace(is_configured=False))
+        self.assertEqual(parser._parse_with_rules("I need white shirts", {}).category, "shirt")
+        self.assertEqual(parser._parse_with_rules("I need white t-shirts", {}).category, "t-shirt")
 
     def test_natural_language_is_mapped_to_safe_commerce_actions(self):
         parser = IntentParser(SimpleNamespace(is_configured=False))
