@@ -22,6 +22,21 @@ class ImageSearchFlowTests(unittest.IsolatedAsyncioTestCase):
         await tools.search_from_intent("store", IntentResult(), query="graphic print")
         self.assertEqual(repository.search_products.await_args.kwargs["filters"]["query"], "graphic print")
 
+    async def test_more_results_exclude_products_already_shown(self):
+        repository = SimpleNamespace(search_products=AsyncMock(return_value=[]))
+        tools = ProductTools(repository)
+
+        await tools.search_from_intent(
+            "store",
+            IntentResult(intent="product_search", category="hoodie"),
+            exclude_ids=["hoodie-1", "hoodie-2", "hoodie-3"],
+            limit=3,
+        )
+
+        filters = repository.search_products.await_args.kwargs["filters"]
+        self.assertEqual(filters["exclude_ids"], ["hoodie-1", "hoodie-2", "hoodie-3"])
+        self.assertEqual(repository.search_products.await_args.kwargs["limit"], 3)
+
     async def test_image_search_without_vector_adapter_returns_a_list(self):
         repository = SimpleNamespace(search_products=AsyncMock(return_value=[]))
         self.assertEqual(await ProductTools(repository).search_from_image(

@@ -494,6 +494,9 @@ class EcommerceProductRepository:
         }
 
     def _matches(self, product: dict, filters: dict) -> bool:
+        excluded = {str(value) for value in filters.get("exclude_ids") or []}
+        if str(product.get("_id")) in excluded:
+            return False
         searchable = self._searchable_text(product)
         query = str(filters.get("query") or "").strip().lower()
         if query and not all(token in searchable for token in query.split()):
@@ -535,16 +538,26 @@ class EcommerceProductRepository:
         attributes = product.get("attributes") or {}
         category_text = " ".join(
             str(value or "")
-            for value in (product.get("category"), attributes.get("sub_category"), product.get("name"))
+            for value in (
+                product.get("category"), attributes.get("sub_category"), product.get("name"),
+                attributes.get("product_type"), attributes.get("fit"), attributes.get("style"),
+            )
         )
         product_tokens = cls._category_tokens(category_text)
         if "shirt" in requested_tokens:
-            return "shirt" in product_tokens
-        if "tshirt" in requested_tokens:
-            return "tshirt" in product_tokens
-        if "sweatshirt" in requested_tokens:
-            return "sweatshirt" in product_tokens
-        return requested_tokens.issubset(product_tokens) or requested.lower() in category_text.lower()
+            base_matches = "shirt" in product_tokens
+        elif "tshirt" in requested_tokens:
+            base_matches = "tshirt" in product_tokens
+        elif "sweatshirt" in requested_tokens:
+            base_matches = "sweatshirt" in product_tokens
+        else:
+            base_matches = requested_tokens.issubset(product_tokens) or requested.lower() in category_text.lower()
+        if not base_matches:
+            return False
+        # Style words in a category request are mandatory. An oversized
+        # T-shirt search must not silently degrade into an ordinary T-shirt.
+        modifiers = requested_tokens.intersection({"oversized", "crop", "polo"})
+        return modifiers.issubset(product_tokens)
 
     @staticmethod
     def _category_tokens(value: str) -> set[str]:

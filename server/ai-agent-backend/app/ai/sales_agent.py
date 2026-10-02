@@ -51,6 +51,7 @@ class SalesAgent:
         self.image_analyzer = image_analyzer or ProductImageAnalyzer()
         self.response_generator = response_generator or ResponseGenerator()
         self.commerce = commerce
+        self._catalog_category_cache: tuple[float, list[str]] | None = None
 
     async def handle_chat(self, payload: AiChatRequest, current_user: UserPublic) -> AiChatResponse:
         start_usage_tracking()
@@ -85,10 +86,10 @@ class SalesAgent:
             },
         )
 
+        catalog_categories = await self._catalog_category_names()
         image_analysis = {}
         image_embedding = None
         if has_image:
-            catalog_categories = await self._catalog_category_names()
             image_analysis, image_embedding = await asyncio.gather(
                 self.image_analyzer.analyze(
                     image_url=payload.image_url,
@@ -133,8 +134,12 @@ class SalesAgent:
             )
         else:
             parse_message = payload.message or self._image_analysis_to_search_text(effective_image_analysis)
-        conversation = self._prepare_context(conversation, parse_message)
-        intent = await self.intent_parser.parse(parse_message, conversation.get("conversation_state", {}))
+        conversation = self._prepare_context(conversation, parse_message, catalog_categories)
+        intent = await self.intent_parser.parse(
+            parse_message,
+            conversation.get("conversation_state", {}),
+            catalog_categories=catalog_categories,
+        )
         if effective_image_analysis:
             intent = self._merge_image_analysis_into_intent(intent, effective_image_analysis)
 
@@ -147,6 +152,7 @@ class SalesAgent:
             previous_catalog_type == "customization"
             and intent.intent == "product_search"
             and explicit_catalog_type not in {"readymade", "drop", "drop product"}
+            and self._continues_customization_context(payload.message)
         )
         if customization_request or continuing_customization:
             intent.intent = "product_search"
@@ -177,8 +183,29 @@ class SalesAgent:
             intent.action == "browse_designs"
             or self._is_design_library_request(payload.message)
         )
+        more_options_request = self._is_more_options_request(payload.message)
+        if more_options_request:
+            # "More" is a continuation of the active search even when the
+            # language model classifies the short phrase as a general question.
+            intent = self._intent_from_state(updated_state, intent)
+        browse_key = self._browse_history_key(intent)
+        browse_history = dict(updated_state.get("browse_history") or {})
+        previous_recommendations = (
+            updated_state.get("recommended_product_ids")
+            or conversation.get("recommended_product_ids")
+            or []
+        )
+        seen_product_ids = (
+            list(browse_history.get(browse_key) or previous_recommendations)
+            if more_options_request
+            else []
+        )
         order_request = self._is_order_request(payload.message)
-        follow_up = self._detect_follow_up(payload.message, conversation, updated_state)
+        follow_up = (
+            None
+            if more_options_request
+            else self._detect_follow_up(payload.message, conversation, updated_state)
+        )
         retry_options = self._is_retry_options_request(payload.message) and updated_state.get("last_search_had_results") is False
         products = []
         selected_product = None
@@ -340,42 +367,55 @@ class SalesAgent:
                     business_id=business_id,
                     intent=intent,
                     query=payload.message,
+                    exclude_ids=seen_product_ids,
+                    limit=3 if conversation.get("channel") == "whatsapp" else 5,
                 )
             if not products:
-                relaxed_products, relaxed_summary = await self._search_relaxed_options(
-                    business_id,
-                    intent,
-                    allow_other_categories=not bool(effective_image_analysis or intent.category),
-                )
-                products = relaxed_products
-                updated_state["recommended_product_ids"] = [product.id for product in products]
-                updated_state["selected_product_id"] = products[0].id if len(products) == 1 else None
-                updated_state["last_offer_type"] = "close_alternatives" if products else "no_match"
-                tool_calls.append(
-                    {
-                        "name": "search_products",
+                if more_options_request:
+                    requested = intent.category or "matching product"
+                    ai_text = f"I’ve shown all currently available {requested} options. Tell me what you want to change, such as color, style, or budget."
+                    response_goal = "report that there are no unseen matching products"
+                    updated_state["last_offer_type"] = "no_more_options"
+                    tool_calls.append({
+                        "name": "search_more_products",
+                        "excluded_count": len(seen_product_ids),
                         "result_count": 0,
-                    }
-                )
-                tool_calls.append(
-                    {
-                        "name": "search_relaxed_products",
-                        "result_count": len(products),
-                        "relaxed_summary": relaxed_summary,
-                    }
-                )
-                if intent.attributes.get("catalog_type") == "customization":
-                    ai_text = self._build_customization_response(
-                        products,
-                        reference_received=bool(has_image or effective_image_analysis),
-                    )
-                    response_goal = "guide the customer from a customization request to a customizable base product"
-                elif effective_image_analysis and not products:
-                    ai_text = self._build_image_no_match_response(effective_image_analysis)
-                    response_goal = "clearly report that the pictured product type is not in the catalogue"
+                    })
                 else:
-                    ai_text = self._build_relaxed_response(intent, relaxed_summary, products)
-                    response_goal = "recommend close alternatives after the exact search failed"
+                    relaxed_products, relaxed_summary = await self._search_relaxed_options(
+                        business_id,
+                        intent,
+                        allow_other_categories=not bool(effective_image_analysis or intent.category),
+                    )
+                    products = relaxed_products
+                    updated_state["recommended_product_ids"] = [product.id for product in products]
+                    updated_state["selected_product_id"] = products[0].id if len(products) == 1 else None
+                    updated_state["last_offer_type"] = "close_alternatives" if products else "no_match"
+                    tool_calls.append(
+                        {
+                            "name": "search_products",
+                            "result_count": 0,
+                        }
+                    )
+                    tool_calls.append(
+                        {
+                            "name": "search_relaxed_products",
+                            "result_count": len(products),
+                            "relaxed_summary": relaxed_summary,
+                        }
+                    )
+                    if intent.attributes.get("catalog_type") == "customization":
+                        ai_text = self._build_customization_response(
+                            products,
+                            reference_received=bool(has_image or effective_image_analysis),
+                        )
+                        response_goal = "guide the customer from a customization request to a customizable base product"
+                    elif effective_image_analysis and not products:
+                        ai_text = self._build_image_no_match_response(effective_image_analysis)
+                        response_goal = "clearly report that the pictured product type is not in the catalogue"
+                    else:
+                        ai_text = self._build_relaxed_response(intent, relaxed_summary, products)
+                        response_goal = "recommend close alternatives after the exact search failed"
             elif self._is_detail_request(payload.message) and products:
                 selected_product = products[0]
                 products = [selected_product]
@@ -422,6 +462,20 @@ class SalesAgent:
 
         if conversation.get("channel") == "whatsapp" and len(products) > 3:
             products = products[:3]
+
+        if intent.intent == "product_search" and products and response_goal in {
+            "recommend matching products",
+            "recommend visually ranked catalogue products with calibrated confidence",
+            "guide the customer from a customization request to a customizable base product",
+        }:
+            previous_ids = seen_product_ids if more_options_request else []
+            browse_history[browse_key] = list(dict.fromkeys([
+                *previous_ids,
+                *[product.id for product in products],
+            ]))[-100:]
+            # Keep only the most recent search groups so conversation state
+            # stays bounded across long-running customer chats.
+            updated_state["browse_history"] = dict(list(browse_history.items())[-20:])
 
         if products:
             updated_state["option_product_ids"] = {
@@ -686,11 +740,21 @@ class SalesAgent:
 
         return response
 
-    def _prepare_context(self, conversation: dict, message: str) -> dict:
+    def _prepare_context(
+        self,
+        conversation: dict,
+        message: str,
+        catalog_categories: list[str] | None = None,
+    ) -> dict:
         """Retain follow-up filters but discard stale selection on a new search."""
         conversation = dict(conversation)
         state = dict(conversation.get("conversation_state", {}))
-        explicit = self.intent_parser._parse_with_rules(message, {})
+        previous_recommendations = list(
+            conversation.get("recommended_product_ids", [])
+            or state.get("recommended_product_ids", [])
+        )
+        more_options_request = self._is_more_options_request(message)
+        explicit = self.intent_parser._parse_with_rules(message, {}, catalog_categories)
         text = message.lower().strip()
         restart = bool(re.search(r"\b(start over|new search|forget that|forget previous|something else)\b", text))
         forget_preferences = bool(re.search(r"\b(forget (?:my |all |the )?(?:preferences|taste|history|previous)|clear (?:my )?(?:preferences|history))\b", text))
@@ -710,15 +774,21 @@ class SalesAgent:
             state = {
                 "recent_turns": state.get("recent_turns", []),
                 **({} if forget_preferences else {"customer_preferences": state.get("customer_preferences", {})}),
+                **({"browse_history": state["browse_history"]} if state.get("browse_history") else {}),
             }
             if (category_changed or explicit_category_search) and previous_catalog_type and not explicit_catalog_type:
-                state["attributes"] = {"catalog_type": previous_catalog_type}
+                if previous_catalog_type != "customization" or self._continues_customization_context(message):
+                    state["attributes"] = {"catalog_type": previous_catalog_type}
         changed_filter = any(getattr(explicit, key) is not None and getattr(explicit, key) != state.get(key) for key in ["category", "color", "max_price", "occasion"])
         # Explicit requests for another category or filter should trigger a fresh search.
         if restart or category_changed or explicit_category_search or explicit_attribute_search or changed_filter:
             reset_search_context(state)
             conversation["selected_product_id"] = None
-            conversation["recommended_product_ids"] = []
+            if more_options_request and previous_recommendations:
+                state["recommended_product_ids"] = previous_recommendations
+                conversation["recommended_product_ids"] = previous_recommendations
+            else:
+                conversation["recommended_product_ids"] = []
         conversation["conversation_state"] = state
         return conversation
 
@@ -862,9 +932,35 @@ class SalesAgent:
             re.search(r"\b(?:i |we )?(?:want|need|would like).{0,20}\b(?:like|same as)\s+(?:this|that)\b", text)
         )
 
+    def _continues_customization_context(self, message: str) -> bool:
+        """Keep custom context for refinements, but clear it for a fresh browse."""
+        text = self.intent_parser._normalize_text(message).strip()
+        if self._is_customization_request(message):
+            return True
+        if re.search(r"\b(?:readymade|ready-made|ready made|regular products?)\b", text):
+            return False
+        explicit = self.intent_parser._parse_with_rules(message, {})
+        fresh_browse = bool(re.search(
+            r"\b(?:show|find|search|looking for|look for|want|need|do you have|have any)\b",
+            text,
+        ))
+        continuity = bool(re.search(
+            r"\b(?:instead|change|switch|make it|same design|that design|this design|on a|on an|for a|for an)\b",
+            text,
+        ))
+        if explicit.category and fresh_browse and not continuity:
+            return False
+        return bool(continuity or explicit.category or explicit.color or explicit.attributes)
+
     @staticmethod
     def _is_design_library_request(message: str) -> bool:
         text = message.lower().strip()
+        if re.search(
+            r"\b(?:share|send|upload|use|provide)\b.{0,35}\b(?:my|our|own)\s+"
+            r"(?:design|artwork|logo|image|photo|picture)\b",
+            text,
+        ):
+            return False
         return bool(
             re.search(
                 r"\b(?:design library|design collections?|design folders?|design templates?|"
@@ -1327,11 +1423,16 @@ class SalesAgent:
 
     async def _catalog_category_names(self) -> list[str]:
         """Return only categories currently used by active ecommerce products."""
+        cached = getattr(self, "_catalog_category_cache", None)
+        if cached and time.monotonic() - cached[0] < 300:
+            return list(cached[1])
         repository = getattr(self.product_tools, "product_repository", None)
         category_loader = getattr(repository, "catalog_categories", None)
         if category_loader:
             try:
-                return await category_loader()
+                categories = await category_loader()
+                self._catalog_category_cache = (time.monotonic(), list(categories))
+                return list(categories)
             except Exception as exc:
                 logger.warning("Could not load unified catalogue categories: %s", exc.__class__.__name__)
 
@@ -1350,13 +1451,15 @@ class SalesAgent:
                 {"_id": {"$in": category_ids}},
                 {"name": 1},
             ).to_list(length=len(category_ids))
-            return sorted(
+            categories = sorted(
                 {
                     str(document.get("name") or "").strip()
                     for document in documents
                     if str(document.get("name") or "").strip()
                 }
             )
+            self._catalog_category_cache = (time.monotonic(), categories)
+            return categories
         except Exception as exc:
             logger.warning("Could not load catalogue categories for image analysis: %s", exc.__class__.__name__)
             return []
@@ -1401,6 +1504,42 @@ class SalesAgent:
             next_state["attributes"] = {**next_state.get("attributes", {}), **intent.attributes}
         return next_state
 
+    @staticmethod
+    def _is_more_options_request(message: str) -> bool:
+        text = str(message or "").lower().strip()
+        return bool(
+            re.search(
+                r"\b(?:other|more|different|next|else|remaining|another)\b.{0,30}"
+                r"\b(?:options?|products?|items?|styles?|hoodies?|shirts?|t\s*-?\s*shirts?)\b",
+                text,
+            )
+            or re.search(
+                r"\b(?:show|send|give|see|view)\b.{0,20}\b(?:other|more|next|different)\b",
+                text,
+            )
+            or text in {"more", "others", "other ones", "next", "next ones", "anything else"}
+        )
+
+    @staticmethod
+    def _browse_history_key(intent: IntentResult) -> str:
+        attributes = intent.attributes or {}
+        parts = [
+            intent.category,
+            intent.color,
+            intent.min_price,
+            intent.max_price,
+            intent.occasion,
+            intent.size,
+            intent.brand,
+            *[
+                f"{key}:{attributes[key]}"
+                for key in sorted(attributes)
+                if attributes.get(key) not in (None, "", [], {})
+            ],
+        ]
+        normalized = "|".join(str(value or "").strip().lower() for value in parts)
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:20]
+
     def _remember_customer_preferences(self, state: dict, message: str, intent: IntentResult) -> None:
         """Keep a compact durable taste profile without replaying the full chat history."""
         if intent.intent != "product_search":
@@ -1416,7 +1555,7 @@ class SalesAgent:
             values = [item for item in values if str(item).lower() != normalized.lower()]
             preferences[key] = ([normalized] + values)[:8]
 
-        remember("categories", explicit.category)
+        remember("categories", explicit.category or intent.category)
         remember("colors", explicit.color)
         remember("occasions", explicit.occasion)
         remember("brands", explicit.brand)

@@ -81,6 +81,26 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
             {"category": "shirt", "attributes": {"pattern": "checked"}},
         ))
 
+    def test_oversized_tshirt_requires_both_tshirt_and_oversized(self):
+        repo = EcommerceProductRepository.__new__(EcommerceProductRepository)
+        oversized = product(
+            name="Black Acid Wash Oversized T-Shirt",
+            category="Men T-Shirts",
+        ).model_dump(by_alias=True)
+        regular = product(
+            name="White Round Neck T-Shirt",
+            category="Men T-Shirts",
+        ).model_dump(by_alias=True)
+        formal_shirt = product(
+            name="White Cotton Formal Shirt",
+            category="Men Shirts",
+        ).model_dump(by_alias=True)
+
+        filters = {"category": "oversized t-shirt", "attributes": {}}
+        self.assertTrue(repo._matches(oversized, filters))
+        self.assertFalse(repo._matches(regular, filters))
+        self.assertFalse(repo._matches(formal_shirt, filters))
+
     def test_catalogue_copy_exposes_verified_product_facts(self):
         repo = EcommerceProductRepository.__new__(EcommerceProductRepository)
         facts = repo._infer_merchandise_attributes(
@@ -212,6 +232,49 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
         parser = IntentParser(SimpleNamespace(is_configured=False))
         self.assertEqual(parser._parse_with_rules("I need white shirts", {}).category, "shirt")
         self.assertEqual(parser._parse_with_rules("I need white t-shirts", {}).category, "t-shirt")
+        self.assertEqual(parser._parse_with_rules("Do you have regular Tshirts?", {}).category, "t-shirt")
+        self.assertEqual(
+            parser._parse_with_rules("Oversized Tshirts readymade", {}).category,
+            "oversized t-shirt",
+        )
+
+    def test_own_design_is_customization_not_design_library_browsing(self):
+        parser = IntentParser(SimpleNamespace(is_configured=False))
+        intent = parser._parse_with_rules("Can I share my own design?", {})
+
+        self.assertEqual(intent.intent, "product_search")
+        self.assertIsNone(intent.action)
+        self.assertEqual(intent.attributes["catalog_type"], "customization")
+        self.assertTrue(self.agent._is_customization_request("Can I share my own design?"))
+        self.assertFalse(self.agent._is_design_library_request("Can I share my own design?"))
+
+    def test_live_catalogue_categories_are_not_limited_to_builtin_aliases(self):
+        parser = IntentParser(SimpleNamespace(is_configured=False))
+        categories = [
+            "Men Shirts", "Men T-Shirts", "Oversized T-Shirts",
+            "Custom Mugs", "Phone Cases", "Canvas Tote Bags",
+        ]
+
+        self.assertEqual(
+            parser._parse_with_rules("show oversized tshirts", {}, categories).category,
+            "oversized t-shirt",
+        )
+        self.assertEqual(
+            parser._parse_with_rules("show ceramic mugs", {}, categories).category,
+            "custom mugs",
+        )
+        self.assertEqual(
+            parser._parse_with_rules("I need phone cases", {}, categories).category,
+            "phone cases",
+        )
+
+    def test_ambiguous_live_category_keeps_broad_language_alias(self):
+        parser = IntentParser(SimpleNamespace(is_configured=False))
+        intent = parser._parse_with_rules(
+            "show shirts", {}, ["Men Shirts", "Women Shirts"]
+        )
+
+        self.assertEqual(intent.category, "shirt")
 
     def test_check_shirt_request_extracts_pattern_filter(self):
         parser = IntentParser(SimpleNamespace(is_configured=False))
@@ -289,6 +352,31 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertNotIn("action", next_state)
         self.assertEqual(next_state["selected_product_id"], "shirt")
+
+    def test_other_product_wording_requests_unseen_results(self):
+        self.assertTrue(self.agent._is_more_options_request("show me other hoodies"))
+        self.assertTrue(self.agent._is_more_options_request("any more options?"))
+        self.assertTrue(self.agent._is_more_options_request("next"))
+        self.assertFalse(self.agent._is_more_options_request("show black hoodies"))
+
+    def test_browse_history_key_changes_with_search_filters(self):
+        hoodies = self.agent._browse_history_key(
+            IntentResult(intent="product_search", category="hoodie")
+        )
+        black_hoodies = self.agent._browse_history_key(
+            IntentResult(intent="product_search", category="hoodie", color="black")
+        )
+
+        self.assertNotEqual(hoodies, black_hoodies)
+
+    def test_catalogue_filter_excludes_previously_shown_product_ids(self):
+        repo = EcommerceProductRepository.__new__(EcommerceProductRepository)
+        item = product(name="Black Hoodie", category="Hoodies").model_dump(by_alias=True)
+
+        self.assertFalse(repo._matches(
+            item,
+            {"category": "hoodie", "attributes": {}, "exclude_ids": [item["_id"]]},
+        ))
 
     def test_indexer_discards_unapproved_generated_fields(self):
         indexer = CatalogIndexer.__new__(CatalogIndexer)

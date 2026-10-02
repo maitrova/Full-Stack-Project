@@ -66,6 +66,89 @@ class ContextTests(unittest.TestCase):
         self.assertIsNone(self.agent._resolve_reference("another one", ["old", "new"], None))
         self.assertEqual(self.agent._resolve_reference("is it available", ["old"], "old"), "old")
 
+    def test_fresh_tshirt_browse_does_not_inherit_customization_catalogue(self):
+        conversation = {
+            "selected_product_id": "custom-polo",
+            "recommended_product_ids": ["custom-polo"],
+            "conversation_state": {
+                "category": "polo",
+                "attributes": {"catalog_type": "customization"},
+                "selected_product_id": "custom-polo",
+                "recommended_product_ids": ["custom-polo"],
+            },
+        }
+
+        result = self.agent._prepare_context(conversation, "Show me some oversized Tshirts")
+
+        self.assertNotIn("category", result["conversation_state"])
+        self.assertNotIn("attributes", result["conversation_state"])
+        self.assertIsNone(result["selected_product_id"])
+        self.assertFalse(self.agent._continues_customization_context("Show me some oversized Tshirts"))
+
+    def test_category_correction_keeps_active_customization_context(self):
+        conversation = {
+            "selected_product_id": "custom-hoodie",
+            "recommended_product_ids": ["custom-hoodie"],
+            "conversation_state": {
+                "category": "hoodie",
+                "attributes": {"catalog_type": "customization"},
+            },
+        }
+
+        result = self.agent._prepare_context(conversation, "Change it to a T-shirt")
+
+        self.assertEqual(
+            result["conversation_state"]["attributes"]["catalog_type"],
+            "customization",
+        )
+        self.assertTrue(self.agent._continues_customization_context("Change it to a T-shirt"))
+
+    def test_live_catalogue_category_starts_a_fresh_search(self):
+        result = self.agent._prepare_context(
+            self.old,
+            "Show me phone cases",
+            ["Men Shirts", "Phone Cases", "Custom Mugs"],
+        )
+
+        self.assertIsNone(result["selected_product_id"])
+        self.assertNotIn("color", result["conversation_state"])
+        self.assertNotIn("max_price", result["conversation_state"])
+
+    def test_other_category_options_keep_browse_history(self):
+        key = "hoodie-search"
+        conversation = {
+            "selected_product_id": "hoodie-3",
+            "recommended_product_ids": ["hoodie-1", "hoodie-2", "hoodie-3"],
+            "conversation_state": {
+                "category": "hoodie",
+                "browse_history": {key: ["hoodie-1", "hoodie-2", "hoodie-3"]},
+            },
+        }
+
+        result = self.agent._prepare_context(conversation, "show other hoodies")
+
+        self.assertEqual(
+            result["conversation_state"]["browse_history"][key],
+            ["hoodie-1", "hoodie-2", "hoodie-3"],
+        )
+
+    def test_first_more_request_after_upgrade_keeps_last_recommendations(self):
+        conversation = {
+            "selected_product_id": None,
+            "recommended_product_ids": ["hoodie-1", "hoodie-2", "hoodie-3"],
+            "conversation_state": {
+                "category": "hoodie",
+                "recommended_product_ids": ["hoodie-1", "hoodie-2", "hoodie-3"],
+            },
+        }
+
+        result = self.agent._prepare_context(conversation, "show other hoodies")
+
+        self.assertEqual(
+            result["conversation_state"]["recommended_product_ids"],
+            ["hoodie-1", "hoodie-2", "hoodie-3"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

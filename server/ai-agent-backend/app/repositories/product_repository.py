@@ -29,6 +29,9 @@ class ProductRepository:
             "business_id": parse_object_id(business_id),
             "status": "active",
         }
+        excluded_ids = [parse_object_id(value) for value in filters.get("exclude_ids") or []]
+        if excluded_ids:
+            query["_id"] = {"$nin": excluded_ids}
         and_conditions = []
 
         if filters.get("query"):

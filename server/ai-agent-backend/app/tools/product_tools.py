@@ -24,6 +24,7 @@ class ProductSearchParams:
     occasion: str | None = None
     brand: str | None = None
     attributes: dict[str, Any] = field(default_factory=dict)
+    exclude_ids: list[str] = field(default_factory=list)
     limit: int = 5
 
 
@@ -60,6 +61,7 @@ class ProductTools:
             "occasion": params.occasion,
             "brand": params.brand,
             "attributes": params.attributes,
+            "exclude_ids": params.exclude_ids,
         }
         products = await self.product_repository.search_products(
             business_id=params.business_id,
@@ -68,7 +70,14 @@ class ProductTools:
         )
         return self._validated_products(products)
 
-    async def search_from_intent(self, business_id: str, intent: IntentResult, query: str | None = None) -> list[ProductPublic]:
+    async def search_from_intent(
+        self,
+        business_id: str,
+        intent: IntentResult,
+        query: str | None = None,
+        exclude_ids: list[str] | None = None,
+        limit: int = 5,
+    ) -> list[ProductPublic]:
         has_structured_filters = any(
             [
                 intent.category,
@@ -93,7 +102,8 @@ class ProductTools:
                 occasion=intent.occasion,
                 brand=intent.brand,
                 attributes=intent.attributes,
-                limit=5,
+                exclude_ids=exclude_ids or [],
+                limit=limit,
             )
         )
 
