@@ -184,6 +184,12 @@ class SalesAgent:
             or self._is_design_library_request(payload.message)
         )
         more_options_request = self._is_more_options_request(payload.message)
+        # Short follow-ups such as "show more" must continue the active
+        # product browse. The intent model can misclassify these messages as
+        # browse_designs, which otherwise routes the reply to the design
+        # library and loses the product context.
+        if more_options_request:
+            design_library_request = False
         if more_options_request:
             # "More" is a continuation of the active search even when the
             # language model classifies the short phrase as a general question.
