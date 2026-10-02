@@ -83,6 +83,12 @@ const cartSchema = new mongoose.Schema(
       default: "ACTIVE",
       index: true,
     },
+    // Bounded idempotency markers for atomic WhatsApp batch additions.
+    whatsappOperationIds: {
+      type: [String],
+      default: [],
+      select: false,
+    },
   },
   { timestamps: true }
 );

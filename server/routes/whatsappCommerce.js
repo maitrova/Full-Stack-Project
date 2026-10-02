@@ -395,45 +395,73 @@ const addLinkedCartItems = async (req, res, items, returnPath = "/cart") => {
     if (previous.status === "complete") return res.status(previous.httpStatus).json(previous.response);
     return res.status(409).json({ message: "Cart update is still being checked." });
   };
-  if (await receipts.findOne({ _id: receiptId })) return replay();
+  const existingReceipt = await receipts.findOne({ _id: receiptId });
+  if (existingReceipt) {
+    const pendingAgeMs = Date.now() - new Date(existingReceipt.createdAt || 0).getTime();
+    if (existingReceipt.status === "pending" && pendingAgeMs > 2 * 60 * 1000) {
+      await receipts.deleteOne({ _id: receiptId, status: "pending" });
+      if (await receipts.findOne({ _id: receiptId })) return replay();
+    } else {
+      return replay();
+    }
+  }
 
-  const session = await mongoose.startSession();
   let responseBody;
   try {
-    await session.withTransaction(async () => {
-      await receipts.insertOne({
-        _id: receiptId,
-        requestHash,
-        status: "pending",
-        createdAt: new Date(),
-      }, { session });
+    await receipts.insertOne({
+      _id: receiptId,
+      requestHash,
+      status: "pending",
+      createdAt: new Date(),
+    });
 
-      const productIds = [...new Set(normalized.map((item) => item.product_id))];
-      const products = await ReadymadeProduct.find({
-        _id: { $in: productIds },
-        isActive: true,
-      }).session(session).lean();
-      const productsById = new Map(products.map((product) => [String(product._id), product]));
-      const validated = normalized.map((item) => {
-        const product = productsById.get(String(item.product_id));
-        const variant = product?.variants?.find((entry) => entry.size === item.size);
-        if (!variant || Number(variant.stock || 0) < item.quantity) {
-          const error = new Error(`Size ${item.size} or the requested quantity is no longer available.`);
-          error.statusCode = 409;
-          throw error;
-        }
-        const unitPrice = getReadymadePricing(product, { variant }).effectivePrice;
-        if (Math.abs(unitPrice - item.expected_price) > 0.005) {
-          const error = new Error("A price changed. Request a new quote in WhatsApp.");
-          error.statusCode = 409;
-          throw error;
-        }
-        return { item, product, variant, unitPrice };
-      });
+    const productIds = [...new Set(normalized.map((item) => item.product_id))];
+    const products = await ReadymadeProduct.find({
+      _id: { $in: productIds },
+      isActive: true,
+    }).lean();
+    const productsById = new Map(products.map((product) => [String(product._id), product]));
+    const validated = normalized.map((item) => {
+      const product = productsById.get(String(item.product_id));
+      const variant = product?.variants?.find((entry) => entry.size === item.size);
+      if (!variant || Number(variant.stock || 0) < item.quantity) {
+        const error = new Error(`Size ${item.size} or the requested quantity is no longer available.`);
+        error.statusCode = 409;
+        throw error;
+      }
+      const unitPrice = getReadymadePricing(product, { variant }).effectivePrice;
+      if (Math.abs(unitPrice - item.expected_price) > 0.005) {
+        const error = new Error("A price changed. Request a new quote in WhatsApp.");
+        error.statusCode = 409;
+        throw error;
+      }
+      return { item, product, variant, unitPrice };
+    });
 
-      const carts = mongoose.connection.db.collection(Cart.collection.name);
-      const cartFilter = { user: req.user._id, status: "ACTIVE" };
-      const cart = await carts.findOne(cartFilter, { session });
+    responseBody = {
+      message: "Confirmed items added to cart",
+      redirectTo: returnPath,
+      addedItems: validated.map(({ item }) => ({
+        product_id: item.product_id,
+        size: item.size,
+        quantity: item.quantity,
+      })),
+    };
+
+    // Every selected size lives in one cart document. A single document write is
+    // atomic in MongoDB and works on both standalone servers and replica sets.
+    // The operation marker makes retries idempotent even if receipt persistence
+    // is interrupted after the cart write succeeds.
+    const carts = mongoose.connection.db.collection(Cart.collection.name);
+    const cartFilter = { user: req.user._id, status: "ACTIVE" };
+    let committed = false;
+    for (let attempt = 0; attempt < 5 && !committed; attempt += 1) {
+      const cart = await carts.findOne(cartFilter);
+      if (cart?.whatsappOperationIds?.includes(batchOperationId)) {
+        committed = true;
+        break;
+      }
+
       const now = new Date();
       const cartItems = [...(cart?.items || [])];
       for (const { item, product, variant, unitPrice } of validated) {
@@ -473,43 +501,66 @@ const addLinkedCartItems = async (req, res, items, returnPath = "/cart") => {
         }
       }
 
+      const operationIds = [...(cart?.whatsappOperationIds || []), batchOperationId].slice(-100);
       if (cart) {
-        await carts.updateOne({ _id: cart._id }, { $set: { items: cartItems, updatedAt: now } }, { session });
+        const result = await carts.updateOne(
+          {
+            _id: cart._id,
+            status: "ACTIVE",
+            updatedAt: cart.updatedAt,
+            whatsappOperationIds: { $ne: batchOperationId },
+          },
+          { $set: { items: cartItems, whatsappOperationIds: operationIds, updatedAt: now } }
+        );
+        committed = Number(result?.matchedCount || 0) === 1;
       } else {
-        await carts.insertOne({
-          user: req.user._id,
-          guestId: null,
-          items: cartItems,
-          status: "ACTIVE",
-          createdAt: now,
-          updatedAt: now,
-        }, { session });
+        try {
+          await carts.insertOne({
+            user: req.user._id,
+            guestId: null,
+            items: cartItems,
+            whatsappOperationIds: operationIds,
+            status: "ACTIVE",
+            createdAt: now,
+            updatedAt: now,
+          });
+          committed = true;
+        } catch (error) {
+          if (error?.code !== 11000) throw error;
+        }
       }
+    }
+    if (!committed) {
+      const error = new Error("Your cart changed at the same time. Please confirm once more.");
+      error.statusCode = 409;
+      throw error;
+    }
 
-      responseBody = {
-        message: "Confirmed items added to cart",
-        redirectTo: returnPath,
-        addedItems: validated.map(({ item }) => ({
-          product_id: item.product_id,
-          size: item.size,
-          quantity: item.quantity,
-        })),
-      };
-      await receipts.updateOne(
-        { _id: receiptId },
-        { $set: { status: "complete", httpStatus: 200, response: responseBody, completedAt: now } },
-        { session }
-      );
-    });
+    await receipts.updateOne(
+      { _id: receiptId },
+      { $set: { status: "complete", httpStatus: 200, response: responseBody, completedAt: new Date() } }
+    );
   } catch (error) {
     if (error?.code === 11000) return replay();
     const statusCode = Number(error?.statusCode) || 503;
     const message = statusCode === 503
       ? "Atomic cart update is temporarily unavailable. Nothing was added."
       : `${error.message} Nothing was added.`;
+    console.error("WhatsApp batch cart update failed:", {
+      message: error?.message,
+      code: error?.code,
+      statusCode,
+      itemCount: normalized.length,
+    });
+    if (statusCode < 500) {
+      await receipts.updateOne(
+        { _id: receiptId },
+        { $set: { status: "complete", httpStatus: statusCode, response: { message }, completedAt: new Date() } }
+      );
+    } else {
+      await receipts.deleteOne({ _id: receiptId }).catch(() => {});
+    }
     return res.status(statusCode).json({ message });
-  } finally {
-    await session.endSession();
   }
 
   await actionAudit().insertOne({

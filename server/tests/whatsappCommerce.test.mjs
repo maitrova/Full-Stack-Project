@@ -30,6 +30,7 @@ async function setup() {
       receipts.set(doc._id, {...doc});
     },
     updateOne: async ({_id}, update) => Object.assign(receipts.get(_id), update.$set),
+    deleteOne: async ({_id}) => receipts.delete(_id),
   };
   const checkoutCollection = {
     createIndex: async () => {},
@@ -63,7 +64,12 @@ async function setup() {
   const cartCollection = {
     findOne: async () => activeCart,
     insertOne: async doc => { activeCart = {_id: 'cart-1', ...doc}; },
-    updateOne: async (_query, update) => { activeCart = {...activeCart, ...update.$set}; },
+    updateOne: async (query, update) => {
+      if (!activeCart || String(query._id) !== String(activeCart._id)) return {matchedCount: 0};
+      if (query.updatedAt && Number(query.updatedAt) !== Number(activeCart.updatedAt)) return {matchedCount: 0};
+      activeCart = {...activeCart, ...update.$set};
+      return {matchedCount: 1};
+    },
   };
   class FakeObjectId {
     constructor(value = crypto.randomBytes(12).toString('hex')) { this.value = value; }
@@ -91,10 +97,7 @@ async function setup() {
         if (name === 'carts') return cartCollection;
         return {deleteMany: async () => {}, insertOne: async () => {}};
       }}},
-      startSession: async () => ({
-        withTransaction: async callback => callback(),
-        endSession: async () => {},
-      }),
+      startSession: async () => { throw new Error('transactions unavailable'); },
       Types: {ObjectId: FakeObjectId},
     }},
     crypto,
@@ -109,7 +112,7 @@ async function setup() {
     }}},
     '../models/readymadeproducts.js': {default: {
       findOne: query => ({lean: async () => productDocument(query._id)}),
-      find: query => ({session: () => ({lean: async () => query._id.$in.map(productDocument)})}),
+      find: query => ({lean: async () => query._id.$in.map(productDocument)}),
     }},
     '../models/Cart.js': {Cart: {collection: {name: 'carts'}}},
     '../utils/readymadePricing.js': {getReadymadePricing: () => ({effectivePrice: 120})},
@@ -135,7 +138,7 @@ async function setup() {
     const id = crypto.createHash('sha256').update(token).digest('hex');
     checkoutRequests.set(id, {_id: id, expiresAt: new Date(Date.now() + 60000), ...document});
   };
-  return {handlers, middleware, response, request, additions: () => additions, seedCheckout, checkoutRequests, setStock: v => stock = v, setLinked: v => linkedUser = v, orderFilter: () => orderFilter, orderIdFilter: () => orderIdFilter, subscriptions, activeCart: () => activeCart};
+  return {handlers, middleware, response, request, additions: () => additions, seedCheckout, checkoutRequests, clearReceipts: () => receipts.clear(), setStock: v => stock = v, setLinked: v => linkedUser = v, orderFilter: () => orderFilter, orderIdFilter: () => orderIdFilter, subscriptions, activeCart: () => activeCart};
 }
 
 test('cart retry replays receipt, including after stock changes', async () => {
@@ -164,7 +167,7 @@ test('stock and changed quotes cannot mutate carts', async () => {
   assert.equal(s.additions(), 0);
 });
 
-test('multi-item endpoint commits one atomic cart update and replays safely', async () => {
+test('multi-item endpoint works without transactions and replays safely', async () => {
   const s = await setup();
   const batch = s.handlers.get('POST /cart/batch')[0];
   const req = {
@@ -181,6 +184,9 @@ test('multi-item endpoint commits one atomic cart update and replays safely', as
   assert.equal(s.activeCart().items.length, 2);
   assert.equal(Array.from(s.activeCart().items, item => item.qty).sort().join(','), '1,2');
 
+  // Simulate losing the separate receipt after the cart write. The marker in
+  // the cart document still prevents the items from being added a second time.
+  s.clearReceipts();
   const replay = s.response();
   await batch(req, replay);
   assert.equal(replay.code, 200);
