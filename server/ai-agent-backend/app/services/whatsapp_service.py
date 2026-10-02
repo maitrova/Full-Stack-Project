@@ -108,6 +108,8 @@ class WhatsAppClient:
         normalized = re.sub(r"[^a-z0-9]+", " ", title.lower()).strip()
         if normalized.startswith("yes") and "add" in normalized:
             return "confirm_cart"
+        if normalized in {"change size", "change sizes", "edit size", "edit sizes"}:
+            return "change_sizes"
         if normalized in {"no", "cancel", "not now"}:
             return "decline_cart"
         option = re.fullmatch(r"option ([1-5])", normalized)
@@ -691,7 +693,9 @@ class WhatsAppService:
                 r"\b(?:would you like me to add|add it to your cart|confirm)\b",
                 body.lower(),
             ):
-                return await self.client.send_reply_buttons(to, body, ["Yes, add it", "No"], message_id), "buttons"
+                return await self.client.send_reply_buttons(
+                    to, body, ["Yes, add it", "Change sizes", "No"], message_id
+                ), "buttons"
             if len(body) <= 1024 and 2 <= len(products) <= 3 and re.search(
                 r"\b(?:option|choose|which one|reply with)\b",
                 body.lower(),
@@ -722,6 +726,8 @@ class WhatsAppService:
                     return "yes confirm"
                 if reply_id == "decline_cart":
                     return "no"
+                if reply_id == "change_sizes":
+                    return "show sizes"
                 return reply.get("title", "").strip()
             if interactive.get("type") == "list_reply":
                 return interactive.get("list_reply", {}).get("title", "").strip()

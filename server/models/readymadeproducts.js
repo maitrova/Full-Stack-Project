@@ -31,6 +31,23 @@ const imageSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const merchandisingSchema = new mongoose.Schema(
+  {
+    productType: { type: String, default: "", trim: true, maxlength: 80 },
+    gender: { type: String, default: "Unisex", trim: true, maxlength: 40 },
+    colors: { type: [String], default: [] },
+    fabric: { type: String, default: "", trim: true, maxlength: 80 },
+    fit: { type: String, default: "", trim: true, maxlength: 80 },
+    sleeve: { type: String, default: "", trim: true, maxlength: 80 },
+    pattern: { type: String, default: "", trim: true, maxlength: 80 },
+    style: { type: String, default: "", trim: true, maxlength: 80 },
+    occasions: { type: [String], default: [] },
+    care: { type: String, default: "", trim: true, maxlength: 300 },
+    searchTags: { type: [String], default: [] },
+  },
+  { _id: false }
+);
+
 const readymadeProductSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
@@ -61,6 +78,10 @@ const readymadeProductSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+
+    // Merchant-authored facts used by search and the AI agent. These fields
+    // take precedence over attributes inferred from the product title.
+    merchandising: { type: merchandisingSchema, default: () => ({}) },
 
     stock: { type: Number, default: 0, min: 0 },
 

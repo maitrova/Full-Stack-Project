@@ -87,6 +87,15 @@ class StoreAnswerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response[0], "Fabric: Cotton.")
         self.assertEqual(response[1], [product])
 
+    def test_cotton_filter_request_is_not_misread_as_product_fact_question(self):
+        self.assertIsNone(
+            WhatsAppCommerce._requested_product_fact("only show me the cotton fabric")
+        )
+        self.assertEqual(
+            WhatsAppCommerce._requested_product_fact("what is the fabric?"),
+            ("fabric", None),
+        )
+
     async def test_customer_fabric_word_does_not_start_variant_search(self):
         product = SimpleNamespace(
             id="shirt",
@@ -130,6 +139,177 @@ class StoreAnswerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(response)
         self.assertEqual(state["purchase"]["product_id"], "shirt")
         tools.get_product_details.assert_not_awaited()
+
+    async def test_two_sizes_are_quoted_and_added_as_two_cart_items(self):
+        product = SimpleNamespace(
+            id="shirt",
+            name="Cotton Checks Shirt",
+            currency="INR",
+            attributes={
+                "source_type": "readymade",
+                "sizes": ["S", "L"],
+                "variants": [
+                    {"size": "S", "stock": 4, "effective_price": 899},
+                    {"size": "L", "stock": 10, "effective_price": 899},
+                ],
+            },
+        )
+        commerce = WhatsAppCommerce(SimpleNamespace())
+        commerce._linked = AsyncMock(return_value=True)
+        commerce._request = AsyncMock(return_value=(201, {}))
+        tools = SimpleNamespace(get_product_details=AsyncMock(return_value=product))
+        state = {
+            "selected_product_id": "shirt",
+            "purchase": {"product_id": "shirt", "size": "L"},
+        }
+        conversation = {
+            "selected_product_id": "shirt",
+            "external_customer_ref": "919999999999",
+        }
+
+        with patch(
+            "app.services.whatsapp_commerce.settings",
+            SimpleNamespace(ecommerce_storefront_url="https://shop.example"),
+        ):
+            quote = await commerce.handle(
+                "I need L one and S one", conversation, state, tools, "business"
+            )
+            added = await commerce.handle(
+                "Yes, add it", conversation, state, tools, "business"
+            )
+
+        self.assertIn("1 x size L", quote[0])
+        self.assertIn("1 x size S", quote[0])
+        self.assertIn("Total: INR 1798", quote[0])
+        self.assertIn("both sizes are in your cart", added[0])
+        commerce._request.assert_awaited_once()
+        request_args = commerce._request.await_args.args
+        self.assertEqual(request_args[1], "/cart/batch")
+        self.assertEqual(
+            {item["size"] for item in request_args[3]["items"]}, {"S", "L"}
+        )
+        self.assertNotIn("purchase", state)
+        self.assertEqual(state["last_cart_update"]["item_count"], 2)
+
+    async def test_change_sizes_keeps_the_pending_purchase(self):
+        product = SimpleNamespace(
+            id="shirt",
+            name="Cotton Checks Shirt",
+            currency="INR",
+            attributes={
+                "source_type": "readymade",
+                "sizes": ["S", "L"],
+                "variants": [
+                    {"size": "S", "stock": 4, "effective_price": 899},
+                    {"size": "L", "stock": 10, "effective_price": 899},
+                ],
+            },
+        )
+        commerce = WhatsAppCommerce(SimpleNamespace())
+        tools = SimpleNamespace(get_product_details=AsyncMock(return_value=product))
+        state = {
+            "selected_product_id": "shirt",
+            "purchase": {
+                "product_id": "shirt",
+                "size": "L",
+                "quantity": 1,
+                "confirmed_quote": 899,
+            },
+        }
+        conversation = {"selected_product_id": "shirt"}
+        intent = IntentResult(intent="commerce_action", action="show_sizes")
+
+        response = await commerce.handle(
+            "show sizes", conversation, state, tools, "business", intent=intent
+        )
+
+        self.assertIn("S: 4 available", response[0])
+        self.assertIn("L: 10 available", response[0])
+        self.assertEqual(state["purchase"]["product_id"], "shirt")
+        self.assertEqual(state["purchase"]["size"], "L")
+
+    async def test_add_one_more_with_size_starts_purchase_instead_of_listing_sizes(self):
+        product = SimpleNamespace(
+            id="shirt",
+            name="Cotton Checks Shirt",
+            currency="INR",
+            attributes={
+                "source_type": "readymade",
+                "sizes": ["S", "L"],
+                "variants": [
+                    {"size": "S", "stock": 4, "effective_price": 899},
+                    {"size": "L", "stock": 10, "effective_price": 899},
+                ],
+            },
+        )
+        commerce = WhatsAppCommerce(SimpleNamespace())
+        tools = SimpleNamespace(get_product_details=AsyncMock(return_value=product))
+        state = {"selected_product_id": "shirt"}
+        conversation = {
+            "selected_product_id": "shirt",
+            "recommended_product_ids": ["shirt"],
+            "external_customer_ref": "919999999999",
+        }
+        intent = IntentResult(intent="commerce_action", action="add_to_cart", wants_to_buy=True)
+
+        with patch(
+            "app.services.whatsapp_commerce.settings",
+            SimpleNamespace(ecommerce_storefront_url="https://shop.example"),
+        ):
+            response = await commerce.handle(
+                "add one more with size L",
+                conversation,
+                state,
+                tools,
+                "business",
+                intent=intent,
+            )
+
+        self.assertIn("size L", response[0])
+        self.assertIn("Add it to your cart", response[0])
+        self.assertNotIn("S: 4 available", response[0])
+        self.assertEqual(state["purchase"]["quantity"], 1)
+
+    async def test_two_sizes_use_one_secure_link_when_account_is_not_connected(self):
+        product = SimpleNamespace(
+            id="shirt",
+            name="Cotton Checks Shirt",
+            currency="INR",
+            attributes={
+                "source_type": "readymade",
+                "sizes": ["S", "L"],
+                "variants": [
+                    {"size": "S", "stock": 4, "effective_price": 899},
+                    {"size": "L", "stock": 10, "effective_price": 899},
+                ],
+            },
+        )
+        commerce = WhatsAppCommerce(SimpleNamespace())
+        commerce._linked = AsyncMock(return_value=False)
+        commerce._link_message = AsyncMock(return_value="secure link")
+        tools = SimpleNamespace(get_product_details=AsyncMock(return_value=product))
+        state = {
+            "selected_product_id": "shirt",
+            "purchase": {"product_id": "shirt"},
+        }
+        conversation = {
+            "selected_product_id": "shirt",
+            "external_customer_ref": "919999999999",
+        }
+
+        quote = await commerce.handle(
+            "one L and one S", conversation, state, tools, "business"
+        )
+        linked = await commerce.handle(
+            "Yes, add it", conversation, state, tools, "business"
+        )
+
+        self.assertIn("Total: INR 1798", quote[0])
+        self.assertEqual(linked[0], "secure link")
+        purchase = commerce._link_message.await_args.kwargs["purchase"]
+        self.assertEqual(len(purchase["items"]), 2)
+        self.assertEqual({item["size"] for item in purchase["items"]}, {"S", "L"})
+        self.assertNotIn("purchase", state)
 
     async def test_customer_can_accept_same_in_stock_cart_quote_after_saying_no(self):
         product = SimpleNamespace(

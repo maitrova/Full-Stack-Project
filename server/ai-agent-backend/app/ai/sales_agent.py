@@ -24,6 +24,7 @@ from app.schemas.product import ProductPublic
 from app.schemas.ai import AiChatRequest, AiChatResponse, IntentResult
 from app.schemas.conversation import ConversationPublic, MessagePublic
 from app.schemas.user import UserPublic
+from app.services.conversation_flow import reset_search_context, sync_flow_state
 from app.tools.product_tools import ProductSearchParams, ProductTools
 from app.utils.object_id import object_id_to_str, parse_object_id
 
@@ -153,17 +154,16 @@ class SalesAgent:
             intent.wants_to_buy = False
 
         updated_state = self._merge_conversation_state(conversation.get("conversation_state", {}), intent)
+        # A successful cart mutation is a one-turn event. The next customer
+        # message resumes the phase derived from the remaining context.
+        updated_state.pop("last_cart_update", None)
         self._remember_customer_preferences(updated_state, payload.message, intent)
         image_lookup = bool(has_image or (effective_image_analysis and (image_reference_question or image_product_choice)))
         if image_lookup:
             # A new visual enquiry must not inherit an older product selection.
             # Otherwise commerce can ask the customer to choose from stale options
             # before the uploaded image has been searched.
-            for key in (
-                "selected_product_id", "recommended_product_ids", "option_product_ids",
-                "option_products", "pending_product_action", "purchase", "last_declined_purchase",
-            ):
-                updated_state.pop(key, None)
+            reset_search_context(updated_state)
             conversation["selected_product_id"] = None
             conversation["recommended_product_ids"] = []
         self._apply_product_option(intent.product_option, conversation, updated_state)
@@ -420,6 +420,9 @@ class SalesAgent:
         }:
             updated_state["last_search_had_results"] = bool(products)
 
+        if conversation.get("channel") == "whatsapp" and len(products) > 3:
+            products = products[:3]
+
         if products:
             updated_state["option_product_ids"] = {
                 str(index): product.id for index, product in enumerate(products, start=1)
@@ -438,20 +441,24 @@ class SalesAgent:
 
         if not presentation and (not image_analysis_failed or customization_request):
             ai_text = await self.response_generator.generate(
-            customer_message=payload.message,
-            intent=intent,
-            fallback_response=ai_text,
-            conversation_state=updated_state,
-            products=products,
-            selected_product=selected_product,
-            response_goal=response_goal,
-            store_context=store_context,
+                customer_message=payload.message,
+                intent=intent,
+                fallback_response=ai_text,
+                conversation_state=updated_state,
+                products=products,
+                selected_product=selected_product,
+                response_goal=response_goal,
+                store_context=store_context,
                 merchant_prompt=business.get("ai_prompt_config"),
-        )
+            )
+
+        if conversation.get("channel") == "whatsapp":
+            ai_text = self._compact_whatsapp_reply(ai_text)
 
         updated_state["recent_turns"] = (updated_state.get("recent_turns", []) + [
             {"customer": payload.message[:1000], "reply": ai_text[:1500]}
         ])[-12:]
+        flow_phase = sync_flow_state(updated_state)
         ai_message = await self.message_repository.create_message(
             business_id=business_id,
             conversation_id=str(conversation["_id"]),
@@ -468,6 +475,7 @@ class SalesAgent:
                     "recommended_product_ids": [product.id for product in products],
                     "recommended_products": [self._product_card(product) for product in products],
                     "selected_product_id": updated_state.get("selected_product_id"),
+                    "flow_phase": flow_phase,
                     "merchant_prompt_version": (business.get("ai_prompt_config") or {}).get("version") or settings.merchant_prompt_version,
                 },
             },
@@ -504,6 +512,15 @@ class SalesAgent:
                 "lead_updated_at": ai_message["created_at"],
             })
 
+        handoff_context = updated_state.get("handoff_context") or {}
+        if updated_state.get("handoff_requested"):
+            conversation_updates.update({
+                "handoff_reason": handoff_context.get("reason") or "customer_requested_team",
+                "handoff_summary": handoff_context.get("summary") or "",
+                "handoff_urgency": handoff_context.get("urgency") or "normal",
+                "handoff_requested_at": ai_message["created_at"],
+            })
+
         await self.conversation_repository.collection.update_one(
             {"_id": conversation["_id"], "business_id": business["_id"]},
             {"$set": conversation_updates},
@@ -520,6 +537,9 @@ class SalesAgent:
                         "external_customer_ref": conversation.get("external_customer_ref"),
                         "lead_type": "customization" if is_customization_lead else "general",
                         "status": "open",
+                        "reason": handoff_context.get("reason") or "customer_requested_team",
+                        "summary": handoff_context.get("summary") or "",
+                        "urgency": handoff_context.get("urgency") or "normal",
                         "created_at": ai_message["created_at"],
                     },
                 },
@@ -679,6 +699,11 @@ class SalesAgent:
             explicit.category
             and not re.search(r"\b(?:this|that|it|option|product)\b", text)
         )
+        explicit_attribute_search = bool(
+            explicit.attributes
+            and re.search(r"\b(?:only|show|find|looking|look for|want|need)\b", text)
+            and not re.search(r"\b(?:this|that|it|option|product)\b", text)
+        )
         previous_catalog_type = (state.get("attributes") or {}).get("catalog_type")
         explicit_catalog_type = explicit.attributes.get("catalog_type")
         if restart or category_changed or explicit_category_search:
@@ -690,10 +715,8 @@ class SalesAgent:
                 state["attributes"] = {"catalog_type": previous_catalog_type}
         changed_filter = any(getattr(explicit, key) is not None and getattr(explicit, key) != state.get(key) for key in ["category", "color", "max_price", "occasion"])
         # Explicit requests for another category or filter should trigger a fresh search.
-        if restart or category_changed or explicit_category_search or changed_filter:
-            state.pop("purchase", None)
-            for key in ["selected_product_id", "recommended_product_ids", "option_product_ids", "option_products", "pending_product_action", "last_declined_purchase", "last_search_had_results", "last_offer_type", "last_image_analysis", "last_order_id"]:
-                state.pop(key, None)
+        if restart or category_changed or explicit_category_search or explicit_attribute_search or changed_filter:
+            reset_search_context(state)
             conversation["selected_product_id"] = None
             conversation["recommended_product_ids"] = []
         conversation["conversation_state"] = state
@@ -1452,6 +1475,27 @@ class SalesAgent:
 
         lines.append("Want details for any one?")
         return "\n".join(lines)
+
+    @staticmethod
+    def _compact_whatsapp_reply(value: str, limit: int = 900) -> str:
+        """Keep WhatsApp output scannable without cutting links or cart facts."""
+        text = re.sub(r"\n{3,}", "\n\n", str(value or "").strip())
+        option_count = 0
+        lines = []
+        for line in text.splitlines():
+            if re.match(r"^\s*\d+[.)]\s+", line):
+                option_count += 1
+                if option_count > 3:
+                    continue
+            lines.append(line.rstrip())
+        text = "\n".join(lines).strip()
+        if len(text) <= limit:
+            return text
+        safe = text[:limit]
+        boundary = max(safe.rfind("\n"), safe.rfind(". "), safe.rfind("? "))
+        if boundary >= limit // 2:
+            safe = safe[:boundary + 1]
+        return safe.rstrip() + "\nReply with what you want to check next."
 
     def _build_customization_response(
         self,

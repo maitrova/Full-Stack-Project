@@ -15,9 +15,11 @@ async function setup() {
   let orderFilter;
   let orderIdFilter;
   let linkedUser = 'owner';
+  let activeCart = null;
   const router = {
     post: (path, ...fns) => handlers.set('POST ' + path, fns),
     get: (path, ...fns) => handlers.set('GET ' + path, fns),
+    patch: (path, ...fns) => handlers.set('PATCH ' + path, fns),
     delete: (path, ...fns) => handlers.set('DELETE ' + path, fns),
     use: fn => middleware.push(fn),
   };
@@ -58,6 +60,24 @@ async function setup() {
       return {_id, count};
     },
   };
+  const cartCollection = {
+    findOne: async () => activeCart,
+    insertOne: async doc => { activeCart = {_id: 'cart-1', ...doc}; },
+    updateOne: async (_query, update) => { activeCart = {...activeCart, ...update.$set}; },
+  };
+  class FakeObjectId {
+    constructor(value = crypto.randomBytes(12).toString('hex')) { this.value = value; }
+    toString() { return String(this.value); }
+  }
+  const productDocument = id => ({
+    _id: id,
+    title: 'Cotton shirt',
+    price: 120,
+    currency: 'INR',
+    thumbnail: 'shirt.jpg',
+    images: [],
+    variants: [{size: 'S', stock, price: 120}, {size: 'M', stock, price: 120}],
+  });
   const stubs = {
     express: {default: {Router: () => router}},
     mongoose: {default: {
@@ -68,8 +88,14 @@ async function setup() {
         if (name === 'whatsapp_account_links') return linkCollection;
         if (name === 'whatsapp_order_subscriptions') return subscriptionCollection;
         if (name === 'whatsapp_commerce_rate_limits') return rateLimitCollection;
+        if (name === 'carts') return cartCollection;
         return {deleteMany: async () => {}, insertOne: async () => {}};
       }}},
+      startSession: async () => ({
+        withTransaction: async callback => callback(),
+        endSession: async () => {},
+      }),
+      Types: {ObjectId: FakeObjectId},
     }},
     crypto,
     '../middleware/authMiddleware.js': {protect: () => {}},
@@ -81,9 +107,17 @@ async function setup() {
       orderIdFilter = query;
       return {select: () => ({lean: async () => ({_id: query._id, orderStatus: 'SHIPPED'})})};
     }}},
-    '../models/readymadeproducts.js': {default: {findOne: () => ({lean: async () => ({variants: [{size: 'M', stock}]})})}},
+    '../models/readymadeproducts.js': {default: {
+      findOne: query => ({lean: async () => productDocument(query._id)}),
+      find: query => ({session: () => ({lean: async () => query._id.$in.map(productDocument)})}),
+    }},
+    '../models/Cart.js': {Cart: {collection: {name: 'carts'}}},
     '../utils/readymadePricing.js': {getReadymadePricing: () => ({effectivePrice: 120})},
-    '../controllers/cartController.js': {addToCart: async (req, res) => {additions++; res.status(201).json({message: 'Added'});}},
+    '../controllers/cartController.js': {
+      addToCart: async (req, res) => {additions++; res.status(201).json({message: 'Added'});},
+      removeCartItem: async (_req, res) => res.status(200).json({message: 'Removed'}),
+      updateCartItemQty: async (_req, res) => res.status(200).json({message: 'Updated'}),
+    },
   };
   const context = vm.createContext({Buffer, URL, process: {env: {WHATSAPP_COMMERCE_KEY: 'test-only', ECOMMERCE_STOREFRONT_URL: 'https://shop.example'}}, Date});
   const source = await readFile(new URL('../routes/whatsappCommerce.js', import.meta.url), 'utf8');
@@ -101,7 +135,7 @@ async function setup() {
     const id = crypto.createHash('sha256').update(token).digest('hex');
     checkoutRequests.set(id, {_id: id, expiresAt: new Date(Date.now() + 60000), ...document});
   };
-  return {handlers, middleware, response, request, additions: () => additions, seedCheckout, checkoutRequests, setStock: v => stock = v, setLinked: v => linkedUser = v, orderFilter: () => orderFilter, orderIdFilter: () => orderIdFilter, subscriptions};
+  return {handlers, middleware, response, request, additions: () => additions, seedCheckout, checkoutRequests, setStock: v => stock = v, setLinked: v => linkedUser = v, orderFilter: () => orderFilter, orderIdFilter: () => orderIdFilter, subscriptions, activeCart: () => activeCart};
 }
 
 test('cart retry replays receipt, including after stock changes', async () => {
@@ -128,6 +162,46 @@ test('stock and changed quotes cannot mutate carts', async () => {
   s.setStock(0);
   await cart(s.request(), s.response());
   assert.equal(s.additions(), 0);
+});
+
+test('multi-item endpoint commits one atomic cart update and replays safely', async () => {
+  const s = await setup();
+  const batch = s.handlers.get('POST /cart/batch')[0];
+  const req = {
+    user: {_id: 'owner'},
+    whatsappAccountRef: 'a'.repeat(64),
+    body: {items: [
+      {product_id: 'a'.repeat(24), size: 'S', quantity: 1, expected_price: 120, operation_id: '1'.repeat(32)},
+      {product_id: 'a'.repeat(24), size: 'M', quantity: 2, expected_price: 120, operation_id: '2'.repeat(32)},
+    ]},
+  };
+  const first = s.response();
+  await batch(req, first);
+  assert.equal(first.code, 200);
+  assert.equal(s.activeCart().items.length, 2);
+  assert.equal(Array.from(s.activeCart().items, item => item.qty).sort().join(','), '1,2');
+
+  const replay = s.response();
+  await batch(req, replay);
+  assert.equal(replay.code, 200);
+  assert.equal(s.activeCart().items.length, 2);
+});
+
+test('multi-item endpoint adds nothing when any requested size is unavailable', async () => {
+  const s = await setup();
+  s.setStock(0);
+  const batch = s.handlers.get('POST /cart/batch')[0];
+  const res = s.response();
+  await batch({
+    user: {_id: 'owner'},
+    whatsappAccountRef: 'a'.repeat(64),
+    body: {items: [
+      {product_id: 'a'.repeat(24), size: 'S', quantity: 1, expected_price: 120, operation_id: '3'.repeat(32)},
+      {product_id: 'a'.repeat(24), size: 'M', quantity: 1, expected_price: 120, operation_id: '4'.repeat(32)},
+    ]},
+  }, res);
+  assert.equal(res.code, 409);
+  assert.equal(s.activeCart(), null);
 });
 
 test('secret and linked account required; orders scoped to linked user', async () => {

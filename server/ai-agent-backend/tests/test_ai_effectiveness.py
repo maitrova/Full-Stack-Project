@@ -94,6 +94,75 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(facts["color"], "White, Blue")
         self.assertEqual(facts["style"], "Formal")
 
+    def test_title_fabric_wins_over_conflicting_description_word(self):
+        repo = EcommerceProductRepository.__new__(EcommerceProductRepository)
+        facts = repo._infer_merchandise_attributes(
+            "White Checks Cotton Shirt",
+            "A denim-inspired blue look for office wear",
+        )
+
+        self.assertEqual(facts["fabric"], "Cotton")
+
+    def test_fabric_filter_uses_canonical_product_fact(self):
+        repo = EcommerceProductRepository.__new__(EcommerceProductRepository)
+        item = product(
+            name="Polyester Shirt",
+            category="Men Shirts",
+        ).model_dump(by_alias=True)
+        item["description"] = "Cotton-inspired look"
+        item["attributes"]["fabric"] = "Polyester"
+
+        self.assertFalse(repo._matches(
+            item,
+            {"category": "shirt", "attributes": {"fabric": "cotton"}},
+        ))
+
+    def test_structured_product_facts_override_title_inference(self):
+        repo = EcommerceProductRepository.__new__(EcommerceProductRepository)
+        document = {
+            "_id": "507f1f77bcf86cd799439011",
+            "title": "Denim Inspired Office Shirt",
+            "description": "Smart office shirt",
+            "category": "category-id",
+            "subCategory": "subcategory-id",
+            "brand": "brand-id",
+            "price": 899,
+            "stock": 5,
+            "currency": "INR",
+            "variants": [{"size": "M", "stock": 5, "price": 899}],
+            "merchandising": {
+                "productType": "Formal shirt",
+                "gender": "Men",
+                "colors": ["White", "Blue"],
+                "fabric": "100% Cotton",
+                "fit": "Regular fit",
+                "occasions": ["Office"],
+                "searchTags": ["workwear"],
+            },
+        }
+        names = {
+            "category": {"category-id": "Men Shirts"},
+            "subCategory": {"subcategory-id": "Formal Shirts"},
+            "brand": {"brand-id": "Maitrova"},
+        }
+
+        normalized = repo._normalize_readymade(
+            document, "507f1f77bcf86cd799439012", names
+        )
+
+        self.assertEqual(normalized["attributes"]["fabric"], "100% Cotton")
+        self.assertEqual(normalized["attributes"]["product_type"], "Formal shirt")
+        self.assertEqual(normalized["attributes"]["color"], "White, Blue")
+        self.assertIn("workwear", normalized["tags"])
+        self.assertTrue(repo._matches(
+            normalized,
+            {"category": "shirt", "attributes": {"fabric": "cotton"}},
+        ))
+        self.assertFalse(repo._matches(
+            normalized,
+            {"category": "shirt", "attributes": {"fabric": "denim"}},
+        ))
+
     def test_medium_confidence_reply_discloses_design_may_differ(self):
         reply = self.agent._build_image_match_response(
             IntentResult(intent="product_search"), [product(score=0.5)], {"confidence": 0.65}
@@ -201,6 +270,16 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(confirm.action, "confirm_cart")
         self.assertEqual(changed_mind.action, "decline_cart")
         self.assertEqual(photos.action, "product_photos")
+
+    def test_add_one_more_is_a_cart_action(self):
+        parser = IntentParser(SimpleNamespace(is_configured=False))
+        intent = parser._parse_with_rules(
+            "add one more with size L",
+            {"selected_product_id": "shirt"},
+        )
+
+        self.assertEqual(intent.action, "add_to_cart")
+        self.assertTrue(intent.wants_to_buy)
 
     def test_transient_action_is_not_saved_as_conversation_context(self):
         next_state = self.agent._merge_conversation_state(

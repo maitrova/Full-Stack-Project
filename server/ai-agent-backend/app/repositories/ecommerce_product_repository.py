@@ -154,10 +154,20 @@ class EcommerceProductRepository:
     def _searchable_text(self, product: dict) -> str:
         attributes = product.get("attributes") or {}
         search_attributes = attributes.get("search_attributes") or {}
+        canonical_attributes = []
+        for key in (
+            "product_type", "gender", "color", "colors", "fabric", "material",
+            "fit", "sleeve", "pattern", "style", "occasion", "occasions", "care",
+        ):
+            value = attributes.get(key)
+            if isinstance(value, (list, tuple, set)):
+                canonical_attributes.extend(value)
+            elif value:
+                canonical_attributes.append(value)
         values = [
             product.get("name"), product.get("description"), product.get("category"),
             attributes.get("sub_category"), attributes.get("brand"), attributes.get("source_type"),
-            *product.get("tags", []), *attributes.get("colors", []),
+            *product.get("tags", []), *canonical_attributes,
             *search_attributes.values(),
         ]
         return " ".join(str(value) for value in values if value).lower()
@@ -289,6 +299,24 @@ class EcommerceProductRepository:
         inferred_attributes = self._infer_merchandise_attributes(
             document.get("title"), document.get("description"), category, subcategory
         )
+        structured = document.get("merchandising") or {}
+        structured_attributes = {
+            "product_type": structured.get("productType"),
+            "gender": structured.get("gender"),
+            "color": ", ".join(structured.get("colors") or []),
+            "colors": structured.get("colors") or [],
+            "fabric": structured.get("fabric"),
+            "fit": structured.get("fit"),
+            "sleeve": structured.get("sleeve"),
+            "pattern": structured.get("pattern"),
+            "style": structured.get("style"),
+            "occasions": structured.get("occasions") or [],
+            "care": structured.get("care"),
+        }
+        structured_attributes = {
+            key: value for key, value in structured_attributes.items()
+            if value not in (None, "", [])
+        }
 
         return {
             "_id": document["_id"],
@@ -315,9 +343,16 @@ class EcommerceProductRepository:
                 "source_type": "readymade",
                 "customizable": False,
                 **inferred_attributes,
+                **structured_attributes,
             },
             "status": "active",
-            "tags": [value for value in [category, subcategory, brand, "readymade", *sizes] if value],
+            "tags": [
+                value for value in [
+                    category, subcategory, brand, "readymade", *sizes,
+                    *(structured.get("searchTags") or []),
+                    *(structured.get("occasions") or []),
+                ] if value
+            ],
             "created_at": document.get("createdAt") or now,
             "updated_at": document.get("updatedAt") or now,
         }
@@ -325,7 +360,8 @@ class EcommerceProductRepository:
     @staticmethod
     def _infer_merchandise_attributes(*values: Any) -> dict[str, Any]:
         """Expose facts that are explicitly present in merchant product copy."""
-        text = " ".join(str(value or "") for value in values).lower()
+        source_texts = [str(value or "").lower() for value in values if value]
+        text = " ".join(source_texts)
         groups = {
             "fabric": [
                 "organic cotton", "cotton blend", "poly cotton", "polyester", "linen",
@@ -341,10 +377,15 @@ class EcommerceProductRepository:
         }
         inferred = {}
         for key, candidates in groups.items():
-            match = next(
-                (candidate for candidate in candidates if re.search(rf"\b{re.escape(candidate)}\b", text)),
-                None,
-            )
+            # Product title is the strongest merchant-provided signal. Do not
+            # let a later description/category word replace an explicit title
+            # fact (for example, a Cotton shirt described as denim-inspired).
+            match = next((
+                candidate
+                for source in source_texts
+                for candidate in candidates
+                if re.search(rf"\b{re.escape(candidate)}\b", source)
+            ), None)
             if match:
                 inferred[key] = match.title()
         colors = [
@@ -473,6 +514,9 @@ class EcommerceProductRepository:
                 if not re.search(r"\bcheck(?:s|ed|ered)?\b", searchable):
                     return False
                 continue
+            canonical_value = (product.get("attributes") or {}).get(key)
+            if canonical_value and normalized_value not in str(canonical_value).lower():
+                return False
             if value and normalized_value not in searchable:
                 return False
         price = self._display_price(product)

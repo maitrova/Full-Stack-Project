@@ -96,6 +96,17 @@ const ProductFormModal = ({
   bestSeller: false,
   newArrival: false,
   paymentOptions: ['COD', 'ONLINE'],
+  productType: '',
+  gender: 'Unisex',
+  colors: '',
+  fabric: '',
+  fit: '',
+  sleeve: '',
+  pattern: '',
+  style: '',
+  occasions: '',
+  care: '',
+  searchTags: '',
   
   });
 
@@ -277,6 +288,17 @@ const ProductFormModal = ({
       paymentOptions: Array.isArray(product.paymentOptions) && product.paymentOptions.length
         ? product.paymentOptions
         : ['COD', 'ONLINE'],
+      productType: product.merchandising?.productType || '',
+      gender: product.merchandising?.gender || 'Unisex',
+      colors: (product.merchandising?.colors || []).join(', '),
+      fabric: product.merchandising?.fabric || '',
+      fit: product.merchandising?.fit || '',
+      sleeve: product.merchandising?.sleeve || '',
+      pattern: product.merchandising?.pattern || '',
+      style: product.merchandising?.style || '',
+      occasions: (product.merchandising?.occasions || []).join(', '),
+      care: product.merchandising?.care || '',
+      searchTags: (product.merchandising?.searchTags || []).join(', '),
     });
 
     // ✅ Variants
@@ -353,6 +375,17 @@ const ProductFormModal = ({
       bestSeller: false,
       newArrival: false,
       paymentOptions: ['COD', 'ONLINE'],
+      productType: '',
+      gender: 'Unisex',
+      colors: '',
+      fabric: '',
+      fit: '',
+      sleeve: '',
+      pattern: '',
+      style: '',
+      occasions: '',
+      care: '',
+      searchTags: '',
       
       // ✅ NEW
     });
@@ -1742,6 +1775,20 @@ const validateForm = () => {
       data.append('price', overallPrice);
       data.append('stock', totalStock);
       data.append('variants', JSON.stringify(normalizedVariants));
+      const list = (value) => String(value || '').split(',').map((item) => item.trim()).filter(Boolean);
+      data.set('merchandising', JSON.stringify({
+        productType: formData.productType,
+        gender: formData.gender,
+        colors: list(formData.colors),
+        fabric: formData.fabric,
+        fit: formData.fit,
+        sleeve: formData.sleeve,
+        pattern: formData.pattern,
+        style: formData.style,
+        occasions: list(formData.occasions),
+        care: formData.care,
+        searchTags: list(formData.searchTags),
+      }));
       if (String(formData.salePrice || '').trim() !== '') {
         data.append('salePrice', formData.salePrice);
       }
@@ -2998,6 +3045,54 @@ const validateForm = () => {
     </p>
   )}
           </div>
+
+            <div className="rounded-lg border border-indigo-100 bg-indigo-50/40 p-6">
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Structured product information</h3>
+                <p className="mt-1 text-sm text-gray-600">
+                  These facts are used directly by WhatsApp search and product questions.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {[
+                  ['productType', 'Product type', 'Formal shirt'],
+                  ['gender', 'Gender', 'Men, Women, or Unisex'],
+                  ['colors', 'Colors', 'White, Blue'],
+                  ['fabric', 'Fabric', '100% cotton'],
+                  ['fit', 'Fit', 'Regular fit'],
+                  ['sleeve', 'Sleeve', 'Long sleeve'],
+                  ['pattern', 'Pattern', 'Checked'],
+                  ['style', 'Style', 'Formal'],
+                  ['occasions', 'Occasions', 'Office, Casual'],
+                  ['searchTags', 'Search tags', 'white checks, office wear'],
+                ].map(([name, label, placeholder]) => (
+                  <label key={name} className="block text-sm font-medium text-gray-700">
+                    {label}
+                    <input
+                      type="text"
+                      name={name}
+                      value={formData[name]}
+                      onChange={handleInputChange}
+                      placeholder={placeholder}
+                      disabled={loading}
+                      className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                    />
+                  </label>
+                ))}
+                <label className="block text-sm font-medium text-gray-700 md:col-span-2 lg:col-span-3">
+                  Care instructions
+                  <input
+                    type="text"
+                    name="care"
+                    value={formData.care}
+                    onChange={handleInputChange}
+                    placeholder="Machine wash cold, do not bleach"
+                    disabled={loading}
+                    className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2.5 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
+                  />
+                </label>
+              </div>
+            </div>
 
             <div className="border rounded-lg p-6">
               <div className="flex items-center justify-between mb-6">

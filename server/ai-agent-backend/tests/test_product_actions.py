@@ -9,7 +9,7 @@ from app.ai.product_image_analyzer import ProductImageAnalyzer
 from app.ai.sales_agent import SalesAgent
 from app.repositories.ecommerce_product_repository import EcommerceProductRepository
 from app.schemas.ai import IntentResult
-from app.services.whatsapp_service import WhatsAppService
+from app.services.whatsapp_service import WhatsAppClient, WhatsAppService
 
 
 class ProductActions(unittest.IsolatedAsyncioTestCase):
@@ -149,6 +149,23 @@ class ProductActions(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             service._message_text({"type": "image", "image": {"id": "media-1", "mime_type": "image/jpeg"}}),
             "Photo enquiry",
+        )
+
+    def test_cart_confirmation_buttons_have_stable_actions(self):
+        self.assertEqual(WhatsAppClient._reply_button_id("Yes, add it", 1), "confirm_cart")
+        self.assertEqual(WhatsAppClient._reply_button_id("Change sizes", 2), "change_sizes")
+        self.assertEqual(WhatsAppClient._reply_button_id("No", 3), "decline_cart")
+
+        service = WhatsAppService.__new__(WhatsAppService)
+        self.assertEqual(
+            service._message_text({
+                "type": "interactive",
+                "interactive": {
+                    "type": "button_reply",
+                    "button_reply": {"id": "change_sizes", "title": "Change sizes"},
+                },
+            }),
+            "show sizes",
         )
 
     async def test_whatsapp_image_media_is_downloaded(self):

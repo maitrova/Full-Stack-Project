@@ -423,7 +423,7 @@ Customer message:
         if pending_purchase and re.search(r"\b(?:yes|yeah|yep|sure|okay|ok|go ahead|do it|confirm|sounds good|please do)\b", text):
             return "confirm_cart"
         if re.search(
-            r"\b(?:add|put|place).*(?:cart|basket)\b|\b(?:i(?:'ll| will| would) take|i want|i need|let me buy|buy|purchase|order|get me|go ahead with) (?:this|that|it|one|product|item|option(?: number)?\s*[1-5])\b",
+            r"\b(?:add|put|place).*(?:cart|basket)\b|\badd\s+(?:one\s+more|another)(?:\s+(?:one|item|piece|shirt))?\b|\b(?:i(?:'ll| will| would) take|i want|i need|let me buy|buy|purchase|order|get me|go ahead with) (?:this|that|it|one|product|item|option(?: number)?\s*[1-5])\b",
             text,
         ):
             return "add_to_cart"

@@ -120,6 +120,94 @@ class WhatsAppCommerce:
         return None
 
     @classmethod
+    def _extract_size_quantities(cls, message: str, product) -> list[dict]:
+        """Parse requests containing two or more size/quantity pairs."""
+        variants = product.attributes.get("variants", [])
+        available = {
+            re.sub(r"[^A-Z0-9]", "", str(variant.get("size") or "").upper()): str(variant.get("size"))
+            for variant in variants
+            if variant.get("size")
+        }
+        patterns = [
+            ("XXXL", r"\b(?:xxxl|extra\s+extra\s+extra\s+large)\b"),
+            ("XXL", r"\b(?:xxl|extra\s+extra\s+large)\b"),
+            ("XL", r"\b(?:xl|extra\s+large)\b"),
+            ("XS", r"\b(?:xs|extra\s+small)\b"),
+            ("M", r"\b(?:m|medium)\b"),
+            ("L", r"\b(?:l|(?<!extra\s)large)\b"),
+            ("S", r"\b(?:s|(?<!extra\s)small)\b"),
+        ]
+        occurrences = []
+        occupied: list[tuple[int, int]] = []
+        lowered = message.lower()
+        for normalized, pattern in patterns:
+            if normalized not in available:
+                continue
+            for match in re.finditer(pattern, lowered, re.IGNORECASE):
+                span = match.span()
+                if any(span[0] < end and span[1] > start for start, end in occupied):
+                    continue
+                occupied.append(span)
+                occurrences.append((span[0], span[1], available[normalized]))
+        occurrences.sort()
+        if len({size for _, _, size in occurrences}) < 2:
+            return []
+
+        latin_numbers = {
+            word: value for word, value in cls._NUMBER_WORDS.items()
+            if word.isascii() and word != "do"
+        }
+        number_pattern = r"\d{1,2}|" + "|".join(
+            sorted((re.escape(word) for word in latin_numbers), key=len, reverse=True)
+        )
+
+        def number_value(token: str | None) -> int:
+            if not token:
+                return 1
+            return int(token) if token.isdigit() else int(latin_numbers.get(token.lower(), 1))
+
+        requested = []
+        seen = set()
+        for start, end, size in occurrences:
+            if size in seen:
+                continue
+            after = lowered[end:end + 24]
+            before = lowered[max(0, start - 24):start]
+            after_match = re.match(
+                rf"\s*(?:x|qty|quantity|[:=-])?\s*({number_pattern})\b",
+                after,
+            )
+            before_match = re.search(
+                rf"\b({number_pattern})\s*(?:x|pieces?|pcs?|items?)?\s*(?:in|of)?\s*$",
+                before,
+            )
+            token = after_match.group(1) if after_match else before_match.group(1) if before_match else None
+            requested.append({"size": size, "quantity": number_value(token)})
+            seen.add(size)
+        return requested
+
+    @classmethod
+    def _extract_corrected_size(cls, message: str, product) -> str | None:
+        """Use the last mentioned valid size in a natural correction."""
+        if not re.search(r"\b(?:actually|instead|change|switch|make that|rather|sorry|not)\b", message, re.I):
+            return None
+        variants = product.attributes.get("variants", [])
+        candidates = []
+        for variant in variants:
+            size = str(variant.get("size") or "")
+            normalized = re.sub(r"[^A-Z0-9]", "", size.upper())
+            if not normalized:
+                continue
+            aliases = {
+                "XS": r"xs|extra\s+small", "S": r"s|small", "M": r"m|medium",
+                "L": r"l|large", "XL": r"xl|extra\s+large",
+                "XXL": r"xxl|extra\s+extra\s+large",
+            }.get(normalized, re.escape(size))
+            for match in re.finditer(rf"\b(?:size\s*)?(?:{aliases})\b", message, re.I):
+                candidates.append((match.start(), size))
+        return max(candidates)[1] if candidates else None
+
+    @classmethod
     def _price_reply(cls, product, size: str | None = None) -> str:
         """Answer price questions directly from live catalogue data."""
         currency = product.currency or "INR"
@@ -146,6 +234,10 @@ class WhatsAppCommerce:
 
     @staticmethod
     def _requested_product_fact(text: str) -> tuple[str, str | None] | None:
+        if re.search(r"\b(?:only|show|find|looking for|want|need)\b", text) and not re.search(
+            r"\b(?:what|which|is|are|does|has|tell me)\b", text
+        ):
+            return None
         field_patterns = {
             "fabric": r"\b(?:fabric|material|made of)\b",
             "brand": r"\bbrand\b",
@@ -154,6 +246,10 @@ class WhatsAppCommerce:
             "sleeve": r"\bsleeves?\b",
             "pattern": r"\b(?:pattern|what print|which print)\b",
             "style": r"\bstyle\b|\b(?:is|it|this|that)\b.{0,12}\b(?:formal|casual|party wear|sportswear|streetwear)\b",
+            "product_type": r"\b(?:product type|what type|kind of product)\b",
+            "gender": r"\b(?:gender|for men|for women|unisex)\b",
+            "occasions": r"\b(?:occasion|where can i wear|suitable for)\b",
+            "care": r"\b(?:care|wash|washing|cleaning instructions?)\b",
             "rating": r"\brating\b",
             "review_count": r"\b(?:review count|how many reviews)\b",
             "size_chart": r"\bsize chart\b",
@@ -190,6 +286,7 @@ class WhatsAppCommerce:
         labels = {
             "fabric": "Fabric", "brand": "Brand", "color": "Color", "fit": "Fit",
             "sleeve": "Sleeves", "pattern": "Pattern", "style": "Style", "rating": "Rating",
+            "product_type": "Product type", "gender": "Gender", "occasions": "Suitable for", "care": "Care",
             "review_count": "Reviews", "size_chart": "Size chart", "payment_options": "Payment options",
         }
         return f"{labels.get(key, key.title())}: {display}."
@@ -225,9 +322,15 @@ class WhatsAppCommerce:
             return result("WhatsApp order updates and connected-account access are turned off. Message us again anytime to shop.")
         if action == "human_handoff" or re.search(r"\b(human|real person|speak to staff|talk to staff|agent please)\b", text):
             state["handoff_requested"] = True
+            state["handoff_context"] = {
+                "reason": self._handoff_reason(text, state),
+                "summary": self._handoff_summary(state),
+                "requested_at": datetime.now(timezone.utc).isoformat(),
+                "urgency": "high" if re.search(r"\b(urgent|immediately|complaint|angry|fraud|wrong order)\b", text) else "normal",
+            }
             return result(
-                "I've shared your request with the store team. They can contact you on WhatsApp "
-                "from a team member's number when available."
+                "I've sent this chat and your latest product details to the store team. "
+                "A team member can contact you on this WhatsApp number."
             )
         if text in {"disconnect", "unlink", "disconnect account"}:
             await self.db.whatsapp_account_links.delete_one({"_id": account})
@@ -326,12 +429,19 @@ class WhatsAppCommerce:
                 return result("Show me which two products you'd like to compare first.")
             return result("\n".join(f"{p.name}: {p.currency} {p.sale_price if p.sale_price is not None else p.price:g}; sizes {', '.join(p.attributes.get('sizes', [])) or 'none in stock'}; {p.stock} left." for p in products))
         product_fact_request = self._requested_product_fact(text)
+        natural_correction = bool(
+            state.get("purchase")
+            and re.search(r"\b(?:actually|instead|change|switch|make that|rather|sorry|not)\b", text)
+        )
         if (
-            action in {"show_sizes", "check_stock"}
-            or product_fact_request
-            or (
-                re.search(r"\b(size|sizes|stock|material|fabric|customize|customise|customization)\b", text)
-                and not re.search(r"\b(buy|cart|order|purchase)\b", text)
+            not natural_correction
+            and (
+                action in {"show_sizes", "check_stock"}
+                or product_fact_request
+                or (
+                    re.search(r"\b(size|sizes|stock|material|fabric|customize|customise|customization)\b", text)
+                    and not re.search(r"\b(add|buy|cart|order|purchase|want|need|take|get)\b", text)
+                )
             )
         ):
             pending_product = state.get("purchase") or {}
@@ -468,6 +578,117 @@ class WhatsAppCommerce:
             if source_type == "customization":
                 return result(f"Open the designer to choose the product, size, color, images, and text securely:\n{product_url}")
             return result(f"Open this drop product to choose the available size and continue securely:\n{product_url}")
+
+        requested_items = self._extract_size_quantities(message, product)
+        corrected_size = self._extract_corrected_size(message, product)
+        if purchase.get("items") and corrected_size and not requested_items:
+            purchase.pop("items", None)
+            purchase.pop("confirmed_items", None)
+            purchase["size"] = corrected_size
+            purchase.pop("quantity", None)
+            purchase.pop("confirmed_quote", None)
+        if requested_items:
+            purchase["items"] = [
+                {**item, "operation_id": secrets.token_hex(16)} for item in requested_items
+            ]
+            for key in ("size", "quantity", "operation_id", "confirmed_quote", "confirmed_items"):
+                purchase.pop(key, None)
+
+        if purchase.get("items"):
+            quoted_items = []
+            for item in purchase["items"]:
+                variant = self._variant(product, item.get("size"))
+                quantity = int(item.get("quantity") or 0)
+                if not variant or quantity < 1 or quantity > 20:
+                    return result(f"Please choose a quantity from 1 to 20 for size {item.get('size') or '?'}.")
+                if int(variant.get("stock") or 0) < quantity:
+                    return result(f"Only {variant.get('stock') or 0} are available in size {item['size']}. Please choose a lower quantity.")
+                quoted_items.append({
+                    "size": item["size"],
+                    "quantity": quantity,
+                    "price": float(variant["effective_price"]),
+                })
+
+            multi_confirmation = bool(
+                action == "confirm_cart"
+                or affirmative_add_request
+                or text in {"confirm", "yes", "yes confirm", "ok", "okay", "sure", "haan", "ha", "avunu", "sare"}
+                or re.search(r"\b(?:please )?confirm\b", text)
+            )
+            if purchase.get("confirmed_items") != quoted_items or not multi_confirmation:
+                purchase["confirmed_items"] = quoted_items
+                lines = [f"Please confirm {self._product_label(product)}:"]
+                for item in quoted_items:
+                    lines.append(
+                        f"{item['quantity']} x size {item['size']} - {product.currency} {item['price']:g} each"
+                    )
+                total = sum(item["quantity"] * item["price"] for item in quoted_items)
+                lines.append(f"Total: {product.currency} {total:g}. Add them to your cart?")
+                lines.append("You can also change a size or quantity.")
+                return result("\n".join(lines))
+
+            if not await self._linked(account):
+                checkout_purchase = {
+                    "items": [
+                        {
+                            "product_id": purchase["product_id"],
+                            "size": item["size"],
+                            "quantity": quote["quantity"],
+                            "operation_id": item["operation_id"],
+                            "expected_price": quote["price"],
+                        }
+                        for item, quote in zip(purchase["items"], quoted_items)
+                    ]
+                }
+                link_message = await self._link_message(
+                    account,
+                    origin,
+                    recipient=conversation.get("external_customer_ref"),
+                    purchase=checkout_purchase,
+                    return_path="/cart",
+                )
+                state.pop("purchase", None)
+                return result(link_message)
+
+            checkout_purchase = {
+                "items": [
+                    {
+                        "product_id": purchase["product_id"],
+                        "size": pending_item["size"],
+                        "quantity": pending_quote["quantity"],
+                        "operation_id": pending_item["operation_id"],
+                        "expected_price": pending_quote["price"],
+                    }
+                    for pending_item, pending_quote in zip(purchase["items"], quoted_items)
+                ]
+            }
+            status, data = await self._request(
+                "POST", "/cart/batch", account, checkout_purchase
+            )
+            if status == 401:
+                link_message = await self._link_message(
+                    account,
+                    origin,
+                    recipient=conversation.get("external_customer_ref"),
+                    purchase=checkout_purchase,
+                    return_path="/cart",
+                )
+                state.pop("purchase", None)
+                return result(link_message)
+            if status not in {200, 201}:
+                return result(
+                    data.get("message")
+                    or "I couldn't add those sizes. Nothing was added; please try again."
+                )
+            state.pop("purchase", None)
+            state.pop("last_declined_purchase", None)
+            state.pop("last_checkout_purchase", None)
+            state["last_cart_update"] = {
+                "product_id": str(product.id),
+                "item_count": len(quoted_items),
+            }
+            return result(f"All set - both sizes are in your cart. Continue securely here:\n{origin}/checkout")
+
         selected_size = self._extract_size(message, product)
         available_variants = [
             variant for variant in product.attributes.get("variants", [])
@@ -480,7 +701,9 @@ class WhatsAppCommerce:
             and re.fullmatch(rf"\s*(?:size\s*)?{re.escape(selected_size)}\s*", message, re.IGNORECASE)
         )
         quantity = None if size_only_reply else self._extract_quantity(
-            message, allow_conversational=continuing_purchase and bool(purchase.get("size") or selected_size),
+            message,
+            allow_conversational=(continuing_purchase or action == "add_to_cart")
+            and bool(purchase.get("size") or selected_size),
         )
         if selected_size:
             purchase["size"] = selected_size
@@ -530,7 +753,7 @@ class WhatsAppCommerce:
             purchase["confirmed_quote"] = price
             return result(
                 f"{quantity} × {self._product_label(product)}, size {purchase['size']} — "
-                f"{product.currency} {price:g} each. Would you like me to add it to your cart?"
+                f"{product.currency} {price:g} each. Add it to your cart? You can still change the size or quantity."
             )
         if not await self._linked(account):
             checkout_purchase = {**purchase, "expected_price": price}
@@ -548,6 +771,11 @@ class WhatsAppCommerce:
         if status in {200, 201}:
             state.pop("purchase", None)
             state.pop("last_declined_purchase", None)
+            state.pop("last_checkout_purchase", None)
+            state["last_cart_update"] = {
+                "product_id": str(product.id),
+                "item_count": 1,
+            }
             return result(f"All set — it’s in your cart. You can finish your address and payment securely here:\n{origin}/checkout")
         if status == 401:
             checkout_purchase = {**purchase, "expected_price": price}
@@ -556,6 +784,25 @@ class WhatsAppCommerce:
             state.pop("purchase", None)
             return result(link_message)
         return result(data.get("message") or "I couldn't confirm the cart update. Please check your cart before trying again.")
+
+    @staticmethod
+    def _handoff_reason(text: str, state: dict) -> str:
+        if state.get("customization_interest") or re.search(r"\b(custom|design|logo|print)\b", text):
+            return "customization_help"
+        if re.search(r"\b(order|delivery|refund|return|payment)\b", text):
+            return "order_support"
+        if state.get("purchase"):
+            return "purchase_help"
+        return "customer_requested_team"
+
+    @staticmethod
+    def _handoff_summary(state: dict) -> str:
+        turns = state.get("recent_turns") or []
+        snippets = [str(turn.get("customer") or "").strip() for turn in turns[-3:]]
+        snippets = [value for value in snippets if value]
+        selected = state.get("selected_product_id")
+        prefix = f"Selected product: {selected}. " if selected else ""
+        return (prefix + "Recent requests: " + " | ".join(snippets))[:600]
 
     async def _checkout_retry_message(self, account, origin, conversation, state, product_tools, business_id, pending):
         product = await product_tools.get_product_details(business_id, str(pending.get("product_id") or ""))
@@ -625,7 +872,8 @@ class WhatsAppCommerce:
                 or len(tokens) != 1 or not re.fullmatch(r"[A-Za-z0-9_-]{40,128}", tokens[0])):
             return "The agent and store checkout addresses don't match. Please ask the store team to check both storefront URL settings."
         if purchase:
-            return f"Sign in securely to add the item and continue to checkout:\n{link}\nThis link expires in 15 minutes. Send STOP anytime to turn off order updates."
+            item_word = "items" if purchase.get("items") else "item"
+            return f"Sign in securely to add the {item_word} and continue to checkout:\n{link}\nThis link expires in 15 minutes. Send STOP anytime to turn off order updates."
         return f"To keep your order details private, open this secure link:\n{link}\nIt expires in 15 minutes. You’ll receive order updates here; send STOP anytime to turn them off."
 
     def _extract_quantity(self, message: str, allow_conversational: bool = False) -> int | None:

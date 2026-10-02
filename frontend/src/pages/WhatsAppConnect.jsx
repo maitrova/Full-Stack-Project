@@ -43,7 +43,9 @@ export default function WhatsAppConnect() {
         setMessage(
           nextDestination === "/checkout"
             ? "Connected. Your confirmed item is ready for address and payment."
-            : "Connected. Your orders are ready to view."
+            : nextDestination === "/cart"
+              ? "Connected. Your confirmed items are now in your cart."
+              : "Connected. Your orders are ready to view."
         );
       })
       .catch((error) => {

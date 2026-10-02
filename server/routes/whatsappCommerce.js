@@ -23,6 +23,17 @@ const isValidSizeValue = (value) => (
   && value.trim() === value
   && !/[\u0000-\u001f\u007f]/.test(value)
 );
+const isValidConfirmedPurchase = (purchase) => (
+  purchase
+  && mongoose.isValidObjectId(purchase.product_id)
+  && isValidSizeValue(purchase.size)
+  && Number.isInteger(purchase.quantity) && purchase.quantity >= 1 && purchase.quantity <= 20
+  && Number.isFinite(purchase.expected_price) && purchase.expected_price >= 0
+  && /^[a-f0-9]{32,64}$/.test(purchase.operation_id || "")
+);
+const confirmedPurchaseItems = (purchase) => (
+  Array.isArray(purchase?.items) ? purchase.items : purchase ? [purchase] : []
+);
 
 const isRateLimited = async (scope, subject, limit, windowMs) => {
   const now = Date.now();
@@ -110,6 +121,14 @@ router.post("/link/complete", protect, async (req, res) => {
     return res.json({ message: "WhatsApp account connected", redirectTo: returnPath });
   }
 
+  const purchaseItems = confirmedPurchaseItems(request.purchase);
+  if (purchaseItems.length < 1 || purchaseItems.length > 5 || purchaseItems.some((item) => !isValidConfirmedPurchase(item))) {
+    return res.status(400).json({ message: "The confirmed WhatsApp cart selection is invalid or expired." });
+  }
+  req.whatsappAccountRef = request.account;
+  if (Array.isArray(request.purchase.items)) {
+    return addLinkedCartItems(req, res, purchaseItems, returnPath);
+  }
   req.body = request.purchase;
   req.whatsappReturnPath = returnPath;
   return addLinkedCartItem(req, res);
@@ -131,12 +150,10 @@ router.post("/link/request", async (req, res) => {
   if (!/^[a-f0-9]{64}$/.test(account) || !/^\d{7,15}$/.test(String(recipient || ""))) {
     return res.status(400).json({ message: "Invalid WhatsApp account or recipient" });
   }
+  const purchaseItems = confirmedPurchaseItems(purchase);
   if (purchase && (
-    !mongoose.isValidObjectId(purchase.product_id) ||
-    !isValidSizeValue(purchase.size) ||
-    !Number.isInteger(purchase.quantity) || purchase.quantity < 1 || purchase.quantity > 20 ||
-    !Number.isFinite(purchase.expected_price) || purchase.expected_price < 0 ||
-    !/^[a-f0-9]{32,64}$/.test(purchase.operation_id || "")
+    purchaseItems.length < 1 || purchaseItems.length > 5
+    || purchaseItems.some((item) => !isValidConfirmedPurchase(item))
   )) {
     return res.status(400).json({ message: "Invalid confirmed purchase" });
   }
@@ -157,10 +174,17 @@ router.post("/link/request", async (req, res) => {
   await linkRequests().createIndex("expiresAt", { expireAfterSeconds: 0 });
   await linkRequests().insertOne({
     _id: hash(token), account, recipient: String(recipient),
-    purchase: purchase ? {
-      product_id: purchase.product_id, size: purchase.size, quantity: purchase.quantity,
-      expected_price: purchase.expected_price, operation_id: purchase.operation_id,
-    } : null,
+    purchase: purchase
+      ? (Array.isArray(purchase.items)
+        ? { items: purchaseItems.map((item) => ({
+          product_id: item.product_id, size: item.size, quantity: item.quantity,
+          expected_price: item.expected_price, operation_id: item.operation_id,
+        })) }
+        : {
+          product_id: purchase.product_id, size: purchase.size, quantity: purchase.quantity,
+          expected_price: purchase.expected_price, operation_id: purchase.operation_id,
+        })
+      : null,
     return_path: ["/checkout", "/cart", "/orders"].includes(returnPath) ? returnPath : "/checkout",
     created_at: now, expiresAt,
   });
@@ -288,7 +312,7 @@ const addLinkedCartItem = async (req, res) => {
   }
   const { product_id: productId, size, quantity, operation_id: operationId } = req.body || {};
   if (!mongoose.isValidObjectId(productId) || !isValidSizeValue(size) || !Number.isInteger(quantity) || quantity < 1 || quantity > 20 || !/^[a-f0-9]{32,64}$/.test(operationId || "")) {
-    return res.status(400).json({ message: "Choose a valid product, size and quantity (1–20)" });
+    return res.status(400).json({ message: "Choose a valid product, size and quantity (1-20)" });
   }
   const receipts = mongoose.connection.db.collection("whatsapp_cart_operations");
   const id = `${req.user._id}:${operationId}`;
@@ -333,6 +357,176 @@ const addLinkedCartItem = async (req, res) => {
   res.status(statusCode).json({ ...response, redirectTo: req.whatsappReturnPath || undefined });
 };
 
+const addLinkedCartItems = async (req, res, items, returnPath = "/cart") => {
+  if (!Array.isArray(items) || items.length < 1 || items.length > 5 || items.some((item) => !isValidConfirmedPurchase(item))) {
+    return res.status(400).json({ message: "Choose valid products, sizes and quantities." });
+  }
+  if (await isRateLimited("cart-batch", req.whatsappAccountRef || req.user?._id, 20, 60 * 1000)) {
+    return res.status(429).json({ message: "Too many cart requests. Please wait a minute." });
+  }
+
+  const normalized = [];
+  for (const item of items) {
+    const key = `${item.product_id}:${item.size}`;
+    const existing = normalized.find((entry) => entry.key === key);
+    if (existing) {
+      if (Math.abs(existing.expected_price - item.expected_price) > 0.005) {
+        return res.status(409).json({ message: "The same size has conflicting prices. Request a new quote." });
+      }
+      existing.quantity += item.quantity;
+      existing.operation_ids.push(item.operation_id);
+    } else {
+      normalized.push({ ...item, key, operation_ids: [item.operation_id] });
+    }
+  }
+  if (normalized.some((item) => item.quantity > 20)) {
+    return res.status(400).json({ message: "A maximum of 20 units is allowed per product and size." });
+  }
+
+  const batchOperationId = hash(normalized.flatMap((item) => item.operation_ids).sort().join(":"));
+  const receiptId = `${req.user._id}:batch:${batchOperationId}`;
+  const requestHash = hash(JSON.stringify(normalized.map(({ key, operation_ids, ...item }) => item)));
+  const receipts = mongoose.connection.db.collection("whatsapp_cart_operations");
+  const replay = async () => {
+    const previous = await receipts.findOne({ _id: receiptId });
+    if (!previous || previous.requestHash !== requestHash) {
+      return res.status(409).json({ message: "Batch operation does not match the original request." });
+    }
+    if (previous.status === "complete") return res.status(previous.httpStatus).json(previous.response);
+    return res.status(409).json({ message: "Cart update is still being checked." });
+  };
+  if (await receipts.findOne({ _id: receiptId })) return replay();
+
+  const session = await mongoose.startSession();
+  let responseBody;
+  try {
+    await session.withTransaction(async () => {
+      await receipts.insertOne({
+        _id: receiptId,
+        requestHash,
+        status: "pending",
+        createdAt: new Date(),
+      }, { session });
+
+      const productIds = [...new Set(normalized.map((item) => item.product_id))];
+      const products = await ReadymadeProduct.find({
+        _id: { $in: productIds },
+        isActive: true,
+      }).session(session).lean();
+      const productsById = new Map(products.map((product) => [String(product._id), product]));
+      const validated = normalized.map((item) => {
+        const product = productsById.get(String(item.product_id));
+        const variant = product?.variants?.find((entry) => entry.size === item.size);
+        if (!variant || Number(variant.stock || 0) < item.quantity) {
+          const error = new Error(`Size ${item.size} or the requested quantity is no longer available.`);
+          error.statusCode = 409;
+          throw error;
+        }
+        const unitPrice = getReadymadePricing(product, { variant }).effectivePrice;
+        if (Math.abs(unitPrice - item.expected_price) > 0.005) {
+          const error = new Error("A price changed. Request a new quote in WhatsApp.");
+          error.statusCode = 409;
+          throw error;
+        }
+        return { item, product, variant, unitPrice };
+      });
+
+      const carts = mongoose.connection.db.collection(Cart.collection.name);
+      const cartFilter = { user: req.user._id, status: "ACTIVE" };
+      const cart = await carts.findOne(cartFilter, { session });
+      const now = new Date();
+      const cartItems = [...(cart?.items || [])];
+      for (const { item, product, variant, unitPrice } of validated) {
+        const normalizedSize = String(item.size).trim().toUpperCase();
+        const signature = `READYMADE:${String(product._id)}:SIZE:${normalizedSize}`;
+        const existing = cartItems.find((entry) => entry.signature === signature);
+        const nextQuantity = Number(existing?.qty || 0) + item.quantity;
+        if (nextQuantity > Number(variant.stock || 0)) {
+          const error = new Error(`Only ${variant.stock || 0} are available in size ${item.size}.`);
+          error.statusCode = 409;
+          throw error;
+        }
+        if (existing) {
+          existing.qty = nextQuantity;
+          existing.unitPrice = unitPrice;
+          existing.updatedAt = now;
+        } else {
+          cartItems.push({
+            _id: new mongoose.Types.ObjectId(),
+            kind: "READYMADE",
+            readymadeProduct: product._id,
+            design: null,
+            dropproduct: null,
+            comboPack: null,
+            product: null,
+            size: normalizedSize,
+            qty: item.quantity,
+            unitPrice,
+            basePrice: Number(variant.price ?? product.price ?? unitPrice),
+            priceDetails: null,
+            currency: product.currency || "INR",
+            previewImage: product.thumbnail || product.images?.[0]?.url || null,
+            signature,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      }
+
+      if (cart) {
+        await carts.updateOne({ _id: cart._id }, { $set: { items: cartItems, updatedAt: now } }, { session });
+      } else {
+        await carts.insertOne({
+          user: req.user._id,
+          guestId: null,
+          items: cartItems,
+          status: "ACTIVE",
+          createdAt: now,
+          updatedAt: now,
+        }, { session });
+      }
+
+      responseBody = {
+        message: "Confirmed items added to cart",
+        redirectTo: returnPath,
+        addedItems: validated.map(({ item }) => ({
+          product_id: item.product_id,
+          size: item.size,
+          quantity: item.quantity,
+        })),
+      };
+      await receipts.updateOne(
+        { _id: receiptId },
+        { $set: { status: "complete", httpStatus: 200, response: responseBody, completedAt: now } },
+        { session }
+      );
+    });
+  } catch (error) {
+    if (error?.code === 11000) return replay();
+    const statusCode = Number(error?.statusCode) || 503;
+    const message = statusCode === 503
+      ? "Atomic cart update is temporarily unavailable. Nothing was added."
+      : `${error.message} Nothing was added.`;
+    return res.status(statusCode).json({ message });
+  } finally {
+    await session.endSession();
+  }
+
+  await actionAudit().insertOne({
+    business_action: "cart_batch_add",
+    channel: "whatsapp",
+    account: req.whatsappAccountRef,
+    actor_user_id: req.user._id,
+    arguments: { items: responseBody.addedItems },
+    operation_id: batchOperationId,
+    outcome: "success",
+    http_status: 200,
+    created_at: new Date(),
+  });
+  return res.status(200).json(responseBody);
+};
+
 router.post("/cart", addLinkedCartItem);
+router.post("/cart/batch", (req, res) => addLinkedCartItems(req, res, req.body?.items, "/cart"));
 
 export default router;

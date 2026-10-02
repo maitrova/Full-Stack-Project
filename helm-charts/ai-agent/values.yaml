@@ -95,7 +95,7 @@ livenessProbe:
 
 readinessProbe:
   enabled: true
-  path: /api/health
+  path: /api/health/ready
   initialDelaySeconds: 10
   periodSeconds: 5
   timeoutSeconds: 3

@@ -41,6 +41,26 @@ class ContextTests(unittest.TestCase):
         self.assertNotIn("purchase", result["conversation_state"])
         self.assertNotIn("recommended_product_ids", result["conversation_state"])
 
+    def test_explicit_fabric_filter_starts_fresh_search(self):
+        conversation = {
+            "selected_product_id": "denim-shirt",
+            "recommended_product_ids": ["denim-shirt"],
+            "conversation_state": {
+                "category": "shirt",
+                "selected_product_id": "denim-shirt",
+                "recommended_product_ids": ["denim-shirt"],
+                "attributes": {"fabric": "denim"},
+            },
+        }
+
+        result = self.agent._prepare_context(
+            conversation, "only show me the cotton fabric"
+        )
+
+        self.assertIsNone(result["selected_product_id"])
+        self.assertNotIn("recommended_product_ids", result["conversation_state"])
+        self.assertEqual(result["conversation_state"]["category"], "shirt")
+
     def test_no_substring_reference(self):
         self.assertIsNone(self.agent._resolve_reference("white shirts", ["old"], "old"))
         self.assertIsNone(self.agent._resolve_reference("another one", ["old", "new"], None))

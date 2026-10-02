@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { createElement, useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import {
   ArrowLeft,
+  Activity,
+  AlertTriangle,
   Bot,
+  Bug,
   CheckCircle2,
   ChevronLeft,
   Clock3,
@@ -13,6 +16,7 @@ import {
   RefreshCw,
   Search,
   UserRound,
+  UserCheck,
   Users,
 } from "lucide-react";
 import { useSelector } from "react-redux";
@@ -94,6 +98,8 @@ export default function WhatsAppChatAdmin() {
   const [error, setError] = useState("");
   const [leadNote, setLeadNote] = useState("");
   const [mobilePane, setMobilePane] = useState("list");
+  const [overview, setOverview] = useState(null);
+  const [showDebug, setShowDebug] = useState(false);
 
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
@@ -113,6 +119,16 @@ export default function WhatsAppChatAdmin() {
     }
   }, [headers, token]);
 
+  const loadOverview = useCallback(async () => {
+    if (!token) return;
+    try {
+      const { data } = await axios.get(`${API_URL}/admin/whatsapp-chats/overview`, { headers });
+      setOverview(data);
+    } catch {
+      // Chat management remains available if monitoring is temporarily unavailable.
+    }
+  }, [headers, token]);
+
   const loadDetail = useCallback(async (id, { quiet = false } = {}) => {
     if (!id || !token) return;
     if (!quiet) setDetailLoading(true);
@@ -129,19 +145,28 @@ export default function WhatsAppChatAdmin() {
   }, [headers, token]);
 
   useEffect(() => {
-    loadChats();
-    const timer = window.setInterval(() => loadChats({ quiet: true }), 15000);
-    return () => window.clearInterval(timer);
-  }, [loadChats]);
+    const initial = window.setTimeout(() => {
+      loadChats();
+      loadOverview();
+    }, 0);
+    const timer = window.setInterval(() => {
+      loadChats({ quiet: true });
+      loadOverview();
+    }, 15000);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(timer);
+    };
+  }, [loadChats, loadOverview]);
 
   useEffect(() => {
-    if (!selectedId) {
-      setDetail(null);
-      return undefined;
-    }
-    loadDetail(selectedId);
+    if (!selectedId) return undefined;
+    const initial = window.setTimeout(() => loadDetail(selectedId), 0);
     const timer = window.setInterval(() => loadDetail(selectedId, { quiet: true }), 10000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(timer);
+    };
   }, [loadDetail, selectedId]);
 
   const stats = useMemo(() => ({
@@ -206,14 +231,37 @@ export default function WhatsAppChatAdmin() {
               <p className="text-sm text-emerald-50/80">AI conversations and customer leads</p>
             </div>
           </div>
-          <button onClick={() => loadChats()} className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20">
-            <RefreshCw className="h-4 w-4" /> Refresh
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setShowDebug((value) => !value)} className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20">
+              <Bug className="h-4 w-4" /> {showDebug ? "Hide flow" : "Debug flow"}
+            </button>
+            <button onClick={() => { loadChats(); loadOverview(); }} className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20">
+              <RefreshCw className="h-4 w-4" /> Refresh
+            </button>
+          </div>
         </div>
       </header>
 
       <section className="mx-auto max-w-[1600px] p-3 sm:p-6">
         {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+
+        {overview && (
+          <div className="mb-4 grid grid-cols-2 gap-2 lg:grid-cols-6">
+            {[
+              ["24h requests", overview.requests, Activity],
+              ["Avg latency", `${overview.average_latency_ms} ms`, Clock3],
+              ["Open handoffs", overview.active_handoffs, Users],
+              ["Image failures", overview.image_failures, AlertTriangle],
+              ["Delivery errors", overview.delivery_errors, AlertTriangle],
+              ["AI cost", `$${Number(overview.estimated_cost_usd || 0).toFixed(4)}`, Activity],
+            ].map(([label, value, Icon]) => (
+              <div key={label} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{createElement(Icon, { className: "h-3.5 w-3.5" })} {label}</p>
+                <p className="mt-1 text-lg font-bold text-slate-900">{value}</p>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="mb-4 grid grid-cols-3 gap-2 sm:gap-3">
           {[
@@ -222,7 +270,7 @@ export default function WhatsAppChatAdmin() {
             ["handoff", "Team requested", stats.handoff, Users],
           ].map(([id, label, count, Icon]) => (
             <button key={id} onClick={() => { setActiveView(id); setMobilePane("list"); }} className={`flex min-w-0 items-center justify-between rounded-xl border p-2.5 text-left transition sm:rounded-2xl sm:p-4 ${activeView === id ? "border-[#25d366] bg-emerald-50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}>
-              <span className="flex min-w-0 items-center gap-2 sm:gap-3"><Icon className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" /><span className="truncate text-xs font-semibold sm:text-base">{label}</span></span>
+              <span className="flex min-w-0 items-center gap-2 sm:gap-3">{createElement(Icon, { className: "h-4 w-4 shrink-0 sm:h-5 sm:w-5" })}<span className="truncate text-xs font-semibold sm:text-base">{label}</span></span>
               <span className="rounded-full bg-white px-2.5 py-1 text-sm font-bold shadow-sm">{count}</span>
             </button>
           ))}
@@ -302,6 +350,14 @@ export default function WhatsAppChatAdmin() {
                             <ChatImage conversationId={selectedConversation._id} messageId={message._id} headers={headers} />
                           )}
                           <p className="whitespace-pre-wrap break-words text-sm">{message.content}</p>
+                          {showDebug && !customer && (
+                            <div className="mt-2 rounded-md bg-slate-900/90 p-2 font-mono text-[10px] text-emerald-200">
+                              <p>phase: {message.metadata?.flow_phase || "unknown"}</p>
+                              <p>intent: {message.metadata?.intent?.intent || "unknown"}</p>
+                              <p>action: {message.metadata?.intent?.action || "none"}</p>
+                              <p>tools: {(message.metadata?.tool_calls || []).map((item) => item.name).join(", ") || "none"}</p>
+                            </div>
+                          )}
                           <p className="mt-1 text-right text-[10px] text-slate-400">{formatDate(message.created_at)}</p>
                         </div>
                       </div>
@@ -322,6 +378,20 @@ export default function WhatsAppChatAdmin() {
                 <button disabled={!whatsappLink(selectedConversation)} onClick={openTeamWhatsApp} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
                   <MessageCircle className="h-4 w-4" /> Open in WhatsApp <ExternalLink className="h-3.5 w-3.5" />
                 </button>
+
+                {selectedConversation.status === "handoff" && (
+                  <button onClick={() => updateConversation({ assignToMe: true })} disabled={saving} className="flex w-full items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-900 disabled:opacity-50">
+                    <UserCheck className="h-4 w-4" /> Assign this handoff to me
+                  </button>
+                )}
+
+                {(selectedConversation.handoff_reason || selectedConversation.handoff_summary) && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
+                    <p className="font-bold capitalize">{String(selectedConversation.handoff_reason || "team help").replaceAll("_", " ")}</p>
+                    <p className="mt-1 whitespace-pre-wrap">{selectedConversation.handoff_summary || "No summary available."}</p>
+                    {selectedConversation.handoff_assigned_name && <p className="mt-2 font-semibold">Owner: {selectedConversation.handoff_assigned_name}</p>}
+                  </div>
+                )}
 
                 <label className="block text-sm font-semibold">Lead status
                   <select value={selectedConversation.lead_status || "new"} onChange={(event) => updateConversation({ leadStatus: event.target.value })} disabled={saving} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-normal capitalize outline-none focus:border-emerald-500">
@@ -348,6 +418,17 @@ export default function WhatsAppChatAdmin() {
                   <p className="flex items-center gap-1.5 font-semibold"><Clock3 className="h-3.5 w-3.5" /> Last activity</p>
                   <p className="mt-1">{formatDate(selectedConversation.last_message_at)}</p>
                 </div>
+
+                {showDebug && (
+                  <div className="rounded-xl bg-slate-950 p-3 font-mono text-[11px] text-slate-200">
+                    <p className="mb-2 font-bold text-emerald-300">Conversation flow</p>
+                    <p>current: {selectedConversation.conversation_state?.flow_phase || "unknown"}</p>
+                    <p>previous: {selectedConversation.conversation_state?.flow_previous_phase || "none"}</p>
+                    <p>intent: {selectedConversation.current_intent || "none"}</p>
+                    <p>selected: {selectedConversation.selected_product_id || selectedConversation.conversation_state?.selected_product_id || "none"}</p>
+                    <p>purchase: {selectedConversation.conversation_state?.purchase ? "pending" : "none"}</p>
+                  </div>
+                )}
               </div>
             ) : <p className="text-sm text-slate-500">Select a chat to manage the lead.</p>}
           </aside>

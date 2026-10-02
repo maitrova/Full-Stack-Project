@@ -89,6 +89,38 @@ const normalizePaymentOptions = (value, fallback = ["COD", "ONLINE"]) => {
   return normalized;
 };
 
+const parseStringList = (value) => {
+  if (value === undefined || value === null || value === "") return [];
+  const source = Array.isArray(value) ? value : String(value).split(",");
+  return [...new Set(source.map((item) => String(item || "").trim()).filter(Boolean))].slice(0, 20);
+};
+
+const normalizeMerchandising = (value, fallback = {}) => {
+  let parsed = value;
+  if (typeof parsed === "string") {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      throw new Error("Structured product information must be valid JSON");
+    }
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) parsed = {};
+  const text = (key, max = 80) => String(parsed[key] ?? fallback[key] ?? "").trim().slice(0, max);
+  return {
+    productType: text("productType"),
+    gender: text("gender", 40) || "Unisex",
+    colors: parseStringList(parsed.colors ?? fallback.colors),
+    fabric: text("fabric"),
+    fit: text("fit"),
+    sleeve: text("sleeve"),
+    pattern: text("pattern"),
+    style: text("style"),
+    occasions: parseStringList(parsed.occasions ?? fallback.occasions),
+    care: text("care", 300),
+    searchTags: parseStringList(parsed.searchTags ?? fallback.searchTags),
+  };
+};
+
 const normalizeRouteSegment = (value = "") =>
   String(value || "")
     .trim()
@@ -783,6 +815,7 @@ export const createReadymadeProduct = async (req, res) => {
       saleStartAt,
       saleEndAt,
       paymentOptions,
+      merchandising,
       thumbnail: thumbnailFromBody,
       imageAltTexts, // ✅ correct field
     } = req.body;
@@ -892,6 +925,7 @@ export const createReadymadeProduct = async (req, res) => {
       bestSeller: bestSeller === "true",
       newArrival: newArrival === "true",
       paymentOptions: normalizePaymentOptions(paymentOptions),
+      merchandising: normalizeMerchandising(merchandising),
 
       images, // ✅ correct format
       thumbnail,
@@ -943,6 +977,7 @@ export const updateReadymadeProduct = async (req, res) => {
       saleStartAt,
       saleEndAt,
       paymentOptions,
+      merchandising,
       thumbnail: thumbnailFromBody,
       imageAltTexts,
     } = req.body;
@@ -968,6 +1003,13 @@ export const updateReadymadeProduct = async (req, res) => {
       product.paymentOptions = normalizePaymentOptions(
         paymentOptions,
         product.paymentOptions
+      );
+    }
+
+    if (merchandising !== undefined) {
+      product.merchandising = normalizeMerchandising(
+        merchandising,
+        product.merchandising?.toObject?.() || product.merchandising || {}
       );
     }
 
