@@ -433,6 +433,21 @@ class WhatsAppCommerce:
             state.get("purchase")
             and re.search(r"\b(?:actually|instead|change|switch|make that|rather|sorry|not)\b", text)
         )
+        # A bare size is a natural reply to the size list in a product-price
+        # response (for example: "It's INR 549. Available sizes: S, M, L."
+        # -> "M"). Keep it attached to the selected product instead of
+        # letting the intent parser treat it as a new catalogue search.
+        selected_product_id = (
+            (state.get("purchase") or {}).get("product_id")
+            or state.get("selected_product_id")
+            or conversation.get("selected_product_id")
+        )
+        size_only_reply = bool(re.fullmatch(r"\s*(?:size\s*)?(?:xs|s|m|l|xl|xxl|xxxl)\s*", message, re.IGNORECASE))
+        if not natural_correction and selected_product_id and size_only_reply:
+            product = await product_tools.get_product_details(business_id, str(selected_product_id))
+            size = self._extract_size(message, product) if product else None
+            if product and size:
+                return result(self._price_reply(product, size), [product])
         if (
             not natural_correction
             and (
