@@ -283,6 +283,36 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(intent.category, "shirt")
         self.assertEqual(intent.attributes["pattern"], "check")
 
+    def test_polo_and_plain_filters_are_preserved(self):
+        parser = IntentParser(SimpleNamespace(is_configured=False))
+        intent = parser._parse_with_rules("I need plain polo t shirts", {})
+
+        self.assertEqual(intent.intent, "product_search")
+        self.assertEqual(intent.category, "t-shirt")
+        self.assertEqual(intent.attributes["style"], "polo")
+        self.assertEqual(intent.attributes["pattern"], "plain")
+
+    async def test_clear_rule_intent_skips_model_parser(self):
+        client = SimpleNamespace(
+            is_configured=True,
+            generate_text=AsyncMock(side_effect=AssertionError("model should not be called")),
+        )
+        parser = IntentParser(client)
+
+        intent = await parser.parse("show plain polo t shirts", {})
+
+        self.assertEqual(intent.attributes["style"], "polo")
+        self.assertEqual(intent.attributes["pattern"], "plain")
+
+    def test_duplicate_display_products_are_removed(self):
+        repo = EcommerceProductRepository.__new__(EcommerceProductRepository)
+        first = product(name="White Polo T-Shirt", category="T-Shirts").model_dump(by_alias=True)
+        second = {**first, "_id": "507f1f77bcf86cd799439013"}
+
+        unique = repo._deduplicate_products([first, second])
+
+        self.assertEqual(len(unique), 1)
+
     async def test_model_cannot_turn_category_discovery_into_cart_action(self):
         client = SimpleNamespace(
             is_configured=True,

@@ -36,7 +36,7 @@ class EcommerceProductRepository:
         products = await self._load_catalogue(business_id)
         matches = [product for product in products if self._matches(product, filters)]
         matches.sort(key=lambda item: (-item["stock"], self._display_price(item)))
-        return matches[:limit]
+        return self._deduplicate_products(matches)[:limit]
 
     async def search_ranked_products(
         self,
@@ -86,7 +86,7 @@ class EcommerceProductRepository:
             ranked.append((score, enriched))
 
         ranked.sort(key=lambda item: (-item[0], -item[1]["stock"], self._display_price(item[1])))
-        results = [product for _, product in ranked[:limit]]
+        results = self._deduplicate_products([product for _, product in ranked[:limit]])
         if len(results) > 1:
             top_score = float(results[0]["attributes"].get("match_score") or 0)
             next_score = float(results[1]["attributes"].get("match_score") or 0)
@@ -226,7 +226,31 @@ class EcommerceProductRepository:
             and (max_price is None or self._display_price(item) <= max_price)
         ]
         matches.sort(key=lambda item: (-item["stock"], self._display_price(item)))
-        return matches[:limit]
+        return self._deduplicate_products(matches)[:limit]
+
+    @staticmethod
+    def _deduplicate_products(products: list[dict]) -> list[dict]:
+        """Remove duplicate catalogue records before they reach the agent."""
+        seen_ids: set[tuple[str, str]] = set()
+        seen_display: set[tuple[str, str, str, str]] = set()
+        unique: list[dict] = []
+        for product in products:
+            source = str((product.get("attributes") or {}).get("source_type") or "")
+            product_id = str(product.get("_id") or "")
+            identity = (source, product_id)
+            price = str(product.get("sale_price") if product.get("sale_price") is not None else product.get("price"))
+            display = (
+                str(product.get("name") or "").strip().casefold(),
+                price,
+                str(product.get("currency") or "").upper(),
+                str(product.get("category") or "").strip().casefold(),
+            )
+            if identity in seen_ids or display in seen_display:
+                continue
+            seen_ids.add(identity)
+            seen_display.add(display)
+            unique.append(product)
+        return unique
 
     async def _load_catalogue(self, business_id: str) -> list[dict]:
         readymade, drops, customization = await asyncio.gather(
@@ -373,7 +397,7 @@ class EcommerceProductRepository:
                 "checked", "checks", "striped", "solid", "plain", "graphic printed",
                 "printed", "typography", "acid wash",
             ],
-            "style": ["formal", "casual", "party wear", "sportswear", "streetwear"],
+            "style": ["polo", "formal", "casual", "party wear", "sportswear", "streetwear"],
         }
         inferred = {}
         for key, candidates in groups.items():

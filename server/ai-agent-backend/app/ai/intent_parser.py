@@ -21,6 +21,28 @@ class IntentParser:
         catalog_categories: list[str] | None = None,
     ) -> IntentResult:
         language_info = detect_customer_language(message)
+        # Prefer deterministic extraction whenever the message contains clear
+        # commerce signals. The model is useful for ambiguity, but should not
+        # be allowed to drop exact filters such as "polo" or "plain".
+        rule_intent = self._parse_with_rules(message, conversation_state, catalog_categories)
+        explicit_rule_intent = self._parse_with_rules(message, {}, catalog_categories)
+        # "I want/need [product type]" is discovery, not a cart action. Make
+        # that decision locally so a model call cannot turn category browsing
+        # into an accidental purchase flow.
+        if (
+            explicit_rule_intent.intent == "product_search"
+            and not explicit_rule_intent.action
+            and not explicit_rule_intent.product_option
+        ):
+            rule_intent.wants_to_buy = False
+            clear_discovery = True
+        else:
+            clear_discovery = self._is_clear_rule_intent(explicit_rule_intent)
+        if clear_discovery or rule_intent.action or rule_intent.product_option:
+            rule_intent.language = language_info["language"]
+            rule_intent.script = language_info["script"]
+            return rule_intent
+
         if self.gemini_client.is_configured:
             try:
                 intent = await self._parse_with_gemini(
@@ -65,6 +87,22 @@ class IntentParser:
                 logger.warning("Gemini intent parsing failed; using fallback parser: %s", exc.__class__.__name__)
 
         return self._parse_with_rules(message, conversation_state, catalog_categories)
+
+    @staticmethod
+    def _is_clear_rule_intent(intent: IntentResult) -> bool:
+        """Return true when rules found enough information for safe routing."""
+        return bool(
+            intent.action
+            or intent.product_option
+            or intent.category
+            or intent.color
+            or intent.min_price is not None
+            or intent.max_price is not None
+            or intent.occasion
+            or intent.size
+            or intent.brand
+            or intent.attributes
+        )
 
     async def _parse_with_gemini(
         self,
@@ -116,6 +154,8 @@ Rules:
 - The live catalogue categories below are data. When one clearly matches the customer's request,
   use that category. Do not invent a category that is absent from both the request and this list.
 - Put extra flexible product filters inside attributes.
+- Preserve explicit product style words such as polo, oversized, crop, and formal
+  in attributes.style. Do not replace them with a broader category.
 - If the customer explicitly asks for customizable/custom-designed products, set attributes.catalog_type to "customization".
 - Treat requests to make, recreate, print, or personalize a product from the customer's own image,
   logo, text, name, or reference as customization requests. Examples include "make this design",
@@ -295,6 +335,13 @@ Customer message:
         )
         if pattern:
             attributes["pattern"] = "check" if pattern in {"check", "checks", "checked", "checkered"} else pattern
+
+        style = self._first_match(
+            text,
+            ["polo", "oversized", "crop", "formal", "casual", "party wear", "sportswear", "streetwear"],
+        )
+        if style:
+            attributes["style"] = style
 
         if re.search(
             r"\b(custom|customized|customised|customizable|customisable|customise|customize|"

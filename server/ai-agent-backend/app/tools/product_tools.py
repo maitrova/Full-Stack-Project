@@ -48,7 +48,23 @@ class ProductTools:
     @classmethod
     def _validated_products(cls, products: list[dict]) -> list[ProductPublic]:
         validated = [cls._validated_product(product) for product in products]
-        return [product for product in validated if product is not None]
+        unique: list[ProductPublic] = []
+        seen: set[tuple[str, str, str, str]] = set()
+        for product in validated:
+            if product is None:
+                continue
+            price = product.sale_price if product.sale_price is not None else product.price
+            key = (
+                product.name.strip().casefold(),
+                str(price),
+                product.currency,
+                product.category.strip().casefold(),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            unique.append(product)
+        return unique
 
     async def search_products(self, params: ProductSearchParams) -> list[ProductPublic]:
         filters = {

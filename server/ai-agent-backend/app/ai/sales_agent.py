@@ -1591,6 +1591,12 @@ class SalesAgent:
             details.append(intent.color)
         if intent.category:
             details.append(intent.category)
+        style = str(intent.attributes.get("style") or "").strip()
+        if style and style.casefold() != str(intent.category or "").casefold():
+            details.append(style)
+        pattern = str(intent.attributes.get("pattern") or "").strip()
+        if pattern:
+            details.append(pattern)
         if intent.occasion:
             details.append(f"for {intent.occasion}")
         if intent.max_price:
@@ -1600,10 +1606,8 @@ class SalesAgent:
         if not products:
             return f"That exact {summary} is not available right now. Want me to show the closest options?"
 
-        best_product = products[0]
         lines = [
-            f"Yes, these {len(products)} option{'s' if len(products) != 1 else ''} look good for {summary}.",
-            f"{best_product.name} is a nice first choice because it is {self._short_match_reason(best_product)}.",
+            f"Yes, these {len(products)} option{'s' if len(products) != 1 else ''} look good for {summary}:",
         ]
         for index, product in enumerate(products, start=1):
             price = product.sale_price if product.sale_price is not None else product.price
