@@ -225,6 +225,15 @@ jobs:
           envs: GEMINI_API_KEY,OPENAI_API_KEY
           script: |
             set -e
+            trap '
+              status=$?
+              echo "AI agent deployment failed (exit ${status}); collecting Kubernetes diagnostics"
+              kubectl -n production get pods -l app.kubernetes.io/instance=ai-agent -o wide || true
+              kubectl -n production describe pods -l app.kubernetes.io/instance=ai-agent || true
+              kubectl -n production get events --sort-by=.lastTimestamp | tail -n 40 || true
+              kubectl -n production logs -l app.kubernetes.io/instance=ai-agent --all-containers --tail=200 --prefix=true || true
+              exit ${status}
+            ' EXIT
             if [ -z "${GEMINI_API_KEY:-}" ]; then
               echo "ERROR: GEMINI_API_KEY GitHub Actions secret is required for the AI agent deployment" >&2
               exit 1
@@ -240,6 +249,7 @@ jobs:
               --history-max 3 \
               --set image.tag=${{ needs.build_and_push.outputs.ai_agent_tag }} \
               "$@" \
+              --timeout 10m \
               --wait \
               --atomic
 
