@@ -217,22 +217,26 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SUDO_PASSWORD: ${{ secrets.VPS_PASSWORD }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           port: ${{ secrets.VPS_PORT }}
           password: ${{ secrets.VPS_PASSWORD }}
-          envs: GEMINI_API_KEY,OPENAI_API_KEY
+          envs: GEMINI_API_KEY,OPENAI_API_KEY,SUDO_PASSWORD
           command_timeout: 15m
           script: |
             set -e
             trap '
               status=$?
               echo "AI agent deployment failed (exit ${status}); collecting Kubernetes diagnostics"
-              sudo -n kubectl -n production get pods -l app.kubernetes.io/instance=ai-agent -o wide || true
-              sudo -n kubectl -n production describe pods -l app.kubernetes.io/instance=ai-agent || true
-              sudo -n kubectl -n production get events --sort-by=.lastTimestamp | tail -n 40 || true
-              sudo -n kubectl -n production logs -l app.kubernetes.io/instance=ai-agent --all-containers --tail=200 --prefix=true || true
+              kubectl_as_root() {
+                printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' kubectl "$@"
+              }
+              kubectl_as_root -n production get pods -l app.kubernetes.io/instance=ai-agent -o wide || true
+              kubectl_as_root -n production describe pods -l app.kubernetes.io/instance=ai-agent || true
+              kubectl_as_root -n production get events --sort-by=.lastTimestamp | tail -n 40 || true
+              kubectl_as_root -n production logs -l app.kubernetes.io/instance=ai-agent --all-containers --tail=200 --prefix=true || true
               exit ${status}
             ' EXIT
             if [ -z "${GEMINI_API_KEY:-}" ]; then
