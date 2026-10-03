@@ -39,6 +39,7 @@ class IntentParser:
         else:
             clear_discovery = self._is_clear_rule_intent(explicit_rule_intent)
         if clear_discovery or rule_intent.action or rule_intent.product_option:
+            rule_intent.confidence = 0.95
             rule_intent.language = language_info["language"]
             rule_intent.script = language_info["script"]
             return rule_intent
@@ -194,7 +195,9 @@ Customer message:
         conversation_state: dict,
         catalog_categories: list[str] | None = None,
     ) -> IntentResult:
-        text = self._normalize_text(message)
+        text = self._correct_catalogue_terms(
+            self._normalize_text(message), catalog_categories or []
+        )
         language_info = detect_customer_language(message)
         attributes = {}
         action = self._detect_action(text, conversation_state)
@@ -369,6 +372,8 @@ Customer message:
             if category or color or max_price or occasion or attributes
             else "general_question"
         )
+        if intent == "product_search" and not action:
+            wants_to_buy = False
 
         return IntentResult(
             intent=intent,
@@ -385,11 +390,50 @@ Customer message:
             confidence=0.55,
         )
 
+    @classmethod
+    def _correct_catalogue_terms(cls, text: str, catalog_categories: list[str]) -> str:
+        """Correct likely product-term typos using the live catalogue vocabulary."""
+        static_terms = {
+            "shirt", "shirts", "tshirt", "tshirts", "hoodie", "sweatshirt", "polo", "plain", "printed",
+            "graphic", "oversized", "formal", "casual", "cotton", "linen", "silk",
+            "denim", "black", "white", "red", "blue", "green", "yellow", "pink",
+            "purple", "brown", "grey", "maroon", "navy", "cream", "orange",
+        }
+        catalogue_terms = set()
+        for category in catalog_categories:
+            normalized = str(category).lower().replace("-", " ")
+            catalogue_terms.update(re.findall(r"[a-z0-9]+", normalized))
+        vocabulary = {
+            term for term in {*static_terms, *catalogue_terms}
+            if len(term) >= 4 and term not in {"mens", "womens", "products"}
+        }
+        if not vocabulary:
+            return text
+
+        protected = {
+            "show", "find", "need", "want", "have", "looking", "for", "under",
+            "below", "above", "with", "from", "the", "some", "any", "please",
+            "available", "options", "option", "product", "products", "price", "stock",
+        }
+        corrected = []
+        for token in re.findall(r"[a-z0-9]+|[^a-z0-9]+", text):
+            if not re.fullmatch(r"[a-z0-9]+", token) or len(token) < 4 or token in protected:
+                corrected.append(token)
+                continue
+            if token in vocabulary:
+                corrected.append(token)
+                continue
+            match = get_close_matches(token, vocabulary, n=1, cutoff=0.78)
+            corrected.append(match[0] if match else token)
+        return "".join(corrected)
+
     @staticmethod
     def _normalize_category(category: str | None) -> str | None:
         if not category:
             return None
-        value = re.sub(r"\s+", " ", str(category).lower().replace("_", " ")).strip()
+        value = re.sub(r"\s+", " ", str(category).lower().replace("_", " ").replace("-", " ")).strip()
+        if "polo" in value and re.search(r"\bt\s*shirts?\b|\btshirts?\b", value):
+            return "t-shirt"
         aliases = {
             "shirts": "shirt", "men shirt": "shirt", "mens shirt": "shirt",
             "men's shirt": "shirt", "men shirts": "shirt", "mens shirts": "shirt",

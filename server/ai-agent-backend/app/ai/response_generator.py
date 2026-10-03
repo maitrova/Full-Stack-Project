@@ -101,6 +101,18 @@ class ResponseGenerator:
             return False
         if products and any(product.name in fallback_response and product.name not in response for product in products):
             return False
+        # A generated rewrite must retain every factual product and its price
+        # from the deterministic draft. Otherwise return the backend draft.
+        for product in products:
+            if product.name not in fallback_response:
+                continue
+            if product.name not in response:
+                return False
+            price = product.sale_price if product.sale_price is not None else product.price
+            price_forms = {str(int(price)), f"{price:g}", f"{price:,.0f}"}
+            fallback_has_price = any(value in fallback_response for value in price_forms)
+            if fallback_has_price and not any(value in response for value in price_forms):
+                return False
         return not self._has_ai_disclaimer(response)
 
     def _has_ai_disclaimer(self, response: str) -> bool:

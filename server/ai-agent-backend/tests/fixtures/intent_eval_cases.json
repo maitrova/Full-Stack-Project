@@ -1,0 +1,14 @@
+[
+  {"message": "show black polo t shirts under 1500", "intent": "product_search", "category": "t-shirt", "color": "black", "max_price": 1500, "attributes": {"style": "polo"}},
+  {"message": "show blak poloo tshrits", "intent": "product_search", "category": "t-shirt", "color": "black", "attributes": {"style": "polo"}},
+  {"message": "i need white cotton shirts", "intent": "product_search", "category": "shirt", "attributes": {"fabric": "cotton"}},
+  {"message": "show oversized tshirts", "intent": "product_search", "category": "oversized t-shirt", "attributes": {"style": "oversized"}},
+  {"message": "show check shirts", "intent": "product_search", "category": "shirt", "attributes": {"pattern": "check"}},
+  {"message": "what is the price of the second one", "intent": "commerce_action", "action": "check_price"},
+  {"message": "is it available in XL", "intent": "commerce_action", "action": "check_stock"},
+  {"message": "show me product photos", "intent": "commerce_action", "action": "product_photos"},
+  {"message": "send me the product link", "intent": "commerce_action", "action": "product_link"},
+  {"message": "i want to speak to a human", "intent": "commerce_action", "action": "human_handoff"},
+  {"message": "what is your return policy", "intent": "general_question"},
+  {"message": "hello", "intent": "general_question"}
+]

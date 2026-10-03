@@ -447,6 +447,16 @@ class WhatsAppCommerce:
             product = await product_tools.get_product_details(business_id, str(selected_product_id))
             size = self._extract_size(message, product) if product else None
             if product and size:
+                # A bare size is a real state transition, not just a
+                # read-only price question. Persist it so the next bare
+                # number is interpreted as quantity for this purchase.
+                purchase_state = state.setdefault(
+                    "purchase",
+                    {"product_id": str(selected_product_id), "operation_id": secrets.token_hex(16)},
+                )
+                purchase_state["size"] = size
+                purchase_state.pop("confirmed_quote", None)
+                purchase_state.pop("quantity", None)
                 return result(self._price_reply(product, size), [product])
         if (
             not natural_correction

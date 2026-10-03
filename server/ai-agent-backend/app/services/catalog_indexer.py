@@ -31,8 +31,6 @@ class CatalogIndexer:
         await self.index.create_index("updated_at")
 
     async def run_once(self, limit: int | None = None) -> int:
-        if not self.gemini_client.supports_embeddings:
-            return 0
         if not await self._acquire_lease():
             return 0
 
@@ -50,6 +48,7 @@ class CatalogIndexer:
                     "product_id": str(product["_id"]),
                     "embedding_model": settings.gemini_embedding_model,
                     "fingerprint": fingerprint,
+                    "derived_attributes_version": 1,
                 },
                 {"_id": 1},
             )
@@ -58,8 +57,13 @@ class CatalogIndexer:
             attempted += 1
             try:
                 image_url = product.get("images", [None])[0] if product.get("images") else None
-                extracted_attributes = {}
-                if image_url:
+                extracted_attributes = self.repository._infer_merchandise_attributes(
+                    product.get("name"),
+                    product.get("description"),
+                    product.get("category"),
+                    product.get("attributes", {}).get("sub_category"),
+                )
+                if image_url and self.gemini_client.supports_embeddings:
                     extracted_attributes = await self.image_analyzer.analyze(
                         image_url=image_url,
                         catalog_categories=catalog_categories,
@@ -67,6 +71,8 @@ class CatalogIndexer:
                     )
                 embedding = None
                 try:
+                    if not self.gemini_client.supports_embeddings:
+                        raise RuntimeError("embedding provider unavailable")
                     embedding = await self.gemini_client.embed_content(
                         text=self._index_text(product),
                         image_url=image_url,
@@ -92,8 +98,14 @@ class CatalogIndexer:
                         "$set": {
                             "source_type": product.get("attributes", {}).get("source_type"),
                             "fingerprint": fingerprint,
+                            "derived_attributes_version": 1,
                             "embedding": embedding,
-                            "search_attributes": self._safe_attributes(extracted_attributes),
+                            "search_attributes": self._safe_attributes({
+                                **self.repository._infer_merchandise_attributes(
+                                    product.get("name"), product.get("description"), product.get("category")
+                                ),
+                                **extracted_attributes,
+                            }),
                             "dimensions": len(embedding) if embedding else 0,
                             "updated_at": datetime.now(timezone.utc),
                         }

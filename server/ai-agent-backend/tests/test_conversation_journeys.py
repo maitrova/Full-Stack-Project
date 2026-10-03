@@ -40,6 +40,7 @@ class ConversationJourneyTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertEqual(sync_flow_state(state), "collecting_variant")
             await commerce.handle("L", conversation, state, tools, "business")
+            self.assertEqual(state["purchase"]["size"], "L")
             await commerce.handle("2", conversation, state, tools, "business")
             self.assertEqual(sync_flow_state(state), "awaiting_cart_confirmation")
 

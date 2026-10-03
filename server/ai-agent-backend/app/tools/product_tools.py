@@ -106,7 +106,7 @@ class ProductTools:
                 intent.attributes,
             ]
         )
-        return await self.search_products(
+        products = await self.search_products(
             ProductSearchParams(
                 business_id=business_id,
                 query=None if has_structured_filters else query,
@@ -122,6 +122,73 @@ class ProductTools:
                 limit=limit,
             )
         )
+        return [product for product in products if self._matches_intent(product, intent)]
+
+    @staticmethod
+    def _matches_intent(product: ProductPublic, intent: IntentResult) -> bool:
+        """Final safety gate for exact searches before products reach the agent."""
+        attributes = {str(key).lower(): value for key, value in (product.attributes or {}).items()}
+        searchable = " ".join(
+            str(value or "")
+            for value in [product.name, product.description, product.category, *product.tags, *attributes.values()]
+        ).lower()
+
+        def normalized(value: Any) -> str:
+            return (
+                str(value or "")
+                .lower()
+                .replace("t-shirts", "tshirt")
+                .replace("t-shirt", "tshirt")
+                .replace("t shirts", "tshirt")
+                .replace("t shirt", "tshirt")
+            )
+
+        requested_category = normalized(intent.category)
+        if requested_category:
+            if "tshirt" in requested_category and "tshirt" not in normalized(searchable):
+                return False
+            if requested_category == "shirt" and "tshirt" in normalized(searchable):
+                return False
+            category_tokens = [token for token in requested_category.split() if token not in {"tshirt", "shirt"}]
+            if any(token not in normalized(searchable) for token in category_tokens):
+                return False
+
+        effective_price = product.sale_price if product.sale_price is not None else product.price
+        if intent.min_price is not None and effective_price < intent.min_price:
+            return False
+        if intent.max_price is not None and effective_price > intent.max_price:
+            return False
+        if intent.color and normalized(intent.color) not in normalized(searchable):
+            return False
+        if intent.occasion and normalized(intent.occasion) not in normalized(searchable):
+            return False
+        if intent.brand and normalized(intent.brand) not in normalized(searchable):
+            return False
+        if intent.size:
+            sizes = {str(size).upper() for size in attributes.get("sizes", [])}
+            if str(intent.size).upper() not in sizes:
+                return False
+
+        for key, requested in (intent.attributes or {}).items():
+            if key == "catalog_type":
+                source = normalized(attributes.get("source_type"))
+                wanted = normalized(requested).replace(" ", "")
+                if wanted == "readymade" and source != "readymade":
+                    return False
+                if wanted in {"dropproduct", "dropproducts"} and source != "drop":
+                    return False
+                if wanted == "customization" and source != "customization":
+                    return False
+                continue
+            wanted = normalized(requested)
+            actual = normalized(attributes.get(key))
+            if wanted:
+                if actual:
+                    if wanted not in actual:
+                        return False
+                elif wanted not in normalized(searchable):
+                    return False
+        return True
 
     async def search_from_image(
         self,

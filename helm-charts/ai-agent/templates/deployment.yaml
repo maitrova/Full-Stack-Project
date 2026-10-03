@@ -17,10 +17,18 @@ spec:
         {{- include "ai-agent.selectorLabels" . | nindent 8 }}
         tag: {{ .Values.image.tag | quote }}
     spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       imagePullSecrets:
         - name: docker-registry-secret
       containers:
         - name: {{ .Chart.Name }}
+          {{- with $.Values.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
@@ -45,7 +53,7 @@ spec:
             - name: {{ $key }}
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "ai-agent.fullname" $ }}-secret
+                  name: {{ $.Values.existingSecret | default (printf "%s-secret" (include "ai-agent.fullname" $)) }}
                   key: {{ $key }}
             {{- end }}
           livenessProbe:

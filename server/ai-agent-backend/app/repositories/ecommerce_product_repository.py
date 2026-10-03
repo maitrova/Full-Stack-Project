@@ -34,9 +34,35 @@ class EcommerceProductRepository:
 
     async def search_products(self, business_id: str, filters: dict, limit: int = 5) -> list[dict]:
         products = await self._load_catalogue(business_id)
+        products = await self._attach_search_attributes(products)
         matches = [product for product in products if self._matches(product, filters)]
         matches.sort(key=lambda item: (-item["stock"], self._display_price(item)))
         return self._deduplicate_products(matches)[:limit]
+
+    async def _attach_search_attributes(self, products: list[dict]) -> list[dict]:
+        """Merge derived metadata without changing the ecommerce product schema."""
+        product_ids = [str(product.get("_id")) for product in products if product.get("_id")]
+        if not product_ids:
+            return products
+        indexed = await self.database.ai_product_search_index.find(
+            {"product_id": {"$in": product_ids}},
+            {"product_id": 1, "search_attributes": 1},
+        ).to_list(length=len(product_ids))
+        by_id = {str(item.get("product_id")): item.get("search_attributes") or {} for item in indexed}
+        enriched = []
+        for product in products:
+            attrs = by_id.get(str(product.get("_id")))
+            if not attrs:
+                enriched.append(product)
+                continue
+            enriched.append({
+                **product,
+                "attributes": {
+                    **product.get("attributes", {}),
+                    "search_attributes": attrs,
+                },
+            })
+        return enriched
 
     async def search_ranked_products(
         self,

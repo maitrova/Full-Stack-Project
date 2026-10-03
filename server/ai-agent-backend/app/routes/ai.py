@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends
 
 from app.ai.sales_agent import SalesAgent
+from app.config.settings import settings
 from app.database.mongodb import get_database, get_ecommerce_database
 from app.dependencies.auth import get_current_user
 from app.repositories.business_repository import BusinessRepository
@@ -51,6 +52,7 @@ async def ai_metrics(
             "image_analysis_failures": 0,
             "image_embedding_failures": 0,
             "handoff_requests": 0,
+            "clarification_requests": 0,
             "checkout_failures": 0,
             "catalogue_embeddings": 0,
             "input_tokens": 0,
@@ -73,6 +75,9 @@ async def ai_metrics(
                 {"$and": ["$had_image", {"$eq": ["$image_embedding_available", False]}]}, 1, 0
             ]}},
             "handoff_requests": {"$sum": {"$cond": ["$handoff_requested", 1, 0]}},
+            "clarification_requests": {"$sum": {"$cond": [
+                {"$eq": ["$response_goal", "ask for clarification because intent confidence is low"]}, 1, 0
+            ]}},
             "checkout_failures": {"$sum": {"$cond": ["$checkout_failure", 1, 0]}},
             "average_latency_ms": {"$avg": "$latency_ms"},
             "input_tokens": {"$sum": "$input_tokens"},
@@ -99,4 +104,43 @@ async def ai_metrics(
         "whatsapp_inbound_messages": (message_rows[0] if message_rows else {}).get("whatsapp_inbound_messages", 0),
         "whatsapp_outbound_messages": (message_rows[0] if message_rows else {}).get("whatsapp_outbound_messages", 0),
     })
+    summary["quality"] = {
+        "clarification_rate": round(
+            summary.get("clarification_requests", 0) / summary.get("requests", 1), 4
+        ) if summary.get("requests") else 0,
+        "empty_search_rate": round(
+            summary.get("empty_searches", 0) / summary.get("requests", 1), 4
+        ) if summary.get("requests") else 0,
+        "handoff_rate": round(
+            summary.get("handoff_requests", 0) / summary.get("requests", 1), 4
+        ) if summary.get("requests") else 0,
+    }
     return summary
+
+
+@router.get("/metrics/trace/{request_id}")
+async def ai_trace(
+    request_id: str,
+    current_user: UserPublic = Depends(get_current_user),
+):
+    """Return a privacy-safe trace for one AI request owned by this merchant."""
+    database = get_database()
+    business = await BusinessRepository(database).find_by_owner_id(current_user.id)
+    if business is None:
+        return {"request_id": request_id, "found": False}
+    metric = await database.ai_agent_metrics.find_one(
+        {"business_id": business["_id"], "request_id": request_id},
+        {"_id": 0},
+    )
+    audits = await database.ai_action_audit.find(
+        {"business_id": business["_id"], "request_id": request_id},
+        {"_id": 0},
+    ).sort("created_at", 1).to_list(length=50)
+    if metric is None and not audits:
+        return {"request_id": request_id, "found": False}
+    return {
+        "request_id": request_id,
+        "found": True,
+        "metric": metric,
+        "actions": audits,
+    }

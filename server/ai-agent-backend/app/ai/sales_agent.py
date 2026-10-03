@@ -3,6 +3,7 @@ import hashlib
 import logging
 import re
 import time
+from uuid import uuid4
 from datetime import datetime, timezone
 from difflib import get_close_matches
 from types import SimpleNamespace
@@ -56,6 +57,7 @@ class SalesAgent:
     async def handle_chat(self, payload: AiChatRequest, current_user: UserPublic) -> AiChatResponse:
         start_usage_tracking()
         started_at = time.monotonic()
+        request_id = uuid4().hex
         business = await self.business_repository.find_by_owner_id(current_user.id)
         if business is None:
             raise HTTPException(
@@ -207,6 +209,21 @@ class SalesAgent:
             else []
         )
         order_request = self._is_order_request(payload.message)
+        needs_clarification = (
+            not has_image
+            and intent.intent == "product_search"
+            and float(intent.confidence or 0) < 0.6
+            and not any([
+                intent.category,
+                intent.color,
+                intent.min_price is not None,
+                intent.max_price is not None,
+                intent.occasion,
+                intent.size,
+                intent.brand,
+                intent.attributes,
+            ])
+        )
         follow_up = (
             None
             if more_options_request
@@ -218,14 +235,14 @@ class SalesAgent:
         tool_calls = []
         response_goal = "answer"
         presentation = None
-        if design_library_request and not image_lookup:
+        if design_library_request and not image_lookup and not needs_clarification:
             presentation = await self._design_library_presentation(
                 business_id,
                 payload.message,
                 conversation,
                 updated_state,
             )
-        if self.commerce and not image_lookup and not presentation:
+        if self.commerce and not image_lookup and not presentation and not needs_clarification:
             presentation = await self.commerce.handle(
                 payload.message,
                 conversation,
@@ -236,7 +253,7 @@ class SalesAgent:
             )
         # An uploaded customer image is input for vision/search. It must not be
         # mistaken for a request to resend photos from the previous turn.
-        if not presentation and not has_image:
+        if not presentation and not has_image and not needs_clarification:
             presentation = await self._presentation_request(
                 business_id,
                 payload.message,
@@ -246,7 +263,11 @@ class SalesAgent:
                 intent_option=intent.product_option,
             )
 
-        if image_analysis_failed and not presentation and not customization_request:
+        if needs_clarification:
+            ai_text = "I want to find the right product for you. What product type, style, color, or budget should I search for?"
+            response_goal = "ask for clarification because intent confidence is low"
+            tool_calls.append({"name": "intent_validation", "status": "clarification_requested"})
+        elif image_analysis_failed and not presentation and not customization_request:
             ai_text = (
                 "Thanks for the photo. Image analysis is temporarily unavailable, "
                 "so I can't reliably identify the item yet. Tell me the product type, "
@@ -528,6 +549,7 @@ class SalesAgent:
                 "content": ai_text,
                 "message_type": "text",
                 "metadata": {
+                    "request_id": request_id,
                     "media_mode": presentation[2] if presentation else "recommendations",
                     "intent": intent.model_dump(),
                     "image_analysis": image_analysis,
@@ -593,6 +615,7 @@ class SalesAgent:
                     "$setOnInsert": {
                         "business_id": business["_id"],
                         "conversation_id": conversation["_id"],
+                        "request_id": request_id,
                         "customer_name": conversation.get("customer_name"),
                         "external_customer_ref": conversation.get("external_customer_ref"),
                         "lead_type": "customization" if is_customization_lead else "general",
@@ -627,6 +650,7 @@ class SalesAgent:
         provider_usage = consume_usage()
         await self._record_metric(
             business_id=business_id,
+            request_id=request_id,
             intent=intent,
             result_count=len(products),
             image_analysis=image_analysis,
@@ -642,7 +666,10 @@ class SalesAgent:
             provider_usage=provider_usage,
         )
 
-        logger.info("AI chat handled for conversation %s with intent %s", conversation["_id"], intent.intent)
+        logger.info(
+            "AI chat handled request=%s conversation=%s intent=%s confidence=%.2f results=%s",
+            request_id, conversation["_id"], intent.intent, float(intent.confidence or 0), len(products),
+        )
         return AiChatResponse(
             conversation=ConversationPublic.model_validate(object_id_to_str(refreshed_conversation)),
             customer_message=MessagePublic.model_validate(object_id_to_str(customer_message)),
@@ -1606,9 +1633,12 @@ class SalesAgent:
         if not products:
             return f"That exact {summary} is not available right now. Want me to show the closest options?"
 
+        category_url = self._category_url(intent.category)
         lines = [
-            f"Yes, these {len(products)} option{'s' if len(products) != 1 else ''} look good for {summary}:",
+            f"Here are some recommendations for {summary}:",
         ]
+        if category_url:
+            lines.append(f"Browse all {self._category_label(intent.category)}: {category_url}")
         for index, product in enumerate(products, start=1):
             price = product.sale_price if product.sale_price is not None else product.price
             stock_text = "in stock" if product.stock > 0 else "out of stock"
@@ -1624,6 +1654,33 @@ class SalesAgent:
 
         lines.append("Want details for any one?")
         return "\n".join(lines)
+
+    @staticmethod
+    def _category_label(category: str | None) -> str:
+        value = re.sub(r"\s+", " ", str(category or "products").replace("-", " ")).strip().lower()
+        if "tshirt" in value or "t shirt" in value:
+            return "T-shirts"
+        if value == "shirt" or value.endswith(" shirts"):
+            return "shirts"
+        if value.endswith("s"):
+            return value
+        return f"{value}s" if value else "products"
+
+    @classmethod
+    def _category_url(cls, category: str | None) -> str | None:
+        origin = str(settings.ecommerce_storefront_url or "").rstrip("/")
+        if not origin.startswith("https://") or not category:
+            return None
+        value = str(category).lower().replace("-", " ").strip()
+        if "tshirt" in value or "t shirt" in value:
+            slug = "t-shirts"
+        elif value == "shirt" or value.endswith(" shirts"):
+            slug = "shirts"
+        else:
+            slug = re.sub(r"[^a-z0-9]+", "-", value).strip("-")
+            if slug and not slug.endswith("s"):
+                slug += "s"
+        return f"{origin}/products/{slug}" if slug else None
 
     @staticmethod
     def _compact_whatsapp_reply(value: str, limit: int = 900) -> str:
@@ -1817,6 +1874,7 @@ class SalesAgent:
         response_goal: str,
         latency_ms: int,
         provider_usage: list[dict] | None = None,
+        request_id: str | None = None,
     ) -> None:
         """Store operational counters without message text, media, or customer identifiers."""
         try:
@@ -1824,7 +1882,9 @@ class SalesAgent:
             await database.ai_agent_metrics.insert_one(
                 {
                     "business_id": parse_object_id(business_id),
+                    "request_id": request_id,
                     "intent": intent.intent,
+                    "intent_confidence": float(intent.confidence or 0),
                     "category": intent.category,
                     "source_type": intent.attributes.get("catalog_type"),
                     "result_count": int(result_count),

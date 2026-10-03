@@ -64,6 +64,11 @@ databaseSecret:
   name: backend-secret
   key: MONGOOSE_URL
 
+# Prefer an externally managed Kubernetes Secret in production. When this is
+# set, envSecrets below are ignored and no Secret containing values.yaml data
+# is rendered by this chart.
+existingSecret: ""
+
 # Non-provider secrets are rendered into the ai-agent Secret.
 # GEMINI_API_KEY is supplied by the deploy workflow from GitHub Actions secrets.
 envSecrets:
@@ -75,6 +80,17 @@ envSecrets:
   WHATSAPP_PHONE_NUMBER_ID: "1331297466727189"
   WHATSAPP_BUSINESS_ID: "6a8ed71fad2e678319a99958"
   WHATSAPP_WABA_ID: "1070613052495208"
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
 
 
 resources:

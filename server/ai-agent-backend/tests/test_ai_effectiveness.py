@@ -9,6 +9,7 @@ from app.repositories.ecommerce_product_repository import EcommerceProductReposi
 from app.schemas.ai import IntentResult
 from app.schemas.product import ProductPublic
 from app.services.catalog_indexer import CatalogIndexer
+from app.tools.product_tools import ProductTools
 
 
 def product(name="Black Graphic Hoodie", category="Mens Hoodies", score=0.8, source="readymade"):
@@ -113,6 +114,17 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(facts["pattern"], "Checks")
         self.assertEqual(facts["color"], "White, Blue")
         self.assertEqual(facts["style"], "Formal")
+
+    def test_derived_index_facts_can_be_built_without_changing_product_schema(self):
+        repo = EcommerceProductRepository.__new__(EcommerceProductRepository)
+        derived = repo._infer_merchandise_attributes(
+            "White Polo Cotton T-Shirt",
+            "Plain polo style for everyday wear",
+            "Men T-Shirts",
+        )
+
+        self.assertEqual(derived["style"], "Polo")
+        self.assertEqual(derived["fabric"], "Cotton")
 
     def test_title_fabric_wins_over_conflicting_description_word(self):
         repo = EcommerceProductRepository.__new__(EcommerceProductRepository)
@@ -312,6 +324,28 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
         unique = repo._deduplicate_products([first, second])
 
         self.assertEqual(len(unique), 1)
+
+    def test_exact_search_result_must_match_style_and_pattern(self):
+        item = product(name="White Polo T-Shirt", category="Men T-Shirts")
+        item.attributes.update({"style": "Polo", "pattern": "Plain"})
+        intent = IntentResult(
+            intent="product_search",
+            category="t-shirt",
+            attributes={"style": "polo", "pattern": "plain"},
+        )
+
+        self.assertTrue(ProductTools._matches_intent(item, intent))
+        item.attributes["style"] = "Round Neck"
+        self.assertFalse(ProductTools._matches_intent(item, intent))
+
+    def test_category_recommendations_include_storefront_link(self):
+        from unittest.mock import patch
+
+        with patch("app.ai.sales_agent.settings", SimpleNamespace(ecommerce_storefront_url="https://maitrova.in")):
+            self.assertEqual(
+                self.agent._category_url("t-shirt"),
+                "https://maitrova.in/products/t-shirts",
+            )
 
     async def test_model_cannot_turn_category_discovery_into_cart_action(self):
         client = SimpleNamespace(

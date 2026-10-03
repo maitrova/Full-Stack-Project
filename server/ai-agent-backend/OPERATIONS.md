@@ -105,6 +105,35 @@ Changing a conversation to OPEN resumes the agent; a human reply assigns the ale
 Monitor failed job counts, open handoff age, Razorpay webhook errors, and WhatsApp
 delivery errors. Notification audit entries expire after 180 days.
 
+AI quality monitoring should also track intent confidence, clarification requests,
+empty exact searches, duplicate-result rate, rejected result validations, model
+provider failures, and human handoff rate. Keep a regression set of real customer
+phrases under `tests/` and run it before changing intent rules, catalogue taxonomy,
+or response prompts.
+
+Run the local evaluation set with:
+
+`python scripts/evaluate_intents.py`
+
+Backfill derived search metadata for existing products with:
+
+`python scripts/backfill_catalogue.py --passes 100`
+
+Both commands leave the ecommerce product documents unchanged. The AI metrics
+endpoint now exposes clarification, empty-search, and handoff rates for dashboard
+and alert integrations.
+
+Each AI request now carries a privacy-safe `request_id` through message metadata,
+tool audits, metrics, and logs. Use that ID to reconstruct a failed interaction
+without logging customer message text in operational metrics.
+
+For production Helm releases, set `existingSecret` to a Secret managed by the
+cluster or an external-secrets controller. Rotate any credentials that were ever
+committed to values files; changing the chart does not revoke previously exposed
+credentials. The pod security context defaults to non-root, RuntimeDefault
+seccomp, no privilege escalation, read-only root filesystem, and dropped Linux
+capabilities.
+
 Store policy answers use published HTML in `companydocuments`. PDF-only documents
 and missing policies are handed to staff rather than guessed. `human` flags the
 conversation as handoff and pauses subsequent automated replies.
