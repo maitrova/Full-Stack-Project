@@ -25,6 +25,30 @@ def product():
 
 
 class ConversationJourneyTests(unittest.IsolatedAsyncioTestCase):
+    async def test_order_request_with_product_filters_searches_before_checkout(self):
+        commerce = WhatsAppCommerce(SimpleNamespace())
+        tools = SimpleNamespace(get_product_details=AsyncMock())
+        conversation = {}
+        state = {}
+
+        result = await commerce.handle(
+            "I need to order the white shirt",
+            conversation,
+            state,
+            tools,
+            "business",
+            intent=IntentResult(
+                intent="product_search",
+                category="shirt",
+                color="white",
+                wants_to_buy=True,
+            ),
+        )
+
+        self.assertIsNone(result)
+        self.assertNotIn("purchase", state)
+        tools.get_product_details.assert_not_awaited()
+
     async def test_customer_can_correct_size_before_atomic_cart_confirmation(self):
         commerce = WhatsAppCommerce(SimpleNamespace())
         commerce._linked = AsyncMock(return_value=True)

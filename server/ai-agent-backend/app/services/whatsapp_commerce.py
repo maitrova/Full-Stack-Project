@@ -528,6 +528,7 @@ class WhatsAppCommerce:
                 or intent.occasion or intent.attributes
             )
         )
+        referenced_product_id = self._referenced_product_id(text, conversation, state)
         discovery_request = bool(
             intent
             and not explicit_buy
@@ -537,6 +538,19 @@ class WhatsAppCommerce:
                 or (action in {None, "add_to_cart"} and has_search_requirements)
             )
         )
+        # "I need to order a white shirt" contains purchase language, but it
+        # still describes a search rather than selecting a specific product.
+        # Search first so the customer can see verified recommendations; only
+        # enter checkout after an option, product name, or existing reference
+        # identifies the item.
+        if (
+            intent
+            and explicit_buy
+            and has_search_requirements
+            and not getattr(intent, "product_option", None)
+            and not referenced_product_id
+        ):
+            discovery_request = True
         buy = not discovery_request and (
             explicit_buy
             or action in {"add_to_cart", "confirm_cart"}
@@ -567,7 +581,7 @@ class WhatsAppCommerce:
         if not buy and not purchase:
             return None
         if not purchase:
-            product_id = self._referenced_product_id(text, conversation, state)
+            product_id = referenced_product_id
             ids = conversation.get("recommended_product_ids", [])
             choice = re.search(r"\b(?:option|product|number)\s*#?\s*([1-5])\b", text)
             if not choice:

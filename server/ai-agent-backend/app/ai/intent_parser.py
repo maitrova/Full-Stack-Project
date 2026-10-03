@@ -9,6 +9,14 @@ from app.schemas.ai import IntentResult
 
 logger = logging.getLogger(__name__)
 
+SUPPORTED_INTENTS = {"product_search", "commerce_action", "store_question", "general_question"}
+SUPPORTED_ACTIONS = {
+    "add_to_cart", "confirm_cart", "decline_cart", "product_photos", "product_link",
+    "browse_designs", "check_price", "check_stock", "show_sizes", "track_order",
+    "show_cart", "remove_from_cart", "update_cart_quantity", "checkout", "retry_checkout",
+    "human_handoff",
+}
+
 
 class IntentParser:
     def __init__(self, gemini_client: GeminiClient | None = None):
@@ -83,11 +91,38 @@ class IntentParser:
                 if not intent.wants_to_buy and not explicit_discovery:
                     intent.wants_to_buy = self._detect_purchase_interest(normalized, intent.action)
                 intent.category = self._normalize_category(intent.category)
+                intent = self._sanitize_model_intent(intent, message, conversation_state)
                 return intent
             except Exception as exc:
                 logger.warning("Gemini intent parsing failed; using fallback parser: %s", exc.__class__.__name__)
 
         return self._parse_with_rules(message, conversation_state, catalog_categories)
+
+    def _sanitize_model_intent(
+        self,
+        intent: IntentResult,
+        message: str,
+        conversation_state: dict,
+    ) -> IntentResult:
+        """Prevent malformed or unsafe model routing from reaching tools."""
+        if intent.intent not in SUPPORTED_INTENTS:
+            logger.warning("Unsupported model intent %r; routing to general_question", intent.intent)
+            intent.intent = "general_question"
+            intent.confidence = min(float(intent.confidence or 0), 0.2)
+        if intent.action not in SUPPORTED_ACTIONS:
+            if intent.action is not None:
+                logger.warning("Unsupported model action %r; clearing action", intent.action)
+            intent.action = None
+        if intent.intent == "commerce_action" and intent.action is None:
+            # A commerce route without a concrete action must not mutate state.
+            intent.intent = "general_question"
+            intent.wants_to_buy = False
+        if intent.intent == "product_search" and not self._is_clear_rule_intent(intent):
+            # Keep vague model output from triggering a broad, unrelated search.
+            rule_intent = self._parse_with_rules(message, conversation_state, None)
+            if rule_intent.intent == "product_search":
+                return rule_intent
+        return intent
 
     @staticmethod
     def _is_clear_rule_intent(intent: IntentResult) -> bool:
@@ -602,6 +637,13 @@ Customer message:
             "నీలం": "blue",
             "పట్టు": "silk",
             "పెళ్లి": "wedding",
+            "చొక్కా": "shirt",
+            "షర్టు": "shirt",
+            "షర్ట్": "shirt",
+            "తెల్ల": "white",
+            "सफेद": "white",
+            "कमीज": "shirt",
+            "शर्ट": "shirt",
         }
         for wrong, correct in replacements.items():
             if wrong.isascii():
