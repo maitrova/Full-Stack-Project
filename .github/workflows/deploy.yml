@@ -223,6 +223,7 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           password: ${{ secrets.VPS_PASSWORD }}
           envs: GEMINI_API_KEY,OPENAI_API_KEY
+          command_timeout: 15m
           script: |
             set -e
             trap '
@@ -249,7 +250,7 @@ jobs:
               --history-max 3 \
               --set image.tag=${{ needs.build_and_push.outputs.ai_agent_tag }} \
               "$@" \
-              --timeout 10m \
+              --timeout 8m \
               --wait \
               --atomic
 
