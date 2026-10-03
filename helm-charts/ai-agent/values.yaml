@@ -81,18 +81,6 @@ envSecrets:
   WHATSAPP_BUSINESS_ID: "6a8ed71fad2e678319a99958"
   WHATSAPP_WABA_ID: "1070613052495208"
 
-podSecurityContext:
-  runAsNonRoot: true
-  seccompProfile:
-    type: RuntimeDefault
-
-containerSecurityContext:
-  allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: true
-  capabilities:
-    drop: ["ALL"]
-
-
 resources:
   limits:
     cpu: "1"
@@ -111,20 +99,11 @@ livenessProbe:
 
 readinessProbe:
   enabled: true
-  path: /api/health/ready
+  path: /api/health
   initialDelaySeconds: 10
   periodSeconds: 5
   timeoutSeconds: 3
   failureThreshold: 3
-
-# MongoDB connectivity and index creation happen during application startup.
-# Keep liveness from restarting the pod while that initialization is running.
-startupProbe:
-  enabled: true
-  path: /api/health
-  periodSeconds: 5
-  timeoutSeconds: 3
-  failureThreshold: 60
 
 autoscaling:
   enabled: true
