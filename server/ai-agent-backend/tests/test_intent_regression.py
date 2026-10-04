@@ -2,7 +2,9 @@ import unittest
 from types import SimpleNamespace
 
 from app.ai.intent_parser import IntentParser
+from app.ai.action_policy import ActionPolicy
 from app.schemas.ai import IntentResult
+from app.services.quality_monitor import build_quality_alerts
 
 
 class IntentRegressionTests(unittest.TestCase):
@@ -69,4 +71,36 @@ class IntentRegressionTests(unittest.TestCase):
         safe = self.parser._sanitize_model_intent(model_intent, "yes", {})
         self.assertEqual(safe.intent, "general_question")
         self.assertIsNone(safe.action)
+
+    def test_action_policy_blocks_cart_mutations_without_state(self):
+        allowed, reason = ActionPolicy.validate(
+            IntentResult(intent="commerce_action", action="checkout"),
+            {},
+            {},
+        )
+        self.assertFalse(allowed)
+        self.assertIn("required", reason)
+
+    def test_action_policy_allows_confirmation_with_pending_quote(self):
+        allowed, reason = ActionPolicy.validate(
+            IntentResult(intent="commerce_action", action="confirm_cart"),
+            {},
+            {"purchase": {"product_id": "p1", "confirmed_quote": 999}},
+        )
+        self.assertTrue(allowed)
+        self.assertIsNone(reason)
+
+    def test_quality_monitor_emits_actionable_alerts(self):
+        alerts = build_quality_alerts({
+            "requests": 10,
+            "checkout_failures": 1,
+            "quality": {
+                "empty_search_rate": 0.4,
+                "clarification_rate": 0.1,
+                "handoff_rate": 0.1,
+            },
+        })
+        codes = {alert["code"] for alert in alerts}
+        self.assertIn("high_empty_search_rate", codes)
+        self.assertIn("checkout_failures", codes)
 

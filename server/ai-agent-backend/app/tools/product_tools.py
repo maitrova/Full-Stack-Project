@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from app.repositories.product_repository import ProductRepository
+from app.services.catalogue_quality import validate_catalogue_record
 from app.schemas.ai import IntentResult
 from app.schemas.product import ProductPublic
 from app.utils.object_id import object_id_to_str
@@ -34,6 +35,20 @@ class ProductTools:
 
     @staticmethod
     def _validated_product(product: dict) -> ProductPublic | None:
+        quality = validate_catalogue_record(product)
+        if quality.errors:
+            logger.warning(
+                "Skipping catalogue product %s due to quality errors: %s",
+                quality.product_id,
+                ",".join(quality.errors),
+            )
+            return None
+        if quality.warnings:
+            logger.info(
+                "Catalogue product %s has quality warnings: %s",
+                quality.product_id,
+                ",".join(quality.warnings),
+            )
         try:
             return ProductPublic.model_validate(object_id_to_str(product))
         except ValidationError as exc:

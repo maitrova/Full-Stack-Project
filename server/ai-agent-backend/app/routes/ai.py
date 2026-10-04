@@ -12,6 +12,8 @@ from app.repositories.message_repository import MessageRepository
 from app.repositories.ecommerce_product_repository import EcommerceProductRepository
 from app.schemas.ai import AiChatRequest, AiChatResponse
 from app.schemas.user import UserPublic
+from app.services.catalogue_quality import validate_catalogue_record
+from app.services.quality_monitor import build_quality_alerts
 from app.tools.product_tools import ProductTools
 
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -54,6 +56,7 @@ async def ai_metrics(
             "handoff_requests": 0,
             "clarification_requests": 0,
             "checkout_failures": 0,
+            "policy_blocks": 0,
             "catalogue_embeddings": 0,
             "input_tokens": 0,
             "output_tokens": 0,
@@ -79,6 +82,7 @@ async def ai_metrics(
                 {"$eq": ["$response_goal", "ask for clarification because intent confidence is low"]}, 1, 0
             ]}},
             "checkout_failures": {"$sum": {"$cond": ["$checkout_failure", 1, 0]}},
+            "policy_blocks": {"$sum": {"$cond": ["$policy_blocked", 1, 0]}},
             "average_latency_ms": {"$avg": "$latency_ms"},
             "input_tokens": {"$sum": "$input_tokens"},
             "output_tokens": {"$sum": "$output_tokens"},
@@ -115,6 +119,7 @@ async def ai_metrics(
             summary.get("handoff_requests", 0) / summary.get("requests", 1), 4
         ) if summary.get("requests") else 0,
     }
+    summary["alerts"] = build_quality_alerts(summary)
     return summary
 
 
@@ -143,4 +148,46 @@ async def ai_trace(
         "found": True,
         "metric": metric,
         "actions": audits,
+    }
+
+
+@router.get("/catalogue/health")
+async def catalogue_health(
+    current_user: UserPublic = Depends(get_current_user),
+):
+    """Return a read-only quality report for the merchant's live AI catalogue."""
+    database = get_database()
+    business = await BusinessRepository(database).find_by_owner_id(current_user.id)
+    if business is None:
+        return {"found": False, "total_products": 0, "error_products": 0, "warning_products": 0}
+
+    repository = EcommerceProductRepository(get_ecommerce_database())
+    products = await repository._load_catalogue(str(business["_id"]))
+    reports = [validate_catalogue_record(product) for product in products]
+
+    def issue_counts(attribute: str) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for report in reports:
+            for issue in getattr(report, attribute):
+                counts[issue] = counts.get(issue, 0) + 1
+        return dict(sorted(counts.items(), key=lambda item: (-item[1], item[0])))
+
+    return {
+        "found": True,
+        "business_id": str(business["_id"]),
+        "total_products": len(reports),
+        "searchable_products": sum(report.is_searchable for report in reports),
+        "error_products": sum(bool(report.errors) for report in reports),
+        "warning_products": sum(bool(report.warnings) for report in reports),
+        "errors_by_type": issue_counts("errors"),
+        "warnings_by_type": issue_counts("warnings"),
+        "products": [
+            {
+                "product_id": report.product_id,
+                "errors": report.errors,
+                "warnings": report.warnings,
+            }
+            for report in reports
+            if report.errors or report.warnings
+        ][:100],
     }

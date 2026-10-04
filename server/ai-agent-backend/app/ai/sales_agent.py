@@ -13,6 +13,7 @@ import httpx
 from fastapi import HTTPException, status
 
 from app.ai.intent_parser import IntentParser
+from app.ai.action_policy import ActionPolicy
 from app.ai.product_image_analyzer import ProductImageAnalyzer
 from app.ai.response_generator import ResponseGenerator
 from app.ai.store_knowledge import StoreKnowledge
@@ -175,6 +176,22 @@ class SalesAgent:
             conversation["selected_product_id"] = None
             conversation["recommended_product_ids"] = []
         self._apply_product_option(intent.product_option, conversation, updated_state)
+        action_allowed, policy_reason = ActionPolicy.validate(intent, conversation, updated_state)
+        policy_blocked = not action_allowed
+        if policy_blocked:
+            logger.warning(
+                "Blocked unsafe commerce action=%s conversation=%s reason=%s",
+                intent.action,
+                conversation.get("_id"),
+                policy_reason,
+            )
+            updated_state["last_policy_block"] = {
+                "action": intent.action,
+                "reason": policy_reason,
+            }
+            intent.action = None
+            intent.intent = "general_question"
+            intent.wants_to_buy = False
         if image_analysis_failed:
             updated_state.pop("last_image_analysis", None)
         if effective_image_analysis:
@@ -211,6 +228,7 @@ class SalesAgent:
         order_request = self._is_order_request(payload.message)
         needs_clarification = (
             not has_image
+            and not policy_blocked
             and intent.intent == "product_search"
             and float(intent.confidence or 0) < 0.6
             and not any([
@@ -267,6 +285,17 @@ class SalesAgent:
             ai_text = "I want to find the right product for you. What product type, style, color, or budget should I search for?"
             response_goal = "ask for clarification because intent confidence is low"
             tool_calls.append({"name": "intent_validation", "status": "clarification_requested"})
+        elif policy_blocked:
+            ai_text = (
+                "I need you to select a product first before I can continue. "
+                "Please reply with the product number or name from the options shown."
+            )
+            response_goal = "explain that a commerce action needs a selected product"
+            tool_calls.append({
+                "name": "action_policy",
+                "status": "blocked",
+                "reason": policy_reason,
+            })
         elif image_analysis_failed and not presentation and not customization_request:
             ai_text = (
                 "Thanks for the photo. Image analysis is temporarily unavailable, "
@@ -685,6 +714,7 @@ class SalesAgent:
             had_image=has_image,
             image_embedding_available=bool(image_embedding),
             handoff_requested=bool(updated_state.get("handoff_requested")),
+            policy_blocked=policy_blocked,
             checkout_failure=(
                 "couldn't create a secure checkout link" in ai_text.lower()
                 or "store service isn't responding" in ai_text.lower()
@@ -1901,6 +1931,7 @@ class SalesAgent:
         checkout_failure: bool,
         response_goal: str,
         latency_ms: int,
+        policy_blocked: bool = False,
         provider_usage: list[dict] | None = None,
         request_id: str | None = None,
     ) -> None:
@@ -1923,6 +1954,7 @@ class SalesAgent:
                     "image_confidence": image_analysis.get("confidence"),
                     "image_embedding_available": image_embedding_available,
                     "handoff_requested": handoff_requested,
+                    "policy_blocked": policy_blocked,
                     "checkout_failure": checkout_failure,
                     "response_goal": response_goal,
                     "latency_ms": latency_ms,

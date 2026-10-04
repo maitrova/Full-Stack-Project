@@ -10,6 +10,7 @@ from app.ai.sales_agent import SalesAgent
 from app.repositories.ecommerce_product_repository import EcommerceProductRepository
 from app.schemas.ai import IntentResult
 from app.services.whatsapp_service import WhatsAppClient, WhatsAppService
+from app.services.catalogue_quality import validate_catalogue_record
 
 
 class ProductActions(unittest.IsolatedAsyncioTestCase):
@@ -27,6 +28,36 @@ class ProductActions(unittest.IsolatedAsyncioTestCase):
         ) for i in range(1, 4)]
         self.agent = SalesAgent(None, None, None, SimpleNamespace(get_product_details=AsyncMock(side_effect=lambda b, p: next(x for x in self.products if x.id == p))))
         self.conversation = {"recommended_product_ids": ["1", "2", "3"]}
+
+    def test_catalogue_quality_rejects_invalid_link_and_variant_stock(self):
+        report = validate_catalogue_record({
+            "_id": "p1",
+            "name": "Test Shirt",
+            "category": "shirt",
+            "price": 500,
+            "sale_price": 400,
+            "stock": 2,
+            "attributes": {
+                "product_url": "http://untrusted.example/item",
+                "variants": [{"size": "M", "stock": -1}],
+            },
+        })
+        self.assertFalse(report.is_searchable)
+        self.assertIn("invalid_product_url", report.errors)
+        self.assertIn("variant_0_negative_stock", report.errors)
+
+    def test_catalogue_quality_warns_without_blocking_missing_optional_media(self):
+        report = validate_catalogue_record({
+            "_id": "p2",
+            "name": "Test Shirt",
+            "category": "shirt",
+            "price": 500,
+            "stock": 2,
+            "attributes": {},
+        })
+        self.assertTrue(report.is_searchable)
+        self.assertIn("missing_product_url", report.warnings)
+        self.assertIn("missing_images", report.warnings)
 
     async def test_link_clarification_then_selection(self):
         state = {}
