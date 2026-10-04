@@ -14,6 +14,7 @@ from app.schemas.ai import AiChatRequest, AiChatResponse
 from app.schemas.user import UserPublic
 from app.services.catalogue_quality import validate_catalogue_record
 from app.services.quality_monitor import build_quality_alerts
+from app.services.website_knowledge import WebsiteKnowledgeSync
 from app.tools.product_tools import ProductTools
 
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -190,4 +191,36 @@ async def catalogue_health(
             for report in reports
             if report.errors or report.warnings
         ][:100],
+    }
+
+
+@router.get("/knowledge/health")
+async def knowledge_health(
+    current_user: UserPublic = Depends(get_current_user),
+):
+    """Show website knowledge freshness and source coverage for the merchant."""
+    database = get_database()
+    business = await BusinessRepository(database).find_by_owner_id(current_user.id)
+    if business is None:
+        return {"found": False, "configured_urls": 0, "active_chunks": 0}
+    ecommerce_database = get_ecommerce_database()
+    collection = ecommerce_database.ai_website_knowledge
+    active_chunks = await collection.count_documents({"status": "active"})
+    stale_chunks = await collection.count_documents({"status": "stale"})
+    latest = await collection.find_one({"status": "active"}, {"_id": 0, "updated_at": 1}, sort=[("updated_at", -1)])
+    sources = await collection.aggregate([
+        {"$match": {"status": "active"}},
+        {"$group": {"_id": "$source_url", "chunks": {"$sum": 1}, "updated_at": {"$max": "$updated_at"}}},
+        {"$sort": {"updated_at": -1}},
+    ]).to_list(length=100)
+    return {
+        "found": True,
+        "configured_urls": len(WebsiteKnowledgeSync.configured_urls()),
+        "active_chunks": active_chunks,
+        "stale_chunks": stale_chunks,
+        "latest_updated_at": latest.get("updated_at") if latest else None,
+        "sources": [
+            {"url": item.get("_id"), "chunks": item.get("chunks", 0), "updated_at": item.get("updated_at")}
+            for item in sources
+        ],
     }

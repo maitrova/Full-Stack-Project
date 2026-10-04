@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     openai_output_cost_per_million: float = 0.0
     catalogue_index_batch_size: int = 10
     catalogue_index_interval_seconds: int = 60
+    website_knowledge_urls: str = ""
+    website_knowledge_sync_interval_seconds: int = 900
+    website_knowledge_chunk_size: int = 1800
 
     whatsapp_verify_token: str | None = None
     whatsapp_access_token: str | None = None

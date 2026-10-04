@@ -714,6 +714,9 @@ Customer message:
         replacements = {
             "marron": "maroon",
             "marroon": "maroon",
+            "over sized": "oversized",
+            "oversize": "oversized",
+            "over-size": "oversized",
             "organzaa": "organza",
             "organzza": "organza",
             "prise": "price",

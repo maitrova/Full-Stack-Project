@@ -52,6 +52,9 @@ envVars:
   GEMINI_OUTPUT_COST_PER_MILLION: "0"
   OPENAI_INPUT_COST_PER_MILLION: "0"
   OPENAI_OUTPUT_COST_PER_MILLION: "0"
+  # Add the exact public pages that contain store policies, FAQs, offers, and customization guidance.
+  WEBSITE_KNOWLEDGE_URLS: https://maitrova.in
+  WEBSITE_KNOWLEDGE_SYNC_INTERVAL_SECONDS: "900"
   JWT_ALGORITHM: HS256
   JWT_ACCESS_TOKEN_EXPIRE_MINUTES: "60"
   WHATSAPP_GRAPH_API_VERSION: v25.0

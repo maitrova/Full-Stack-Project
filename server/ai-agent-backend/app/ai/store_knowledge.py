@@ -57,6 +57,22 @@ class StoreKnowledge:
                     context["published_information"].append({"title": str(doc.get("name") or "Store information"), "content": content[:6000], "truncated": len(content) > 6000})
         except Exception as exc:
             logger.warning("Store information unavailable: %s", exc.__class__.__name__)
+        try:
+            website_docs = await self.db.ai_website_knowledge.find({"status": "active"}).sort("updated_at", -1).limit(40).to_list(40)
+            topic_terms = [term for topic in topics for term in self.DOCUMENT_TOPICS.get(topic, "").split("|")]
+            for doc in website_docs:
+                content = re.sub(r"\s+", " ", str(doc.get("content") or "")).strip()
+                haystack = f"{doc.get('title', '')} {content}".lower()
+                if not include_all and topic_terms and not any(term.lower() in haystack for term in topic_terms):
+                    continue
+                context["published_information"].append({
+                    "title": str(doc.get("title") or "Website information"),
+                    "content": content[:6000],
+                    "source_url": str(doc.get("source_url") or ""),
+                    "fetched_at": doc.get("fetched_at"),
+                })
+        except Exception as exc:
+            logger.warning("Website knowledge unavailable: %s", exc.__class__.__name__)
         return context
 
     @staticmethod

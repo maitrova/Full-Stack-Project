@@ -4,6 +4,7 @@ import asyncio
 from contextlib import suppress
 from app.services.whatsapp_queue import worker
 from app.services.catalog_indexer import catalog_index_worker
+from app.services.website_knowledge import website_knowledge_worker
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -61,15 +62,19 @@ async def lifespan(app: FastAPI):
     await get_database().merchant_prompt_versions.create_index([("business_id", 1), ("version", -1)], unique=True)
     whatsapp_worker = asyncio.create_task(worker(get_database()))
     catalogue_worker = asyncio.create_task(catalog_index_worker(get_ecommerce_database()))
+    website_knowledge_task = asyncio.create_task(website_knowledge_worker(get_ecommerce_database()))
     try:
         yield
     finally:
         whatsapp_worker.cancel()
         catalogue_worker.cancel()
+        website_knowledge_task.cancel()
         with suppress(asyncio.CancelledError):
             await whatsapp_worker
         with suppress(asyncio.CancelledError):
             await catalogue_worker
+        with suppress(asyncio.CancelledError):
+            await website_knowledge_task
         await close_mongo_connection()
     logger.info("Stopped %s", settings.app_name)
 

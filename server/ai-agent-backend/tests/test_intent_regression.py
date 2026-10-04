@@ -43,6 +43,12 @@ class IntentRegressionTests(unittest.TestCase):
         self.assertEqual(intent.attributes.get("style"), "polo")
         self.assertEqual(intent.max_price, 1500)
 
+    def test_spaced_oversized_request_is_a_filtered_search(self):
+        intent = self.parser._parse_with_rules("I need a t shirt over sized", {})
+        self.assertEqual(intent.intent, "product_search")
+        self.assertEqual(intent.category, "t-shirt")
+        self.assertEqual(intent.attributes.get("style"), "oversized")
+
     def test_order_word_with_filters_stays_product_discovery(self):
         """A category request must not become an add-to-cart mutation."""
         model_intent = IntentResult(
