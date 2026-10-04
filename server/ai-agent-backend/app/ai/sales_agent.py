@@ -204,11 +204,40 @@ class SalesAgent:
             updated_state["last_image_analysis"] = effective_image_analysis
         store_question = StoreKnowledge.is_store_question(payload.message) or intent.intent == "store_question"
         store_context = await StoreKnowledge(self.commerce.db if self.commerce else None).load(business, payload.message, include_all=intent.intent == "store_question")
+        normalized_message = self.intent_parser._normalize_text(payload.message).strip().lower()
+        is_greeting = normalized_message in {
+            "hi", "hello", "hey", "hai", "namaste", "namaskar", "good morning",
+            "good afternoon", "good evening", "thanks", "thank you", "thankyou",
+        }
+        ambiguous_general = bool(
+            not has_image
+            and not policy_blocked
+            and not store_question
+            and intent.intent == "general_question"
+            and not intent.action
+            and not is_greeting
+        )
         design_library_request = (
             intent.action == "browse_designs"
             or self._is_design_library_request(payload.message)
         )
         more_options_request = self._is_more_options_request(payload.message)
+        # A customization reply can offer a verified designer URL and ask the
+        # customer whether to open it. Keep this confirmation deterministic;
+        # a one-word "yes" must not go through the generic intent fallback.
+        customization_link_confirmation = bool(
+            (
+                updated_state.get("pending_customization_offer")
+                or (
+                    updated_state.get("customization_interest")
+                    and not updated_state.get("purchase")
+                    and not updated_state.get("handoff_requested")
+                )
+            )
+            and self._is_affirmative(self.intent_parser._normalize_text(payload.message).strip())
+        )
+        if customization_link_confirmation:
+            updated_state.pop("pending_customization_offer", None)
         # Short follow-ups such as "show more" must continue the active
         # product browse. The intent model can misclassify these messages as
         # browse_designs, which otherwise routes the reply to the design
@@ -247,6 +276,7 @@ class SalesAgent:
                 intent.brand,
                 intent.attributes,
             ])
+            or ambiguous_general
         )
         follow_up = (
             None
@@ -259,7 +289,25 @@ class SalesAgent:
         tool_calls = []
         response_goal = "answer"
         presentation = None
-        if design_library_request and not image_lookup and not needs_clarification:
+        if customization_link_confirmation:
+            designer_url = str(settings.ecommerce_customization_url or "").strip()
+            if designer_url.startswith("https://"):
+                presentation = (
+                    "Great — you can start designing here:\n"
+                    f"{designer_url}\n\n"
+                    "Upload your image, choose the product, size, color, and placement in the designer. "
+                    "If you need help, send 'human' and our customization team will contact you.",
+                    [],
+                    "none",
+                )
+            else:
+                presentation = (
+                    "I couldn't verify the customization link right now. "
+                    "Send 'human' and our customization team will help you.",
+                    [],
+                    "none",
+                )
+        elif design_library_request and not image_lookup and not needs_clarification:
             presentation = await self._design_library_presentation(
                 business_id,
                 payload.message,
@@ -288,7 +336,17 @@ class SalesAgent:
             )
 
         if needs_clarification:
-            ai_text = "I want to find the right product for you. What product type, style, color, or budget should I search for?"
+            if ambiguous_general:
+                ai_text = (
+                    "I want to make sure I help with the right request. Please choose one:\n"
+                    "1. Find or recommend a product\n"
+                    "2. Check price, size, color, or stock\n"
+                    "3. Track an order, delivery, return, or refund\n"
+                    "4. Customize a product or print your own design\n"
+                    "5. Talk to our store team"
+                )
+            else:
+                ai_text = "I want to find the right product for you. What product type, style, color, or budget should I search for?"
             response_goal = "ask for clarification because intent confidence is low"
             tool_calls.append({"name": "intent_validation", "status": "clarification_requested"})
         elif policy_blocked:
@@ -521,6 +579,17 @@ class SalesAgent:
             "guide the customer from a customization request to a customizable base product",
         }:
             updated_state["last_search_had_results"] = bool(products)
+
+        # The customization response contains a verified designer URL and an
+        # explicit offer to open it. Remember that offer for the next turn.
+        # Do not set it when the URL is unavailable; that case must use the
+        # human-handoff path instead of accepting a misleading "yes".
+        if (
+            response_goal == "guide the customer from a customization request to a customizable base product"
+            and str(settings.ecommerce_customization_url or "").startswith("https://")
+            and not customization_link_confirmation
+        ):
+            updated_state["pending_customization_offer"] = True
 
         if conversation.get("channel") == "whatsapp" and len(products) > 3:
             products = products[:3]

@@ -23,6 +23,7 @@ FACTUAL_RESPONSE_GOALS = {
     "answer variant availability",
     "explain product details",
     "product photos or link",
+    "ask for clarification because intent confidence is low",
 }
 
 
