@@ -25,6 +25,21 @@ ROMAN_TELUGU_TERMS = {
     "unda",
     "unnaya",
     "telupu",
+    "dani",
+    "pampandi",
+    "pampistara",
+    "entha",
+    "ela",
+    "cheyyali",
+    "cheyyandi",
+    "meeda",
+    "ni",
+    "lo",
+    "padutundi",
+    "ekkada",
+    "naku",
+    "naaku",
+    "cheyyandi",
 }
 
 ROMAN_HINDI_TERMS = {
@@ -38,6 +53,20 @@ ROMAN_HINDI_TERMS = {
     "mehenga",
     "sasta",
     "shaadi",
+    "mujhe",
+    "iske",
+    "iska",
+    "isko",
+    "bhej",
+    "bhejo",
+    "karna",
+    "karo",
+    "batao",
+    "kitne",
+    "mein",
+    "kab",
+    "mera",
+    "chahiye",
 }
 
 
@@ -62,7 +91,7 @@ def detect_customer_language(message: str) -> dict[str, str]:
 
     if words & ROMAN_TELUGU_TERMS:
         return {
-            "language": "Telugu-English",
+            "language": "Roman Telugu",
             "script": "Latin",
             "reply_instruction": (
                 "Reply in the same Roman Telugu plus English mix. Use Telugu words in Latin script, "
@@ -72,7 +101,7 @@ def detect_customer_language(message: str) -> dict[str, str]:
 
     if words & ROMAN_HINDI_TERMS:
         return {
-            "language": "Hindi-English",
+            "language": "Hinglish",
             "script": "Latin",
             "reply_instruction": (
                 "Reply in the same Hinglish style. Use Hindi words in Latin script, "

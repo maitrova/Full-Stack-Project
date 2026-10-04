@@ -572,6 +572,34 @@ class SalesAgent:
         )
         if is_customization_lead:
             updated_state["customization_interest"] = True
+        customization_reply_lower = ai_text.lower()
+        customization_needs_handoff = bool(
+            is_customization_lead
+            and (
+                # There is no verified base product/designer URL to continue
+                # the flow, so the store team must take ownership.
+                ("designer link is not configured" in customization_reply_lower)
+                or (
+                    ("couldn't find" in customization_reply_lower or "couldn't load" in customization_reply_lower)
+                    and "https://" not in ai_text
+                )
+                or ("send 'human'" in customization_reply_lower and "https://" not in ai_text)
+            )
+        )
+        if customization_needs_handoff and not updated_state.get("handoff_requested"):
+            updated_state["handoff_requested"] = True
+            updated_state["handoff_context"] = {
+                "reason": "customization_help",
+                "summary": (
+                    "The customer requested customization, but the agent could not complete the "
+                    "customization flow or provide a verified designer link."
+                ),
+                "urgency": "high",
+            }
+            ai_text = (
+                "I couldn't complete the customization setup automatically. "
+                "I've sent this to our customization team with your request, and they will contact you shortly."
+            )
         conversation_updates = {
             "status": "handoff" if updated_state.get("handoff_requested") else conversation.get("status", "open"),
             "current_intent": intent.intent,

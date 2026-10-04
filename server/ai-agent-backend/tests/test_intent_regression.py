@@ -2,6 +2,7 @@ import unittest
 from types import SimpleNamespace
 
 from app.ai.intent_parser import IntentParser
+from app.schemas.ai import IntentResult
 
 
 class IntentRegressionTests(unittest.TestCase):
@@ -39,4 +40,33 @@ class IntentRegressionTests(unittest.TestCase):
         self.assertEqual(intent.color, "black")
         self.assertEqual(intent.attributes.get("style"), "polo")
         self.assertEqual(intent.max_price, 1500)
+
+    def test_order_word_with_filters_stays_product_discovery(self):
+        """A category request must not become an add-to-cart mutation."""
+        model_intent = IntentResult(
+            intent="commerce_action",
+            action="add_to_cart",
+            category="shirt",
+            confidence=0.92,
+        )
+        safe = self.parser._sanitize_model_intent(
+            model_intent,
+            "I need to order the white shhirt",
+            {},
+        )
+        self.assertEqual(safe.intent, "product_search")
+        self.assertIsNone(safe.action)
+        self.assertEqual(safe.category, "shirt")
+        self.assertEqual(safe.color, "white")
+        self.assertFalse(safe.wants_to_buy)
+
+    def test_confirmation_without_pending_purchase_is_safe(self):
+        model_intent = IntentResult(
+            intent="commerce_action",
+            action="confirm_cart",
+            confidence=0.95,
+        )
+        safe = self.parser._sanitize_model_intent(model_intent, "yes", {})
+        self.assertEqual(safe.intent, "general_question")
+        self.assertIsNone(safe.action)
 

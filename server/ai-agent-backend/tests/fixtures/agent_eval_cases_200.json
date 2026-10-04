@@ -1,0 +1,6552 @@
+[
+  {
+    "id": "case-001",
+    "conversation": [
+      "I need white cotton shirts"
+    ],
+    "language": "English",
+    "scenario": "product_search",
+    "expected_route": "product_search",
+    "expected_intent": "product_search",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "white",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Find the requested product before discussing checkout."
+  },
+  {
+    "id": "case-002",
+    "conversation": [
+      "I need black polo T-shirts under 1500"
+    ],
+    "language": "English",
+    "scenario": "product_search",
+    "expected_route": "product_search",
+    "expected_intent": "product_search",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "black",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Find the requested product before discussing checkout."
+  },
+  {
+    "id": "case-003",
+    "conversation": [
+      "I need white shirts kavali"
+    ],
+    "language": "Telugu-English",
+    "scenario": "product_search",
+    "expected_route": "product_search",
+    "expected_intent": "product_search",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "white",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Find the requested product before discussing checkout."
+  },
+  {
+    "id": "case-004",
+    "conversation": [
+      "I need black hoodie chahiye"
+    ],
+    "language": "Hindi-English",
+    "scenario": "product_search",
+    "expected_route": "product_search",
+    "expected_intent": "product_search",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "hoodie",
+      "color": "black",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Find the requested product before discussing checkout."
+  },
+  {
+    "id": "case-005",
+    "conversation": [
+      "I need చొక్కా"
+    ],
+    "language": "Telugu",
+    "scenario": "product_search",
+    "expected_route": "product_search",
+    "expected_intent": "product_search",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Find the requested product before discussing checkout."
+  },
+  {
+    "id": "case-006",
+    "conversation": [
+      "I need सफेद शर्ट"
+    ],
+    "language": "Hindi",
+    "scenario": "product_search",
+    "expected_route": "product_search",
+    "expected_intent": "product_search",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "white",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Find the requested product before discussing checkout."
+  },
+  {
+    "id": "case-007",
+    "conversation": [
+      "I need oversized hoodies"
+    ],
+    "language": "English",
+    "scenario": "product_search",
+    "expected_route": "product_search",
+    "expected_intent": "product_search",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "hoodie",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Find the requested product before discussing checkout."
+  },
+  {
+    "id": "case-008",
+    "conversation": [
+      "I need wedding sarees"
+    ],
+    "language": "English",
+    "scenario": "product_search",
+    "expected_route": "product_search",
+    "expected_intent": "product_search",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "saree",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Find the requested product before discussing checkout."
+  },
+  {
+    "id": "case-009",
+    "conversation": [
+      "I need white shirt kavali"
+    ],
+    "language": "Roman Telugu",
+    "scenario": "product_search",
+    "expected_route": "product_search",
+    "expected_intent": "product_search",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "white",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Find the requested product before discussing checkout."
+  },
+  {
+    "id": "case-010",
+    "conversation": [
+      "I need shaadi ke liye saree chahiye"
+    ],
+    "language": "Hinglish",
+    "scenario": "product_search",
+    "expected_route": "product_search",
+    "expected_intent": "product_search",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "saree",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Find the requested product before discussing checkout."
+  },
+  {
+    "id": "case-011",
+    "conversation": [
+      "show me some white cotton shirts"
+    ],
+    "language": "English",
+    "scenario": "product_recommendation",
+    "expected_route": "product_recommendation",
+    "expected_intent": "product_recommendation",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "white",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show verified recommendations."
+  },
+  {
+    "id": "case-012",
+    "conversation": [
+      "show me some black polo T-shirts under 1500"
+    ],
+    "language": "English",
+    "scenario": "product_recommendation",
+    "expected_route": "product_recommendation",
+    "expected_intent": "product_recommendation",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "black",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show verified recommendations."
+  },
+  {
+    "id": "case-013",
+    "conversation": [
+      "show me some white shirts kavali"
+    ],
+    "language": "Telugu-English",
+    "scenario": "product_recommendation",
+    "expected_route": "product_recommendation",
+    "expected_intent": "product_recommendation",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "white",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show verified recommendations."
+  },
+  {
+    "id": "case-014",
+    "conversation": [
+      "show me some black hoodie chahiye"
+    ],
+    "language": "Hindi-English",
+    "scenario": "product_recommendation",
+    "expected_route": "product_recommendation",
+    "expected_intent": "product_recommendation",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "hoodie",
+      "color": "black",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show verified recommendations."
+  },
+  {
+    "id": "case-015",
+    "conversation": [
+      "show me some చొక్కా"
+    ],
+    "language": "Telugu",
+    "scenario": "product_recommendation",
+    "expected_route": "product_recommendation",
+    "expected_intent": "product_recommendation",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show verified recommendations."
+  },
+  {
+    "id": "case-016",
+    "conversation": [
+      "show me some सफेद शर्ट"
+    ],
+    "language": "Hindi",
+    "scenario": "product_recommendation",
+    "expected_route": "product_recommendation",
+    "expected_intent": "product_recommendation",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "white",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show verified recommendations."
+  },
+  {
+    "id": "case-017",
+    "conversation": [
+      "show me some oversized hoodies"
+    ],
+    "language": "English",
+    "scenario": "product_recommendation",
+    "expected_route": "product_recommendation",
+    "expected_intent": "product_recommendation",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "hoodie",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show verified recommendations."
+  },
+  {
+    "id": "case-018",
+    "conversation": [
+      "show me some wedding sarees"
+    ],
+    "language": "English",
+    "scenario": "product_recommendation",
+    "expected_route": "product_recommendation",
+    "expected_intent": "product_recommendation",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "saree",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show verified recommendations."
+  },
+  {
+    "id": "case-019",
+    "conversation": [
+      "show me some white shirt kavali"
+    ],
+    "language": "Roman Telugu",
+    "scenario": "product_recommendation",
+    "expected_route": "product_recommendation",
+    "expected_intent": "product_recommendation",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "white",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show verified recommendations."
+  },
+  {
+    "id": "case-020",
+    "conversation": [
+      "show me some shaadi ke liye saree chahiye"
+    ],
+    "language": "Hinglish",
+    "scenario": "product_recommendation",
+    "expected_route": "product_recommendation",
+    "expected_intent": "product_recommendation",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "saree",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show verified recommendations."
+  },
+  {
+    "id": "case-021",
+    "conversation": [
+      "show whit cottn shirts"
+    ],
+    "language": "English",
+    "scenario": "typo_search",
+    "expected_route": "product_search",
+    "expected_intent": "product_search",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Correct spelling mistakes without changing the request."
+  },
+  {
+    "id": "case-022",
+    "conversation": [
+      "show blak poloo tshrits"
+    ],
+    "language": "English",
+    "scenario": "typo_search",
+    "expected_route": "product_search",
+    "expected_intent": "product_search",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": null,
+      "color": "black",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Correct spelling mistakes without changing the request."
+  },
+  {
+    "id": "case-023",
+    "conversation": [
+      "show blak tshrit kavali"
+    ],
+    "language": "Telugu-English",
+    "scenario": "typo_search",
+    "expected_route": "product_search",
+    "expected_intent": "product_search",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": null,
+      "color": "black",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Correct spelling mistakes without changing the request."
+  },
+  {
+    "id": "case-024",
+    "conversation": [
+      "show whte shirt chahiye"
+    ],
+    "language": "Hindi-English",
+    "scenario": "typo_search",
+    "expected_route": "product_search",
+    "expected_intent": "product_search",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Correct spelling mistakes without changing the request."
+  },
+  {
+    "id": "case-025",
+    "conversation": [
+      "show షర్ట్"
+    ],
+    "language": "Telugu",
+    "scenario": "typo_search",
+    "expected_route": "product_search",
+    "expected_intent": "product_search",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Correct spelling mistakes without changing the request."
+  },
+  {
+    "id": "case-026",
+    "conversation": [
+      "show सफेद शर्ट"
+    ],
+    "language": "Hindi",
+    "scenario": "typo_search",
+    "expected_route": "product_search",
+    "expected_intent": "product_search",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "white",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Correct spelling mistakes without changing the request."
+  },
+  {
+    "id": "case-027",
+    "conversation": [
+      "show oversizd hodie"
+    ],
+    "language": "English",
+    "scenario": "typo_search",
+    "expected_route": "product_search",
+    "expected_intent": "product_search",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "hoodie",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Correct spelling mistakes without changing the request."
+  },
+  {
+    "id": "case-028",
+    "conversation": [
+      "show weding sarees"
+    ],
+    "language": "English",
+    "scenario": "typo_search",
+    "expected_route": "product_search",
+    "expected_intent": "product_search",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "saree",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Correct spelling mistakes without changing the request."
+  },
+  {
+    "id": "case-029",
+    "conversation": [
+      "show telupu shrt kavali"
+    ],
+    "language": "Roman Telugu",
+    "scenario": "typo_search",
+    "expected_route": "product_search",
+    "expected_intent": "product_search",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": null,
+      "color": "white",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Correct spelling mistakes without changing the request."
+  },
+  {
+    "id": "case-030",
+    "conversation": [
+      "show saree dikhwo"
+    ],
+    "language": "Hinglish",
+    "scenario": "typo_search",
+    "expected_route": "product_search",
+    "expected_intent": "product_search",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "saree",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Correct spelling mistakes without changing the request."
+  },
+  {
+    "id": "case-031",
+    "conversation": [
+      "what is the price of option 2"
+    ],
+    "language": "English",
+    "scenario": "price",
+    "expected_route": "check_price",
+    "expected_intent": "check_price",
+    "expected_action": "check_price",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3
+    },
+    "requires_tool": true,
+    "expected_tool": "check_price",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use the selected product and verified price only."
+  },
+  {
+    "id": "case-032",
+    "conversation": [
+      "what is the price of option 1"
+    ],
+    "language": "English",
+    "scenario": "price",
+    "expected_route": "check_price",
+    "expected_intent": "check_price",
+    "expected_action": "check_price",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3
+    },
+    "requires_tool": true,
+    "expected_tool": "check_price",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use the selected product and verified price only."
+  },
+  {
+    "id": "case-033",
+    "conversation": [
+      "what is the price of option 3"
+    ],
+    "language": "Telugu-English",
+    "scenario": "price",
+    "expected_route": "check_price",
+    "expected_intent": "check_price",
+    "expected_action": "check_price",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3
+    },
+    "requires_tool": true,
+    "expected_tool": "check_price",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use the selected product and verified price only."
+  },
+  {
+    "id": "case-034",
+    "conversation": [
+      "what is the price of option 2"
+    ],
+    "language": "Hindi-English",
+    "scenario": "price",
+    "expected_route": "check_price",
+    "expected_intent": "check_price",
+    "expected_action": "check_price",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3
+    },
+    "requires_tool": true,
+    "expected_tool": "check_price",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use the selected product and verified price only."
+  },
+  {
+    "id": "case-035",
+    "conversation": [
+      "what is the price of option 1"
+    ],
+    "language": "Telugu",
+    "scenario": "price",
+    "expected_route": "check_price",
+    "expected_intent": "check_price",
+    "expected_action": "check_price",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3
+    },
+    "requires_tool": true,
+    "expected_tool": "check_price",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use the selected product and verified price only."
+  },
+  {
+    "id": "case-036",
+    "conversation": [
+      "what is the price of option 3"
+    ],
+    "language": "Hindi",
+    "scenario": "price",
+    "expected_route": "check_price",
+    "expected_intent": "check_price",
+    "expected_action": "check_price",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3
+    },
+    "requires_tool": true,
+    "expected_tool": "check_price",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use the selected product and verified price only."
+  },
+  {
+    "id": "case-037",
+    "conversation": [
+      "what is the price of option 2"
+    ],
+    "language": "English",
+    "scenario": "price",
+    "expected_route": "check_price",
+    "expected_intent": "check_price",
+    "expected_action": "check_price",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3
+    },
+    "requires_tool": true,
+    "expected_tool": "check_price",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use the selected product and verified price only."
+  },
+  {
+    "id": "case-038",
+    "conversation": [
+      "what is the price of option 1"
+    ],
+    "language": "English",
+    "scenario": "price",
+    "expected_route": "check_price",
+    "expected_intent": "check_price",
+    "expected_action": "check_price",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3
+    },
+    "requires_tool": true,
+    "expected_tool": "check_price",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use the selected product and verified price only."
+  },
+  {
+    "id": "case-039",
+    "conversation": [
+      "what is the price of option 2"
+    ],
+    "language": "Roman Telugu",
+    "scenario": "price",
+    "expected_route": "check_price",
+    "expected_intent": "check_price",
+    "expected_action": "check_price",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3
+    },
+    "requires_tool": true,
+    "expected_tool": "check_price",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use the selected product and verified price only."
+  },
+  {
+    "id": "case-040",
+    "conversation": [
+      "what is the price of option 3"
+    ],
+    "language": "Hinglish",
+    "scenario": "price",
+    "expected_route": "check_price",
+    "expected_intent": "check_price",
+    "expected_action": "check_price",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3
+    },
+    "requires_tool": true,
+    "expected_tool": "check_price",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use the selected product and verified price only."
+  },
+  {
+    "id": "case-041",
+    "conversation": [
+      "is option 2 available in L"
+    ],
+    "language": "English",
+    "scenario": "stock",
+    "expected_route": "check_stock",
+    "expected_intent": "commerce_action",
+    "expected_action": "check_stock",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "check_stock",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Check live variant stock."
+  },
+  {
+    "id": "case-042",
+    "conversation": [
+      "is option 1 available in XL"
+    ],
+    "language": "English",
+    "scenario": "stock",
+    "expected_route": "check_stock",
+    "expected_intent": "commerce_action",
+    "expected_action": "check_stock",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "check_stock",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Check live variant stock."
+  },
+  {
+    "id": "case-043",
+    "conversation": [
+      "is option 3 available in M"
+    ],
+    "language": "Telugu-English",
+    "scenario": "stock",
+    "expected_route": "check_stock",
+    "expected_intent": "commerce_action",
+    "expected_action": "check_stock",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "check_stock",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Check live variant stock."
+  },
+  {
+    "id": "case-044",
+    "conversation": [
+      "is option 2 available in S"
+    ],
+    "language": "Hindi-English",
+    "scenario": "stock",
+    "expected_route": "check_stock",
+    "expected_intent": "commerce_action",
+    "expected_action": "check_stock",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "check_stock",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Check live variant stock."
+  },
+  {
+    "id": "case-045",
+    "conversation": [
+      "is option 1 available in L"
+    ],
+    "language": "Telugu",
+    "scenario": "stock",
+    "expected_route": "check_stock",
+    "expected_intent": "commerce_action",
+    "expected_action": "check_stock",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "check_stock",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Check live variant stock."
+  },
+  {
+    "id": "case-046",
+    "conversation": [
+      "is option 3 available in XL"
+    ],
+    "language": "Hindi",
+    "scenario": "stock",
+    "expected_route": "check_stock",
+    "expected_intent": "commerce_action",
+    "expected_action": "check_stock",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "check_stock",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Check live variant stock."
+  },
+  {
+    "id": "case-047",
+    "conversation": [
+      "is option 2 available in M"
+    ],
+    "language": "English",
+    "scenario": "stock",
+    "expected_route": "check_stock",
+    "expected_intent": "commerce_action",
+    "expected_action": "check_stock",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "check_stock",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Check live variant stock."
+  },
+  {
+    "id": "case-048",
+    "conversation": [
+      "is option 1 available in Free size"
+    ],
+    "language": "English",
+    "scenario": "stock",
+    "expected_route": "check_stock",
+    "expected_intent": "commerce_action",
+    "expected_action": "check_stock",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "check_stock",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Check live variant stock."
+  },
+  {
+    "id": "case-049",
+    "conversation": [
+      "is option 2 available in L"
+    ],
+    "language": "Roman Telugu",
+    "scenario": "stock",
+    "expected_route": "check_stock",
+    "expected_intent": "commerce_action",
+    "expected_action": "check_stock",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "check_stock",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Check live variant stock."
+  },
+  {
+    "id": "case-050",
+    "conversation": [
+      "is option 3 available in Free size"
+    ],
+    "language": "Hinglish",
+    "scenario": "stock",
+    "expected_route": "check_stock",
+    "expected_intent": "commerce_action",
+    "expected_action": "check_stock",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "check_stock",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Check live variant stock."
+  },
+  {
+    "id": "case-051",
+    "conversation": [
+      "send photos of option 2"
+    ],
+    "language": "English",
+    "scenario": "photos",
+    "expected_route": "product_photos",
+    "expected_intent": "commerce_action",
+    "expected_action": "show_photos",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "show_photos",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send only verified product images."
+  },
+  {
+    "id": "case-052",
+    "conversation": [
+      "send photos of option 1"
+    ],
+    "language": "English",
+    "scenario": "photos",
+    "expected_route": "product_photos",
+    "expected_intent": "commerce_action",
+    "expected_action": "show_photos",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "show_photos",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send only verified product images."
+  },
+  {
+    "id": "case-053",
+    "conversation": [
+      "send photos of option 3"
+    ],
+    "language": "Telugu-English",
+    "scenario": "photos",
+    "expected_route": "product_photos",
+    "expected_intent": "commerce_action",
+    "expected_action": "show_photos",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "show_photos",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send only verified product images."
+  },
+  {
+    "id": "case-054",
+    "conversation": [
+      "send photos of option 2"
+    ],
+    "language": "Hindi-English",
+    "scenario": "photos",
+    "expected_route": "product_photos",
+    "expected_intent": "commerce_action",
+    "expected_action": "show_photos",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "show_photos",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send only verified product images."
+  },
+  {
+    "id": "case-055",
+    "conversation": [
+      "send photos of option 1"
+    ],
+    "language": "Telugu",
+    "scenario": "photos",
+    "expected_route": "product_photos",
+    "expected_intent": "commerce_action",
+    "expected_action": "show_photos",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "show_photos",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send only verified product images."
+  },
+  {
+    "id": "case-056",
+    "conversation": [
+      "send photos of option 3"
+    ],
+    "language": "Hindi",
+    "scenario": "photos",
+    "expected_route": "product_photos",
+    "expected_intent": "commerce_action",
+    "expected_action": "show_photos",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "show_photos",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send only verified product images."
+  },
+  {
+    "id": "case-057",
+    "conversation": [
+      "send photos of option 2"
+    ],
+    "language": "English",
+    "scenario": "photos",
+    "expected_route": "product_photos",
+    "expected_intent": "commerce_action",
+    "expected_action": "show_photos",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "show_photos",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send only verified product images."
+  },
+  {
+    "id": "case-058",
+    "conversation": [
+      "send photos of option 1"
+    ],
+    "language": "English",
+    "scenario": "photos",
+    "expected_route": "product_photos",
+    "expected_intent": "commerce_action",
+    "expected_action": "show_photos",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "show_photos",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send only verified product images."
+  },
+  {
+    "id": "case-059",
+    "conversation": [
+      "send photos of option 2"
+    ],
+    "language": "Roman Telugu",
+    "scenario": "photos",
+    "expected_route": "product_photos",
+    "expected_intent": "commerce_action",
+    "expected_action": "show_photos",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "show_photos",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send only verified product images."
+  },
+  {
+    "id": "case-060",
+    "conversation": [
+      "send photos of option 3"
+    ],
+    "language": "Hinglish",
+    "scenario": "photos",
+    "expected_route": "product_photos",
+    "expected_intent": "commerce_action",
+    "expected_action": "show_photos",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "show_photos",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send only verified product images."
+  },
+  {
+    "id": "case-061",
+    "conversation": [
+      "send me the link for option 2"
+    ],
+    "language": "English",
+    "scenario": "link",
+    "expected_route": "product_link",
+    "expected_intent": "commerce_action",
+    "expected_action": "show_product_link",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "show_product_link",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send the verified product URL."
+  },
+  {
+    "id": "case-062",
+    "conversation": [
+      "send me the link for option 1"
+    ],
+    "language": "English",
+    "scenario": "link",
+    "expected_route": "product_link",
+    "expected_intent": "commerce_action",
+    "expected_action": "show_product_link",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "show_product_link",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send the verified product URL."
+  },
+  {
+    "id": "case-063",
+    "conversation": [
+      "send me the link for option 3"
+    ],
+    "language": "Telugu-English",
+    "scenario": "link",
+    "expected_route": "product_link",
+    "expected_intent": "commerce_action",
+    "expected_action": "show_product_link",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "show_product_link",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send the verified product URL."
+  },
+  {
+    "id": "case-064",
+    "conversation": [
+      "send me the link for option 2"
+    ],
+    "language": "Hindi-English",
+    "scenario": "link",
+    "expected_route": "product_link",
+    "expected_intent": "commerce_action",
+    "expected_action": "show_product_link",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "show_product_link",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send the verified product URL."
+  },
+  {
+    "id": "case-065",
+    "conversation": [
+      "send me the link for option 1"
+    ],
+    "language": "Telugu",
+    "scenario": "link",
+    "expected_route": "product_link",
+    "expected_intent": "commerce_action",
+    "expected_action": "show_product_link",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "show_product_link",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send the verified product URL."
+  },
+  {
+    "id": "case-066",
+    "conversation": [
+      "send me the link for option 3"
+    ],
+    "language": "Hindi",
+    "scenario": "link",
+    "expected_route": "product_link",
+    "expected_intent": "commerce_action",
+    "expected_action": "show_product_link",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "show_product_link",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send the verified product URL."
+  },
+  {
+    "id": "case-067",
+    "conversation": [
+      "send me the link for option 2"
+    ],
+    "language": "English",
+    "scenario": "link",
+    "expected_route": "product_link",
+    "expected_intent": "commerce_action",
+    "expected_action": "show_product_link",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "show_product_link",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send the verified product URL."
+  },
+  {
+    "id": "case-068",
+    "conversation": [
+      "send me the link for option 1"
+    ],
+    "language": "English",
+    "scenario": "link",
+    "expected_route": "product_link",
+    "expected_intent": "commerce_action",
+    "expected_action": "show_product_link",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "show_product_link",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send the verified product URL."
+  },
+  {
+    "id": "case-069",
+    "conversation": [
+      "send me the link for option 2"
+    ],
+    "language": "Roman Telugu",
+    "scenario": "link",
+    "expected_route": "product_link",
+    "expected_intent": "commerce_action",
+    "expected_action": "show_product_link",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "show_product_link",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send the verified product URL."
+  },
+  {
+    "id": "case-070",
+    "conversation": [
+      "send me the link for option 3"
+    ],
+    "language": "Hinglish",
+    "scenario": "link",
+    "expected_route": "product_link",
+    "expected_intent": "commerce_action",
+    "expected_action": "show_product_link",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "recommended_products": 3,
+      "selected_product": true
+    },
+    "requires_tool": true,
+    "expected_tool": "show_product_link",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send the verified product URL."
+  },
+  {
+    "id": "case-071",
+    "conversation": [
+      "add option 2 to my cart"
+    ],
+    "language": "English",
+    "scenario": "cart",
+    "expected_route": "add_to_cart",
+    "expected_intent": "add_to_cart",
+    "expected_action": "add_to_cart",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "add_to_cart",
+    "requires_confirmation": true,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Do not claim success until the cart tool confirms it."
+  },
+  {
+    "id": "case-072",
+    "conversation": [
+      "add option 1 to my cart"
+    ],
+    "language": "English",
+    "scenario": "cart",
+    "expected_route": "add_to_cart",
+    "expected_intent": "add_to_cart",
+    "expected_action": "add_to_cart",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "add_to_cart",
+    "requires_confirmation": true,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Do not claim success until the cart tool confirms it."
+  },
+  {
+    "id": "case-073",
+    "conversation": [
+      "add option 3 to my cart"
+    ],
+    "language": "Telugu-English",
+    "scenario": "cart",
+    "expected_route": "add_to_cart",
+    "expected_intent": "add_to_cart",
+    "expected_action": "add_to_cart",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "add_to_cart",
+    "requires_confirmation": true,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Do not claim success until the cart tool confirms it."
+  },
+  {
+    "id": "case-074",
+    "conversation": [
+      "add option 2 to my cart"
+    ],
+    "language": "Hindi-English",
+    "scenario": "cart",
+    "expected_route": "add_to_cart",
+    "expected_intent": "add_to_cart",
+    "expected_action": "add_to_cart",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "add_to_cart",
+    "requires_confirmation": true,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Do not claim success until the cart tool confirms it."
+  },
+  {
+    "id": "case-075",
+    "conversation": [
+      "add option 1 to my cart"
+    ],
+    "language": "Telugu",
+    "scenario": "cart",
+    "expected_route": "add_to_cart",
+    "expected_intent": "add_to_cart",
+    "expected_action": "add_to_cart",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "add_to_cart",
+    "requires_confirmation": true,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Do not claim success until the cart tool confirms it."
+  },
+  {
+    "id": "case-076",
+    "conversation": [
+      "add option 3 to my cart"
+    ],
+    "language": "Hindi",
+    "scenario": "cart",
+    "expected_route": "add_to_cart",
+    "expected_intent": "add_to_cart",
+    "expected_action": "add_to_cart",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "add_to_cart",
+    "requires_confirmation": true,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Do not claim success until the cart tool confirms it."
+  },
+  {
+    "id": "case-077",
+    "conversation": [
+      "add option 2 to my cart"
+    ],
+    "language": "English",
+    "scenario": "cart",
+    "expected_route": "add_to_cart",
+    "expected_intent": "add_to_cart",
+    "expected_action": "add_to_cart",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "add_to_cart",
+    "requires_confirmation": true,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Do not claim success until the cart tool confirms it."
+  },
+  {
+    "id": "case-078",
+    "conversation": [
+      "add option 1 to my cart"
+    ],
+    "language": "English",
+    "scenario": "cart",
+    "expected_route": "add_to_cart",
+    "expected_intent": "add_to_cart",
+    "expected_action": "add_to_cart",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "add_to_cart",
+    "requires_confirmation": true,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Do not claim success until the cart tool confirms it."
+  },
+  {
+    "id": "case-079",
+    "conversation": [
+      "add option 2 to my cart"
+    ],
+    "language": "Roman Telugu",
+    "scenario": "cart",
+    "expected_route": "add_to_cart",
+    "expected_intent": "add_to_cart",
+    "expected_action": "add_to_cart",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "add_to_cart",
+    "requires_confirmation": true,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Do not claim success until the cart tool confirms it."
+  },
+  {
+    "id": "case-080",
+    "conversation": [
+      "add option 3 to my cart"
+    ],
+    "language": "Hinglish",
+    "scenario": "cart",
+    "expected_route": "add_to_cart",
+    "expected_intent": "add_to_cart",
+    "expected_action": "add_to_cart",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "add_to_cart",
+    "requires_confirmation": true,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Do not claim success until the cart tool confirms it."
+  },
+  {
+    "id": "case-081",
+    "conversation": [
+      "yes, add it"
+    ],
+    "language": "English",
+    "scenario": "confirm",
+    "expected_route": "confirm_cart",
+    "expected_intent": "confirm_cart",
+    "expected_action": "confirm_cart",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "pending_purchase": true
+    },
+    "requires_tool": true,
+    "expected_tool": "confirm_cart",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Confirm only a pending cart action."
+  },
+  {
+    "id": "case-082",
+    "conversation": [
+      "yes, add it"
+    ],
+    "language": "English",
+    "scenario": "confirm",
+    "expected_route": "confirm_cart",
+    "expected_intent": "confirm_cart",
+    "expected_action": "confirm_cart",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "pending_purchase": true
+    },
+    "requires_tool": true,
+    "expected_tool": "confirm_cart",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Confirm only a pending cart action."
+  },
+  {
+    "id": "case-083",
+    "conversation": [
+      "yes, add it"
+    ],
+    "language": "Telugu-English",
+    "scenario": "confirm",
+    "expected_route": "confirm_cart",
+    "expected_intent": "confirm_cart",
+    "expected_action": "confirm_cart",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "pending_purchase": true
+    },
+    "requires_tool": true,
+    "expected_tool": "confirm_cart",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Confirm only a pending cart action."
+  },
+  {
+    "id": "case-084",
+    "conversation": [
+      "yes, add it"
+    ],
+    "language": "Hindi-English",
+    "scenario": "confirm",
+    "expected_route": "confirm_cart",
+    "expected_intent": "confirm_cart",
+    "expected_action": "confirm_cart",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "pending_purchase": true
+    },
+    "requires_tool": true,
+    "expected_tool": "confirm_cart",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Confirm only a pending cart action."
+  },
+  {
+    "id": "case-085",
+    "conversation": [
+      "yes, add it"
+    ],
+    "language": "Telugu",
+    "scenario": "confirm",
+    "expected_route": "confirm_cart",
+    "expected_intent": "confirm_cart",
+    "expected_action": "confirm_cart",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "pending_purchase": true
+    },
+    "requires_tool": true,
+    "expected_tool": "confirm_cart",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Confirm only a pending cart action."
+  },
+  {
+    "id": "case-086",
+    "conversation": [
+      "yes, add it"
+    ],
+    "language": "Hindi",
+    "scenario": "confirm",
+    "expected_route": "confirm_cart",
+    "expected_intent": "confirm_cart",
+    "expected_action": "confirm_cart",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "pending_purchase": true
+    },
+    "requires_tool": true,
+    "expected_tool": "confirm_cart",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Confirm only a pending cart action."
+  },
+  {
+    "id": "case-087",
+    "conversation": [
+      "yes, add it"
+    ],
+    "language": "English",
+    "scenario": "confirm",
+    "expected_route": "confirm_cart",
+    "expected_intent": "confirm_cart",
+    "expected_action": "confirm_cart",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "pending_purchase": true
+    },
+    "requires_tool": true,
+    "expected_tool": "confirm_cart",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Confirm only a pending cart action."
+  },
+  {
+    "id": "case-088",
+    "conversation": [
+      "yes, add it"
+    ],
+    "language": "English",
+    "scenario": "confirm",
+    "expected_route": "confirm_cart",
+    "expected_intent": "confirm_cart",
+    "expected_action": "confirm_cart",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "pending_purchase": true
+    },
+    "requires_tool": true,
+    "expected_tool": "confirm_cart",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Confirm only a pending cart action."
+  },
+  {
+    "id": "case-089",
+    "conversation": [
+      "yes, add it"
+    ],
+    "language": "Roman Telugu",
+    "scenario": "confirm",
+    "expected_route": "confirm_cart",
+    "expected_intent": "confirm_cart",
+    "expected_action": "confirm_cart",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "pending_purchase": true
+    },
+    "requires_tool": true,
+    "expected_tool": "confirm_cart",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Confirm only a pending cart action."
+  },
+  {
+    "id": "case-090",
+    "conversation": [
+      "yes, add it"
+    ],
+    "language": "Hinglish",
+    "scenario": "confirm",
+    "expected_route": "confirm_cart",
+    "expected_intent": "confirm_cart",
+    "expected_action": "confirm_cart",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "pending_purchase": true
+    },
+    "requires_tool": true,
+    "expected_tool": "confirm_cart",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Confirm only a pending cart action."
+  },
+  {
+    "id": "case-091",
+    "conversation": [
+      "take me to checkout"
+    ],
+    "language": "English",
+    "scenario": "checkout",
+    "expected_route": "checkout",
+    "expected_intent": "commerce_action",
+    "expected_action": "checkout",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "pending_purchase": true
+    },
+    "requires_tool": true,
+    "expected_tool": "checkout",
+    "requires_confirmation": true,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send the secure checkout flow."
+  },
+  {
+    "id": "case-092",
+    "conversation": [
+      "take me to checkout"
+    ],
+    "language": "English",
+    "scenario": "checkout",
+    "expected_route": "checkout",
+    "expected_intent": "commerce_action",
+    "expected_action": "checkout",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "pending_purchase": true
+    },
+    "requires_tool": true,
+    "expected_tool": "checkout",
+    "requires_confirmation": true,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send the secure checkout flow."
+  },
+  {
+    "id": "case-093",
+    "conversation": [
+      "take me to checkout"
+    ],
+    "language": "Telugu-English",
+    "scenario": "checkout",
+    "expected_route": "checkout",
+    "expected_intent": "commerce_action",
+    "expected_action": "checkout",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "pending_purchase": true
+    },
+    "requires_tool": true,
+    "expected_tool": "checkout",
+    "requires_confirmation": true,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send the secure checkout flow."
+  },
+  {
+    "id": "case-094",
+    "conversation": [
+      "take me to checkout"
+    ],
+    "language": "Hindi-English",
+    "scenario": "checkout",
+    "expected_route": "checkout",
+    "expected_intent": "commerce_action",
+    "expected_action": "checkout",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "pending_purchase": true
+    },
+    "requires_tool": true,
+    "expected_tool": "checkout",
+    "requires_confirmation": true,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send the secure checkout flow."
+  },
+  {
+    "id": "case-095",
+    "conversation": [
+      "take me to checkout"
+    ],
+    "language": "Telugu",
+    "scenario": "checkout",
+    "expected_route": "checkout",
+    "expected_intent": "commerce_action",
+    "expected_action": "checkout",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "pending_purchase": true
+    },
+    "requires_tool": true,
+    "expected_tool": "checkout",
+    "requires_confirmation": true,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send the secure checkout flow."
+  },
+  {
+    "id": "case-096",
+    "conversation": [
+      "take me to checkout"
+    ],
+    "language": "Hindi",
+    "scenario": "checkout",
+    "expected_route": "checkout",
+    "expected_intent": "commerce_action",
+    "expected_action": "checkout",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "pending_purchase": true
+    },
+    "requires_tool": true,
+    "expected_tool": "checkout",
+    "requires_confirmation": true,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send the secure checkout flow."
+  },
+  {
+    "id": "case-097",
+    "conversation": [
+      "take me to checkout"
+    ],
+    "language": "English",
+    "scenario": "checkout",
+    "expected_route": "checkout",
+    "expected_intent": "commerce_action",
+    "expected_action": "checkout",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "pending_purchase": true
+    },
+    "requires_tool": true,
+    "expected_tool": "checkout",
+    "requires_confirmation": true,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send the secure checkout flow."
+  },
+  {
+    "id": "case-098",
+    "conversation": [
+      "take me to checkout"
+    ],
+    "language": "English",
+    "scenario": "checkout",
+    "expected_route": "checkout",
+    "expected_intent": "commerce_action",
+    "expected_action": "checkout",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "pending_purchase": true
+    },
+    "requires_tool": true,
+    "expected_tool": "checkout",
+    "requires_confirmation": true,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send the secure checkout flow."
+  },
+  {
+    "id": "case-099",
+    "conversation": [
+      "take me to checkout"
+    ],
+    "language": "Roman Telugu",
+    "scenario": "checkout",
+    "expected_route": "checkout",
+    "expected_intent": "commerce_action",
+    "expected_action": "checkout",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "pending_purchase": true
+    },
+    "requires_tool": true,
+    "expected_tool": "checkout",
+    "requires_confirmation": true,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send the secure checkout flow."
+  },
+  {
+    "id": "case-100",
+    "conversation": [
+      "take me to checkout"
+    ],
+    "language": "Hinglish",
+    "scenario": "checkout",
+    "expected_route": "checkout",
+    "expected_intent": "commerce_action",
+    "expected_action": "checkout",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {
+      "pending_purchase": true
+    },
+    "requires_tool": true,
+    "expected_tool": "checkout",
+    "requires_confirmation": true,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Send the secure checkout flow."
+  },
+  {
+    "id": "case-101",
+    "conversation": [
+      "where is my order?"
+    ],
+    "language": "English",
+    "scenario": "tracking",
+    "expected_route": "track_order",
+    "expected_intent": "track_order",
+    "expected_action": "track_order",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "track_order",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use order data; never invent tracking status."
+  },
+  {
+    "id": "case-102",
+    "conversation": [
+      "where is my order?"
+    ],
+    "language": "English",
+    "scenario": "tracking",
+    "expected_route": "track_order",
+    "expected_intent": "track_order",
+    "expected_action": "track_order",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "track_order",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use order data; never invent tracking status."
+  },
+  {
+    "id": "case-103",
+    "conversation": [
+      "where is my order?"
+    ],
+    "language": "Telugu-English",
+    "scenario": "tracking",
+    "expected_route": "track_order",
+    "expected_intent": "track_order",
+    "expected_action": "track_order",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "track_order",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use order data; never invent tracking status."
+  },
+  {
+    "id": "case-104",
+    "conversation": [
+      "where is my order?"
+    ],
+    "language": "Hindi-English",
+    "scenario": "tracking",
+    "expected_route": "track_order",
+    "expected_intent": "track_order",
+    "expected_action": "track_order",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "track_order",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use order data; never invent tracking status."
+  },
+  {
+    "id": "case-105",
+    "conversation": [
+      "where is my order?"
+    ],
+    "language": "Telugu",
+    "scenario": "tracking",
+    "expected_route": "track_order",
+    "expected_intent": "track_order",
+    "expected_action": "track_order",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "track_order",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use order data; never invent tracking status."
+  },
+  {
+    "id": "case-106",
+    "conversation": [
+      "where is my order?"
+    ],
+    "language": "Hindi",
+    "scenario": "tracking",
+    "expected_route": "track_order",
+    "expected_intent": "track_order",
+    "expected_action": "track_order",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "track_order",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use order data; never invent tracking status."
+  },
+  {
+    "id": "case-107",
+    "conversation": [
+      "where is my order?"
+    ],
+    "language": "English",
+    "scenario": "tracking",
+    "expected_route": "track_order",
+    "expected_intent": "track_order",
+    "expected_action": "track_order",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "track_order",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use order data; never invent tracking status."
+  },
+  {
+    "id": "case-108",
+    "conversation": [
+      "where is my order?"
+    ],
+    "language": "English",
+    "scenario": "tracking",
+    "expected_route": "track_order",
+    "expected_intent": "track_order",
+    "expected_action": "track_order",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "track_order",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use order data; never invent tracking status."
+  },
+  {
+    "id": "case-109",
+    "conversation": [
+      "where is my order?"
+    ],
+    "language": "Roman Telugu",
+    "scenario": "tracking",
+    "expected_route": "track_order",
+    "expected_intent": "track_order",
+    "expected_action": "track_order",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "track_order",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use order data; never invent tracking status."
+  },
+  {
+    "id": "case-110",
+    "conversation": [
+      "where is my order?"
+    ],
+    "language": "Hinglish",
+    "scenario": "tracking",
+    "expected_route": "track_order",
+    "expected_intent": "track_order",
+    "expected_action": "track_order",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "track_order",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use order data; never invent tracking status."
+  },
+  {
+    "id": "case-111",
+    "conversation": [
+      "how long does delivery take?"
+    ],
+    "language": "English",
+    "scenario": "delivery",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-112",
+    "conversation": [
+      "how long does delivery take?"
+    ],
+    "language": "English",
+    "scenario": "delivery",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-113",
+    "conversation": [
+      "how long does delivery take?"
+    ],
+    "language": "Telugu-English",
+    "scenario": "delivery",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-114",
+    "conversation": [
+      "how long does delivery take?"
+    ],
+    "language": "Hindi-English",
+    "scenario": "delivery",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-115",
+    "conversation": [
+      "how long does delivery take?"
+    ],
+    "language": "Telugu",
+    "scenario": "delivery",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-116",
+    "conversation": [
+      "how long does delivery take?"
+    ],
+    "language": "Hindi",
+    "scenario": "delivery",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-117",
+    "conversation": [
+      "how long does delivery take?"
+    ],
+    "language": "English",
+    "scenario": "delivery",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-118",
+    "conversation": [
+      "how long does delivery take?"
+    ],
+    "language": "English",
+    "scenario": "delivery",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-119",
+    "conversation": [
+      "how long does delivery take?"
+    ],
+    "language": "Roman Telugu",
+    "scenario": "delivery",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-120",
+    "conversation": [
+      "how long does delivery take?"
+    ],
+    "language": "Hinglish",
+    "scenario": "delivery",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-121",
+    "conversation": [
+      "what is your return policy?"
+    ],
+    "language": "English",
+    "scenario": "returns",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-122",
+    "conversation": [
+      "what is your return policy?"
+    ],
+    "language": "English",
+    "scenario": "returns",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-123",
+    "conversation": [
+      "what is your return policy?"
+    ],
+    "language": "Telugu-English",
+    "scenario": "returns",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-124",
+    "conversation": [
+      "what is your return policy?"
+    ],
+    "language": "Hindi-English",
+    "scenario": "returns",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-125",
+    "conversation": [
+      "what is your return policy?"
+    ],
+    "language": "Telugu",
+    "scenario": "returns",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-126",
+    "conversation": [
+      "what is your return policy?"
+    ],
+    "language": "Hindi",
+    "scenario": "returns",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-127",
+    "conversation": [
+      "what is your return policy?"
+    ],
+    "language": "English",
+    "scenario": "returns",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-128",
+    "conversation": [
+      "what is your return policy?"
+    ],
+    "language": "English",
+    "scenario": "returns",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-129",
+    "conversation": [
+      "what is your return policy?"
+    ],
+    "language": "Roman Telugu",
+    "scenario": "returns",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-130",
+    "conversation": [
+      "what is your return policy?"
+    ],
+    "language": "Hinglish",
+    "scenario": "returns",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-131",
+    "conversation": [
+      "do you accept cash on delivery?"
+    ],
+    "language": "English",
+    "scenario": "payment",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-132",
+    "conversation": [
+      "do you accept cash on delivery?"
+    ],
+    "language": "English",
+    "scenario": "payment",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-133",
+    "conversation": [
+      "do you accept cash on delivery?"
+    ],
+    "language": "Telugu-English",
+    "scenario": "payment",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-134",
+    "conversation": [
+      "do you accept cash on delivery?"
+    ],
+    "language": "Hindi-English",
+    "scenario": "payment",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-135",
+    "conversation": [
+      "do you accept cash on delivery?"
+    ],
+    "language": "Telugu",
+    "scenario": "payment",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-136",
+    "conversation": [
+      "do you accept cash on delivery?"
+    ],
+    "language": "Hindi",
+    "scenario": "payment",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-137",
+    "conversation": [
+      "do you accept cash on delivery?"
+    ],
+    "language": "English",
+    "scenario": "payment",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-138",
+    "conversation": [
+      "do you accept cash on delivery?"
+    ],
+    "language": "English",
+    "scenario": "payment",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-139",
+    "conversation": [
+      "do you accept cash on delivery?"
+    ],
+    "language": "Roman Telugu",
+    "scenario": "payment",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-140",
+    "conversation": [
+      "do you accept cash on delivery?"
+    ],
+    "language": "Hinglish",
+    "scenario": "payment",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Answer only from published store information."
+  },
+  {
+    "id": "case-141",
+    "conversation": [
+      "how can I contact the store?"
+    ],
+    "language": "English",
+    "scenario": "contact",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use verified contact information only."
+  },
+  {
+    "id": "case-142",
+    "conversation": [
+      "how can I contact the store?"
+    ],
+    "language": "English",
+    "scenario": "contact",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use verified contact information only."
+  },
+  {
+    "id": "case-143",
+    "conversation": [
+      "how can I contact the store?"
+    ],
+    "language": "Telugu-English",
+    "scenario": "contact",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use verified contact information only."
+  },
+  {
+    "id": "case-144",
+    "conversation": [
+      "how can I contact the store?"
+    ],
+    "language": "Hindi-English",
+    "scenario": "contact",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use verified contact information only."
+  },
+  {
+    "id": "case-145",
+    "conversation": [
+      "how can I contact the store?"
+    ],
+    "language": "Telugu",
+    "scenario": "contact",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use verified contact information only."
+  },
+  {
+    "id": "case-146",
+    "conversation": [
+      "how can I contact the store?"
+    ],
+    "language": "Hindi",
+    "scenario": "contact",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use verified contact information only."
+  },
+  {
+    "id": "case-147",
+    "conversation": [
+      "how can I contact the store?"
+    ],
+    "language": "English",
+    "scenario": "contact",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use verified contact information only."
+  },
+  {
+    "id": "case-148",
+    "conversation": [
+      "how can I contact the store?"
+    ],
+    "language": "English",
+    "scenario": "contact",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use verified contact information only."
+  },
+  {
+    "id": "case-149",
+    "conversation": [
+      "how can I contact the store?"
+    ],
+    "language": "Roman Telugu",
+    "scenario": "contact",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use verified contact information only."
+  },
+  {
+    "id": "case-150",
+    "conversation": [
+      "how can I contact the store?"
+    ],
+    "language": "Hinglish",
+    "scenario": "contact",
+    "expected_route": "store_question",
+    "expected_intent": "store_question",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Use verified contact information only."
+  },
+  {
+    "id": "case-151",
+    "conversation": [
+      "I want my logo on a white cotton shirts"
+    ],
+    "language": "English",
+    "scenario": "customization",
+    "expected_route": "customization",
+    "expected_intent": "customization",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "white",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": "customization"
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show customizable base products and explain designer options."
+  },
+  {
+    "id": "case-152",
+    "conversation": [
+      "I want my name on a black polo T-shirts under 1500"
+    ],
+    "language": "English",
+    "scenario": "customization",
+    "expected_route": "customization",
+    "expected_intent": "customization",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "black",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": "customization"
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show customizable base products and explain designer options."
+  },
+  {
+    "id": "case-153",
+    "conversation": [
+      "I want my my photo on a white shirts kavali"
+    ],
+    "language": "Telugu-English",
+    "scenario": "customization",
+    "expected_route": "customization",
+    "expected_intent": "customization",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "white",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": "customization"
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show customizable base products and explain designer options."
+  },
+  {
+    "id": "case-154",
+    "conversation": [
+      "I want my mera logo on a black hoodie chahiye"
+    ],
+    "language": "Hindi-English",
+    "scenario": "customization",
+    "expected_route": "customization",
+    "expected_intent": "customization",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "hoodie",
+      "color": "black",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": "customization"
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show customizable base products and explain designer options."
+  },
+  {
+    "id": "case-155",
+    "conversation": [
+      "I want my నా లోగో on a చొక్కా"
+    ],
+    "language": "Telugu",
+    "scenario": "customization",
+    "expected_route": "customization",
+    "expected_intent": "customization",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": "customization"
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show customizable base products and explain designer options."
+  },
+  {
+    "id": "case-156",
+    "conversation": [
+      "I want my मेरा नाम on a सफेद शर्ट"
+    ],
+    "language": "Hindi",
+    "scenario": "customization",
+    "expected_route": "customization",
+    "expected_intent": "customization",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "white",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": "customization"
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show customizable base products and explain designer options."
+  },
+  {
+    "id": "case-157",
+    "conversation": [
+      "I want my artwork on a oversized hoodies"
+    ],
+    "language": "English",
+    "scenario": "customization",
+    "expected_route": "customization",
+    "expected_intent": "customization",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "hoodie",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": "customization"
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show customizable base products and explain designer options."
+  },
+  {
+    "id": "case-158",
+    "conversation": [
+      "I want my photo on a wedding sarees"
+    ],
+    "language": "English",
+    "scenario": "customization",
+    "expected_route": "customization",
+    "expected_intent": "customization",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "saree",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": "customization"
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show customizable base products and explain designer options."
+  },
+  {
+    "id": "case-159",
+    "conversation": [
+      "I want my na photo on a white shirt kavali"
+    ],
+    "language": "Roman Telugu",
+    "scenario": "customization",
+    "expected_route": "customization",
+    "expected_intent": "customization",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "white",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": "customization"
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show customizable base products and explain designer options."
+  },
+  {
+    "id": "case-160",
+    "conversation": [
+      "I want my mera photo on a shaadi ke liye saree chahiye"
+    ],
+    "language": "Hinglish",
+    "scenario": "customization",
+    "expected_route": "customization",
+    "expected_intent": "customization",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "saree",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": "customization"
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show customizable base products and explain designer options."
+  },
+  {
+    "id": "case-161",
+    "conversation": [
+      "put this image on my white cotton shirts"
+    ],
+    "language": "English",
+    "scenario": "uploaded_image",
+    "expected_route": "customization",
+    "expected_intent": "customization",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "white",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": "customization"
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Explain that the image may need to be uploaded again in the designer."
+  },
+  {
+    "id": "case-162",
+    "conversation": [
+      "put this image on my black polo T-shirts under 1500"
+    ],
+    "language": "English",
+    "scenario": "uploaded_image",
+    "expected_route": "customization",
+    "expected_intent": "customization",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "black",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": "customization"
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Explain that the image may need to be uploaded again in the designer."
+  },
+  {
+    "id": "case-163",
+    "conversation": [
+      "put this image on my white shirts kavali"
+    ],
+    "language": "Telugu-English",
+    "scenario": "uploaded_image",
+    "expected_route": "customization",
+    "expected_intent": "customization",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "white",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": "customization"
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Explain that the image may need to be uploaded again in the designer."
+  },
+  {
+    "id": "case-164",
+    "conversation": [
+      "put this image on my black hoodie chahiye"
+    ],
+    "language": "Hindi-English",
+    "scenario": "uploaded_image",
+    "expected_route": "customization",
+    "expected_intent": "customization",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "hoodie",
+      "color": "black",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": "customization"
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Explain that the image may need to be uploaded again in the designer."
+  },
+  {
+    "id": "case-165",
+    "conversation": [
+      "put this image on my చొక్కా"
+    ],
+    "language": "Telugu",
+    "scenario": "uploaded_image",
+    "expected_route": "customization",
+    "expected_intent": "customization",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": "customization"
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Explain that the image may need to be uploaded again in the designer."
+  },
+  {
+    "id": "case-166",
+    "conversation": [
+      "put this image on my सफेद शर्ट"
+    ],
+    "language": "Hindi",
+    "scenario": "uploaded_image",
+    "expected_route": "customization",
+    "expected_intent": "customization",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "white",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": "customization"
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Explain that the image may need to be uploaded again in the designer."
+  },
+  {
+    "id": "case-167",
+    "conversation": [
+      "put this image on my oversized hoodies"
+    ],
+    "language": "English",
+    "scenario": "uploaded_image",
+    "expected_route": "customization",
+    "expected_intent": "customization",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "hoodie",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": "customization"
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Explain that the image may need to be uploaded again in the designer."
+  },
+  {
+    "id": "case-168",
+    "conversation": [
+      "put this image on my wedding sarees"
+    ],
+    "language": "English",
+    "scenario": "uploaded_image",
+    "expected_route": "customization",
+    "expected_intent": "customization",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "saree",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": "customization"
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Explain that the image may need to be uploaded again in the designer."
+  },
+  {
+    "id": "case-169",
+    "conversation": [
+      "put this image on my white shirt kavali"
+    ],
+    "language": "Roman Telugu",
+    "scenario": "uploaded_image",
+    "expected_route": "customization",
+    "expected_intent": "customization",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "shirt",
+      "color": "white",
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": "customization"
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Explain that the image may need to be uploaded again in the designer."
+  },
+  {
+    "id": "case-170",
+    "conversation": [
+      "put this image on my shaadi ke liye saree chahiye"
+    ],
+    "language": "Hinglish",
+    "scenario": "uploaded_image",
+    "expected_route": "customization",
+    "expected_intent": "customization",
+    "expected_action": "search_products",
+    "expected_entities": {
+      "category": "saree",
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": "customization"
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "search_products",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Explain that the image may need to be uploaded again in the designer."
+  },
+  {
+    "id": "case-171",
+    "conversation": [
+      "what designs do you have?"
+    ],
+    "language": "English",
+    "scenario": "design_library",
+    "expected_route": "design_library",
+    "expected_intent": "design_library",
+    "expected_action": "browse_designs",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "browse_designs",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show the verified design-library link or options."
+  },
+  {
+    "id": "case-172",
+    "conversation": [
+      "what designs do you have?"
+    ],
+    "language": "English",
+    "scenario": "design_library",
+    "expected_route": "design_library",
+    "expected_intent": "design_library",
+    "expected_action": "browse_designs",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "browse_designs",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show the verified design-library link or options."
+  },
+  {
+    "id": "case-173",
+    "conversation": [
+      "what designs do you have?"
+    ],
+    "language": "Telugu-English",
+    "scenario": "design_library",
+    "expected_route": "design_library",
+    "expected_intent": "design_library",
+    "expected_action": "browse_designs",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "browse_designs",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show the verified design-library link or options."
+  },
+  {
+    "id": "case-174",
+    "conversation": [
+      "what designs do you have?"
+    ],
+    "language": "Hindi-English",
+    "scenario": "design_library",
+    "expected_route": "design_library",
+    "expected_intent": "design_library",
+    "expected_action": "browse_designs",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "browse_designs",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show the verified design-library link or options."
+  },
+  {
+    "id": "case-175",
+    "conversation": [
+      "what designs do you have?"
+    ],
+    "language": "Telugu",
+    "scenario": "design_library",
+    "expected_route": "design_library",
+    "expected_intent": "design_library",
+    "expected_action": "browse_designs",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "browse_designs",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show the verified design-library link or options."
+  },
+  {
+    "id": "case-176",
+    "conversation": [
+      "what designs do you have?"
+    ],
+    "language": "Hindi",
+    "scenario": "design_library",
+    "expected_route": "design_library",
+    "expected_intent": "design_library",
+    "expected_action": "browse_designs",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "browse_designs",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show the verified design-library link or options."
+  },
+  {
+    "id": "case-177",
+    "conversation": [
+      "what designs do you have?"
+    ],
+    "language": "English",
+    "scenario": "design_library",
+    "expected_route": "design_library",
+    "expected_intent": "design_library",
+    "expected_action": "browse_designs",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "browse_designs",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show the verified design-library link or options."
+  },
+  {
+    "id": "case-178",
+    "conversation": [
+      "what designs do you have?"
+    ],
+    "language": "English",
+    "scenario": "design_library",
+    "expected_route": "design_library",
+    "expected_intent": "design_library",
+    "expected_action": "browse_designs",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "browse_designs",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show the verified design-library link or options."
+  },
+  {
+    "id": "case-179",
+    "conversation": [
+      "what designs do you have?"
+    ],
+    "language": "Roman Telugu",
+    "scenario": "design_library",
+    "expected_route": "design_library",
+    "expected_intent": "design_library",
+    "expected_action": "browse_designs",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "browse_designs",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show the verified design-library link or options."
+  },
+  {
+    "id": "case-180",
+    "conversation": [
+      "what designs do you have?"
+    ],
+    "language": "Hinglish",
+    "scenario": "design_library",
+    "expected_route": "design_library",
+    "expected_intent": "design_library",
+    "expected_action": "browse_designs",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "browse_designs",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Show the verified design-library link or options."
+  },
+  {
+    "id": "case-181",
+    "conversation": [
+      "please ask the customization team to contact me"
+    ],
+    "language": "English",
+    "scenario": "handoff",
+    "expected_route": "human_handoff",
+    "expected_intent": "human_handoff",
+    "expected_action": "create_handoff",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "create_handoff",
+    "requires_confirmation": false,
+    "expected_handoff": true,
+    "expected_handoff_priority": "high",
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Create a high-priority customization handoff."
+  },
+  {
+    "id": "case-182",
+    "conversation": [
+      "please ask the customization team to contact me"
+    ],
+    "language": "English",
+    "scenario": "handoff",
+    "expected_route": "human_handoff",
+    "expected_intent": "human_handoff",
+    "expected_action": "create_handoff",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "create_handoff",
+    "requires_confirmation": false,
+    "expected_handoff": true,
+    "expected_handoff_priority": "high",
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Create a high-priority customization handoff."
+  },
+  {
+    "id": "case-183",
+    "conversation": [
+      "please ask the customization team to contact me"
+    ],
+    "language": "Telugu-English",
+    "scenario": "handoff",
+    "expected_route": "human_handoff",
+    "expected_intent": "human_handoff",
+    "expected_action": "create_handoff",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "create_handoff",
+    "requires_confirmation": false,
+    "expected_handoff": true,
+    "expected_handoff_priority": "high",
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Create a high-priority customization handoff."
+  },
+  {
+    "id": "case-184",
+    "conversation": [
+      "please ask the customization team to contact me"
+    ],
+    "language": "Hindi-English",
+    "scenario": "handoff",
+    "expected_route": "human_handoff",
+    "expected_intent": "human_handoff",
+    "expected_action": "create_handoff",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "create_handoff",
+    "requires_confirmation": false,
+    "expected_handoff": true,
+    "expected_handoff_priority": "high",
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Create a high-priority customization handoff."
+  },
+  {
+    "id": "case-185",
+    "conversation": [
+      "please ask the customization team to contact me"
+    ],
+    "language": "Telugu",
+    "scenario": "handoff",
+    "expected_route": "human_handoff",
+    "expected_intent": "human_handoff",
+    "expected_action": "create_handoff",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "create_handoff",
+    "requires_confirmation": false,
+    "expected_handoff": true,
+    "expected_handoff_priority": "high",
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Create a high-priority customization handoff."
+  },
+  {
+    "id": "case-186",
+    "conversation": [
+      "please ask the customization team to contact me"
+    ],
+    "language": "Hindi",
+    "scenario": "handoff",
+    "expected_route": "human_handoff",
+    "expected_intent": "human_handoff",
+    "expected_action": "create_handoff",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "create_handoff",
+    "requires_confirmation": false,
+    "expected_handoff": true,
+    "expected_handoff_priority": "high",
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Create a high-priority customization handoff."
+  },
+  {
+    "id": "case-187",
+    "conversation": [
+      "please ask the customization team to contact me"
+    ],
+    "language": "English",
+    "scenario": "handoff",
+    "expected_route": "human_handoff",
+    "expected_intent": "human_handoff",
+    "expected_action": "create_handoff",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "create_handoff",
+    "requires_confirmation": false,
+    "expected_handoff": true,
+    "expected_handoff_priority": "high",
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Create a high-priority customization handoff."
+  },
+  {
+    "id": "case-188",
+    "conversation": [
+      "please ask the customization team to contact me"
+    ],
+    "language": "English",
+    "scenario": "handoff",
+    "expected_route": "human_handoff",
+    "expected_intent": "human_handoff",
+    "expected_action": "create_handoff",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "create_handoff",
+    "requires_confirmation": false,
+    "expected_handoff": true,
+    "expected_handoff_priority": "high",
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Create a high-priority customization handoff."
+  },
+  {
+    "id": "case-189",
+    "conversation": [
+      "please ask the customization team to contact me"
+    ],
+    "language": "Roman Telugu",
+    "scenario": "handoff",
+    "expected_route": "human_handoff",
+    "expected_intent": "human_handoff",
+    "expected_action": "create_handoff",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "create_handoff",
+    "requires_confirmation": false,
+    "expected_handoff": true,
+    "expected_handoff_priority": "high",
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Create a high-priority customization handoff."
+  },
+  {
+    "id": "case-190",
+    "conversation": [
+      "please ask the customization team to contact me"
+    ],
+    "language": "Hinglish",
+    "scenario": "handoff",
+    "expected_route": "human_handoff",
+    "expected_intent": "human_handoff",
+    "expected_action": "create_handoff",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": true,
+    "expected_tool": "create_handoff",
+    "requires_confirmation": false,
+    "expected_handoff": true,
+    "expected_handoff_priority": "high",
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Create a high-priority customization handoff."
+  },
+  {
+    "id": "case-191",
+    "conversation": [
+      "can you give me medical advice?"
+    ],
+    "language": "English",
+    "scenario": "unsupported",
+    "expected_route": "unsupported",
+    "expected_intent": "unsupported",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Do not answer outside store capabilities; offer safe help or handoff."
+  },
+  {
+    "id": "case-192",
+    "conversation": [
+      "can you give me medical advice?"
+    ],
+    "language": "English",
+    "scenario": "unsupported",
+    "expected_route": "unsupported",
+    "expected_intent": "unsupported",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Do not answer outside store capabilities; offer safe help or handoff."
+  },
+  {
+    "id": "case-193",
+    "conversation": [
+      "can you give me medical advice?"
+    ],
+    "language": "Telugu-English",
+    "scenario": "unsupported",
+    "expected_route": "unsupported",
+    "expected_intent": "unsupported",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Do not answer outside store capabilities; offer safe help or handoff."
+  },
+  {
+    "id": "case-194",
+    "conversation": [
+      "can you give me medical advice?"
+    ],
+    "language": "Hindi-English",
+    "scenario": "unsupported",
+    "expected_route": "unsupported",
+    "expected_intent": "unsupported",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Do not answer outside store capabilities; offer safe help or handoff."
+  },
+  {
+    "id": "case-195",
+    "conversation": [
+      "can you give me medical advice?"
+    ],
+    "language": "Telugu",
+    "scenario": "unsupported",
+    "expected_route": "unsupported",
+    "expected_intent": "unsupported",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Do not answer outside store capabilities; offer safe help or handoff."
+  },
+  {
+    "id": "case-196",
+    "conversation": [
+      "can you give me medical advice?"
+    ],
+    "language": "Hindi",
+    "scenario": "unsupported",
+    "expected_route": "unsupported",
+    "expected_intent": "unsupported",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Do not answer outside store capabilities; offer safe help or handoff."
+  },
+  {
+    "id": "case-197",
+    "conversation": [
+      "can you give me medical advice?"
+    ],
+    "language": "English",
+    "scenario": "unsupported",
+    "expected_route": "unsupported",
+    "expected_intent": "unsupported",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Do not answer outside store capabilities; offer safe help or handoff."
+  },
+  {
+    "id": "case-198",
+    "conversation": [
+      "can you give me medical advice?"
+    ],
+    "language": "English",
+    "scenario": "unsupported",
+    "expected_route": "unsupported",
+    "expected_intent": "unsupported",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Do not answer outside store capabilities; offer safe help or handoff."
+  },
+  {
+    "id": "case-199",
+    "conversation": [
+      "can you give me medical advice?"
+    ],
+    "language": "Roman Telugu",
+    "scenario": "unsupported",
+    "expected_route": "unsupported",
+    "expected_intent": "unsupported",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Do not answer outside store capabilities; offer safe help or handoff."
+  },
+  {
+    "id": "case-200",
+    "conversation": [
+      "can you give me medical advice?"
+    ],
+    "language": "Hinglish",
+    "scenario": "unsupported",
+    "expected_route": "unsupported",
+    "expected_intent": "unsupported",
+    "expected_action": "none",
+    "expected_entities": {
+      "category": null,
+      "color": null,
+      "size": null,
+      "max_price": null,
+      "occasion": null,
+      "catalog_type": null
+    },
+    "context": {},
+    "requires_tool": false,
+    "expected_tool": "none",
+    "requires_confirmation": false,
+    "expected_handoff": false,
+    "expected_handoff_priority": null,
+    "must_not_claim": [
+      "order placed",
+      "invented price",
+      "invented stock",
+      "invented URL"
+    ],
+    "evaluation_notes": "Do not answer outside store capabilities; offer safe help or handoff."
+  }
+]

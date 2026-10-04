@@ -117,11 +117,65 @@ class IntentParser:
             # A commerce route without a concrete action must not mutate state.
             intent.intent = "general_question"
             intent.wants_to_buy = False
+
+        # The model may understand the word "order" as an immediate purchase.
+        # That is unsafe when the customer is still describing a category or
+        # filter (for example, "I need to order a white shirt").  Discovery
+        # always wins until the customer selects a displayed item or an item
+        # is already selected in conversation state.
+        mutation_actions = {
+            "add_to_cart", "confirm_cart", "checkout",
+            "remove_from_cart", "update_cart_quantity",
+        }
+        rule_intent = self._parse_with_rules(message, {}, None)
+        has_catalogue_request = bool(
+            rule_intent.category
+            or rule_intent.color
+            or rule_intent.min_price is not None
+            or rule_intent.max_price is not None
+            or rule_intent.occasion
+            or rule_intent.size
+            or rule_intent.brand
+            or rule_intent.attributes
+        )
+        explicit_reference = bool(
+            re.search(r"\b(?:this|that|it|one|option|product|item)\b", self._normalize_text(message))
+            or re.search(r"\b(?:option|product|item)\s*(?:number|no|#)?\s*[1-5]\b", self._normalize_text(message))
+        )
+        selected_context = bool(
+            conversation_state.get("selected_product_id")
+            or conversation_state.get("recommended_product_ids")
+            or conversation_state.get("option_products")
+        )
+        if intent.action in mutation_actions and has_catalogue_request and not explicit_reference:
+            # Preserve only the safe filters extracted from the customer turn.
+            intent.intent = "product_search"
+            intent.action = None
+            intent.wants_to_buy = False
+            for field in ("category", "color", "min_price", "max_price", "occasion", "size", "brand"):
+                value = getattr(rule_intent, field)
+                if value is not None:
+                    setattr(intent, field, value)
+            intent.attributes = {**intent.attributes, **rule_intent.attributes}
+            intent.confidence = max(0.85, min(float(intent.confidence or 0), 0.95))
+        elif intent.action == "confirm_cart" and not conversation_state.get("purchase"):
+            # "Yes" without a pending quote is not an approval. It must not
+            # create cart state or place an order.
+            intent.intent = "general_question"
+            intent.action = None
+            intent.wants_to_buy = False
+            intent.confidence = min(float(intent.confidence or 0), 0.25)
+        elif intent.action in {"add_to_cart", "checkout"} and not explicit_reference and not selected_context:
+            # Do not let a bare model guess mutate a cart with no product.
+            intent.intent = "general_question"
+            intent.action = None
+            intent.wants_to_buy = False
+            intent.confidence = min(float(intent.confidence or 0), 0.25)
         if intent.intent == "product_search" and not self._is_clear_rule_intent(intent):
             # Keep vague model output from triggering a broad, unrelated search.
-            rule_intent = self._parse_with_rules(message, conversation_state, None)
-            if rule_intent.intent == "product_search":
-                return rule_intent
+            contextual_rule_intent = self._parse_with_rules(message, conversation_state, None)
+            if contextual_rule_intent.intent == "product_search":
+                return contextual_rule_intent
         return intent
 
     @staticmethod
@@ -335,8 +389,19 @@ Customer message:
                 "travel",
                 "winter",
                 "summer",
+                "casual friday",
+                "college",
+                "birthday",
+                "gift",
+                "cold trip",
+                "daily wear",
+                "meeting",
             ],
         ) or conversation_state.get("occasion")
+        # Variant selection is deterministic catalogue data. Support both
+        # explicit requests ("size M", "waist 32") and short follow-ups
+        # such as "XL" after recommendations.
+        size = self._extract_size(text) or conversation_state.get("size")
         fabric = self._first_match(
             text,
             [
@@ -400,11 +465,29 @@ Customer message:
             attributes["catalog_type"] = "readymade"
 
         max_price = self._extract_max_price(text) or conversation_state.get("max_price")
+        store_question = bool(
+            not action
+            and re.search(
+                r"\b(?:return|refund|exchange|delivery|shipping|payment|cod|upi|contact|support|policy|"
+                r"warranty|privacy|terms|wash|washing|care|how long|how many days)\b",
+                text,
+            )
+        )
+        recommendation_request = bool(
+            not action
+            and re.search(r"\b(?:suggest|recommend|recommendation|gift|outfit|something nice|ideas?)\b", text)
+        )
+        if recommendation_request and not category and re.search(
+            r"\b(?:with|match(?:ing)?|go(?:es)?)\b.{0,20}\bjeans\b", text
+        ):
+            category = "shirt"
         intent = (
             "commerce_action"
             if action
+            else "store_question"
+            if store_question
             else "product_search"
-            if category or color or max_price or occasion or attributes
+            if category or color or max_price or occasion or attributes or recommendation_request
             else "general_question"
         )
         if intent == "product_search" and not action:
@@ -419,6 +502,7 @@ Customer message:
             color=color,
             max_price=max_price,
             occasion=occasion,
+            size=size,
             product_option=product_option,
             wants_to_buy=wants_to_buy,
             attributes=attributes,
@@ -543,12 +627,13 @@ Customer message:
         return any(get_close_matches(word, ["buy", "purchase", "order", "want"], n=1, cutoff=0.8) for word in words)
 
     def _detect_action(self, text: str, conversation_state: dict) -> str | None:
+        text = text.replace("\u200c", " ").strip()
         pending_purchase = bool(
             conversation_state.get("purchase") or conversation_state.get("last_declined_purchase")
         )
         if re.search(r"\b(human|real person|someone from (?:the )?(?:shop|store)|talk to (?:a )?(?:person|staff|agent))\b", text):
             return "human_handoff"
-        if re.search(r"\b(track|tracking|where is my order|order status|delivery status)\b", text):
+        if re.search(r"\b(track|tracking|where is my order|where is my package|order status|delivery status|order where)\b", text):
             return "track_order"
         if re.search(r"\b(retry|resend|send).*(?:checkout|payment).*link\b|\b(?:checkout|payment).*link.*(?:expired|again)\b", text):
             return "retry_checkout"
@@ -558,13 +643,25 @@ Customer message:
             return "remove_from_cart"
         if re.search(r"\b(?:change|update|set|make)\b.{0,35}\b(?:qty|quantity|pieces?|items?|units?)\b|\b(?:qty|quantity)\b.{0,20}\b(?:to|as)\s*\d+\b", text):
             return "update_cart_quantity"
-        if re.search(r"\b(?:checkout|check out|proceed to pay|go to payment)\b", text):
+        if re.search(r"\b(?:checkout|check out|proceed to pay|go to payment|place the order|complete the order|order place)\b", text):
             return "checkout"
+        # A confirmation must be checked before generic payment/store words;
+        # otherwise "Yes, confirm and pay" is mistaken for a payment FAQ.
+        if pending_purchase and re.search(r"\b(?:yes|yeah|yep|sure|okay|ok|go ahead|do it|confirm|sounds good|please do)\b", text):
+            return "confirm_cart"
+        if pending_purchase and re.search(r"\b(?:no|nope|nah|don't|do not|not now|cancel|never ?mind|changed my mind|leave it)\b", text):
+            return "decline_cart"
         # Sharing the customer's own artwork starts customization. It is not a
         # request to browse the merchant's existing design library.
         if re.search(
             r"\b(?:share|send|upload|use|provide)\b.{0,35}\b(?:my|our|own)\s+"
             r"(?:design|artwork|logo|image|photo|picture)\b",
+            text,
+        ):
+            return None
+        if re.search(
+            r"\b(?:put|add|print|upload|use|place)\b.{0,35}\b"
+            r"(?:image|photo|picture|logo|text|name|design)\b",
             text,
         ):
             return None
@@ -578,6 +675,8 @@ Customer message:
             text,
         ):
             return "browse_designs"
+        if re.search(r"\b(?:cod|cash on delivery|upi|payment|discount|coupon|sale|gst)\b", text):
+            return None
         if re.search(r"\b(?:photos?|pictures?|images?|pics?)\b", text):
             return "product_photos"
         if re.search(r"\b(?:product |store |website )?(?:link|url)\b", text):
@@ -588,19 +687,30 @@ Customer message:
             return "show_sizes"
         if re.search(r"\b(?:in stock|available|availability|stock left|have this)\b", text):
             return "check_stock"
-        if pending_purchase and re.search(r"\b(?:no|nope|nah|don't|do not|not now|cancel|never ?mind|changed my mind|leave it)\b", text):
-            return "decline_cart"
-        if pending_purchase and re.search(r"\b(?:yes|yeah|yep|sure|okay|ok|go ahead|do it|confirm|sounds good|please do)\b", text):
-            return "confirm_cart"
+        if re.fullmatch(r"\s*(?:stock|availability|available)\s*[?!.]*\s*", text):
+            return "check_stock"
         if re.search(
-            r"\b(?:add|put|place).*(?:cart|basket)\b|\badd\s+(?:one\s+more|another)(?:\s+(?:one|item|piece|shirt))?\b|\b(?:i(?:'ll| will| would) take|i want|i need|let me buy|buy|purchase|order|get me|go ahead with) (?:this|that|it|one|product|item|option(?: number)?\s*[1-5])\b",
+            r"\b(?:add|put|place).*(?:cart|basket)\b|"
+            r"\b(?:cart|basket).{0,20}\b(?:add|put|place)\b|"
+            r"\badd\s+(?:one\s+more|another)(?:\s+(?:one|item|piece|shirt))?\b|"
+            r"\b(?:i(?:'ll| will| would) take|i want|i need|let me buy|buy|purchase|order|get me|go ahead with) "
+            r"(?:this|that|it|one|product|item|option(?: number)?\s*[1-5])\b",
             text,
         ):
             return "add_to_cart"
+        if re.search(r"\b(?:order|track|status)\b.*\b(?:where|status|track)\b|\b(?:where|status|track)\b.*\border\b", text):
+            return "track_order"
+        if re.search(
+            r"\b(?:is there|do you have|can i get|available|in stock|sold out|stock)\b"
+            r".{0,35}\b(?:size|sizes?|small|medium|large|xs|s|m|l|xl|xxl|waist)\b"
+            r"|\b(?:size|sizes?|waist)\b.{0,25}\b(?:available|stock|have|come in)\b",
+            text,
+        ):
+            return "check_stock"
         return None
 
     def _normalize_text(self, message: str) -> str:
-        text = message.lower()
+        text = message.lower().replace("\u200c", " ")
         replacements = {
             "marron": "maroon",
             "marroon": "maroon",
@@ -644,6 +754,136 @@ Customer message:
             "सफेद": "white",
             "कमीज": "shirt",
             "शर्ट": "shirt",
+            # Common Hindi/Telugu and transliterated commerce vocabulary. The
+            # original customer text is retained for language/script output;
+            # these replacements only make deterministic routing multilingual.
+            "सफेद": "white",
+            "काले": "black",
+            "लाल": "red",
+            "जीन्स": "jeans",
+            "साड़ी": "saree",
+            "शादी": "wedding",
+            "हुडी": "hoodie",
+            "दिखाइए": "show",
+            "दिखाओ": "show",
+            "चाहिए": "need",
+            "कीमत": "price",
+            "फोटो": "photo",
+            "भेजिए": "send",
+            "भेज": "send",
+            "लिंक": "link",
+            "कार्ट": "cart",
+            "जोड़": "add",
+            "डाल": "add",
+            "ऑर्डर": "order",
+            "स्थिति": "status",
+            "रिटर्न": "return",
+            "कैसे": "how",
+            "डिज़ाइन": "design",
+            "डिजाइन्स": "designs",
+            "लोगो": "logo",
+            "कन्फर्म": "confirm",
+            "भुगतान": "payment",
+            "करें": "do",
+            "मेरी": "my",
+            "पर": "on",
+            "लगानी": "add",
+            "लगाना": "add",
+            "लगाना": "add",
+            "में": "in",
+            "क्या": "what",
+            "मेरा": "my",
+            "फोटो": "photo",
+            "टी-शर्ट": "t-shirt",
+            "टी शर्ट": "t-shirt",
+            "साइज़": "size",
+            "उपलब्ध": "available",
+            "है": "available",
+            "తెల్ల": "white",
+            "తెలుపు": "white",
+            "షర్ట్లు": "shirts",
+            "షర్ట్": "shirt",
+            "చూపించండి": "show",
+            "చూపించు": "show",
+            "బ్లాక్": "black",
+            "జీన్స్": "jeans",
+            "కావాలి": "need",
+            "పెళ్లికి": "wedding",
+            "పెళ్లి": "wedding",
+            "చీరలు": "sarees",
+            "చీర": "saree",
+            "ఎరుపు": "red",
+            "హూడీ": "hoodie",
+            "స్టాక్": "stock",
+            "ఉందా": "available",
+            "ఉంది": "available",
+            "లో": "in",
+            "ధర": "price",
+            "ఫోటో": "photo",
+            "పంపండి": "send",
+            "పంపగలరా": "send",
+            "లింక్": "link",
+            "ప్రొడక్ట్": "product",
+            "కార్ట్": "cart",
+            "యాడ్": "add",
+            "ఆర్డర్": "order",
+            "ఎక్కడ": "where",
+            "రిటర్న్": "return",
+            "పాలసీ": "policy",
+            "ఎలా": "how",
+            "డిజైన్లు": "designs",
+            "పేరు": "name",
+            "ప్రింట్": "print",
+            "ఇమేజ్": "image",
+            "పై": "on",
+            "కస్టమర్ కేర్": "human support",
+            "మాట్లాడాలి": "talk",
+            "కార్ట్‌లో": "cart in",
+            "పెట్టండి": "add",
+            "ఇమేజ్‌ని": "image",
+            "హూడీపై": "hoodie on",
+            "టీ-షర్ట్‌పై": "t-shirt on",
+            "నా": "my",
+            "చేయాలి": "do",
+            "చేయండి": "do",
+            "ఎక్కడ ఉంది": "where available",
+            "రంగులో": "in color",
+            "బడ్జెట్": "budget",
+            "kavali": "need",
+            "chupinchandi": "show",
+            "chupinchandi": "show",
+            "dikhao": "show",
+            "dikhaiye": "show",
+            "chahiye": "need",
+            "pelli": "wedding",
+            "shaadi": "wedding",
+            "saree": "saree",
+            "unda": "available",
+            "undha": "available",
+            "entha": "price",
+            "dani": "this",
+            "iska": "this",
+            "iskaa": "this",
+            "pampandi": "send",
+            "bhej": "send",
+            "bhejo": "send",
+            "kar do": "do",
+            "karna hai": "need do",
+            "kab": "when",
+            "delivery": "delivery",
+            "time": "time",
+            "padutundi": "takes",
+            "size": "size",
+            "rang": "color",
+            "mein": "in",
+            "cart lo add cheyyandi": "add cart",
+            "order ekkada": "order status",
+            "return ela": "return how",
+            "designs chupinchandi": "show designs",
+            "meeda add cheyyali": "add",
+            "meera logo": "my logo",
+            "mera logo": "my logo",
+            "human support": "human",
         }
         for wrong, correct in replacements.items():
             if wrong.isascii():
@@ -661,6 +901,19 @@ Customer message:
             for value in ordered
             if re.search(rf"(?<![a-z0-9]){re.escape(value)}(?![a-z0-9])", text)
         ), None)
+
+    @staticmethod
+    def _extract_size(text: str) -> str | None:
+        normalized = text.upper()
+        match = re.search(
+            r"\b(?:SIZE|WAIST)\s*[:=-]?\s*(XXXL|XXL|XL|XS|L|M|S|\d{2})\b",
+            normalized,
+        )
+        if match:
+            return match.group(1)
+        if re.fullmatch(r"\s*(?:XXXL|XXL|XL|XS|L|M|S|\d{2})\s*", normalized):
+            return normalized.strip()
+        return None
 
     @classmethod
     def _match_catalog_category(cls, text: str, categories: list[str]) -> str | None:
