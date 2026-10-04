@@ -152,11 +152,16 @@ class SalesAgent:
             (conversation.get("conversation_state", {}).get("attributes") or {}).get("catalog_type") or ""
         ).lower()
         explicit_catalog_type = str(intent.attributes.get("catalog_type") or "").lower()
+        customization_navigation = bool(re.search(
+            r"\b(?:where should i design|where can i design|designer link|where can i customize|"
+            r"where should i customize|start designing|open the designer)\b",
+            self.intent_parser._normalize_text(payload.message),
+        ))
         continuing_customization = (
             previous_catalog_type == "customization"
-            and intent.intent == "product_search"
+            and (intent.intent == "product_search" or customization_navigation)
             and explicit_catalog_type not in {"readymade", "drop", "drop product"}
-            and self._continues_customization_context(payload.message)
+            and (customization_navigation or self._continues_customization_context(payload.message))
         )
         if customization_request or continuing_customization:
             intent.intent = "product_search"
@@ -1037,7 +1042,8 @@ class SalesAgent:
             text,
         ))
         continuity = bool(re.search(
-            r"\b(?:instead|change|switch|make it|same design|that design|this design|on a|on an|for a|for an)\b",
+            r"\b(?:instead|change|switch|make it|same design|that design|this design|on a|on an|for a|for an|"
+            r"where should i design|where can i design|designer link|where can i customize|where should i customize)\b",
             text,
         ))
         if explicit.category and fresh_browse and not continuity:
@@ -1067,6 +1073,11 @@ class SalesAgent:
             or re.search(
                 r"\b(?:designs?|artworks?|templates?)\b.{0,35}"
                 r"\b(?:have|available|show|share|send|view|browse)\b",
+                text,
+            )
+            or re.search(
+                r"\b(?:where|how|send|share|give|show|need|want)\b.{0,35}"
+                r"\b(?:designer|design|customi[sz]e|customization|customisation)\b",
                 text,
             )
         )

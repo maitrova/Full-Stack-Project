@@ -260,6 +260,10 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.agent._is_customization_request("Can I share my own design?"))
         self.assertFalse(self.agent._is_design_library_request("Can I share my own design?"))
 
+    def test_customization_navigation_follow_up_opens_design_flow(self):
+        self.assertTrue(self.agent._is_design_library_request("where should I design"))
+        self.assertTrue(self.agent._is_design_library_request("send the designer link"))
+
     def test_customization_response_offers_designer_and_human_paths(self):
         item = product(name="Custom T-Shirt", category="T-Shirts", source="customization")
         with patch(
