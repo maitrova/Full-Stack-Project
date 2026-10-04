@@ -232,7 +232,8 @@ class ProductTools:
             image_embedding=image_embedding,
             limit=5,
         )
-        return self._validated_products(products)
+        validated = self._validated_products(products)
+        return [product for product in validated if self._matches_intent(product, intent)]
 
     async def get_product_details(self, business_id: str, product_id: str) -> ProductPublic | None:
         product = await self.product_repository.find_by_id(product_id, business_id)

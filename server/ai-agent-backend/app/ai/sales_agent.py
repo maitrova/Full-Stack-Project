@@ -27,6 +27,7 @@ from app.schemas.ai import AiChatRequest, AiChatResponse, IntentResult
 from app.schemas.conversation import ConversationPublic, MessagePublic
 from app.schemas.user import UserPublic
 from app.services.conversation_flow import reset_search_context, sync_flow_state
+from app.services.pricing import verified_discount, verified_price_text
 from app.tools.product_tools import ProductSearchParams, ProductTools
 from app.utils.object_id import object_id_to_str, parse_object_id
 
@@ -411,7 +412,7 @@ class SalesAgent:
             if products:
                 updated_state["recommended_product_ids"] = [product.id for product in products]
         elif intent.intent == "product_search":
-            if has_image and effective_image_analysis:
+            if has_image and effective_image_analysis and intent.attributes.get("catalog_type") != "customization":
                 products = await self.product_tools.search_from_image(
                     business_id=business_id,
                     intent=intent,
@@ -1105,18 +1106,19 @@ class SalesAgent:
         if not base_url:
             origin = (settings.ecommerce_storefront_url or "").rstrip("/")
             fallback_url = f"{origin}/customproducts" if origin.startswith("https://") else None
-            reply = "I couldn't load a product for the design library right now."
+            reply = "I couldn't verify the design library right now."
             if fallback_url:
-                reply += f" You can browse customizable products here:\n{fallback_url}"
-            else:
-                reply += " Send 'human' and our team will help you."
+                reply += f"\nOption 1: Browse customizable products here:\n{fallback_url}"
+            reply += "\nOption 2: Send 'human' and our customization team will help you."
             return reply, [], "none"
 
         folders = await self._load_design_library_folders()
         if not folders:
             return (
-                "Open the custom designer here, then choose Design Library to view the available designs:\n"
-                f"{base_url}",
+                "I couldn't load the design collections right now.\n"
+                "Option 1: Open the verified custom designer and choose Design Library:\n"
+                f"{base_url}\n"
+                "Option 2: Send 'human' and our customization team will share the available designs.",
                 [],
                 "none",
             )
@@ -1125,18 +1127,20 @@ class SalesAgent:
         if requested_folder:
             folder_url = self._design_collection_url(base_url, requested_folder)
             return (
-                f"Here is our {requested_folder} design collection:\n{folder_url}\n"
-                "Open it to preview a design on the product and customize it.",
+                f"Here is our verified {requested_folder} design collection:\n{folder_url}\n"
+                "Open it to preview a design on the product and customize it.\n"
+                "If you need help choosing a design, send 'human' and our customization team will help you.",
                 [],
                 "none",
             )
 
         visible_folders = folders[:6]
-        lines = ["Here are our design collections. Open any one to view its designs:"]
+        lines = ["Here are our verified design collections. Open any one to explore its designs:"]
         for index, folder in enumerate(visible_folders, start=1):
             lines.append(f"{index}. {folder}\n{self._design_collection_url(base_url, folder)}")
         if len(folders) > len(visible_folders):
             lines.append("Tell me the collection name if you want another one.")
+        lines.append("Need help or a design not listed here? Send 'human' and our customization team will help you.")
         return "\n".join(lines), [], "none"
 
     async def _load_design_library_folders(self) -> list[str]:
@@ -1238,7 +1242,7 @@ class SalesAgent:
             kind = product.attributes.get("source_type") or "product"
             visual_label = (product.attributes.get("search_attributes") or {}).get("product_name_hint")
             label = str(visual_label or product.name).strip()
-            lines.append(f"{index}. {label} - {product.currency} {int(price)} - {kind}")
+            lines.append(f"{index}. {label} - {verified_price_text(product)} - {kind}")
         lines.append("Reply with the option number for photos, sizes, or the product link.")
         return "\n".join(lines)
 
@@ -1708,7 +1712,7 @@ class SalesAgent:
             if product.attributes.get("occasion"):
                 reason_parts.append(f"for {product.attributes['occasion']}")
             reason = f" ({', '.join(reason_parts)})" if reason_parts else ""
-            lines.append(f"{index}. {product.name} - {product.currency} {int(price)} - {stock_text}{reason}")
+            lines.append(f"{index}. {product.name} - {verified_price_text(product)} - {stock_text}{reason}")
 
         lines.append("Want details for any one?")
         return "\n".join(lines)
@@ -1766,11 +1770,15 @@ class SalesAgent:
         products: list[ProductPublic],
         reference_received: bool = False,
     ) -> str:
+        designer_url = str(settings.ecommerce_customization_url or "").strip()
         if not products:
-            return (
-                "I can help with a custom design, but I couldn't find a customizable base product "
-                "for this request right now. Send 'human' and our team can check it with you."
-            )
+            lines = [
+                "I can help with your custom design, but I couldn't verify a matching base product in chat.",
+            ]
+            if designer_url.startswith("https://"):
+                lines.append(f"Option 1: Open the customization page and choose a base product: {designer_url}")
+            lines.append("Option 2: Send 'human' and our customization team will contact you.")
+            return "\n".join(lines)
 
         if reference_received:
             intro = (
@@ -1783,23 +1791,24 @@ class SalesAgent:
                 "I'll send its designer link."
             )
         lines = [intro]
+        if designer_url.startswith("https://"):
+            lines.append(f"Option 1: Open the customization page: {designer_url}")
         for index, product in enumerate(products, start=1):
             price = product.sale_price if product.sale_price is not None else product.price
             colors = product.attributes.get("colors") or []
             color_text = f" - colors: {', '.join(str(value) for value in colors[:4])}" if colors else ""
             stock_text = "available" if product.stock > 0 else "out of stock"
             lines.append(
-                f"{index}. {product.name} - starts at {product.currency} {int(price)} - {stock_text}{color_text}"
+                f"{index}. {product.name} - starts at {verified_price_text(product)} - {stock_text}{color_text}"
             )
-        lines.append(
-            "Reply with the option number. In the designer you can choose size and color, then add your image or text."
-        )
+        lines.append("In the designer, choose the product, size, color, and add your image or text.")
+        lines.append("Option 2: If you need help, send 'human' and our customization team will contact you.")
         return "\n".join(lines)
 
     def _build_customization_selection_response(self, product: ProductPublic) -> str:
         price = product.sale_price if product.sale_price is not None else product.price
         url = product.attributes.get("product_url")
-        lines = [product.name, f"Starting price: {product.currency} {int(price)}."]
+        lines = [product.name, f"Starting price: {verified_price_text(product)}."]
         if product.stock <= 0:
             lines.append("This base product is currently out of stock.")
             return "\n".join(lines)
@@ -1809,6 +1818,7 @@ class SalesAgent:
             lines.append("If you sent a reference here, upload it again in the designer so it is attached to your product.")
         else:
             lines.append("The designer link is not configured yet. Send 'human' and our team will help you.")
+        lines.append("If you cannot complete the customization in the designer, send 'human' and our team will contact you.")
         return "\n".join(lines)
 
     def _build_relaxed_response(self, intent: IntentResult, relaxed_summary: str, products: list[ProductPublic]) -> str:
@@ -1836,7 +1846,7 @@ class SalesAgent:
             occasion = product.attributes.get("occasion")
             detail = ", ".join(str(value) for value in [color, occasion] if value)
             suffix = f" ({detail})" if detail else ""
-            lines.append(f"{index}. {product.name} - {product.currency} {int(price)} - {stock_text}{suffix}")
+            lines.append(f"{index}. {product.name} - {verified_price_text(product)} - {stock_text}{suffix}")
         lines.append("Want details for any one?")
         return "\n".join(lines)
 
@@ -1881,7 +1891,7 @@ class SalesAgent:
         name = self._product_display_name(product)
         lines = [
             name,
-            f"Starting price is {product.currency} {int(price)}." if customizable else f"Price is {product.currency} {int(price)}.",
+            f"Starting price is {verified_price_text(product)}." if customizable else f"Price is {verified_price_text(product)}.",
             ("Available to customize." if customizable else "In stock.")
             if product.stock > 0
             else "Currently out of stock.",
@@ -2002,6 +2012,7 @@ class SalesAgent:
 
     def _product_card(self, product: ProductPublic) -> dict:
         price = product.sale_price if product.sale_price is not None else product.price
+        discount = verified_discount(product.price, product.sale_price)
         return {
             "id": product.id,
             "name": product.name,
@@ -2009,6 +2020,8 @@ class SalesAgent:
             "price": product.price,
             "sale_price": product.sale_price,
             "display_price": price,
+            "discount": discount,
+            "price_label": verified_price_text(product),
             "currency": product.currency,
             "stock": product.stock,
             "image": product.images[0] if product.images else None,

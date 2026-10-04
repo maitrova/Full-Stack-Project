@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
 import unittest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 from app.ai.intent_parser import IntentParser
 from app.ai.sales_agent import SalesAgent
@@ -259,6 +259,18 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(intent.attributes["catalog_type"], "customization")
         self.assertTrue(self.agent._is_customization_request("Can I share my own design?"))
         self.assertFalse(self.agent._is_design_library_request("Can I share my own design?"))
+
+    def test_customization_response_offers_designer_and_human_paths(self):
+        item = product(name="Custom T-Shirt", category="T-Shirts", source="customization")
+        with patch(
+            "app.ai.sales_agent.settings",
+            SimpleNamespace(ecommerce_customization_url="https://maitrova.in/customize"),
+        ):
+            reply = self.agent._build_customization_response([item])
+        self.assertIn("Option 1", reply)
+        self.assertIn("https://maitrova.in/customize", reply)
+        self.assertIn("Option 2", reply)
+        self.assertIn("customization team will contact you", reply)
 
     def test_live_catalogue_categories_are_not_limited_to_builtin_aliases(self):
         parser = IntentParser(SimpleNamespace(is_configured=False))

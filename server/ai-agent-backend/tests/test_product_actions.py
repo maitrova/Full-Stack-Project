@@ -11,6 +11,7 @@ from app.repositories.ecommerce_product_repository import EcommerceProductReposi
 from app.schemas.ai import IntentResult
 from app.services.whatsapp_service import WhatsAppClient, WhatsAppService
 from app.services.catalogue_quality import validate_catalogue_record
+from app.services.pricing import verified_discount, verified_price_text
 
 
 class ProductActions(unittest.IsolatedAsyncioTestCase):
@@ -28,6 +29,12 @@ class ProductActions(unittest.IsolatedAsyncioTestCase):
         ) for i in range(1, 4)]
         self.agent = SalesAgent(None, None, None, SimpleNamespace(get_product_details=AsyncMock(side_effect=lambda b, p: next(x for x in self.products if x.id == p))))
         self.conversation = {"recommended_product_ids": ["1", "2", "3"]}
+
+    def test_discount_is_calculated_only_from_verified_prices(self):
+        product = SimpleNamespace(price=1000, sale_price=800, currency="INR")
+        self.assertEqual(verified_discount(product.price, product.sale_price)["discount_percent"], 20)
+        self.assertIn("was INR 1000, 20% off", verified_price_text(product))
+        self.assertIsNone(verified_discount(1000, 1100))
 
     def test_catalogue_quality_rejects_invalid_link_and_variant_stock(self):
         report = validate_catalogue_record({

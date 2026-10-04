@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     ecommerce_public_url: str | None = None
     ecommerce_outputs_path: str | None = None
     ecommerce_storefront_url: str | None = None
+    ecommerce_customization_url: str | None = None
     ecommerce_api_url: str = "http://127.0.0.1:5000/api"
     remote_image_allowed_hosts: str = ""
     remote_image_max_bytes: int = 10 * 1024 * 1024

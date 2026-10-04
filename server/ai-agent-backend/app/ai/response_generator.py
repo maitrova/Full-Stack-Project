@@ -8,6 +8,7 @@ from app.ai.language import detect_customer_language
 from app.config.settings import settings
 from app.schemas.ai import IntentResult
 from app.schemas.product import ProductPublic
+from app.services.pricing import verified_discount
 
 logger = logging.getLogger(__name__)
 
@@ -260,6 +261,7 @@ Fallback response:
             return None
 
         display_price = product.sale_price if product.sale_price is not None else product.price
+        discount = verified_discount(product.price, product.sale_price)
         return {
             "id": product.id,
             "name": product.name,
@@ -268,6 +270,7 @@ Fallback response:
             "price": product.price,
             "sale_price": product.sale_price,
             "display_price": display_price,
+            "discount": discount,
             "currency": product.currency,
             "stock": product.stock,
             "sku": product.sku,

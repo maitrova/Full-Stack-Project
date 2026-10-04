@@ -41,6 +41,7 @@ envVars:
   ECOMMERCE_MONGODB_DB_NAME: appdb
   ECOMMERCE_PUBLIC_URL: https://maitrova.in/api/outputs
   ECOMMERCE_STOREFRONT_URL: https://www.maitrova.in
+  ECOMMERCE_CUSTOMIZATION_URL: https://maitrova.in/customproducts
   ECOMMERCE_API_URL: https://maitrova.in/api
   REMOTE_IMAGE_ALLOWED_HOSTS: www.maitrova.in,maitrova.in
   REMOTE_IMAGE_MAX_BYTES: "10485760"
@@ -53,7 +54,7 @@ envVars:
   OPENAI_INPUT_COST_PER_MILLION: "0"
   OPENAI_OUTPUT_COST_PER_MILLION: "0"
   # Add the exact public pages that contain store policies, FAQs, offers, and customization guidance.
-  WEBSITE_KNOWLEDGE_URLS: https://maitrova.in
+  WEBSITE_KNOWLEDGE_URLS: https://maitrova.in,https://maitrova.in/terms-and-conditions,https://maitrova.in/privacy-policy,https://maitrova.in/faq,https://maitrova.in/about-us,https://maitrova.in/payment-shipping-cancellation-policy,https://maitrova.in/return-refund-policy,https://maitrova.in/customize,https://maitrova.in/customization-disclaimer-policy
   WEBSITE_KNOWLEDGE_SYNC_INTERVAL_SECONDS: "900"
   JWT_ALGORITHM: HS256
   JWT_ACCESS_TOKEN_EXPIRE_MINUTES: "60"
