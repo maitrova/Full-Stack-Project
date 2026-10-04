@@ -11,6 +11,19 @@ from app.schemas.product import ProductPublic
 
 logger = logging.getLogger(__name__)
 
+# These responses contain transactional or policy facts. They are assembled
+# from verified backend data and must not be paraphrased by a language model,
+# because a fluent rewrite can change a price, stock state, variant, policy,
+# order status, or checkout link.
+FACTUAL_RESPONSE_GOALS = {
+    "answer the store question from verified store information; acknowledge any missing facts",
+    "send the customer to the ecommerce product checkout flow",
+    "answer stock availability",
+    "answer variant availability",
+    "explain product details",
+    "product photos or link",
+}
+
 
 class ResponseGenerator:
     def __init__(self, gemini_client: GeminiClient | None = None):
@@ -28,6 +41,8 @@ class ResponseGenerator:
         store_context: dict | None = None,
         merchant_prompt: dict | None = None,
     ) -> str:
+        if response_goal in FACTUAL_RESPONSE_GOALS:
+            return fallback_response
         if not self.gemini_client.is_configured:
             return fallback_response
 
