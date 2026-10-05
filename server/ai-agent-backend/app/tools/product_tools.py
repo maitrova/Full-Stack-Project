@@ -37,7 +37,14 @@ class ProductTools:
 
     @staticmethod
     def _validated_product(product: dict) -> ProductPublic | None:
-        quality = validate_catalogue_record(product)
+        try:
+            quality = validate_catalogue_record(product)
+        except Exception as exc:
+            logger.warning(
+                "Skipping catalogue product because quality validation failed (%s)",
+                exc.__class__.__name__,
+            )
+            return None
         if quality.errors:
             logger.warning(
                 "Skipping catalogue product %s due to quality errors: %s",
@@ -61,10 +68,28 @@ class ProductTools:
                 "s" if exc.error_count() != 1 else "",
             )
             return None
+        except Exception as exc:
+            logger.warning(
+                "Skipping catalogue product %s because normalization failed (%s)",
+                str(product.get("_id") or "unknown"),
+                exc.__class__.__name__,
+            )
+            return None
 
     @classmethod
     def _validated_products(cls, products: list[dict]) -> list[ProductPublic]:
-        validated = [cls._validated_product(product) for product in products]
+        validated = []
+        for product in products or []:
+            if not isinstance(product, dict):
+                logger.warning("Skipping non-object catalogue result")
+                continue
+            try:
+                validated.append(cls._validated_product(product))
+            except Exception as exc:
+                logger.warning(
+                    "Skipping catalogue result after validation failure (%s)",
+                    exc.__class__.__name__,
+                )
         unique: list[ProductPublic] = []
         seen: set[tuple[str, str, str, str]] = set()
         for product in validated:
