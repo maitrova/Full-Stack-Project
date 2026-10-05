@@ -261,6 +261,58 @@ class SalesAgent:
             "hi", "hello", "hey", "hai", "namaste", "namaskar", "good morning",
             "good afternoon", "good evening", "thanks", "thank you", "thankyou",
         }
+        if is_greeting and route_blocked:
+            # Greetings are complete, safe requests. They must never be sent
+            # through the ambiguity menu just because the parser called them
+            # a general question.
+            route_blocked = False
+            route_decision = ToolRouter.decide(
+                IntentResult(intent="general_question", confidence=1.0),
+                updated_state,
+                conversation,
+            )
+            updated_state["last_route"] = {
+                "route": "greeting",
+                "allowed": True,
+                "reason": None,
+            }
+
+        # "Do you have T-shirts?" and "Do you have printed-god T-shirts?"
+        # are discovery requests when no product has been selected. Do not let
+        # the availability/price action prevent catalogue search.
+        read_only_product_actions = {
+            "check_stock", "check_price", "show_sizes", "product_photos", "product_link",
+        }
+        has_product_constraints = bool(
+            intent.category
+            or intent.color
+            or intent.size
+            or intent.brand
+            or intent.occasion
+            or intent.attributes
+            or intent.min_price is not None
+            or intent.max_price is not None
+        )
+        has_selected_product = bool(
+            updated_state.get("selected_product_id")
+            or conversation.get("selected_product_id")
+        )
+        if (
+            intent.action in read_only_product_actions
+            and not has_selected_product
+            and has_product_constraints
+            and not store_question
+        ):
+            intent.action = None
+            intent.intent = "product_search"
+            intent.wants_to_buy = False
+            route_blocked = False
+            route_decision = ToolRouter.decide(intent, updated_state, conversation)
+            updated_state["last_route"] = {
+                "route": route_decision.route,
+                "allowed": True,
+                "reason": "discovery_before_product_fact",
+            }
         ambiguous_general = bool(
             not has_image
             and not policy_blocked
