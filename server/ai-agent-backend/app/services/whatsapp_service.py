@@ -462,9 +462,37 @@ class WhatsAppService:
                         await self.deliveries.update_one({"_id": whatsapp_message_id}, {"$set": {"response": ai_response.model_dump(mode="json")}}, upsert=True)
                         await self._deliver(from_phone, whatsapp_message_id, ai_response)
                         processed += 1
-                    except Exception:
-                        logger.exception("WhatsApp message processing failed")
-                        raise
+                    except Exception as exc:
+                        # Never leave a customer message without an outcome.
+                        # Image failures have a specialized path above; text
+                        # failures receive a safe retry/handoff response and
+                        # are marked complete so the queue cannot loop forever.
+                        logger.exception("WhatsApp message processing failed (%s)", type(exc).__name__)
+                        fallback = (
+                            "I couldn't process that request right now. Please send it again, or reply "
+                            "'human' and our store team will help you."
+                        )
+                        try:
+                            sent = await self.client.send_text(from_phone, fallback, whatsapp_message_id)
+                            await self.deliveries.update_one(
+                                {"_id": whatsapp_message_id},
+                                {
+                                    "$set": {
+                                        "complete": True,
+                                        "text_sent": bool(sent),
+                                        "processing_error": type(exc).__name__,
+                                    },
+                                    "$inc": {"outbound_messages": 1 if sent else 0},
+                                },
+                                upsert=True,
+                            )
+                            processed += 1
+                        except Exception as fallback_exc:
+                            logger.error(
+                                "WhatsApp fallback reply failed (%s)",
+                                type(fallback_exc).__name__,
+                            )
+                        continue
 
         return {"status": "ok", "processed": processed}
 
