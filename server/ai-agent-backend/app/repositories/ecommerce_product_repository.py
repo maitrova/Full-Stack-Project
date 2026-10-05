@@ -633,6 +633,22 @@ class EcommerceProductRepository:
         excluded = {str(value) for value in filters.get("exclude_ids") or []}
         if str(product.get("_id")) in excluded:
             return False
+        requested_source = str((filters.get("attributes") or {}).get("catalog_type") or "").lower()
+        source = str((product.get("attributes") or {}).get("source_type") or "").lower()
+        # Customization is an explicit workflow. Do not mix blank base
+        # products into ordinary searches such as "God image T-shirt".
+        if not requested_source and source == "customization":
+            return False
+        if requested_source:
+            allowed_sources = {
+                "customization": {"customization"},
+                "readymade": {"readymade"},
+                "drop product": {"drop"},
+                "drop products": {"drop"},
+            }
+            allowed = allowed_sources.get(requested_source)
+            if allowed and source not in allowed:
+                return False
         searchable = self._searchable_text(product)
         query = str(filters.get("query") or "").strip().lower()
         if query and not all(token in searchable for token in query.split()):
@@ -649,6 +665,12 @@ class EcommerceProductRepository:
             return False
         for key, value in (filters.get("attributes") or {}).items():
             normalized_value = str(value or "").lower()
+            # Theme/character/style descriptions are ranked semantically from
+            # the original customer message. Do not maintain a hard-coded
+            # vocabulary here ("god", "devil", etc.); the catalogue is the
+            # source of truth for future themes.
+            if key == "theme":
+                continue
             if key == "pattern" and normalized_value in {"check", "checks", "checked", "checkered"}:
                 if not re.search(r"\bcheck(?:s|ed|ered)?\b", searchable):
                     return False

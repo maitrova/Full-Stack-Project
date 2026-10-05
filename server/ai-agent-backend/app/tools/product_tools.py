@@ -150,6 +150,9 @@ class ProductTools:
         )
         filters = {
             "business_id": business_id,
+            # Structured fields constrain the candidates. The complete
+            # customer message is passed separately to the embedding ranker;
+            # it must not become an all-words lexical filter.
             "query": None if has_structured_filters else query,
             "category": intent.category,
             "min_price": intent.min_price,
@@ -188,6 +191,10 @@ class ProductTools:
     def _matches_intent(product: ProductPublic, intent: IntentResult) -> bool:
         """Final safety gate for exact searches before products reach the agent."""
         attributes = {str(key).lower(): value for key, value in (product.attributes or {}).items()}
+        source = str(attributes.get("source_type") or "").lower()
+        requested_source = str((intent.attributes or {}).get("catalog_type") or "").lower()
+        if not requested_source and source == "customization":
+            return False
         searchable = " ".join(
             str(value or "")
             for value in [product.name, product.description, product.category, *product.tags, *attributes.values()]
@@ -242,6 +249,11 @@ class ProductTools:
                 continue
             wanted = normalized(requested)
             actual = normalized(attributes.get(key))
+            # Themes are not a fixed enum. Semantic ranking compares the
+            # complete customer message with product title/description/tags
+            # and indexed attributes, so new themes need no code change.
+            if key == "theme":
+                continue
             if wanted:
                 if actual:
                     if wanted not in actual:

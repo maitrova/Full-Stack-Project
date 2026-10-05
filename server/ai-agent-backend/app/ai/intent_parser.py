@@ -453,6 +453,7 @@ Customer message:
             text,
             [
                 "radha krishna", "krishna", "ganesha", "shiva", "buddha",
+                "god", "gods", "deity", "deities", "devotional", "spiritual",
                 "anime", "cartoon", "marvel", "pokemon", "football", "cricket",
                 "floral", "flowers", "nature", "animal", "tiger", "lion",
                 "bike", "car", "gaming", "vintage", "aesthetic", "minimal",
