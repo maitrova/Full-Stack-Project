@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     website_knowledge_urls: str = ""
     website_knowledge_sync_interval_seconds: int = 900
     website_knowledge_chunk_size: int = 1800
+    website_knowledge_embedding_min_score: float = 0.62
+    website_knowledge_embedding_top_k: int = 6
 
     whatsapp_verify_token: str | None = None
     whatsapp_access_token: str | None = None

@@ -157,8 +157,28 @@ class SalesAgent:
             r"where should i customize|start designing|open the designer)\b",
             self.intent_parser._normalize_text(payload.message),
         ))
+        # A new catalogue browse must leave the customization flow. This is
+        # intentionally stricter than relying on the model's inherited
+        # attributes: "Do you have oversized T-shirts?" is a normal browse,
+        # even if the previous product happened to be customizable.
+        fresh_readymade_search = bool(
+            intent.intent == "product_search"
+            and intent.category
+            and not customization_request
+            and not customization_navigation
+            and not re.search(
+                r"\b(?:custom(?:ize|ised|ized|isation|ization)?|personalize|personalise|"
+                r"own design|my (?:image|photo|logo|design)|print|upload|designer)\b",
+                self.intent_parser._normalize_text(payload.message),
+            )
+            and re.search(
+                r"\b(?:show|do you have|have|find|search|looking for|look for|need|want)\b",
+                self.intent_parser._normalize_text(payload.message),
+            )
+        )
         continuing_customization = (
             previous_catalog_type == "customization"
+            and not fresh_readymade_search
             and (intent.intent == "product_search" or customization_navigation)
             and explicit_catalog_type not in {"readymade", "drop", "drop product"}
             and (customization_navigation or self._continues_customization_context(payload.message))
@@ -167,8 +187,22 @@ class SalesAgent:
             intent.intent = "product_search"
             intent.attributes["catalog_type"] = "customization"
             intent.wants_to_buy = False
+        elif fresh_readymade_search:
+            # Remove inherited model/state classification before the search
+            # tools run, so customizable products cannot contaminate a normal
+            # readymade recommendation.
+            intent.attributes.pop("catalog_type", None)
 
         updated_state = self._merge_conversation_state(conversation.get("conversation_state", {}), intent)
+        if fresh_readymade_search:
+            inherited_attributes = dict(updated_state.get("attributes") or {})
+            inherited_attributes.pop("catalog_type", None)
+            if inherited_attributes:
+                updated_state["attributes"] = inherited_attributes
+            else:
+                updated_state.pop("attributes", None)
+            updated_state.pop("customization_interest", None)
+            updated_state.pop("pending_customization_offer", None)
         # A successful cart mutation is a one-turn event. The next customer
         # message resumes the phase derived from the remaining context.
         updated_state.pop("last_cart_update", None)
@@ -624,6 +658,22 @@ class SalesAgent:
                 "from_image": bool(effective_image_analysis),
             }
 
+        customization_assistance = bool(
+            customization_request
+            or continuing_customization
+            or design_library_request
+            or intent.attributes.get("catalog_type") == "customization"
+        )
+        if customization_assistance:
+            # Customization is handled as a service lead, not as a normal
+            # catalogue recommendation. Product data may be used internally
+            # to validate suggestions, but WhatsApp must not send product
+            # images/cards for this flow.
+            products = []
+            selected_product = None
+            if presentation:
+                presentation = (presentation[0], [], "none")
+
         if not presentation and (not image_analysis_failed or customization_request):
             ai_text = await self.response_generator.generate(
                 customer_message=payload.message,
@@ -636,6 +686,29 @@ class SalesAgent:
                 store_context=store_context,
                 merchant_prompt=business.get("ai_prompt_config"),
             )
+
+        # Prevent an accidental model/state loop from sending the same answer
+        # repeatedly for a different customer message. Preserve the previous
+        # answer in history, but recover with a safe clarification menu.
+        previous_turns = updated_state.get("recent_turns") or []
+        previous_turn = previous_turns[-1] if previous_turns else {}
+        repeated_reply = bool(
+            previous_turn.get("reply")
+            and str(previous_turn.get("reply")).strip().casefold() == str(ai_text).strip().casefold()
+            and self.intent_parser._normalize_text(payload.message).strip().casefold()
+            != self.intent_parser._normalize_text(previous_turn.get("customer") or "").strip().casefold()
+        )
+        if repeated_reply:
+            ai_text = (
+                "I may have misunderstood your last message. Please choose one:\n"
+                "1. Find or recommend a product\n"
+                "2. Check price, size, color, or stock\n"
+                "3. Track an order, delivery, return, or refund\n"
+                "4. Customize a product or print your own design\n"
+                "5. Talk to our store team"
+            )
+            response_goal = "ask for clarification because intent confidence is low"
+            tool_calls.append({"name": "loop_guard", "status": "clarification_requested"})
 
         if conversation.get("channel") == "whatsapp":
             ai_text = self._compact_whatsapp_reply(ai_text)
@@ -667,13 +740,7 @@ class SalesAgent:
             },
         )
 
-        is_customization_lead = bool(
-            customization_request
-            or continuing_customization
-            or design_library_request
-            or intent.attributes.get("catalog_type") == "customization"
-            or updated_state.get("customization_interest")
-        )
+        is_customization_lead = bool(customization_assistance or updated_state.get("customization_interest"))
         if is_customization_lead:
             updated_state["customization_interest"] = True
         customization_reply_lower = ai_text.lower()
@@ -739,7 +806,13 @@ class SalesAgent:
             {"_id": conversation["_id"], "business_id": business["_id"]},
             {"$set": conversation_updates},
         )
-        if updated_state.get("handoff_requested"):
+        if is_customization_lead or updated_state.get("handoff_requested"):
+            lead_reason = handoff_context.get("reason") if updated_state.get("handoff_requested") else "customization_assistance"
+            lead_summary = handoff_context.get("summary") if updated_state.get("handoff_requested") else (
+                "Customer requested product customization. Review the conversation and assist with the design, "
+                "product, image-upload, or pricing questions as needed."
+            )
+            lead_urgency = handoff_context.get("urgency") if updated_state.get("handoff_requested") else "normal"
             await self.conversation_repository.collection.database.whatsapp_handoff_alerts.update_one(
                 {"conversation_id": conversation["_id"], "status": {"$in": ["open", "assigned"]}},
                 {
@@ -752,9 +825,9 @@ class SalesAgent:
                         "external_customer_ref": conversation.get("external_customer_ref"),
                         "lead_type": "customization" if is_customization_lead else "general",
                         "status": "open",
-                        "reason": handoff_context.get("reason") or "customer_requested_team",
-                        "summary": handoff_context.get("summary") or "",
-                        "urgency": handoff_context.get("urgency") or "normal",
+                        "reason": lead_reason or "customer_requested_team",
+                        "summary": lead_summary or "",
+                        "urgency": lead_urgency or "normal",
                         "created_at": ai_message["created_at"],
                     },
                 },

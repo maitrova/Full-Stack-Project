@@ -11,6 +11,7 @@ import httpx
 from pymongo import ReturnDocument
 
 from app.config.settings import settings
+from app.ai.gemini_client import GeminiClient
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class WebsiteKnowledgeSync:
         self.database = database
         self.collection = database.ai_website_knowledge
         self.locks = database.ai_background_locks
+        self.embedding_client = GeminiClient()
 
     async def ensure_indexes(self) -> None:
         await self.collection.create_index([("source_url", 1), ("chunk_index", 1)], unique=True)
@@ -66,19 +68,41 @@ class WebsiteKnowledgeSync:
                         key = {"source_url": url, "chunk_index": index}
                         active_keys.append(key)
                         fingerprint = hashlib.sha256(chunk.encode("utf-8")).hexdigest()
-                        await self.collection.update_one(
-                            key,
-                            {"$set": {
-                                "source_url": url,
-                                "title": title[:200],
-                                "content": chunk,
-                                "content_hash": fingerprint,
-                                "status": "active",
-                                "fetched_at": datetime.now(timezone.utc),
-                                "updated_at": datetime.now(timezone.utc),
-                            }},
-                            upsert=True,
-                        )
+                        existing = await self.collection.find_one(key, {"content_hash": 1, "embedding": 1})
+                        update = {
+                            "source_url": url,
+                            "title": title[:200],
+                            "content": chunk,
+                            "content_hash": fingerprint,
+                            "status": "active",
+                            "fetched_at": datetime.now(timezone.utc),
+                            "updated_at": datetime.now(timezone.utc),
+                        }
+                        if not (
+                            existing
+                            and existing.get("content_hash") == fingerprint
+                            and existing.get("embedding")
+                        ) and self.embedding_client.supports_embeddings:
+                            try:
+                                update["embedding"] = await self.embedding_client.embed_content(
+                                    text=f"{title}\n{chunk}"
+                                )
+                                update["embedding_model"] = settings.gemini_embedding_model
+                                update["embedding_status"] = "ready"
+                            except Exception as exc:
+                                # Knowledge remains usable through keyword
+                                # retrieval even when embeddings are unavailable.
+                                logger.warning(
+                                    "Website knowledge embedding failed for %s: %s",
+                                    url,
+                                    exc.__class__.__name__,
+                                )
+                                update["embedding_status"] = "unavailable"
+                                update["embedding_error"] = exc.__class__.__name__
+                        elif not existing or not existing.get("embedding"):
+                            update["embedding_status"] = "unavailable"
+                            update["embedding_error"] = "provider_not_configured"
+                        await self.collection.update_one(key, {"$set": update}, upsert=True)
                         synced += 1
                 except Exception as exc:
                     failed += 1

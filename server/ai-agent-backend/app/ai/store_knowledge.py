@@ -1,7 +1,11 @@
 """Ground store answers in published information, never model assumptions."""
 import html
 import logging
+import math
 import re
+
+from app.ai.gemini_client import GeminiClient
+from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +30,7 @@ class StoreKnowledge:
 
     def __init__(self, database=None):
         self.db = database
+        self.embedding_client = GeminiClient()
 
     @classmethod
     def topics(cls, message):
@@ -58,13 +63,21 @@ class StoreKnowledge:
         except Exception as exc:
             logger.warning("Store information unavailable: %s", exc.__class__.__name__)
         try:
-            website_docs = await self.db.ai_website_knowledge.find({"status": "active"}).sort("updated_at", -1).limit(40).to_list(40)
-            topic_terms = [term for topic in topics for term in self.DOCUMENT_TOPICS.get(topic, "").split("|")]
-            for doc in website_docs:
+            website_docs = await self.db.ai_website_knowledge.find({"status": "active"}).sort("updated_at", -1).limit(200).to_list(200)
+            semantic_docs = await self._semantic_documents(website_docs, message)
+            if semantic_docs is not None:
+                selected_docs = semantic_docs
+            else:
+                topic_terms = [term for topic in topics for term in self.DOCUMENT_TOPICS.get(topic, "").split("|")]
+                selected_docs = []
+                for doc in website_docs:
+                    content = re.sub(r"\s+", " ", str(doc.get("content") or "")).strip()
+                    haystack = f"{doc.get('title', '')} {content}".lower()
+                    if not include_all and topic_terms and not any(term.lower() in haystack for term in topic_terms):
+                        continue
+                    selected_docs.append(doc)
+            for doc in selected_docs:
                 content = re.sub(r"\s+", " ", str(doc.get("content") or "")).strip()
-                haystack = f"{doc.get('title', '')} {content}".lower()
-                if not include_all and topic_terms and not any(term.lower() in haystack for term in topic_terms):
-                    continue
                 context["published_information"].append({
                     "title": str(doc.get("title") or "Website information"),
                     "content": content[:6000],
@@ -74,6 +87,33 @@ class StoreKnowledge:
         except Exception as exc:
             logger.warning("Website knowledge unavailable: %s", exc.__class__.__name__)
         return context
+
+    async def _semantic_documents(self, documents, message):
+        """Return only strongly related website chunks, or None for fallback."""
+        embedded = [doc for doc in documents if isinstance(doc.get("embedding"), list) and doc.get("embedding")]
+        if not embedded or not self.embedding_client.supports_embeddings:
+            return None
+        try:
+            query = await self.embedding_client.embed_content(text=message)
+        except Exception as exc:
+            logger.warning("Website knowledge query embedding failed: %s", exc.__class__.__name__)
+            return None
+        scored = []
+        for doc in embedded:
+            score = self._cosine(query, doc.get("embedding"))
+            if score >= settings.website_knowledge_embedding_min_score:
+                scored.append((score, doc))
+        scored.sort(key=lambda item: item[0], reverse=True)
+        return [doc for _, doc in scored[:settings.website_knowledge_embedding_top_k]]
+
+    @staticmethod
+    def _cosine(left, right) -> float:
+        if not left or not right or len(left) != len(right):
+            return 0.0
+        dot = sum(float(a) * float(b) for a, b in zip(left, right))
+        left_norm = math.sqrt(sum(float(a) * float(a) for a in left))
+        right_norm = math.sqrt(sum(float(b) * float(b) for b in right))
+        return dot / (left_norm * right_norm) if left_norm and right_norm else 0.0
 
     @staticmethod
     def fallback(context):

@@ -42,6 +42,33 @@ class StoreAnswerTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("don't have confirmed details", reply)
         self.assertIn("human", reply)
 
+    async def test_website_knowledge_embeddings_keep_strong_matches_only(self):
+        knowledge = StoreKnowledge(None)
+        knowledge.embedding_client = SimpleNamespace(
+            supports_embeddings=True,
+            embed_content=AsyncMock(return_value=[1.0, 0.0]),
+        )
+        documents = [
+            {"title": "Shipping", "content": "Delivery information", "embedding": [1.0, 0.0]},
+            {"title": "Unrelated", "content": "Unrelated information", "embedding": [0.0, 1.0]},
+        ]
+
+        selected = await knowledge._semantic_documents(documents, "How long does delivery take?")
+
+        self.assertEqual([item["title"] for item in selected], ["Shipping"])
+
+    async def test_website_knowledge_embeddings_return_no_answer_for_weak_match(self):
+        knowledge = StoreKnowledge(None)
+        knowledge.embedding_client = SimpleNamespace(
+            supports_embeddings=True,
+            embed_content=AsyncMock(return_value=[1.0, 0.0]),
+        )
+        documents = [{"title": "Returns", "content": "Return information", "embedding": [0.0, 1.0]}]
+
+        selected = await knowledge._semantic_documents(documents, "What is your store address?")
+
+        self.assertEqual(selected, [])
+
     async def test_policy_answer_prompt_has_store_facts_and_handles_empty_products(self):
         client = SimpleNamespace(is_configured=True, generate_text=AsyncMock(return_value="Delivery takes 5 days."))
         generator = ResponseGenerator(client)

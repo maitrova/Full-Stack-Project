@@ -15,6 +15,7 @@ from app.schemas.user import UserPublic
 from app.services.catalogue_quality import validate_catalogue_record
 from app.services.quality_monitor import build_quality_alerts
 from app.services.website_knowledge import WebsiteKnowledgeSync
+from app.ai.gemini_client import GeminiClient
 from app.tools.product_tools import ProductTools
 
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -207,6 +208,19 @@ async def knowledge_health(
     collection = ecommerce_database.ai_website_knowledge
     active_chunks = await collection.count_documents({"status": "active"})
     stale_chunks = await collection.count_documents({"status": "stale"})
+    embedded_chunks = await collection.count_documents({
+        "status": "active",
+        "embedding": {"$exists": True, "$ne": []},
+    })
+    embedding_error_chunks = await collection.count_documents({
+        "status": "active",
+        "embedding_status": "unavailable",
+    })
+    latest_embedding_error = await collection.find_one(
+        {"status": "active", "embedding_status": "unavailable"},
+        {"_id": 0, "embedding_error": 1, "updated_at": 1},
+        sort=[("updated_at", -1)],
+    )
     latest = await collection.find_one({"status": "active"}, {"_id": 0, "updated_at": 1}, sort=[("updated_at", -1)])
     sources = await collection.aggregate([
         {"$match": {"status": "active"}},
@@ -218,6 +232,15 @@ async def knowledge_health(
         "configured_urls": len(WebsiteKnowledgeSync.configured_urls()),
         "active_chunks": active_chunks,
         "stale_chunks": stale_chunks,
+        "embeddings": {
+            "configured": GeminiClient().supports_embeddings,
+            "model": settings.gemini_embedding_model,
+            "active_embedded_chunks": embedded_chunks,
+            "active_unembedded_chunks": max(0, active_chunks - embedded_chunks),
+            "chunks_with_errors": embedding_error_chunks,
+            "latest_error": latest_embedding_error.get("embedding_error") if latest_embedding_error else None,
+            "latest_error_at": latest_embedding_error.get("updated_at") if latest_embedding_error else None,
+        },
         "latest_updated_at": latest.get("updated_at") if latest else None,
         "sources": [
             {"url": item.get("_id"), "chunks": item.get("chunks", 0), "updated_at": item.get("updated_at")}

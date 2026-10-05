@@ -24,6 +24,7 @@ FACTUAL_RESPONSE_GOALS = {
     "explain product details",
     "product photos or link",
     "ask for clarification because intent confidence is low",
+    "guide the customer from a customization request to a customizable base product",
 }
 
 
