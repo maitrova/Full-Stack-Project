@@ -173,6 +173,11 @@ class ProductTools:
                     query_embedding=query_embedding,
                     limit=limit,
                 )
+                # The semantic repository returns normalized dictionaries,
+                # while the final intent gate works with ProductPublic
+                # objects. Convert them at this boundary so semantic search
+                # follows the same contract as lexical search.
+                products = self._validated_products(products)
             except Exception as exc:
                 logger.warning("Semantic product search unavailable; using lexical search: %s", exc.__class__.__name__)
         if not products:
