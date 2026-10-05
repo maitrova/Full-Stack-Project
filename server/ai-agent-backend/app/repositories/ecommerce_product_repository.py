@@ -39,6 +39,49 @@ class EcommerceProductRepository:
         matches.sort(key=lambda item: (-item["stock"], self._display_price(item)))
         return self._deduplicate_products(matches)[:limit]
 
+    async def search_semantic_products(
+        self,
+        business_id: str,
+        filters: dict,
+        query: str,
+        query_embedding: list[float],
+        limit: int = 5,
+    ) -> list[dict]:
+        """Rank strictly filtered catalogue candidates by text meaning."""
+        products = await self._load_catalogue(business_id)
+        products = await self._attach_search_attributes(products)
+        candidates = [product for product in products if self._matches(product, filters)]
+        if not candidates:
+            return []
+
+        product_ids = [str(product.get("_id")) for product in candidates]
+        indexed = await self.database.ai_product_search_index.find(
+            {
+                "product_id": {"$in": product_ids},
+                "embedding_model": settings.gemini_embedding_model,
+            },
+            {"product_id": 1, "embedding": 1, "text_embedding": 1},
+        ).to_list(length=len(product_ids))
+        embeddings = {
+            str(item.get("product_id")): item.get("text_embedding") or item.get("embedding")
+            for item in indexed
+        }
+        ranked = []
+        for product in candidates:
+            embedding = embeddings.get(str(product.get("_id")))
+            semantic_score = self._cosine(query_embedding, embedding)
+            lexical_score = self._term_overlap(query, self._searchable_text(product))
+            score = semantic_score * 0.82 + lexical_score * 0.18
+            if score >= settings.catalogue_semantic_min_score:
+                enriched = dict(product)
+                enriched["attributes"] = {
+                    **product.get("attributes", {}),
+                    "semantic_match_score": round(score, 4),
+                }
+                ranked.append((score, enriched))
+        ranked.sort(key=lambda item: (-item[0], -int(item[1].get("stock") or 0), self._display_price(item[1])))
+        return self._deduplicate_products([product for _, product in ranked[:limit]])
+
     async def _attach_search_attributes(self, products: list[dict]) -> list[dict]:
         """Merge derived metadata without changing the ecommerce product schema."""
         product_ids = [str(product.get("_id")) for product in products if product.get("_id")]

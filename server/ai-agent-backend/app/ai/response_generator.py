@@ -163,7 +163,12 @@ class ResponseGenerator:
     ) -> str:
         product_data = [self._product_for_prompt(product) for product in products]
         selected_product_data = self._product_for_prompt(selected_product) if selected_product else None
-        language_info = detect_customer_language(customer_message)
+        default_language = (
+            settings.whatsapp_default_language
+            if str(conversation_state.get("channel") or "").casefold() == "whatsapp"
+            else None
+        )
+        language_info = detect_customer_language(customer_message, default_language=default_language)
         active_merchant_prompt = merchant_prompt or {}
         merchant_instructions = (
             str(active_merchant_prompt.get("instructions") or settings.merchant_prompt_instructions).strip()

@@ -446,6 +446,22 @@ Customer message:
         if style:
             attributes["style"] = style
 
+        # Customers often describe a print/theme instead of knowing the exact
+        # product name. Search these terms in product titles, descriptions,
+        # tags, and merchandising attributes.
+        theme = self._first_match(
+            text,
+            [
+                "radha krishna", "krishna", "ganesha", "shiva", "buddha",
+                "anime", "cartoon", "marvel", "pokemon", "football", "cricket",
+                "floral", "flowers", "nature", "animal", "tiger", "lion",
+                "bike", "car", "gaming", "vintage", "aesthetic", "minimal",
+                "quote", "typography", "graphic",
+            ],
+        )
+        if theme:
+            attributes["theme"] = theme
+
         if re.search(
             r"\b(custom|customized|customised|customizable|customisable|customise|customize|"
             r"customization|customisation|custom design|personalize|personalise|own design)\b",

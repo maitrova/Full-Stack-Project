@@ -48,7 +48,7 @@ class CatalogIndexer:
                     "product_id": str(product["_id"]),
                     "embedding_model": settings.gemini_embedding_model,
                     "fingerprint": fingerprint,
-                    "derived_attributes_version": 1,
+                    "derived_attributes_version": 2,
                 },
                 {"_id": 1},
             )
@@ -70,9 +70,13 @@ class CatalogIndexer:
                         customer_message=product.get("name"),
                     )
                 embedding = None
+                text_embedding = None
                 try:
                     if not self.gemini_client.supports_embeddings:
                         raise RuntimeError("embedding provider unavailable")
+                    text_embedding = await self.gemini_client.embed_content(
+                        text=self._index_text(product)
+                    )
                     embedding = await self.gemini_client.embed_content(
                         text=self._index_text(product),
                         image_url=image_url,
@@ -98,8 +102,9 @@ class CatalogIndexer:
                         "$set": {
                             "source_type": product.get("attributes", {}).get("source_type"),
                             "fingerprint": fingerprint,
-                            "derived_attributes_version": 1,
+                            "derived_attributes_version": 2,
                             "embedding": embedding,
+                            "text_embedding": text_embedding,
                             "search_attributes": self._safe_attributes({
                                 **self.repository._infer_merchandise_attributes(
                                     product.get("name"), product.get("description"), product.get("category")
@@ -123,7 +128,7 @@ class CatalogIndexer:
 
     def _safe_attributes(self, attributes: dict) -> dict:
         allowed = {
-            "category", "product_type", "product_name_hint", "visible_text", "brand", "color",
+            "category", "product_type", "product_name_hint", "visible_text", "brand", "color", "theme",
             "material", "fabric", "occasion", "style", "pattern", "work", "gender", "description",
         }
         return {
@@ -165,10 +170,19 @@ class CatalogIndexer:
 
     def _index_text(self, product: dict) -> str:
         attributes = product.get("attributes") or {}
+        structured_values = []
+        for key, value in attributes.items():
+            if key in {"variants", "product_url", "match_components", "match_score"}:
+                continue
+            if isinstance(value, (list, tuple, set)):
+                structured_values.extend(str(item) for item in value)
+            elif value:
+                structured_values.append(str(value))
         values = [
             product.get("name"), product.get("description"), product.get("category"),
             attributes.get("sub_category"), attributes.get("brand"), attributes.get("source_type"),
             " ".join(product.get("tags") or []), " ".join(attributes.get("colors") or []),
+            " ".join(structured_values),
         ]
         return "Product for visual commerce search: " + ". ".join(str(value) for value in values if value)
 

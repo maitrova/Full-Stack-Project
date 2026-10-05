@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from app.repositories.product_repository import ProductRepository
+from app.ai.gemini_client import GeminiClient
 from app.services.catalogue_quality import validate_catalogue_record
 from app.schemas.ai import IntentResult
 from app.schemas.product import ProductPublic
@@ -30,8 +31,9 @@ class ProductSearchParams:
 
 
 class ProductTools:
-    def __init__(self, product_repository: ProductRepository):
+    def __init__(self, product_repository: ProductRepository, gemini_client: GeminiClient | None = None):
         self.product_repository = product_repository
+        self.gemini_client = gemini_client or GeminiClient()
 
     @staticmethod
     def _validated_product(product: dict) -> ProductPublic | None:
@@ -121,22 +123,35 @@ class ProductTools:
                 intent.attributes,
             ]
         )
-        products = await self.search_products(
-            ProductSearchParams(
-                business_id=business_id,
-                query=None if has_structured_filters else query,
-                category=intent.category,
-                min_price=intent.min_price,
-                max_price=intent.max_price,
-                color=intent.color,
-                size=intent.size,
-                occasion=intent.occasion,
-                brand=intent.brand,
-                attributes=intent.attributes,
-                exclude_ids=exclude_ids or [],
-                limit=limit,
-            )
-        )
+        filters = {
+            "business_id": business_id,
+            "query": None if has_structured_filters else query,
+            "category": intent.category,
+            "min_price": intent.min_price,
+            "max_price": intent.max_price,
+            "color": intent.color,
+            "size": intent.size,
+            "occasion": intent.occasion,
+            "brand": intent.brand,
+            "attributes": intent.attributes,
+            "exclude_ids": exclude_ids or [],
+            "limit": limit,
+        }
+        products = []
+        if query and self.gemini_client.supports_embeddings:
+            try:
+                query_embedding = await self.gemini_client.embed_content(text=query)
+                products = await self.product_repository.search_semantic_products(
+                    business_id=business_id,
+                    filters=filters,
+                    query=query,
+                    query_embedding=query_embedding,
+                    limit=limit,
+                )
+            except Exception as exc:
+                logger.warning("Semantic product search unavailable; using lexical search: %s", exc.__class__.__name__)
+        if not products:
+            products = await self.search_products(ProductSearchParams(**filters))
         return [product for product in products if self._matches_intent(product, intent)]
 
     @staticmethod

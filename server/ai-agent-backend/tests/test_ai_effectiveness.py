@@ -260,6 +260,28 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.agent._is_customization_request("Can I share my own design?"))
         self.assertFalse(self.agent._is_design_library_request("Can I share my own design?"))
 
+    def test_product_description_extracts_character_theme_without_product_name(self):
+        parser = IntentParser(SimpleNamespace(is_configured=False))
+        intent = parser._parse_with_rules(
+            "Hoodie medha Krishna image undi, available ga unda?",
+            {},
+        )
+
+        self.assertEqual(intent.category, "hoodie")
+        self.assertEqual(intent.attributes["theme"], "krishna")
+
+    def test_whatsapp_defaults_to_roman_telugu_but_preserves_explicit_scripts(self):
+        from app.ai.language import detect_customer_language
+
+        self.assertEqual(
+            detect_customer_language("show me a hoodie", "Roman Telugu")["language"],
+            "Roman Telugu",
+        )
+        self.assertEqual(
+            detect_customer_language("కృష్ణ హూడీ కావాలి", "Roman Telugu")["language"],
+            "Telugu",
+        )
+
     def test_customization_navigation_follow_up_opens_design_flow(self):
         self.assertTrue(self.agent._is_design_library_request("where should I design"))
         self.assertTrue(self.agent._is_design_library_request("send the designer link"))

@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     openai_output_cost_per_million: float = 0.0
     catalogue_index_batch_size: int = 10
     catalogue_index_interval_seconds: int = 60
+    catalogue_semantic_min_score: float = 0.42
     website_knowledge_urls: str = ""
     website_knowledge_sync_interval_seconds: int = 900
     website_knowledge_chunk_size: int = 1800
@@ -65,6 +66,7 @@ class Settings(BaseSettings):
     whatsapp_waba_id: str | None = None
     whatsapp_messages_per_minute: int = 30
     whatsapp_checkout_links_per_hour: int = 10
+    whatsapp_default_language: str = "Roman Telugu"
 
     model_config = SettingsConfigDict(
         # When this service lives at server/ai-agent-backend, also read server/.env.

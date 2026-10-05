@@ -70,7 +70,7 @@ ROMAN_HINDI_TERMS = {
 }
 
 
-def detect_customer_language(message: str) -> dict[str, str]:
+def detect_customer_language(message: str, default_language: str | None = None) -> dict[str, str]:
     text = message.strip()
     lowered = text.lower()
     words = set(re.findall(r"[a-z]+", lowered))
@@ -107,6 +107,23 @@ def detect_customer_language(message: str) -> dict[str, str]:
                 "Reply in the same Hinglish style. Use Hindi words in Latin script, "
                 "and do not switch to only English."
             ),
+        }
+
+    if str(default_language or "").strip().casefold() in {"roman telugu", "telugu latin"}:
+        return {
+            "language": "Roman Telugu",
+            "script": "Latin",
+            "reply_instruction": (
+                "Reply mainly in natural Roman Telugu with simple English product words. "
+                "Use Telugu words in Latin script and do not switch to only English."
+            ),
+        }
+
+    if str(default_language or "").strip().casefold() == "telugu":
+        return {
+            "language": "Telugu",
+            "script": "Telugu",
+            "reply_instruction": "Reply mainly in Telugu using Telugu script, keeping product names and URLs unchanged.",
         }
 
     return {

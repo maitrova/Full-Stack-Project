@@ -17,6 +17,7 @@ from app.ai.action_policy import ActionPolicy
 from app.ai.product_image_analyzer import ProductImageAnalyzer
 from app.ai.response_generator import ResponseGenerator
 from app.ai.store_knowledge import StoreKnowledge
+from app.ai.tool_router import ToolRouter
 from app.ai.usage import consume_usage, start_usage_tracking
 from app.config.settings import settings
 from app.repositories.business_repository import BusinessRepository
@@ -194,6 +195,7 @@ class SalesAgent:
             intent.attributes.pop("catalog_type", None)
 
         updated_state = self._merge_conversation_state(conversation.get("conversation_state", {}), intent)
+        updated_state["channel"] = conversation.get("channel") or updated_state.get("channel")
         if fresh_readymade_search:
             inherited_attributes = dict(updated_state.get("attributes") or {})
             inherited_attributes.pop("catalog_type", None)
@@ -218,6 +220,13 @@ class SalesAgent:
         self._apply_product_option(intent.product_option, conversation, updated_state)
         action_allowed, policy_reason = ActionPolicy.validate(intent, conversation, updated_state)
         policy_blocked = not action_allowed
+        route_decision = ToolRouter.decide(intent, updated_state, conversation)
+        route_blocked = not route_decision.allowed
+        updated_state["last_route"] = {
+            "route": route_decision.route,
+            "allowed": route_decision.allowed,
+            "reason": route_decision.reason,
+        }
         if policy_blocked:
             logger.warning(
                 "Blocked unsafe commerce action=%s conversation=%s reason=%s",
@@ -229,6 +238,15 @@ class SalesAgent:
                 "action": intent.action,
                 "reason": policy_reason,
             }
+            intent.action = None
+            intent.intent = "general_question"
+            intent.wants_to_buy = False
+        elif route_blocked and route_decision.route == "clarification":
+            logger.info(
+                "Tool router requested clarification conversation=%s reason=%s",
+                conversation.get("_id"),
+                route_decision.reason,
+            )
             intent.action = None
             intent.intent = "general_question"
             intent.wants_to_buy = False
@@ -298,6 +316,7 @@ class SalesAgent:
         needs_clarification = (
             not has_image
             and not policy_blocked
+            and not route_blocked
             and intent.intent == "product_search"
             and float(intent.confidence or 0) < 0.6
             and not any([
@@ -311,6 +330,7 @@ class SalesAgent:
                 intent.attributes,
             ])
             or ambiguous_general
+            or route_blocked
         )
         follow_up = (
             None
@@ -370,7 +390,7 @@ class SalesAgent:
             )
 
         if needs_clarification:
-            if ambiguous_general:
+            if ambiguous_general or route_blocked:
                 ai_text = (
                     "I want to make sure I help with the right request. Please choose one:\n"
                     "1. Find or recommend a product\n"

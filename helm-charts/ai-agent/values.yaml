@@ -61,6 +61,7 @@ envVars:
   WHATSAPP_GRAPH_API_VERSION: v25.0
   WHATSAPP_MESSAGES_PER_MINUTE: "30"
   WHATSAPP_CHECKOUT_LINKS_PER_HOUR: "10"
+  WHATSAPP_DEFAULT_LANGUAGE: Roman Telugu
 
 # Reuse the backend's MongoDB URI and appdb database so the ecommerce server
 # and AI agent share one database while keeping data in separate collections.
