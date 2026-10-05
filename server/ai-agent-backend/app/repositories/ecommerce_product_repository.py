@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime, timezone
 import html
+import logging
 import math
 from typing import Any
 import re
@@ -10,6 +11,8 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.config.settings import settings
 from app.utils.object_id import parse_object_id
+
+logger = logging.getLogger(__name__)
 
 
 class EcommerceProductRepository:
@@ -65,6 +68,7 @@ class EcommerceProductRepository:
         embeddings = {
             str(item.get("product_id")): item.get("text_embedding") or item.get("embedding")
             for item in indexed
+            if item.get("product_id")
         }
         ranked = []
         for product in candidates:
@@ -253,11 +257,24 @@ class EcommerceProductRepository:
         return hits / len(tokens)
 
     def _cosine(self, left: list[float] | None, right: list[float] | None) -> float:
-        if not left or not right or len(left) != len(right):
+        # Search indexes can contain legacy, null, or partially written
+        # embeddings while a reindex is running. A bad vector must not make
+        # the entire customer search fail.
+        if (
+            not isinstance(left, (list, tuple))
+            or not isinstance(right, (list, tuple))
+            or not left
+            or not right
+            or len(left) != len(right)
+        ):
             return 0.0
-        dot = sum(a * b for a, b in zip(left, right))
-        left_norm = math.sqrt(sum(value * value for value in left))
-        right_norm = math.sqrt(sum(value * value for value in right))
+        try:
+            values = [(float(a), float(b)) for a, b in zip(left, right)]
+            dot = sum(a * b for a, b in values)
+            left_norm = math.sqrt(sum(a * a for a, _ in values))
+            right_norm = math.sqrt(sum(b * b for _, b in values))
+        except (TypeError, ValueError, OverflowError):
+            return 0.0
         if not left_norm or not right_norm:
             return 0.0
         return max(0.0, min(1.0, dot / (left_norm * right_norm)))
@@ -328,11 +345,28 @@ class EcommerceProductRepository:
             self.customization_collection.find({}).limit(500).to_list(length=500),
         )
         names = await self._lookup_names(readymade)
-        return [
-            *[self._normalize_readymade(document, business_id, names) for document in readymade],
-            *[self._normalize_drop(document, business_id) for document in drops],
-            *[self._normalize_customization(document, business_id) for document in customization],
-        ]
+        catalogue: list[dict] = []
+
+        # A single malformed legacy product must not take down search for all
+        # customers. Keep the record out of results and leave a diagnostic in
+        # the server log so the catalogue can be corrected asynchronously.
+        for source, documents, normalizer in (
+            ("readymade", readymade, lambda item: self._normalize_readymade(item, business_id, names)),
+            ("drop", drops, lambda item: self._normalize_drop(item, business_id)),
+            ("customization", customization, lambda item: self._normalize_customization(item, business_id)),
+        ):
+            for document in documents:
+                try:
+                    catalogue.append(normalizer(document))
+                except Exception as exc:
+                    product_id = str(document.get("_id") or "unknown") if isinstance(document, dict) else "unknown"
+                    logger.warning(
+                        "Skipping malformed %s catalogue record %s during search (%s)",
+                        source,
+                        product_id,
+                        exc.__class__.__name__,
+                    )
+        return catalogue
 
     async def catalog_categories(self) -> list[str]:
         readymade_ids, drop_categories, customization_categories = await asyncio.gather(
@@ -362,7 +396,16 @@ class EcommerceProductRepository:
         ]
         result: dict[str, dict[str, str]] = {}
         for field, collection in specs:
-            ids = list({document.get(field) for document in documents if document.get(field)})
+            ids: list[Any] = []
+            seen_ids: set[str] = set()
+            for document in documents:
+                if not isinstance(document, dict):
+                    continue
+                value = document.get(field)
+                if not value or str(value) in seen_ids:
+                    continue
+                seen_ids.add(str(value))
+                ids.append(value)
             if not ids:
                 result[field] = {}
                 continue
