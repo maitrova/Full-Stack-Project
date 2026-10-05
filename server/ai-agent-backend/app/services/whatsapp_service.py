@@ -566,6 +566,41 @@ class WhatsAppService:
         if conversation is None or conversation.get("status") != "handoff":
             return False
 
+        # A customization lead or an open handoff alert must not permanently
+        # silence the assistant. Pause automation only while a teammate has
+        # actively taken ownership, or when the customer explicitly asks for
+        # a human. Otherwise resume AI for ordinary product/store questions.
+        normalized_text = str(text or "").lower().strip()
+        explicitly_human = bool(re.search(
+            r"\b(?:human|real person|someone from (?:the )?(?:shop|store)|"
+            r"talk to (?:a )?(?:person|staff|agent)|store team)\b",
+            normalized_text,
+        ))
+        assigned_alert = await self.conversation_repository.collection.database.whatsapp_handoff_alerts.find_one(
+            {"conversation_id": conversation["_id"], "status": "assigned"},
+            {"_id": 1},
+        )
+        if not explicitly_human and assigned_alert is None:
+            await self.conversation_repository.collection.update_one(
+                {"_id": conversation["_id"], "business_id": business["_id"]},
+                {
+                    "$set": {"status": "open", "updated_at": datetime.now(timezone.utc)},
+                    "$unset": {
+                        "conversation_state.handoff_requested": "",
+                        "conversation_state.handoff_context": "",
+                        "handoff_reason": "",
+                        "handoff_summary": "",
+                        "handoff_urgency": "",
+                        "handoff_requested_at": "",
+                    },
+                },
+            )
+            logger.info(
+                "Resuming AI for WhatsApp conversation %s; handoff is not assigned",
+                conversation.get("_id"),
+            )
+            return False
+
         await self.message_repository.create_message(
             business_id=str(business["_id"]),
             conversation_id=str(conversation["_id"]),
