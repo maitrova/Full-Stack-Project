@@ -41,7 +41,6 @@ envVars:
 
 # Secret Environment Variables (non-sensitive enough for Helm, stored in cluster secret)
 envSecrets:
-  JWT_SECRET: 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
   GOOGLE_CLIENT_ID: 777795975212-0kfni6fgt4036k9rplvf1l7n70hukngo.apps.googleusercontent.com
   MONGOOSE_PASSWORD: "Saigollapalli@122"
   MONGOOSE_URL: "mongodb://maitrova:Saigollapalli%40122@mongodb:27017/appdb?authSource=admin"

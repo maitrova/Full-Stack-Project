@@ -118,18 +118,26 @@ jobs:
 
       - name: Deploy Backend to VPS
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           port: ${{ secrets.VPS_PORT }}
           password: ${{ secrets.VPS_PASSWORD }}
+          envs: JWT_SECRET
           script: |
             set -e
+            if [ -z "${JWT_SECRET:-}" ]; then
+              echo "ERROR: JWT_SECRET GitHub Actions secret is required" >&2
+              exit 1
+            fi
             helm upgrade --install backend /tmp/backend \
               --namespace production \
               --create-namespace \
               --history-max 3 \
               --set image.tag=${{ needs.build_and_push.outputs.backend_tag }} \
+              --set-string envSecrets.JWT_SECRET="$JWT_SECRET" \
               --wait \
               --atomic
             
@@ -218,20 +226,22 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           port: ${{ secrets.VPS_PORT }}
           password: ${{ secrets.VPS_PASSWORD }}
-          envs: GEMINI_API_KEY,OPENAI_API_KEY
+          envs: GEMINI_API_KEY,OPENAI_API_KEY,JWT_SECRET
           script: |
             set -e
-            if [ -z "${GEMINI_API_KEY:-}" ]; then
+            if [ -z "${GEMINI_API_KEY:-}" ] || [ -z "${JWT_SECRET:-}" ]; then
               echo "ERROR: GEMINI_API_KEY GitHub Actions secret is required for the AI agent deployment" >&2
               exit 1
             fi
             set --
             set -- --set-string "envSecrets.GEMINI_API_KEY=${GEMINI_API_KEY}"
+            set -- "$@" --set-string "envSecrets.JWT_SECRET=${JWT_SECRET}"
             if [ -n "${OPENAI_API_KEY:-}" ]; then
               set -- "$@" --set-string "envSecrets.OPENAI_API_KEY=${OPENAI_API_KEY}"
             fi

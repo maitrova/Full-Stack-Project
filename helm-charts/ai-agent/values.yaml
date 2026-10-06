@@ -80,7 +80,6 @@ existingSecret: ""
 # Non-provider secrets are rendered into the ai-agent Secret.
 # GEMINI_API_KEY is supplied by the deploy workflow from GitHub Actions secrets.
 envSecrets:
-  JWT_SECRET: "hemanth"
   WHATSAPP_VERIFY_TOKEN: "9d80f52f11e34589949dc7ab6c1df33a"
   WHATSAPP_ACCESS_TOKEN: "EAAtOYebWxSoBSVbQaKeefqrSkirBlPY73S8ZAIU1csY2FrKq0knBxZBZAUyJU9PXEkNEX3LKMCt6lBCZB6w2CoA9DTmEbZCKzkL4kuOclZBKP1SSZBM0aeEXeZA8XJbVIWbUF2vrkFktquNOFYKrCEUgwW4iebj00IbXR9BitZBu5EI9F8dePamaCZC46VdAN8vPblJ91g4OsvlySXPHvI6LZAhNdgZBZBR5ZBIzDwzMu6SAOj"
   WHATSAPP_APP_SECRET: "6d9c3a848d0ac061b4fab5fb974acad8"
