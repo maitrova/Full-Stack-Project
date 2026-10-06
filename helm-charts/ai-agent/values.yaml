@@ -47,7 +47,8 @@ envVars:
   ECOMMERCE_API_URL: https://maitrova.in/api
   REMOTE_IMAGE_ALLOWED_HOSTS: www.maitrova.in,maitrova.in
   REMOTE_IMAGE_MAX_BYTES: "10485760"
-  FRONTEND_ORIGIN: https://www.maitrova.in
+  # Both canonical storefront hosts serve the browser application.
+  FRONTEND_ORIGIN: https://www.maitrova.in,https://maitrova.in
   GEMINI_MODEL: gemini-3.1-flash-lite
   OPENAI_MODEL: gpt-4.1-mini
   MERCHANT_PROMPT_VERSION: "2026-10-01"
