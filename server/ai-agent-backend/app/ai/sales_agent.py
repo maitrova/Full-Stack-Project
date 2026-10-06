@@ -608,11 +608,25 @@ class SalesAgent:
                         "result_count": 0,
                     })
                 else:
-                    relaxed_products, relaxed_summary = await self._search_relaxed_options(
-                        business_id,
-                        intent,
-                        allow_other_categories=not bool(effective_image_analysis or intent.category),
+                    descriptive_search = bool(
+                        intent.attributes.get("theme")
+                        or re.search(
+                            r"\b(?:image|photo|picture|design|printed|print|character|theme|artwork)\b",
+                            self.intent_parser._normalize_text(payload.message),
+                        )
                     )
+                    if descriptive_search:
+                        # Do not broaden a low-confidence design/theme search
+                        # into unrelated products. The customer asked for a
+                        # specific visual concept, so an honest no-match is
+                        # safer than a misleading recommendation.
+                        relaxed_products, relaxed_summary = [], "an exact catalogue match"
+                    else:
+                        relaxed_products, relaxed_summary = await self._search_relaxed_options(
+                            business_id,
+                            intent,
+                            allow_other_categories=not bool(effective_image_analysis or intent.category),
+                        )
                     products = relaxed_products
                     updated_state["recommended_product_ids"] = [product.id for product in products]
                     updated_state["selected_product_id"] = products[0].id if len(products) == 1 else None
@@ -705,7 +719,14 @@ class SalesAgent:
             "recommend visually ranked catalogue products with calibrated confidence",
             "guide the customer from a customization request to a customizable base product",
         }:
-            previous_ids = seen_product_ids if more_options_request else []
+            # Repeated searches with the same filters should rotate through
+            # unseen products instead of returning the same top-ranked cards.
+            # `seen_product_ids` is scoped to the normalized search key, so a
+            # changed category, color, budget, or theme starts a new rotation.
+            previous_ids = list(dict.fromkeys([
+                *browse_history.get(browse_key, []),
+                *seen_product_ids,
+            ]))
             browse_history[browse_key] = list(dict.fromkeys([
                 *previous_ids,
                 *[product.id for product in products],

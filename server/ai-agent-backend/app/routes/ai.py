@@ -11,7 +11,9 @@ from app.repositories.conversation_repository import ConversationRepository
 from app.repositories.message_repository import MessageRepository
 from app.repositories.ecommerce_product_repository import EcommerceProductRepository
 from app.schemas.ai import AiChatRequest, AiChatResponse
+from app.schemas.evaluation import EvaluationRequest
 from app.schemas.user import UserPublic
+from app.services.agent_evaluation import AgentEvaluator
 from app.services.catalogue_quality import validate_catalogue_record
 from app.services.quality_monitor import build_quality_alerts
 from app.services.website_knowledge import WebsiteKnowledgeSync
@@ -38,6 +40,89 @@ async def chat(
     sales_agent: SalesAgent = Depends(get_sales_agent),
 ):
     return await sales_agent.handle_chat(payload, current_user)
+
+
+@router.post("/evaluate")
+async def evaluate_agent(
+    payload: EvaluationRequest,
+    current_user: UserPublic = Depends(get_current_user),
+):
+    """Run read-only test messages and persist an evaluation report.
+
+    This endpoint never sends WhatsApp messages and does not execute cart,
+    checkout, order, or human-handoff mutations.
+    """
+    database = get_database()
+    business = await BusinessRepository(database).find_by_owner_id(current_user.id)
+    if business is None:
+        return {"found": False, "message": "Create a business before running evaluations."}
+
+    sales_agent = get_sales_agent()
+    categories = await sales_agent._catalog_category_names()
+    report = await AgentEvaluator(
+        product_tools=sales_agent.product_tools,
+        intent_parser=sales_agent.intent_parser,
+    ).run(
+        business_id=str(business["_id"]),
+        cases=payload.cases,
+        catalog_categories=categories,
+    )
+    report.update({
+        "business_id": business["_id"],
+        "name": payload.name,
+    })
+    insert_result = await database.ai_agent_evaluations.insert_one(report)
+    report["run_id"] = str(insert_result.inserted_id)
+    report.pop("_id", None)
+    report["business_id"] = str(report["business_id"])
+    return report
+
+
+@router.get("/evaluations")
+async def list_evaluations(
+    limit: int = 20,
+    current_user: UserPublic = Depends(get_current_user),
+):
+    """List recent evaluation summaries for the signed-in merchant."""
+    database = get_database()
+    business = await BusinessRepository(database).find_by_owner_id(current_user.id)
+    if business is None:
+        return {"runs": []}
+    limit = max(1, min(limit, 100))
+    rows = await database.ai_agent_evaluations.find(
+        {"business_id": business["_id"]},
+        {"_id": 1, "name": 1, "created_at": 1, "total_cases": 1, "passed_cases": 1,
+         "failed_cases": 1, "pass_rate": 1, "average_latency_ms": 1},
+    ).sort("created_at", -1).to_list(length=limit)
+    return {
+        "runs": [
+            {**row, "run_id": str(row.pop("_id")), "business_id": str(business["_id"])}
+            for row in rows
+        ]
+    }
+
+
+@router.get("/evaluations/{run_id}")
+async def get_evaluation(
+    run_id: str,
+    current_user: UserPublic = Depends(get_current_user),
+):
+    """Return one complete evaluation report."""
+    from bson import ObjectId
+
+    database = get_database()
+    business = await BusinessRepository(database).find_by_owner_id(current_user.id)
+    if business is None or not ObjectId.is_valid(run_id):
+        return {"found": False}
+    report = await database.ai_agent_evaluations.find_one({
+        "_id": ObjectId(run_id),
+        "business_id": business["_id"],
+    })
+    if report is None:
+        return {"found": False}
+    report["run_id"] = str(report.pop("_id"))
+    report["business_id"] = str(report["business_id"])
+    return {"found": True, "report": report}
 
 
 @router.get("/metrics")

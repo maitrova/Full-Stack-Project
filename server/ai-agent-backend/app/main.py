@@ -58,6 +58,8 @@ async def lifespan(app: FastAPI):
     await get_database().whatsapp_handoff_alerts.create_index([("business_id", 1), ("status", 1), ("created_at", -1)])
     await get_database().ai_agent_metrics.create_index([("business_id", 1), ("created_at", -1)])
     await get_database().ai_agent_metrics.create_index("created_at", expireAfterSeconds=15552000)
+    await get_database().ai_agent_evaluations.create_index([("business_id", 1), ("created_at", -1)])
+    await get_database().ai_agent_evaluations.create_index("created_at", expireAfterSeconds=15552000)
     await get_database().ai_action_audit.create_index([("business_id", 1), ("created_at", -1)])
     await get_database().merchant_prompt_versions.create_index([("business_id", 1), ("version", -1)], unique=True)
     whatsapp_worker = asyncio.create_task(worker(get_database()))
