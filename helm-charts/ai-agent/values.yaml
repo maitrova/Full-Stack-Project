@@ -26,6 +26,8 @@ ingress:
       paths:
         - path: /api/whatsapp/webhook
           pathType: Exact
+        - path: /api/
+          pathType: Prefix
   tls:
     - secretName: ai-maitrova-tls
       hosts:
