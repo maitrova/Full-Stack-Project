@@ -13,9 +13,16 @@ const initialMessages = [
   "Do you have oversized hoodies?",
 ];
 
+const initialExpectedIntents = [
+  "product_search",
+  "product_search",
+  "customization",
+  "product_search",
+];
+
 export default function AIAgentEvaluation() {
   const [messages, setMessages] = useState(initialMessages.join("\n"));
-  const [expectedIntent, setExpectedIntent] = useState("product_search");
+  const [expectedIntents, setExpectedIntents] = useState(initialExpectedIntents.join("\n"));
   const [runName, setRunName] = useState("Browser evaluation");
   const [evaluationKey, setEvaluationKey] = useState("");
   const [loading, setLoading] = useState(false);
@@ -26,9 +33,9 @@ export default function AIAgentEvaluation() {
     () => messages.split(/\r?\n/).map((message, index) => ({
       id: `browser-${index + 1}`,
       message: message.trim(),
-      expected: expectedIntent ? { intent: expectedIntent } : {},
+      expected: expectedIntents.split(/\r?\n/)[index]?.trim() ? { intent: expectedIntents.split(/\r?\n/)[index].trim() } : {},
     })).filter((item) => item.message),
-    [messages, expectedIntent],
+    [messages, expectedIntents],
   );
 
   const runEvaluation = async () => {
@@ -67,14 +74,9 @@ export default function AIAgentEvaluation() {
             <p className="mt-1 text-xs text-slate-500">This key is sent only in the request header and is not stored in the frontend code.</p>
             <label className="mt-5 block text-sm font-semibold text-slate-700">Customer messages (one per line)</label>
             <textarea value={messages} onChange={(event) => setMessages(event.target.value)} rows={12} className="mt-2 w-full rounded-lg border border-slate-300 p-3 font-mono text-sm" />
-            <label className="mt-5 block text-sm font-semibold text-slate-700">Expected intent for these cases</label>
-            <select value={expectedIntent} onChange={(event) => setExpectedIntent(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2">
-              <option value="">Do not assert intent</option>
-              <option value="product_search">product_search</option>
-              <option value="general_question">general_question</option>
-              <option value="store_question">store_question</option>
-              <option value="commerce_action">commerce_action</option>
-            </select>
+            <label className="mt-5 block text-sm font-semibold text-slate-700">Expected intent (one per message, optional)</label>
+            <textarea value={expectedIntents} onChange={(event) => setExpectedIntents(event.target.value)} rows={4} placeholder="product_search\nproduct_search\ncustomization" className="mt-2 w-full rounded-lg border border-slate-300 p-3 font-mono text-sm" />
+            <p className="mt-1 text-xs text-slate-500">Keep the lines aligned with the customer messages. Leave a line blank to measure routing without asserting intent.</p>
             <button onClick={runEvaluation} disabled={loading || !cases.length || !evaluationKey.trim()} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
               {loading ? "Running..." : `Run ${cases.length} test${cases.length === 1 ? "" : "s"}`}

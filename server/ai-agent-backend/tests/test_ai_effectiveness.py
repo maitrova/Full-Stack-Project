@@ -270,6 +270,14 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(intent.category, "hoodie")
         self.assertEqual(intent.attributes["theme"], "krishna")
 
+    def test_roman_telugu_theme_availability_is_discovery_search(self):
+        parser = IntentParser(SimpleNamespace(is_configured=False))
+        intent = parser._parse_with_rules("krishnudi unda?", {})
+
+        self.assertEqual(intent.intent, "product_search")
+        self.assertIsNone(intent.action)
+        self.assertEqual(intent.attributes["theme"], "krishna")
+
     def test_whatsapp_defaults_to_roman_telugu_but_preserves_explicit_scripts(self):
         from app.ai.language import detect_customer_language
 

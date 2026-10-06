@@ -284,12 +284,23 @@ Customer message:
         conversation_state: dict,
         catalog_categories: list[str] | None = None,
     ) -> IntentResult:
+        raw_text = message.lower().replace("\u200c", " ")
         text = self._correct_catalogue_terms(
             self._normalize_text(message), catalog_categories or []
         )
         language_info = detect_customer_language(message)
         attributes = {}
         action = self._detect_action(text, conversation_state)
+        # Roman-Telugu availability wording such as "krishnudi unda?" is a
+        # discovery search, not a product-level stock check. The normalizer
+        # translates "unda" to "available", so detect the original wording
+        # before the action classifier turns it into check_stock.
+        roman_telugu_discovery = bool(
+            re.search(r"\b(?:unda|undaa|undaya|unnaya|vunda|vundaa|dorukutunda|dorukutundaa)\b", raw_text)
+            and not conversation_state.get("selected_product_id")
+        )
+        if action == "check_stock" and roman_telugu_discovery:
+            action = None
         pending_purchase = bool(conversation_state.get("purchase"))
         simple_number = bool(re.fullmatch(r"\s*(?:[1-5]|one|two|three|four|five)\s*", text))
         product_option = None if pending_purchase and simple_number else self._extract_product_option(

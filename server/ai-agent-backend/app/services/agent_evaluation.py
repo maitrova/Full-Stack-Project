@@ -32,7 +32,11 @@ class AgentEvaluator:
             )
             route = ToolRouter.decide(intent, state, {})
             products = []
-            if intent.intent == "product_search":
+            # The router is the source of truth for tool selection. A read-only
+            # catalogue action may have an intent such as commerce_action
+            # (price/stock/photo/link), but it still needs catalogue results in
+            # the evaluation report. Never execute mutating commerce actions.
+            if route.route == "product_catalogue":
                 products = await self.product_tools.search_from_intent(
                     business_id=business_id,
                     intent=intent,
