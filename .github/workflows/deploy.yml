@@ -227,21 +227,23 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          AI_EVALUATION_KEY: ${{ secrets.AI_EVALUATION_KEY }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           port: ${{ secrets.VPS_PORT }}
           password: ${{ secrets.VPS_PASSWORD }}
-          envs: GEMINI_API_KEY,OPENAI_API_KEY,JWT_SECRET
+          envs: GEMINI_API_KEY,OPENAI_API_KEY,JWT_SECRET,AI_EVALUATION_KEY
           script: |
             set -e
-            if [ -z "${GEMINI_API_KEY:-}" ] || [ -z "${JWT_SECRET:-}" ]; then
-              echo "ERROR: GEMINI_API_KEY GitHub Actions secret is required for the AI agent deployment" >&2
+            if [ -z "${GEMINI_API_KEY:-}" ] || [ -z "${JWT_SECRET:-}" ] || [ -z "${AI_EVALUATION_KEY:-}" ]; then
+              echo "ERROR: GEMINI_API_KEY, JWT_SECRET, and AI_EVALUATION_KEY GitHub Actions secrets are required for the AI agent deployment" >&2
               exit 1
             fi
             set --
             set -- --set-string "envSecrets.GEMINI_API_KEY=${GEMINI_API_KEY}"
             set -- "$@" --set-string "envSecrets.JWT_SECRET=${JWT_SECRET}"
+            set -- "$@" --set-string "envSecrets.AI_EVALUATION_KEY=${AI_EVALUATION_KEY}"
             if [ -n "${OPENAI_API_KEY:-}" ]; then
               set -- "$@" --set-string "envSecrets.OPENAI_API_KEY=${OPENAI_API_KEY}"
             fi

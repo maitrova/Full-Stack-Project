@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     website_knowledge_chunk_size: int = 1800
     website_knowledge_embedding_min_score: float = 0.62
     website_knowledge_embedding_top_k: int = 6
+    ai_evaluation_key: str = ""
+    ai_evaluation_rate_limit_per_minute: int = 20
 
     whatsapp_verify_token: str | None = None
     whatsapp_access_token: str | None = None

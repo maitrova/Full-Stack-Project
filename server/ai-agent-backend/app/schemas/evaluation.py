@@ -13,4 +13,5 @@ class EvaluationCase(BaseModel):
 class EvaluationRequest(BaseModel):
     name: str = Field(default="manual-evaluation", max_length=120)
     cases: list[EvaluationCase] = Field(..., min_length=1, max_length=500)
+    business_id: str | None = Field(default=None, max_length=80)
 

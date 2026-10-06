@@ -1,8 +1,6 @@
 import { useMemo, useState } from "react";
 import axios from "axios";
 import { AlertTriangle, CheckCircle2, Loader2, Play, XCircle } from "lucide-react";
-import { useSelector } from "react-redux";
-import { selectCurrentToken } from "../redux/slices/Userslice.js";
 
 const AI_AGENT_URL = (
   import.meta.env.VITE_AI_AGENT_API_URL || "http://127.0.0.1:8000/api"
@@ -16,10 +14,10 @@ const initialMessages = [
 ];
 
 export default function AIAgentEvaluation() {
-  const token = useSelector(selectCurrentToken);
   const [messages, setMessages] = useState(initialMessages.join("\n"));
   const [expectedIntent, setExpectedIntent] = useState("product_search");
   const [runName, setRunName] = useState("Browser evaluation");
+  const [evaluationKey, setEvaluationKey] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [report, setReport] = useState(null);
@@ -34,14 +32,14 @@ export default function AIAgentEvaluation() {
   );
 
   const runEvaluation = async () => {
-    if (!token || !cases.length) return;
+    if (!evaluationKey.trim() || !cases.length) return;
     setLoading(true);
     setError("");
     try {
       const response = await axios.post(
         `${AI_AGENT_URL}/ai/evaluate`,
         { name: runName, cases },
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { "X-Evaluation-Key": evaluationKey.trim() } },
       );
       setReport(response.data);
     } catch (err) {
@@ -64,6 +62,9 @@ export default function AIAgentEvaluation() {
           <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
             <label className="text-sm font-semibold text-slate-700">Evaluation name</label>
             <input value={runName} onChange={(event) => setRunName(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2" />
+            <label className="mt-5 block text-sm font-semibold text-slate-700">Evaluation key</label>
+            <input type="password" value={evaluationKey} onChange={(event) => setEvaluationKey(event.target.value)} placeholder="Enter the key provided by your administrator" className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2" autoComplete="off" />
+            <p className="mt-1 text-xs text-slate-500">This key is sent only in the request header and is not stored in the frontend code.</p>
             <label className="mt-5 block text-sm font-semibold text-slate-700">Customer messages (one per line)</label>
             <textarea value={messages} onChange={(event) => setMessages(event.target.value)} rows={12} className="mt-2 w-full rounded-lg border border-slate-300 p-3 font-mono text-sm" />
             <label className="mt-5 block text-sm font-semibold text-slate-700">Expected intent for these cases</label>
@@ -74,7 +75,7 @@ export default function AIAgentEvaluation() {
               <option value="store_question">store_question</option>
               <option value="commerce_action">commerce_action</option>
             </select>
-            <button onClick={runEvaluation} disabled={loading || !cases.length} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
+            <button onClick={runEvaluation} disabled={loading || !cases.length || !evaluationKey.trim()} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
               {loading ? "Running..." : `Run ${cases.length} test${cases.length === 1 ? "" : "s"}`}
             </button>

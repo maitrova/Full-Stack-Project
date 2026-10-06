@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+import hmac
+import time
 
 from app.ai.sales_agent import SalesAgent
 from app.config.settings import settings
@@ -21,6 +23,7 @@ from app.ai.gemini_client import GeminiClient
 from app.tools.product_tools import ProductTools
 
 router = APIRouter(prefix="/ai", tags=["ai"])
+_evaluation_hits: dict[str, list[float]] = {}
 
 
 def get_sales_agent() -> SalesAgent:
@@ -45,15 +48,35 @@ async def chat(
 @router.post("/evaluate")
 async def evaluate_agent(
     payload: EvaluationRequest,
-    current_user: UserPublic = Depends(get_current_user),
+    request: Request,
+    x_evaluation_key: str | None = Header(default=None),
 ):
     """Run read-only test messages and persist an evaluation report.
 
     This endpoint never sends WhatsApp messages and does not execute cart,
     checkout, order, or human-handoff mutations.
     """
+    configured_key = settings.ai_evaluation_key.strip()
+    if not configured_key or not x_evaluation_key or not hmac.compare_digest(x_evaluation_key, configured_key):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid evaluation key")
+
+    now = time.monotonic()
+    client_key = request.client.host if request.client else "unknown"
+    recent = [timestamp for timestamp in _evaluation_hits.get(client_key, []) if now - timestamp < 60]
+    if len(recent) >= settings.ai_evaluation_rate_limit_per_minute:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Evaluation rate limit exceeded")
+    recent.append(now)
+    _evaluation_hits[client_key] = recent
+
     database = get_database()
-    business = await BusinessRepository(database).find_by_owner_id(current_user.id)
+    business = None
+    if payload.business_id:
+        from app.utils.object_id import parse_object_id
+        business = await BusinessRepository(database).collection.find_one({"_id": parse_object_id(payload.business_id)})
+    if business is None:
+        # This deployment currently serves one merchant storefront. The
+        # optional business_id keeps the endpoint ready for multi-tenant use.
+        business = await BusinessRepository(database).collection.find_one({})
     if business is None:
         return {"found": False, "message": "Create a business before running evaluations."}
 
