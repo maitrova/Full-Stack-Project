@@ -494,6 +494,23 @@ Customer message:
             not action
             and re.search(r"\b(?:suggest|recommend|recommendation|gift|outfit|something nice|ideas?)\b", text)
         )
+        # Roman Telugu availability questions often contain no English
+        # category word, for example "krishnudi unda?" or "ee design undaya?".
+        # Route them to semantic catalogue search instead of treating them as
+        # a generic follow-up that reuses the previous recommendation.
+        roman_telugu_availability = bool(
+            re.search(
+                r"\b(?:unda|undaa|undaya|unnaya|vunda|vundaa|dorukutunda|"
+                r"dorukutundaa|kavali|kavala)\b",
+                text,
+            )
+            and not re.search(
+                r"\b(?:delivery|shipping|payment|upi|cod|return|refund|"
+                r"exchange|order|status|support|contact)\b",
+                text,
+            )
+            and len(re.findall(r"[a-z]+", text)) >= 2
+        )
         if recommendation_request and not category and re.search(
             r"\b(?:with|match(?:ing)?|go(?:es)?)\b.{0,20}\bjeans\b", text
         ):
@@ -505,6 +522,7 @@ Customer message:
             if store_question
             else "product_search"
             if category or color or max_price or occasion or attributes or recommendation_request
+            or roman_telugu_availability
             else "general_question"
         )
         if intent == "product_search" and not action:
