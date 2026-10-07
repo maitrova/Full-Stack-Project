@@ -260,6 +260,14 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.agent._is_customization_request("Can I share my own design?"))
         self.assertFalse(self.agent._is_design_library_request("Can I share my own design?"))
 
+    def test_own_image_print_request_overrides_photo_action(self):
+        parser = IntentParser(SimpleNamespace(is_configured=False))
+        intent = parser._parse_with_rules("I want my own image printed on a T-shirt", {})
+
+        self.assertEqual(intent.intent, "product_search")
+        self.assertIsNone(intent.action)
+        self.assertEqual(intent.attributes["catalog_type"], "customization")
+
     def test_product_description_extracts_character_theme_without_product_name(self):
         parser = IntentParser(SimpleNamespace(is_configured=False))
         intent = parser._parse_with_rules(
@@ -383,6 +391,18 @@ class AiEffectivenessTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(ProductTools._matches_intent(item, intent))
         item.attributes["style"] = "Round Neck"
         self.assertFalse(ProductTools._matches_intent(item, intent))
+
+    def test_exact_theme_search_rejects_unrelated_product(self):
+        item = product(name="White Graphic T-Shirt", category="Men T-Shirts")
+        intent = IntentResult(
+            intent="product_search",
+            category="t-shirt",
+            attributes={"theme": "krishna"},
+        )
+
+        self.assertFalse(ProductTools._matches_intent(item, intent))
+        item.name = "Krishna Graphic T-Shirt"
+        self.assertTrue(ProductTools._matches_intent(item, intent))
 
     def test_category_recommendations_include_storefront_link(self):
         from unittest.mock import patch

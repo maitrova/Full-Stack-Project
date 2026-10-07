@@ -665,11 +665,14 @@ class EcommerceProductRepository:
             return False
         for key, value in (filters.get("attributes") or {}).items():
             normalized_value = str(value or "").lower()
-            # Theme/character/style descriptions are ranked semantically from
-            # the original customer message. Do not maintain a hard-coded
-            # vocabulary here ("god", "devil", etc.); the catalogue is the
-            # source of truth for future themes.
             if key == "theme":
+                # The theme is a hard constraint; embeddings may rank only
+                # among products that contain the requested theme in their
+                # title, description, tags, or indexed search attributes.
+                # This remains catalogue-driven and does not hard-code names
+                # such as Krishna or Devil.
+                if normalized_value and normalized_value not in searchable:
+                    return False
                 continue
             if key == "pattern" and normalized_value in {"check", "checks", "checked", "checkered"}:
                 if not re.search(r"\bcheck(?:s|ed|ered)?\b", searchable):

@@ -36,7 +36,10 @@ class AgentEvaluator:
             # catalogue action may have an intent such as commerce_action
             # (price/stock/photo/link), but it still needs catalogue results in
             # the evaluation report. Never execute mutating commerce actions.
-            if route.route == "product_catalogue":
+            if (
+                route.route == "product_catalogue"
+                and intent.attributes.get("catalog_type") != "customization"
+            ):
                 products = await self.product_tools.search_from_intent(
                     business_id=business_id,
                     intent=intent,

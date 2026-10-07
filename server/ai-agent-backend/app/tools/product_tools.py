@@ -249,10 +249,13 @@ class ProductTools:
                 continue
             wanted = normalized(requested)
             actual = normalized(attributes.get(key))
-            # Themes are not a fixed enum. Semantic ranking compares the
-            # complete customer message with product title/description/tags
-            # and indexed attributes, so new themes need no code change.
             if key == "theme":
+                # Theme/character requests are hard constraints. Embeddings
+                # are useful for ranking matching candidates, but must never
+                # turn an unrelated product into a recommendation when the
+                # requested theme is absent from its catalogue text.
+                if wanted and wanted not in normalized(searchable):
+                    return False
                 continue
             if wanted:
                 if actual:

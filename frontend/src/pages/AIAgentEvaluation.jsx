@@ -16,7 +16,7 @@ const initialMessages = [
 const initialExpectedIntents = [
   "product_search",
   "product_search",
-  "customization",
+  "product_search",
   "product_search",
 ];
 

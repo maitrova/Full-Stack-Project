@@ -128,6 +128,16 @@ class IntentParser:
             "remove_from_cart", "update_cart_quantity",
         }
         rule_intent = self._parse_with_rules(message, {}, None)
+        if (
+            rule_intent.attributes.get("catalog_type") == "customization"
+            and intent.action in {"product_photos", "product_link", "check_price", "check_stock", "show_sizes"}
+        ):
+            intent.intent = "product_search"
+            intent.action = None
+            intent.wants_to_buy = False
+            intent.attributes = {**intent.attributes, **rule_intent.attributes}
+            intent.confidence = max(0.85, min(float(intent.confidence or 0), 0.95))
+            return intent
         has_catalogue_request = bool(
             rule_intent.category
             or rule_intent.color
@@ -479,8 +489,12 @@ Customer message:
             r"customization|customisation|custom design|personalize|personalise|own design)\b",
             text,
         ) or re.search(
-            r"\b(?:add|put|print|upload|use)\b.{0,30}\b(?:my |our )?"
+            r"\b(?:add|put|print|printed|printing|upload|use)\b.{0,30}\b(?:my |our )?"
             r"(?:image|photo|picture|logo|text|name|design)\b",
+            text,
+        ) or re.search(
+            r"\b(?:my|our)(?:\s+own)?\s+(?:image|photo|picture|logo|text|name|design)\b.{0,30}"
+            r"\b(?:add|put|print|printed|printing|upload|use)\b",
             text,
         ) or re.search(
             r"\b(?:make|create|design|recreate|print)\b.{0,30}\b(?:this|that|same|similar|like this|design)\b",
@@ -491,6 +505,15 @@ Customer message:
             attributes["catalog_type"] = "drop product"
         elif re.search(r"\b(readymade|ready-made|ready made)\b", text):
             attributes["catalog_type"] = "readymade"
+
+        # A customer-owned image is a customization request, not a request
+        # to browse catalogue photos. The photo detector runs earlier because
+        # the message contains the word "image", so the more specific signal
+        # must take precedence.
+        if attributes.get("catalog_type") == "customization" and action in {
+            "product_photos", "product_link", "check_price", "check_stock", "show_sizes",
+        }:
+            action = None
 
         max_price = self._extract_max_price(text) or conversation_state.get("max_price")
         store_question = bool(
