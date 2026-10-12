@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { AlertTriangle, CheckCircle2, Loader2, Play, RefreshCw, XCircle } from "lucide-react";
+import { useSelector } from "react-redux";
+import { selectCurrentToken } from "../redux/slices/Userslice.js";
 
 const AI_AGENT_URL = (import.meta.env.VITE_AI_AGENT_API_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 const initialMessages = ["Show me white T-shirts", "krishnudi unda?", "I want my own image printed on a T-shirt", "Do you have oversized hoodies?"];
@@ -19,7 +21,7 @@ export default function AIAgentEvaluation() {
   const [previewMessage, setPreviewMessage] = useState(initialMessages[0]);
   const [preview, setPreview] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const token = localStorage.getItem("token");
+  const token = useSelector(selectCurrentToken);
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
   const cases = useMemo(() => messages.split(/\r?\n/).map((message, index) => ({ id: `browser-${index + 1}`, message: message.trim(), expected: expectedIntents.split(/\r?\n/)[index]?.trim() ? { intent: expectedIntents.split(/\r?\n/)[index].trim() } : {} })).filter(item => item.message), [messages, expectedIntents]);
 
