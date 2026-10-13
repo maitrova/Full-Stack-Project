@@ -18,6 +18,8 @@ import {
   getReadymadeProductByPath,
   getHomeCategoryTiles,
   getHomeSubCategoryTiles,
+  exportReadymadeProducts,
+  importReadymadeProducts,
   
 } from "../controllers/readymadeProduct.controller.js";
 import upload from "../middleware/readymadeProductUpload.middleware.js";
@@ -64,6 +66,8 @@ readymadeproducts.delete("/admin/delete/:id", deleteReadymadeProduct);
 // Product list management (for admin panel)
 readymadeproducts.get("/admin/all", getAllReadymadeProducts); // Get all products for admin
 readymadeproducts.get("/admin/filtered", getFilteredProducts); // Filter products for admin
+readymadeproducts.get("/admin/export", exportReadymadeProducts);
+readymadeproducts.post("/admin/import", express.json({ limit: "25mb" }), importReadymadeProducts);
 
 // Bulk operations
 readymadeproducts.patch("/admin/bulk/update-flags", updateProductList); // Bulk update flags

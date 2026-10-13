@@ -1,7 +1,8 @@
 // components/admin/AllProducts.jsx
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Plus, ChevronLeft, ChevronRight, Search, Filter, Download, Package } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight, Search, Filter, Download, Upload, Package, X } from 'lucide-react';
+import axios from 'axios';
 import {
   fetchProducts,
   deleteProduct,
@@ -34,6 +35,12 @@ const AllProducts = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [localCategory, setLocalCategory] = useState(currentCategory);
   const [localSubCategory, setLocalSubCategory] = useState(currentSubCategory);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferCategory, setTransferCategory] = useState('');
+  const [transferLimit, setTransferLimit] = useState('25');
+  const [transferLoading, setTransferLoading] = useState(false);
+  const [transferMessage, setTransferMessage] = useState('');
+  const apiBase = import.meta.env.VITE_API_URL || 'https://maitrova.in/backend';
 
   useEffect(() => {
     loadProducts();
@@ -121,6 +128,37 @@ const AllProducts = ({
       .filter(sub => sub && sub.trim() !== '');
   };
 
+  const downloadExport = async () => {
+    setTransferLoading(true); setTransferMessage('');
+    try {
+      const response = await axios.get(`${apiBase}/readymadeproducts/admin/export`, {
+        params: { category: transferCategory, limit: transferLimit },
+      });
+      const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), products: response.data.data }, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a'); link.href = url;
+      link.download = `products-${transferCategory || 'all'}-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click(); URL.revokeObjectURL(url);
+      setTransferMessage(`${response.data.count} products exported.`);
+    } catch (error) { setTransferMessage(error.response?.data?.message || 'Export failed.'); }
+    finally { setTransferLoading(false); }
+  };
+
+  const importProducts = async (event) => {
+    const file = event.target.files?.[0]; event.target.value = '';
+    if (!file) return;
+    setTransferLoading(true); setTransferMessage('');
+    try {
+      const payload = JSON.parse(await file.text());
+      const productsToImport = Array.isArray(payload) ? payload : payload.products;
+      if (!Array.isArray(productsToImport) || !productsToImport.length) throw new Error('The file does not contain products.');
+      const response = await axios.post(`${apiBase}/readymadeproducts/admin/import`, { products: productsToImport });
+      setTransferMessage(`${response.data.imported} products imported successfully. Refresh the list to see them.`);
+      loadProducts();
+    } catch (error) { setTransferMessage(error.response?.data?.message || error.message || 'Import failed.'); }
+    finally { setTransferLoading(false); }
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-lg overflow-hidden">
       <div className="p-6 border-b">
@@ -167,13 +205,26 @@ const AllProducts = ({
               <Plus className="w-5 h-5" />
               <span>Add New Product</span>
             </button>
-            <button className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-medium">
+            <button onClick={() => { setTransferMessage(''); setShowTransferModal(true); }} className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-medium">
               <Download className="w-5 h-5" />
               <span>Export</span>
             </button>
           </div>
         </div>
       </div>
+
+      {showTransferModal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
+          <div className="mb-5 flex items-center justify-between"><h2 className="text-xl font-semibold">Import / Export Products</h2><button onClick={() => setShowTransferModal(false)}><X /></button></div>
+          <p className="mb-4 text-sm text-gray-600">Export a JSON catalog from production and import the same file into local.</p>
+          <label className="mb-2 block text-sm font-medium">Category</label>
+          <select value={transferCategory} onChange={(e) => setTransferCategory(e.target.value)} className="mb-4 w-full rounded-lg border px-3 py-2"><option value="">All categories</option>{filters.categories?.map((category) => <option key={category} value={category}>{category}</option>)}</select>
+          <label className="mb-2 block text-sm font-medium">How many products?</label>
+          <input type="number" min="1" max="10000" value={transferLimit} onChange={(e) => setTransferLimit(e.target.value)} className="mb-5 w-full rounded-lg border px-3 py-2" />
+          <div className="flex flex-wrap gap-3"><button disabled={transferLoading} onClick={downloadExport} className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white disabled:opacity-50"><Download className="h-4 w-4" />Export JSON</button><label className="flex cursor-pointer items-center gap-2 rounded-lg bg-green-600 px-4 py-2 font-medium text-white"><Upload className="h-4 w-4" />Import JSON<input type="file" accept=".json,application/json" onChange={importProducts} className="hidden" /></label></div>
+          {transferLoading && <p className="mt-4 text-sm text-gray-500">Processing...</p>}{transferMessage && <p className="mt-4 text-sm text-gray-700">{transferMessage}</p>}
+        </div>
+      </div>}
 
       {loading ? (
         <div className="flex justify-center items-center h-64">

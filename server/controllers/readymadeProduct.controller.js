@@ -1,6 +1,7 @@
 import ReadymadeProduct from "../models/readymadeproducts.js";
 import Category from "../models/Category.js";
 import SubCategory from "../models/SubCategory.js";
+import Brand from "../models/Brand.js";
 import { attachReadymadePricing } from "../utils/readymadePricing.js";
 import { markAffectedCombosForReview } from "./comboPackController.js";
 import {
@@ -209,6 +210,9 @@ export const getAllReadymadeProducts = async (req, res) => {
     const skip = (page - 1) * limit;
     
     const products = await ReadymadeProduct.find(query)
+      .populate("category", "name")
+      .populate("subCategory", "name")
+      .populate("brand", "name")
       .populate("category", "name")
       .populate("subCategory", "name")
       .sort({ createdAt: -1 })
@@ -741,6 +745,57 @@ export const getFilteredProducts = async (req, res) => {
       success: false,
       message: error.message
     });
+  }
+};
+
+// Export/import helpers for moving a catalog between environments. The raw
+// references are intentionally kept so category, brand, and image metadata
+// can be restored in another database.
+export const exportReadymadeProducts = async (req, res) => {
+  try {
+    const { category, limit = 1000 } = req.query;
+    const query = {};
+    if (category) {
+      const categoryDoc = await Category.findOne({
+        $or: [
+          { _id: String(category).match(/^[0-9a-fA-F]{24}$/) ? category : undefined },
+          { name: { $regex: `^${String(category).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" } },
+        ].filter((condition) => condition._id !== undefined || condition.name),
+      }).select("_id");
+      if (!categoryDoc) return res.json({ success: true, data: [] });
+      query.category = categoryDoc._id;
+    }
+    const products = await ReadymadeProduct.find(query)
+      .sort({ createdAt: -1 })
+      .limit(Math.min(Math.max(Number(limit) || 1000, 1), 10000))
+      .select("-__v")
+      .lean();
+    res.json({ success: true, data: products, count: products.length });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const importReadymadeProducts = async (req, res) => {
+  try {
+    const products = Array.isArray(req.body?.products) ? req.body.products : [];
+    if (!products.length) return res.status(400).json({ success: false, message: "products must be a non-empty array" });
+    const documents = await Promise.all(products.map(async ({ _id, id, createdAt, updatedAt, ...product }) => {
+      const categoryName = product.category?.name;
+      const subCategoryName = product.subCategory?.name;
+      const brandName = product.brand?.name;
+      const [category, subCategory, brand] = await Promise.all([
+        categoryName ? Category.findOne({ name: categoryName }).select("_id") : null,
+        subCategoryName ? SubCategory.findOne({ name: subCategoryName }).select("_id") : null,
+        brandName ? Brand.findOne({ name: brandName }).select("_id") : null,
+      ]);
+      if (!category || !brand) throw new Error(`Missing category or brand for ${product.title}`);
+      return { ...product, category: category._id, subCategory: subCategory?._id || undefined, brand: brand._id };
+    }));
+    const inserted = await ReadymadeProduct.insertMany(documents, { ordered: false });
+    res.status(201).json({ success: true, imported: inserted.length });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message, imported: error.insertedDocs?.length || 0 });
   }
 };
 
