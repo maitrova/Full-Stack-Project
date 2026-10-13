@@ -284,6 +284,7 @@ class ProductTools:
             "occasion": intent.occasion,
             "brand": intent.brand,
             "attributes": intent.attributes,
+            "require_in_stock": intent.action == "check_stock",
         }
         products = await ranked_search(
             business_id=business_id,

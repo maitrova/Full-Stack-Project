@@ -68,7 +68,7 @@
     "conversation": [
       "I need white shirts kavali"
     ],
-    "language": "Telugu-English",
+    "language": "Roman Telugu",
     "scenario": "product_search",
     "expected_route": "product_search",
     "expected_intent": "product_search",
@@ -100,7 +100,7 @@
     "conversation": [
       "I need black hoodie chahiye"
     ],
-    "language": "Hindi-English",
+    "language": "Hinglish",
     "scenario": "product_search",
     "expected_route": "product_search",
     "expected_intent": "product_search",
@@ -388,7 +388,7 @@
     "conversation": [
       "show me some white shirts kavali"
     ],
-    "language": "Telugu-English",
+    "language": "Roman Telugu",
     "scenario": "product_recommendation",
     "expected_route": "product_recommendation",
     "expected_intent": "product_recommendation",
@@ -420,7 +420,7 @@
     "conversation": [
       "show me some black hoodie chahiye"
     ],
-    "language": "Hindi-English",
+    "language": "Hinglish",
     "scenario": "product_recommendation",
     "expected_route": "product_recommendation",
     "expected_intent": "product_recommendation",
@@ -708,7 +708,7 @@
     "conversation": [
       "show blak tshrit kavali"
     ],
-    "language": "Telugu-English",
+    "language": "Roman Telugu",
     "scenario": "typo_search",
     "expected_route": "product_search",
     "expected_intent": "product_search",
@@ -740,7 +740,7 @@
     "conversation": [
       "show whte shirt chahiye"
     ],
-    "language": "Hindi-English",
+    "language": "Hinglish",
     "scenario": "typo_search",
     "expected_route": "product_search",
     "expected_intent": "product_search",
@@ -1030,9 +1030,9 @@
   {
     "id": "case-033",
     "conversation": [
-      "what is the price of option 3"
+      "option 3 price entha?"
     ],
-    "language": "Telugu-English",
+    "language": "Roman Telugu",
     "scenario": "price",
     "expected_route": "check_price",
     "expected_intent": "check_price",
@@ -1064,9 +1064,9 @@
   {
     "id": "case-034",
     "conversation": [
-      "what is the price of option 2"
+      "option 2 ka price kya hai?"
     ],
-    "language": "Hindi-English",
+    "language": "Hinglish",
     "scenario": "price",
     "expected_route": "check_price",
     "expected_intent": "check_price",
@@ -1098,7 +1098,7 @@
   {
     "id": "case-035",
     "conversation": [
-      "what is the price of option 1"
+      "ఆప్షన్ 1 ధర ఎంత?"
     ],
     "language": "Telugu",
     "scenario": "price",
@@ -1132,7 +1132,7 @@
   {
     "id": "case-036",
     "conversation": [
-      "what is the price of option 3"
+      "ऑप्शन 3 की कीमत क्या है?"
     ],
     "language": "Hindi",
     "scenario": "price",
@@ -1234,7 +1234,7 @@
   {
     "id": "case-039",
     "conversation": [
-      "what is the price of option 2"
+      "option 2 price entha?"
     ],
     "language": "Roman Telugu",
     "scenario": "price",
@@ -1268,7 +1268,7 @@
   {
     "id": "case-040",
     "conversation": [
-      "what is the price of option 3"
+      "option 3 ka price kya hai?"
     ],
     "language": "Hinglish",
     "scenario": "price",
@@ -1372,9 +1372,9 @@
   {
     "id": "case-043",
     "conversation": [
-      "is option 3 available in M"
+      "option 3 M lo available unda?"
     ],
-    "language": "Telugu-English",
+    "language": "Roman Telugu",
     "scenario": "stock",
     "expected_route": "check_stock",
     "expected_intent": "commerce_action",
@@ -1407,9 +1407,9 @@
   {
     "id": "case-044",
     "conversation": [
-      "is option 2 available in S"
+      "option 2 S mein available hai?"
     ],
-    "language": "Hindi-English",
+    "language": "Hinglish",
     "scenario": "stock",
     "expected_route": "check_stock",
     "expected_intent": "commerce_action",
@@ -1442,7 +1442,7 @@
   {
     "id": "case-045",
     "conversation": [
-      "is option 1 available in L"
+      "ఆప్షన్ 1 సైజ్ L లో ఉందా?"
     ],
     "language": "Telugu",
     "scenario": "stock",
@@ -1477,7 +1477,7 @@
   {
     "id": "case-046",
     "conversation": [
-      "is option 3 available in XL"
+      "ऑप्शन 3 साइज़ XL में उपलब्ध है?"
     ],
     "language": "Hindi",
     "scenario": "stock",
@@ -1582,7 +1582,7 @@
   {
     "id": "case-049",
     "conversation": [
-      "is option 2 available in L"
+      "option 2 L lo available unda?"
     ],
     "language": "Roman Telugu",
     "scenario": "stock",
@@ -1617,7 +1617,7 @@
   {
     "id": "case-050",
     "conversation": [
-      "is option 3 available in Free size"
+      "option 3 Free size mein available hai?"
     ],
     "language": "Hinglish",
     "scenario": "stock",
@@ -1722,9 +1722,9 @@
   {
     "id": "case-053",
     "conversation": [
-      "send photos of option 3"
+      "option 3 photos pampandi"
     ],
-    "language": "Telugu-English",
+    "language": "Roman Telugu",
     "scenario": "photos",
     "expected_route": "product_photos",
     "expected_intent": "commerce_action",
@@ -1757,9 +1757,9 @@
   {
     "id": "case-054",
     "conversation": [
-      "send photos of option 2"
+      "option 2 ki photos bhejo"
     ],
-    "language": "Hindi-English",
+    "language": "Hinglish",
     "scenario": "photos",
     "expected_route": "product_photos",
     "expected_intent": "commerce_action",
@@ -1792,7 +1792,7 @@
   {
     "id": "case-055",
     "conversation": [
-      "send photos of option 1"
+      "ఆప్షన్ 1 ఫోటోలు పంపండి"
     ],
     "language": "Telugu",
     "scenario": "photos",
@@ -1827,7 +1827,7 @@
   {
     "id": "case-056",
     "conversation": [
-      "send photos of option 3"
+      "ऑप्शन 3 की तस्वीरें भेजिए"
     ],
     "language": "Hindi",
     "scenario": "photos",
@@ -1932,7 +1932,7 @@
   {
     "id": "case-059",
     "conversation": [
-      "send photos of option 2"
+      "option 2 photos pampandi"
     ],
     "language": "Roman Telugu",
     "scenario": "photos",
@@ -1967,7 +1967,7 @@
   {
     "id": "case-060",
     "conversation": [
-      "send photos of option 3"
+      "option 3 ki photos bhejo"
     ],
     "language": "Hinglish",
     "scenario": "photos",
@@ -2072,9 +2072,9 @@
   {
     "id": "case-063",
     "conversation": [
-      "send me the link for option 3"
+      "option 3 link pampandi"
     ],
-    "language": "Telugu-English",
+    "language": "Roman Telugu",
     "scenario": "link",
     "expected_route": "product_link",
     "expected_intent": "commerce_action",
@@ -2107,9 +2107,9 @@
   {
     "id": "case-064",
     "conversation": [
-      "send me the link for option 2"
+      "option 2 ka link bhejo"
     ],
-    "language": "Hindi-English",
+    "language": "Hinglish",
     "scenario": "link",
     "expected_route": "product_link",
     "expected_intent": "commerce_action",
@@ -2142,7 +2142,7 @@
   {
     "id": "case-065",
     "conversation": [
-      "send me the link for option 1"
+      "ఆప్షన్ 1 లింక్ పంపండి"
     ],
     "language": "Telugu",
     "scenario": "link",
@@ -2177,7 +2177,7 @@
   {
     "id": "case-066",
     "conversation": [
-      "send me the link for option 3"
+      "ऑप्शन 3 का लिंक भेजिए"
     ],
     "language": "Hindi",
     "scenario": "link",
@@ -2282,7 +2282,7 @@
   {
     "id": "case-069",
     "conversation": [
-      "send me the link for option 2"
+      "option 2 link pampandi"
     ],
     "language": "Roman Telugu",
     "scenario": "link",
@@ -2317,7 +2317,7 @@
   {
     "id": "case-070",
     "conversation": [
-      "send me the link for option 3"
+      "option 3 ka link bhejo"
     ],
     "language": "Hinglish",
     "scenario": "link",
@@ -2416,9 +2416,9 @@
   {
     "id": "case-073",
     "conversation": [
-      "add option 3 to my cart"
+      "option 3 ni cart lo add cheyyandi"
     ],
-    "language": "Telugu-English",
+    "language": "Roman Telugu",
     "scenario": "cart",
     "expected_route": "add_to_cart",
     "expected_intent": "add_to_cart",
@@ -2448,9 +2448,9 @@
   {
     "id": "case-074",
     "conversation": [
-      "add option 2 to my cart"
+      "option 2 ko cart mein add karo"
     ],
-    "language": "Hindi-English",
+    "language": "Hinglish",
     "scenario": "cart",
     "expected_route": "add_to_cart",
     "expected_intent": "add_to_cart",
@@ -2480,7 +2480,7 @@
   {
     "id": "case-075",
     "conversation": [
-      "add option 1 to my cart"
+      "ఆప్షన్ 1 కార్ట్‌లో పెట్టండి"
     ],
     "language": "Telugu",
     "scenario": "cart",
@@ -2512,7 +2512,7 @@
   {
     "id": "case-076",
     "conversation": [
-      "add option 3 to my cart"
+      "ऑप्शन 3 को कार्ट में डालिए"
     ],
     "language": "Hindi",
     "scenario": "cart",
@@ -2608,7 +2608,7 @@
   {
     "id": "case-079",
     "conversation": [
-      "add option 2 to my cart"
+      "option 2 ni cart lo add cheyyandi"
     ],
     "language": "Roman Telugu",
     "scenario": "cart",
@@ -2640,7 +2640,7 @@
   {
     "id": "case-080",
     "conversation": [
-      "add option 3 to my cart"
+      "option 3 ko cart mein add karo"
     ],
     "language": "Hinglish",
     "scenario": "cart",
@@ -2740,9 +2740,9 @@
   {
     "id": "case-083",
     "conversation": [
-      "yes, add it"
+      "sare, add cheyyandi"
     ],
-    "language": "Telugu-English",
+    "language": "Roman Telugu",
     "scenario": "confirm",
     "expected_route": "confirm_cart",
     "expected_intent": "confirm_cart",
@@ -2774,9 +2774,9 @@
   {
     "id": "case-084",
     "conversation": [
-      "yes, add it"
+      "haan, add kar do"
     ],
-    "language": "Hindi-English",
+    "language": "Hinglish",
     "scenario": "confirm",
     "expected_route": "confirm_cart",
     "expected_intent": "confirm_cart",
@@ -2808,7 +2808,7 @@
   {
     "id": "case-085",
     "conversation": [
-      "yes, add it"
+      "అవును, జోడించండి"
     ],
     "language": "Telugu",
     "scenario": "confirm",
@@ -2842,7 +2842,7 @@
   {
     "id": "case-086",
     "conversation": [
-      "yes, add it"
+      "हाँ, जोड़ दीजिए"
     ],
     "language": "Hindi",
     "scenario": "confirm",
@@ -2944,7 +2944,7 @@
   {
     "id": "case-089",
     "conversation": [
-      "yes, add it"
+      "sare, add cheyyandi"
     ],
     "language": "Roman Telugu",
     "scenario": "confirm",
@@ -2978,7 +2978,7 @@
   {
     "id": "case-090",
     "conversation": [
-      "yes, add it"
+      "haan, add kar do"
     ],
     "language": "Hinglish",
     "scenario": "confirm",
@@ -3080,9 +3080,9 @@
   {
     "id": "case-093",
     "conversation": [
-      "take me to checkout"
+      "checkout ki teesukellandi"
     ],
-    "language": "Telugu-English",
+    "language": "Roman Telugu",
     "scenario": "checkout",
     "expected_route": "checkout",
     "expected_intent": "commerce_action",
@@ -3114,9 +3114,9 @@
   {
     "id": "case-094",
     "conversation": [
-      "take me to checkout"
+      "checkout par le chalo"
     ],
-    "language": "Hindi-English",
+    "language": "Hinglish",
     "scenario": "checkout",
     "expected_route": "checkout",
     "expected_intent": "commerce_action",
@@ -3148,7 +3148,7 @@
   {
     "id": "case-095",
     "conversation": [
-      "take me to checkout"
+      "చెకౌట్‌కు తీసుకెళ్లండి"
     ],
     "language": "Telugu",
     "scenario": "checkout",
@@ -3182,7 +3182,7 @@
   {
     "id": "case-096",
     "conversation": [
-      "take me to checkout"
+      "चेकआउट पर ले जाइए"
     ],
     "language": "Hindi",
     "scenario": "checkout",
@@ -3284,7 +3284,7 @@
   {
     "id": "case-099",
     "conversation": [
-      "take me to checkout"
+      "checkout ki teesukellandi"
     ],
     "language": "Roman Telugu",
     "scenario": "checkout",
@@ -3318,7 +3318,7 @@
   {
     "id": "case-100",
     "conversation": [
-      "take me to checkout"
+      "checkout par le chalo"
     ],
     "language": "Hinglish",
     "scenario": "checkout",
@@ -3416,9 +3416,9 @@
   {
     "id": "case-103",
     "conversation": [
-      "where is my order?"
+      "naa order ekkada undi?"
     ],
-    "language": "Telugu-English",
+    "language": "Roman Telugu",
     "scenario": "tracking",
     "expected_route": "track_order",
     "expected_intent": "track_order",
@@ -3448,9 +3448,9 @@
   {
     "id": "case-104",
     "conversation": [
-      "where is my order?"
+      "mera order kahan hai?"
     ],
-    "language": "Hindi-English",
+    "language": "Hinglish",
     "scenario": "tracking",
     "expected_route": "track_order",
     "expected_intent": "track_order",
@@ -3480,7 +3480,7 @@
   {
     "id": "case-105",
     "conversation": [
-      "where is my order?"
+      "నా ఆర్డర్ ఎక్కడ ఉంది?"
     ],
     "language": "Telugu",
     "scenario": "tracking",
@@ -3512,7 +3512,7 @@
   {
     "id": "case-106",
     "conversation": [
-      "where is my order?"
+      "मेरा ऑर्डर कहाँ है?"
     ],
     "language": "Hindi",
     "scenario": "tracking",
@@ -3608,7 +3608,7 @@
   {
     "id": "case-109",
     "conversation": [
-      "where is my order?"
+      "naa order ekkada undi?"
     ],
     "language": "Roman Telugu",
     "scenario": "tracking",
@@ -3640,7 +3640,7 @@
   {
     "id": "case-110",
     "conversation": [
-      "where is my order?"
+      "mera order kahan hai?"
     ],
     "language": "Hinglish",
     "scenario": "tracking",
@@ -3736,9 +3736,9 @@
   {
     "id": "case-113",
     "conversation": [
-      "how long does delivery take?"
+      "delivery entha time padutundi?"
     ],
-    "language": "Telugu-English",
+    "language": "Roman Telugu",
     "scenario": "delivery",
     "expected_route": "store_question",
     "expected_intent": "store_question",
@@ -3768,9 +3768,9 @@
   {
     "id": "case-114",
     "conversation": [
-      "how long does delivery take?"
+      "delivery mein kitna time lagega?"
     ],
-    "language": "Hindi-English",
+    "language": "Hinglish",
     "scenario": "delivery",
     "expected_route": "store_question",
     "expected_intent": "store_question",
@@ -3800,7 +3800,7 @@
   {
     "id": "case-115",
     "conversation": [
-      "how long does delivery take?"
+      "డెలివరీకి ఎంత సమయం పడుతుంది?"
     ],
     "language": "Telugu",
     "scenario": "delivery",
@@ -3832,7 +3832,7 @@
   {
     "id": "case-116",
     "conversation": [
-      "how long does delivery take?"
+      "डिलीवरी में कितना समय लगेगा?"
     ],
     "language": "Hindi",
     "scenario": "delivery",
@@ -3928,7 +3928,7 @@
   {
     "id": "case-119",
     "conversation": [
-      "how long does delivery take?"
+      "delivery entha time padutundi?"
     ],
     "language": "Roman Telugu",
     "scenario": "delivery",
@@ -3960,7 +3960,7 @@
   {
     "id": "case-120",
     "conversation": [
-      "how long does delivery take?"
+      "delivery mein kitna time lagega?"
     ],
     "language": "Hinglish",
     "scenario": "delivery",
@@ -4056,9 +4056,9 @@
   {
     "id": "case-123",
     "conversation": [
-      "what is your return policy?"
+      "return policy enti?"
     ],
-    "language": "Telugu-English",
+    "language": "Roman Telugu",
     "scenario": "returns",
     "expected_route": "store_question",
     "expected_intent": "store_question",
@@ -4088,9 +4088,9 @@
   {
     "id": "case-124",
     "conversation": [
-      "what is your return policy?"
+      "return policy kya hai?"
     ],
-    "language": "Hindi-English",
+    "language": "Hinglish",
     "scenario": "returns",
     "expected_route": "store_question",
     "expected_intent": "store_question",
@@ -4120,7 +4120,7 @@
   {
     "id": "case-125",
     "conversation": [
-      "what is your return policy?"
+      "రిటర్న్ పాలసీ ఏమిటి?"
     ],
     "language": "Telugu",
     "scenario": "returns",
@@ -4152,7 +4152,7 @@
   {
     "id": "case-126",
     "conversation": [
-      "what is your return policy?"
+      "रिटर्न पॉलिसी क्या है?"
     ],
     "language": "Hindi",
     "scenario": "returns",
@@ -4248,7 +4248,7 @@
   {
     "id": "case-129",
     "conversation": [
-      "what is your return policy?"
+      "return policy enti?"
     ],
     "language": "Roman Telugu",
     "scenario": "returns",
@@ -4280,7 +4280,7 @@
   {
     "id": "case-130",
     "conversation": [
-      "what is your return policy?"
+      "return policy kya hai?"
     ],
     "language": "Hinglish",
     "scenario": "returns",
@@ -4376,9 +4376,9 @@
   {
     "id": "case-133",
     "conversation": [
-      "do you accept cash on delivery?"
+      "cash on delivery accept chestara?"
     ],
-    "language": "Telugu-English",
+    "language": "Roman Telugu",
     "scenario": "payment",
     "expected_route": "store_question",
     "expected_intent": "store_question",
@@ -4408,9 +4408,9 @@
   {
     "id": "case-134",
     "conversation": [
-      "do you accept cash on delivery?"
+      "cash on delivery accept karte ho?"
     ],
-    "language": "Hindi-English",
+    "language": "Hinglish",
     "scenario": "payment",
     "expected_route": "store_question",
     "expected_intent": "store_question",
@@ -4440,7 +4440,7 @@
   {
     "id": "case-135",
     "conversation": [
-      "do you accept cash on delivery?"
+      "క్యాష్ ఆన్ డెలివరీ ఉందా?"
     ],
     "language": "Telugu",
     "scenario": "payment",
@@ -4472,7 +4472,7 @@
   {
     "id": "case-136",
     "conversation": [
-      "do you accept cash on delivery?"
+      "क्या कैश ऑन डिलीवरी है?"
     ],
     "language": "Hindi",
     "scenario": "payment",
@@ -4568,7 +4568,7 @@
   {
     "id": "case-139",
     "conversation": [
-      "do you accept cash on delivery?"
+      "cash on delivery accept chestara?"
     ],
     "language": "Roman Telugu",
     "scenario": "payment",
@@ -4600,7 +4600,7 @@
   {
     "id": "case-140",
     "conversation": [
-      "do you accept cash on delivery?"
+      "cash on delivery accept karte ho?"
     ],
     "language": "Hinglish",
     "scenario": "payment",
@@ -4696,9 +4696,9 @@
   {
     "id": "case-143",
     "conversation": [
-      "how can I contact the store?"
+      "store ni ela contact cheyyali?"
     ],
-    "language": "Telugu-English",
+    "language": "Roman Telugu",
     "scenario": "contact",
     "expected_route": "store_question",
     "expected_intent": "store_question",
@@ -4728,9 +4728,9 @@
   {
     "id": "case-144",
     "conversation": [
-      "how can I contact the store?"
+      "store se contact kaise karun?"
     ],
-    "language": "Hindi-English",
+    "language": "Hinglish",
     "scenario": "contact",
     "expected_route": "store_question",
     "expected_intent": "store_question",
@@ -4760,7 +4760,7 @@
   {
     "id": "case-145",
     "conversation": [
-      "how can I contact the store?"
+      "స్టోర్‌ను ఎలా సంప్రదించాలి?"
     ],
     "language": "Telugu",
     "scenario": "contact",
@@ -4792,7 +4792,7 @@
   {
     "id": "case-146",
     "conversation": [
-      "how can I contact the store?"
+      "स्टोर से संपर्क कैसे करें?"
     ],
     "language": "Hindi",
     "scenario": "contact",
@@ -4888,7 +4888,7 @@
   {
     "id": "case-149",
     "conversation": [
-      "how can I contact the store?"
+      "store ni ela contact cheyyali?"
     ],
     "language": "Roman Telugu",
     "scenario": "contact",
@@ -4920,7 +4920,7 @@
   {
     "id": "case-150",
     "conversation": [
-      "how can I contact the store?"
+      "store se contact kaise karun?"
     ],
     "language": "Hinglish",
     "scenario": "contact",
@@ -5018,7 +5018,7 @@
     "conversation": [
       "I want my my photo on a white shirts kavali"
     ],
-    "language": "Telugu-English",
+    "language": "Roman Telugu",
     "scenario": "customization",
     "expected_route": "customization",
     "expected_intent": "customization",
@@ -5050,7 +5050,7 @@
     "conversation": [
       "I want my mera logo on a black hoodie chahiye"
     ],
-    "language": "Hindi-English",
+    "language": "Hinglish",
     "scenario": "customization",
     "expected_route": "customization",
     "expected_intent": "customization",
@@ -5338,7 +5338,7 @@
     "conversation": [
       "put this image on my white shirts kavali"
     ],
-    "language": "Telugu-English",
+    "language": "Roman Telugu",
     "scenario": "uploaded_image",
     "expected_route": "customization",
     "expected_intent": "customization",
@@ -5370,7 +5370,7 @@
     "conversation": [
       "put this image on my black hoodie chahiye"
     ],
-    "language": "Hindi-English",
+    "language": "Hinglish",
     "scenario": "uploaded_image",
     "expected_route": "customization",
     "expected_intent": "customization",
@@ -5656,9 +5656,9 @@
   {
     "id": "case-173",
     "conversation": [
-      "what designs do you have?"
+      "designs chupinchandi"
     ],
-    "language": "Telugu-English",
+    "language": "Roman Telugu",
     "scenario": "design_library",
     "expected_route": "design_library",
     "expected_intent": "design_library",
@@ -5688,9 +5688,9 @@
   {
     "id": "case-174",
     "conversation": [
-      "what designs do you have?"
+      "designs dikhao"
     ],
-    "language": "Hindi-English",
+    "language": "Hinglish",
     "scenario": "design_library",
     "expected_route": "design_library",
     "expected_intent": "design_library",
@@ -5720,7 +5720,7 @@
   {
     "id": "case-175",
     "conversation": [
-      "what designs do you have?"
+      "డిజైన్లు చూపించండి"
     ],
     "language": "Telugu",
     "scenario": "design_library",
@@ -5752,7 +5752,7 @@
   {
     "id": "case-176",
     "conversation": [
-      "what designs do you have?"
+      "डिज़ाइन दिखाइए"
     ],
     "language": "Hindi",
     "scenario": "design_library",
@@ -5848,7 +5848,7 @@
   {
     "id": "case-179",
     "conversation": [
-      "what designs do you have?"
+      "designs chupinchandi"
     ],
     "language": "Roman Telugu",
     "scenario": "design_library",
@@ -5880,7 +5880,7 @@
   {
     "id": "case-180",
     "conversation": [
-      "what designs do you have?"
+      "designs dikhao"
     ],
     "language": "Hinglish",
     "scenario": "design_library",
@@ -5976,9 +5976,9 @@
   {
     "id": "case-183",
     "conversation": [
-      "please ask the customization team to contact me"
+      "customization team tho matladali"
     ],
-    "language": "Telugu-English",
+    "language": "Roman Telugu",
     "scenario": "handoff",
     "expected_route": "human_handoff",
     "expected_intent": "human_handoff",
@@ -6008,9 +6008,9 @@
   {
     "id": "case-184",
     "conversation": [
-      "please ask the customization team to contact me"
+      "customization team se baat karni hai"
     ],
-    "language": "Hindi-English",
+    "language": "Hinglish",
     "scenario": "handoff",
     "expected_route": "human_handoff",
     "expected_intent": "human_handoff",
@@ -6040,7 +6040,7 @@
   {
     "id": "case-185",
     "conversation": [
-      "please ask the customization team to contact me"
+      "కస్టమైజేషన్ టీమ్‌తో మాట్లాడాలి"
     ],
     "language": "Telugu",
     "scenario": "handoff",
@@ -6072,7 +6072,7 @@
   {
     "id": "case-186",
     "conversation": [
-      "please ask the customization team to contact me"
+      "कस्टमाइज़ेशन टीम से बात करनी है"
     ],
     "language": "Hindi",
     "scenario": "handoff",
@@ -6168,7 +6168,7 @@
   {
     "id": "case-189",
     "conversation": [
-      "please ask the customization team to contact me"
+      "customization team tho matladali"
     ],
     "language": "Roman Telugu",
     "scenario": "handoff",
@@ -6200,7 +6200,7 @@
   {
     "id": "case-190",
     "conversation": [
-      "please ask the customization team to contact me"
+      "customization team se baat karni hai"
     ],
     "language": "Hinglish",
     "scenario": "handoff",
@@ -6296,9 +6296,9 @@
   {
     "id": "case-193",
     "conversation": [
-      "can you give me medical advice?"
+      "medical advice ivvagalara?"
     ],
-    "language": "Telugu-English",
+    "language": "Roman Telugu",
     "scenario": "unsupported",
     "expected_route": "unsupported",
     "expected_intent": "unsupported",
@@ -6328,9 +6328,9 @@
   {
     "id": "case-194",
     "conversation": [
-      "can you give me medical advice?"
+      "kya aap medical advice de sakte ho?"
     ],
-    "language": "Hindi-English",
+    "language": "Hinglish",
     "scenario": "unsupported",
     "expected_route": "unsupported",
     "expected_intent": "unsupported",
@@ -6360,7 +6360,7 @@
   {
     "id": "case-195",
     "conversation": [
-      "can you give me medical advice?"
+      "మెడికల్ సలహా ఇవ్వగలరా?"
     ],
     "language": "Telugu",
     "scenario": "unsupported",
@@ -6392,7 +6392,7 @@
   {
     "id": "case-196",
     "conversation": [
-      "can you give me medical advice?"
+      "क्या आप मेडिकल सलाह दे सकते हैं?"
     ],
     "language": "Hindi",
     "scenario": "unsupported",
@@ -6488,7 +6488,7 @@
   {
     "id": "case-199",
     "conversation": [
-      "can you give me medical advice?"
+      "medical advice ivvagalara?"
     ],
     "language": "Roman Telugu",
     "scenario": "unsupported",
@@ -6520,7 +6520,7 @@
   {
     "id": "case-200",
     "conversation": [
-      "can you give me medical advice?"
+      "kya aap medical advice de sakte ho?"
     ],
     "language": "Hinglish",
     "scenario": "unsupported",

@@ -13,7 +13,7 @@ class RouteDecision:
 
 
 class ToolRouter:
-    """Convert parser output into a small, auditable set of backend routes."""
+    """Classify requests separately from action authorization/execution."""
 
     ACTION_ROUTES = {
         "add_to_cart": "cart",
@@ -35,21 +35,13 @@ class ToolRouter:
     }
 
     @classmethod
-    def decide(cls, intent: IntentResult, state: dict, conversation: dict) -> RouteDecision:
+    def classify(cls, intent: IntentResult) -> RouteDecision:
+        """Pure route classification. This method never reads or mutates state."""
         action = intent.action
         if action:
             route = cls.ACTION_ROUTES.get(action)
             if route is None:
                 return RouteDecision("clarification", False, "The requested action is not supported.")
-            if action == "confirm_cart" and not state.get("purchase"):
-                return RouteDecision("clarification", False, "There is no pending cart quote to confirm.")
-            if action in {"add_to_cart", "checkout"} and not (
-                state.get("selected_product_id")
-                or conversation.get("selected_product_id")
-                or state.get("purchase")
-                or intent.product_option
-            ):
-                return RouteDecision("clarification", False, "A product must be selected first.")
             return RouteDecision(route)
 
         if intent.intent == "product_search":
@@ -59,3 +51,21 @@ class ToolRouter:
         if intent.intent == "general_question":
             return RouteDecision("clarification", False, "The request needs clarification.")
         return RouteDecision("clarification", False, "The request could not be safely classified.")
+
+    @classmethod
+    def decide(cls, intent: IntentResult, state: dict, conversation: dict) -> RouteDecision:
+        """Backward-compatible classify + authorization decision for callers."""
+        decision = cls.classify(intent)
+        if not decision.allowed:
+            return decision
+        action = intent.action
+        if action == "confirm_cart" and not state.get("purchase"):
+            return RouteDecision("clarification", False, "There is no pending cart quote to confirm.")
+        if action in {"add_to_cart", "checkout"} and not (
+            state.get("selected_product_id")
+            or conversation.get("selected_product_id")
+            or state.get("purchase")
+            or intent.product_option
+        ):
+            return RouteDecision("clarification", False, "A product must be selected first.")
+        return decision

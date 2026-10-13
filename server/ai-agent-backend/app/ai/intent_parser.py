@@ -6,6 +6,7 @@ from difflib import get_close_matches
 from app.ai.gemini_client import GeminiClient
 from app.ai.language import detect_customer_language
 from app.schemas.ai import IntentResult
+from app.services.product_taxonomy import normalize_category
 
 logger = logging.getLogger(__name__)
 
@@ -311,7 +312,11 @@ Customer message:
         )
         if action == "check_stock" and roman_telugu_discovery:
             action = None
-        pending_purchase = bool(conversation_state.get("purchase"))
+        pending_purchase = bool(
+            conversation_state.get("purchase")
+            or conversation_state.get("pending_purchase")
+            or conversation_state.get("last_declined_purchase")
+        )
         simple_number = bool(re.fullmatch(r"\s*(?:[1-5]|one|two|three|four|five)\s*", text))
         product_option = None if pending_purchase and simple_number else self._extract_product_option(
             text,
@@ -369,6 +374,7 @@ Customer message:
         color = self._first_match(
             text,
             [
+                "navy",
                 "dark blue",
                 "navy blue",
                 "black",
@@ -484,7 +490,11 @@ Customer message:
         if theme:
             attributes["theme"] = theme
 
-        if re.search(
+        customization_type = self._extract_customization_type(text)
+        if customization_type:
+            attributes["customization_type"] = customization_type
+            attributes["catalog_type"] = "customization"
+        elif re.search(
             r"\b(custom|customized|customised|customizable|customisable|customise|customize|"
             r"customization|customisation|custom design|personalize|personalise|own design)\b",
             text,
@@ -515,7 +525,9 @@ Customer message:
         }:
             action = None
 
-        max_price = self._extract_max_price(text) or conversation_state.get("max_price")
+        min_price, max_price = self._extract_price_bounds(text)
+        min_price = min_price if min_price is not None else conversation_state.get("min_price")
+        max_price = max_price if max_price is not None else conversation_state.get("max_price")
         store_question = bool(
             not action
             and re.search(
@@ -617,26 +629,7 @@ Customer message:
 
     @staticmethod
     def _normalize_category(category: str | None) -> str | None:
-        if not category:
-            return None
-        value = re.sub(r"\s+", " ", str(category).lower().replace("_", " ").replace("-", " ")).strip()
-        if "polo" in value and re.search(r"\bt\s*shirts?\b|\btshirts?\b", value):
-            return "t-shirt"
-        aliases = {
-            "shirts": "shirt", "men shirt": "shirt", "mens shirt": "shirt",
-            "men's shirt": "shirt", "men shirts": "shirt", "mens shirts": "shirt",
-            "men's shirts": "shirt", "t shirt": "t-shirt", "t shirts": "t-shirt",
-            "t-shirts": "t-shirt", "tee": "t-shirt", "tees": "t-shirt",
-            "oversized t shirt": "oversized t-shirt", "oversized t shirts": "oversized t-shirt",
-            "oversized t-shirts": "oversized t-shirt",
-            "tshirt": "t-shirt", "tshirts": "t-shirt",
-            "oversized tshirt": "oversized t-shirt", "oversized tshirts": "oversized t-shirt",
-            "hoodies": "hoodie", "sweatshirts": "sweatshirt", "crop tops": "crop top",
-            "shoes": "shoe", "handbag": "bag", "handbags": "bag", "backpack": "bag",
-            "backpacks": "bag", "accessories": "accessory", "belt": "accessory",
-            "wallet": "accessory", "sunglasses": "accessory", "cap": "accessory",
-        }
-        return aliases.get(value, value)
+        return normalize_category(category)
 
     @staticmethod
     def _extract_product_option(text: str, allow_bare_cardinal: bool = False) -> int | None:
@@ -698,9 +691,26 @@ Customer message:
     def _detect_action(self, text: str, conversation_state: dict) -> str | None:
         text = text.replace("\u200c", " ").strip()
         pending_purchase = bool(
-            conversation_state.get("purchase") or conversation_state.get("last_declined_purchase")
+            conversation_state.get("purchase")
+            or conversation_state.get("pending_purchase")
+            or conversation_state.get("last_declined_purchase")
         )
-        if re.search(r"\b(human|real person|someone from (?:the )?(?:shop|store)|talk to (?:a )?(?:person|staff|agent))\b", text):
+        has_product_context = bool(
+            conversation_state.get("selected_product_id")
+            or conversation_state.get("recommended_product_ids")
+            or conversation_state.get("option_products")
+        )
+        if re.search(
+            r"\b(?:refund pending|money was deducted|arrived damaged|lost my order|lost the order number|"
+            r"customization team|customisation team|support team|customer care)\b",
+            text,
+        ):
+            return "human_handoff"
+        if re.search(
+            r"\b(human|real person|someone from (?:the )?(?:shop|store)|talk to (?:a )?(?:person|staff|agent)|"
+            r"customization team|customisation team|support team|customer care)",
+            text,
+        ):
             return "human_handoff"
         if re.search(r"\b(track|tracking|where is my order|where is my package|order status|delivery status|order where)\b", text):
             return "track_order"
@@ -720,6 +730,15 @@ Customer message:
             return "confirm_cart"
         if pending_purchase and re.search(r"\b(?:no|nope|nah|don't|do not|not now|cancel|never ?mind|changed my mind|leave it)\b", text):
             return "decline_cart"
+        # Short variant follow-ups inherit the product selected or displayed
+        # in the previous turn. Without this state gate, "XL" or "this one in
+        # medium" is incorrectly treated as a new product search.
+        if has_product_context and (
+            self._extract_size(text)
+            or re.fullmatch(r"\s*(?:this|that|it)\s+(?:one\s+)?in\s+\w+\s*[?!.]*\s*", text)
+            or re.fullmatch(r"\s*(?:this|that|it)\s+in\s+(?:\w+)\s*[?!.]*\s*", text)
+        ):
+            return "check_stock"
         # Sharing the customer's own artwork starts customization. It is not a
         # request to browse the merchant's existing design library.
         if re.search(
@@ -740,6 +759,10 @@ Customer message:
             text,
         ) or re.search(
             r"\b(?:what|which|show|share|send|view|browse|have|available)\b.{0,35}"
+            r"\b(?:designs?|artworks?|templates?|collections?)\b",
+            text,
+        ) or re.search(
+            r"\b(?:any|some|more|different|latest|new|floral|graphic|printed|anime)\b.{0,30}"
             r"\b(?:designs?|artworks?|templates?|collections?)\b",
             text,
         ):
@@ -983,6 +1006,12 @@ Customer message:
     @staticmethod
     def _extract_size(text: str) -> str | None:
         normalized = text.upper()
+        for phrase, value in {
+            "EXTRA SMALL": "XS", "EXTRA LARGE": "XL",
+            "SMALL": "S", "MEDIUM": "M", "LARGE": "L",
+        }.items():
+            if re.search(rf"\b{re.escape(phrase)}\b", normalized):
+                return value
         match = re.search(
             r"\b(?:SIZE|WAIST)\s*[:=-]?\s*(XXXL|XXL|XL|XS|L|M|S|\d{2})\b",
             normalized,
@@ -1048,15 +1077,36 @@ Customer message:
             return token[:-1]
         return token
 
-    def _extract_max_price(self, text: str) -> float | None:
-        match = re.search(r"(?:under|below|max|around|within|less than)\s*(?:rs\.?|₹|inr)?\s*(\d+(?:\.\d+)?)\s*k\b", text)
-        if match:
-            return float(match.group(1)) * 1000
+    @staticmethod
+    def _money_value(value: str, suffix: str | None) -> float:
+        amount = float(value)
+        return amount * 1000 if suffix and suffix.lower() == "k" else amount
 
-        match = re.search(r"(?:under|below|max|around|within|less than)\s*(?:rs\.?|₹|inr)?\s*(\d+(?:\.\d+)?)", text)
-        if not match:
-            match = re.search(r"\b(\d+(?:\.\d+)?)\s*k\b", text)
-            if match:
-                return float(match.group(1)) * 1000
-            return None
-        return float(match.group(1))
+    @classmethod
+    def _extract_price_bounds(cls, text: str) -> tuple[float | None, float | None]:
+        amount = r"(\d+(?:\.\d+)?)\s*(k)?"
+        currency = r"(?:rs\.?|inr|₹|â‚¹)?\s*"
+        max_match = re.search(rf"(?:under|below|max(?:imum)?|within|less than|up to|upto)\s*{currency}{amount}", text, re.I)
+        min_match = re.search(rf"(?:above|over|minimum|at least|from)\s*{currency}{amount}", text, re.I)
+        max_price = cls._money_value(max_match.group(1), max_match.group(2)) if max_match else None
+        min_price = cls._money_value(min_match.group(1), min_match.group(2)) if min_match else None
+        if max_price is None and min_price is None:
+            standalone = re.search(rf"\b{amount}\b", text, re.I)
+            if standalone and standalone.group(2):
+                max_price = cls._money_value(standalone.group(1), standalone.group(2))
+        return min_price, max_price
+
+    @classmethod
+    def _extract_max_price(cls, text: str) -> float | None:
+        return cls._extract_price_bounds(text)[1]
+
+    @staticmethod
+    def _extract_customization_type(text: str) -> str | None:
+        if re.search(r"\b(?:logo|brand mark|company mark)\b", text):
+            return "logo"
+        if re.search(r"\b(?:photo|picture|image|pic)\b", text):
+            return "user_image"
+        if re.search(r"\b(?:name|text|quote|message|lettering)\b", text):
+            return "text_customization"
+        return None
+

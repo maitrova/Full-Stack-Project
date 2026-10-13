@@ -36,6 +36,77 @@ def get_sales_agent() -> SalesAgent:
     )
 
 
+@router.get("/workflow")
+async def ai_workflow(current_user: UserPublic = Depends(get_current_user)):
+    """Return the read-only AI workflow map for the admin web UI.
+
+    This exposes architecture metadata only. It never returns prompts, API
+    keys, customer messages, catalogue records, or provider credentials.
+    """
+    return {
+        "version": "1.0",
+        "title": "AI Sales Agent Workflow",
+        "entrypoints": [
+            {"id": "web_chat", "label": "Web chat", "endpoint": "/api/ai/chat"},
+            {"id": "whatsapp", "label": "WhatsApp webhook", "endpoint": "/api/whatsapp/webhook"},
+        ],
+        "nodes": [
+            {"id": "input", "label": "Customer message or image", "type": "input"},
+            {"id": "state", "label": "Load conversation state", "type": "state", "file": "app/ai/sales_agent.py"},
+            {"id": "language", "label": "Language and text normalization", "type": "parser", "file": "app/ai/language.py"},
+            {"id": "intent", "label": "Intent and entity extraction", "type": "parser", "file": "app/ai/intent_parser.py"},
+            {"id": "model", "label": "Gemini / OpenAI fallback", "type": "model", "file": "app/ai/gemini_client.py"},
+            {"id": "route", "label": "Route classification", "type": "router", "file": "app/ai/tool_router.py"},
+            {"id": "policy", "label": "Action authorization", "type": "guard", "file": "app/ai/action_policy.py"},
+            {"id": "catalogue", "label": "Catalogue search", "type": "tool", "file": "app/tools/product_tools.py"},
+            {"id": "filters", "label": "Hard product filters", "type": "tool", "file": "app/repositories/ecommerce_product_repository.py"},
+            {"id": "embeddings", "label": "Semantic / visual ranking", "type": "embedding", "file": "app/services/catalog_indexer.py"},
+            {"id": "knowledge", "label": "Website/store knowledge", "type": "knowledge", "file": "app/services/website_knowledge.py"},
+            {"id": "commerce", "label": "Cart, checkout, tracking, handoff", "type": "action", "file": "app/ai/sales_agent.py"},
+            {"id": "fallback", "label": "Clarification or safe fallback", "type": "fallback", "file": "app/ai/response_generator.py"},
+            {"id": "response", "label": "Verified response and state update", "type": "output", "file": "app/ai/sales_agent.py"},
+        ],
+        "edges": [
+            {"from": "input", "to": "state"},
+            {"from": "state", "to": "language"},
+            {"from": "language", "to": "intent"},
+            {"from": "intent", "to": "model", "condition": "ambiguous or rules insufficient"},
+            {"from": "model", "to": "intent", "condition": "structured model result"},
+            {"from": "intent", "to": "route"},
+            {"from": "route", "to": "policy"},
+            {"from": "policy", "to": "fallback", "condition": "unsafe or incomplete action"},
+            {"from": "policy", "to": "catalogue", "condition": "product route"},
+            {"from": "catalogue", "to": "filters"},
+            {"from": "filters", "to": "embeddings", "condition": "semantic or image query"},
+            {"from": "policy", "to": "knowledge", "condition": "store question"},
+            {"from": "policy", "to": "commerce", "condition": "authorized action"},
+            {"from": "catalogue", "to": "response"},
+            {"from": "embeddings", "to": "response"},
+            {"from": "knowledge", "to": "response"},
+            {"from": "commerce", "to": "response"},
+            {"from": "fallback", "to": "response"},
+        ],
+        "models": {
+            "primary_text_and_vision": "GEMINI_MODEL",
+            "secondary_text_and_vision": "OPENAI_MODEL",
+            "embedding": "GEMINI_EMBEDDING_MODEL",
+            "fallback_policy": "deterministic rules and verified catalogue facts",
+        },
+        "routes": [
+            "product_search", "product_selection", "product_details", "product_recommendation",
+            "customization", "design_library", "store_question", "cart", "checkout",
+            "order_tracking", "human_handoff", "unsupported",
+        ],
+        "fallbacks": [
+            "Gemini unavailable -> deterministic parser",
+            "No product match -> no-match response plus similar/custom option",
+            "Missing product selection -> ask for option or product name",
+            "Unsafe cart action -> block and ask for required details",
+            "Unsupported request -> safe capability clarification",
+        ],
+    }
+
+
 @router.post("/chat", response_model=AiChatResponse, response_model_by_alias=False)
 async def chat(
     payload: AiChatRequest,

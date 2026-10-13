@@ -11,6 +11,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.config.settings import settings
 from app.utils.object_id import parse_object_id
+from app.services.product_taxonomy import infer_canonical_attributes
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +130,7 @@ class EcommerceProductRepository:
         search_index = {str(item["product_id"]): item for item in index_documents}
 
         ranked: list[tuple[float, dict]] = []
+        filtered_out = 0
         for product in products:
             indexed = search_index.get(str(product["_id"])) or {}
             searchable_product = {
@@ -138,6 +140,12 @@ class EcommerceProductRepository:
                     "search_attributes": indexed.get("search_attributes") or {},
                 },
             }
+            # Explicit customer constraints are hard filters. Similarity must
+            # never rescue a product with the wrong category, budget, size,
+            # source, color, or exclusion status.
+            if not self._matches(searchable_product, filters):
+                filtered_out += 1
+                continue
             score, components = self._hybrid_score(
                 searchable_product,
                 filters,
@@ -158,6 +166,11 @@ class EcommerceProductRepository:
             enriched["attributes"]["match_components"] = components
             ranked.append((score, enriched))
 
+        logger.debug(
+            "Hybrid catalogue search filtered %s candidates before ranking; ranked=%s",
+            filtered_out,
+            len(ranked),
+        )
         ranked.sort(key=lambda item: (-item[0], -item[1]["stock"], self._display_price(item[1])))
         results = self._deduplicate_products([product for _, product in ranked[:limit]])
         if len(results) > 1:
@@ -435,6 +448,7 @@ class EcommerceProductRepository:
         inferred_attributes = self._infer_merchandise_attributes(
             document.get("title"), document.get("description"), category, subcategory
         )
+        inferred_attributes.update(infer_canonical_attributes(document.get("title"), category, inferred_attributes))
         structured = document.get("merchandising") or {}
         structured_attributes = {
             "product_type": structured.get("productType"),
@@ -574,6 +588,7 @@ class EcommerceProductRepository:
                 "product_url": self._drop_product_url(document),
                 "source_type": "drop",
                 "customizable": False,
+                **infer_canonical_attributes(document.get("name"), category, {}),
             },
             "status": "active",
             "tags": [value for value in [category, subcategory, "drop product"] if value],
@@ -622,6 +637,7 @@ class EcommerceProductRepository:
                 "product_url": self._customization_product_url(document),
                 "source_type": "customization",
                 "customizable": True,
+                **infer_canonical_attributes(document.get("name"), category, {}),
             },
             "status": "active",
             "tags": [value for value in [category, subcategory, "custom", "customization", *colors] if value],
@@ -662,6 +678,8 @@ class EcommerceProductRepository:
                 return False
         size = str(filters.get("size") or "").strip().upper()
         if size and size not in product.get("attributes", {}).get("sizes", []):
+            return False
+        if filters.get("require_in_stock") and int(product.get("stock") or 0) <= 0:
             return False
         for key, value in (filters.get("attributes") or {}).items():
             normalized_value = str(value or "").lower()

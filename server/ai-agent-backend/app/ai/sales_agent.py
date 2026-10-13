@@ -17,7 +17,7 @@ from app.ai.action_policy import ActionPolicy
 from app.ai.product_image_analyzer import ProductImageAnalyzer
 from app.ai.response_generator import ResponseGenerator
 from app.ai.store_knowledge import StoreKnowledge
-from app.ai.tool_router import ToolRouter
+from app.ai.tool_router import RouteDecision, ToolRouter
 from app.ai.usage import consume_usage, start_usage_tracking
 from app.config.settings import settings
 from app.repositories.business_repository import BusinessRepository
@@ -220,7 +220,12 @@ class SalesAgent:
         self._apply_product_option(intent.product_option, conversation, updated_state)
         action_allowed, policy_reason = ActionPolicy.validate(intent, conversation, updated_state)
         policy_blocked = not action_allowed
-        route_decision = ToolRouter.decide(intent, updated_state, conversation)
+        # Route classification is pure; stateful action authorization happens
+        # separately above through ActionPolicy. This prevents route selection
+        # from implicitly mutating or authorizing commerce actions.
+        route_decision = ToolRouter.classify(intent)
+        if route_decision.allowed and intent.action and policy_blocked:
+            route_decision = RouteDecision("clarification", False, policy_reason)
         route_blocked = not route_decision.allowed
         updated_state["last_route"] = {
             "route": route_decision.route,

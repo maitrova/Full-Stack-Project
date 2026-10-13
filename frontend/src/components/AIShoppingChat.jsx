@@ -20,8 +20,8 @@ import { buildImageUrl } from "../utils/responsiveImage";
 import { buildReadymadeProductPath } from "../utils/readymadeRoutes";
 
 const AI_AGENT_API_URL =
-  import.meta.env.VITE_AI_AGENT_API_URL || "http://127.0.0.1:8000";
-const AI_AGENT_FALLBACK_API_URL = "http://127.0.0.1:8002";
+  import.meta.env.VITE_AI_AGENT_API_URL || "http://127.0.0.1:8000/api";
+const AI_AGENT_FALLBACK_API_URL = "http://127.0.0.1:8002/api";
 const MERN_API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 const CHAT_SESSION_STORAGE_KEY = "ai-shopping-chat-session-id";
 
@@ -449,26 +449,31 @@ const AIShoppingChat = () => {
     setIsLoading(true);
 
     try {
-      // Step 2: React sends the user's message to the Python FastAPI /chat endpoint.
+      // The FastAPI agent is mounted under /api/ai/chat. Keep the browser
+      // session separate from the backend conversation id until the first
+      // response returns a real Mongo conversation id.
       const { data } = await postToAiAgent("/chat", {
-        session_id: sessionId,
+        conversation_id: /^[a-f0-9]{24}$/i.test(sessionId) ? sessionId : null,
         message: trimmedMessage,
         page_context: pageContext,
       }, {
         headers: requestHeaders,
       });
 
-      if (data.session_id) {
-        setSessionId(data.session_id);
+      if (data.conversation?._id) {
+        setSessionId(data.conversation._id);
       }
 
-      // Step 7: The Python API now returns { response: "...", products: [...] }.
+      const assistantText = data.ai_message?.content || data.response || "";
+      const products = Array.isArray(data.recommended_products)
+        ? data.recommended_products
+        : Array.isArray(data.products) ? data.products : [];
       setMessages((currentMessages) => [
         ...currentMessages,
         {
           role: "assistant",
-          text: data.response,
-          products: Array.isArray(data.products) ? data.products : [],
+          text: assistantText,
+          products,
           offers: Array.isArray(data.offers) ? data.offers : [],
         },
       ]);
@@ -479,7 +484,7 @@ const AIShoppingChat = () => {
           {
             sessionId,
             userMessage: trimmedMessage,
-            assistantMessage: data.response,
+            assistantMessage: assistantText,
           },
           { headers: requestHeaders }
         );
@@ -487,7 +492,7 @@ const AIShoppingChat = () => {
         // History persistence should not hide an answer that was already received.
       }
 
-      await runAssistantAction(data.action);
+      await runAssistantAction(data.intent?.action || data.action);
     } catch (requestError) {
       setError(
         requestError.response?.data?.detail ||
@@ -800,7 +805,7 @@ const AIShoppingChat = () => {
         </section>
       )}
 
-      {/* <button
+      <button
         type="button"
         onClick={() => setIsOpen((currentValue) => !currentValue)}
         className="relative inline-flex h-14 w-14 items-center justify-center rounded-full bg-gray-950 text-white shadow-xl transition hover:bg-gray-800 focus:outline-none focus:ring-4 focus:ring-gray-900/20"
@@ -816,7 +821,7 @@ const AIShoppingChat = () => {
         ) : (
           <MessageCircle className="h-6 w-6" aria-hidden="true" />
         )}
-      </button> */}
+      </button>
     </div>
   );
 };

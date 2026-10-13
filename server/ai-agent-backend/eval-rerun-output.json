@@ -1,0 +1,937 @@
+{
+  "total": 200,
+  "passed": 134,
+  "failed": 66,
+  "accuracy": 0.67,
+  "failure_breakdown": {
+    "route": 41,
+    "entities": 12,
+    "language": 19
+  },
+  "failures": [
+    {
+      "id": "case-002",
+      "passed": false,
+      "failures": [
+        "entities"
+      ],
+      "expected_route": "product_search",
+      "actual_route": "product_search",
+      "expected_language": "English",
+      "actual_language": "English",
+      "entity_failures": {
+        "category": {
+          "expected": "shirt",
+          "actual": "t-shirt"
+        }
+      },
+      "message": "I need black polo T-shirts under 1500"
+    },
+    {
+      "id": "case-008",
+      "passed": false,
+      "failures": [
+        "entities"
+      ],
+      "expected_route": "product_search",
+      "actual_route": "product_search",
+      "expected_language": "English",
+      "actual_language": "English",
+      "entity_failures": {
+        "category": {
+          "expected": "saree",
+          "actual": null
+        }
+      },
+      "message": "I need wedding sarees"
+    },
+    {
+      "id": "case-012",
+      "passed": false,
+      "failures": [
+        "entities"
+      ],
+      "expected_route": "product_recommendation",
+      "actual_route": "product_search",
+      "expected_language": "English",
+      "actual_language": "English",
+      "entity_failures": {
+        "category": {
+          "expected": "shirt",
+          "actual": "t-shirt"
+        }
+      },
+      "message": "show me some black polo T-shirts under 1500"
+    },
+    {
+      "id": "case-018",
+      "passed": false,
+      "failures": [
+        "entities"
+      ],
+      "expected_route": "product_recommendation",
+      "actual_route": "product_search",
+      "expected_language": "English",
+      "actual_language": "English",
+      "entity_failures": {
+        "category": {
+          "expected": "saree",
+          "actual": null
+        }
+      },
+      "message": "show me some wedding sarees"
+    },
+    {
+      "id": "case-023",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "product_search",
+      "actual_route": "product_selection",
+      "expected_language": "Roman Telugu",
+      "actual_language": "Roman Telugu",
+      "entity_failures": {},
+      "message": "show blak tshrit kavali"
+    },
+    {
+      "id": "case-028",
+      "passed": false,
+      "failures": [
+        "route",
+        "entities"
+      ],
+      "expected_route": "product_search",
+      "actual_route": "general_question",
+      "expected_language": "English",
+      "actual_language": "English",
+      "entity_failures": {
+        "category": {
+          "expected": "saree",
+          "actual": null
+        }
+      },
+      "message": "show weding sarees"
+    },
+    {
+      "id": "case-030",
+      "passed": false,
+      "failures": [
+        "language"
+      ],
+      "expected_route": "product_search",
+      "actual_route": "product_search",
+      "expected_language": "Hinglish",
+      "actual_language": "English",
+      "entity_failures": {},
+      "message": "show saree dikhwo"
+    },
+    {
+      "id": "case-043",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "check_stock",
+      "actual_route": "general_question",
+      "expected_language": "Roman Telugu",
+      "actual_language": "Roman Telugu",
+      "entity_failures": {},
+      "message": "option 3 M lo available unda?"
+    },
+    {
+      "id": "case-046",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "check_stock",
+      "actual_route": "general_question",
+      "expected_language": "Hindi",
+      "actual_language": "Hindi",
+      "entity_failures": {},
+      "message": "ऑप्शन 3 साइज़ XL में उपलब्ध है?"
+    },
+    {
+      "id": "case-048",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "check_stock",
+      "actual_route": "general_question",
+      "expected_language": "English",
+      "actual_language": "English",
+      "entity_failures": {},
+      "message": "is option 1 available in Free size"
+    },
+    {
+      "id": "case-049",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "check_stock",
+      "actual_route": "general_question",
+      "expected_language": "Roman Telugu",
+      "actual_language": "Roman Telugu",
+      "entity_failures": {},
+      "message": "option 2 L lo available unda?"
+    },
+    {
+      "id": "case-050",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "check_stock",
+      "actual_route": "general_question",
+      "expected_language": "Hinglish",
+      "actual_language": "Hinglish",
+      "entity_failures": {},
+      "message": "option 3 Free size mein available hai?"
+    },
+    {
+      "id": "case-054",
+      "passed": false,
+      "failures": [
+        "language"
+      ],
+      "expected_route": "product_photos",
+      "actual_route": "product_photos",
+      "expected_language": "Hinglish",
+      "actual_language": "Roman Telugu",
+      "entity_failures": {},
+      "message": "option 2 ki photos bhejo"
+    },
+    {
+      "id": "case-055",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "product_photos",
+      "actual_route": "general_question",
+      "expected_language": "Telugu",
+      "actual_language": "Telugu",
+      "entity_failures": {},
+      "message": "ఆప్షన్ 1 ఫోటోలు పంపండి"
+    },
+    {
+      "id": "case-056",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "product_photos",
+      "actual_route": "general_question",
+      "expected_language": "Hindi",
+      "actual_language": "Hindi",
+      "entity_failures": {},
+      "message": "ऑप्शन 3 की तस्वीरें भेजिए"
+    },
+    {
+      "id": "case-060",
+      "passed": false,
+      "failures": [
+        "language"
+      ],
+      "expected_route": "product_photos",
+      "actual_route": "product_photos",
+      "expected_language": "Hinglish",
+      "actual_language": "Roman Telugu",
+      "entity_failures": {},
+      "message": "option 3 ki photos bhejo"
+    },
+    {
+      "id": "case-083",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "confirm_cart",
+      "actual_route": "general_question",
+      "expected_language": "Roman Telugu",
+      "actual_language": "Roman Telugu",
+      "entity_failures": {},
+      "message": "sare, add cheyyandi"
+    },
+    {
+      "id": "case-084",
+      "passed": false,
+      "failures": [
+        "route",
+        "language"
+      ],
+      "expected_route": "confirm_cart",
+      "actual_route": "general_question",
+      "expected_language": "Hinglish",
+      "actual_language": "English",
+      "entity_failures": {},
+      "message": "haan, add kar do"
+    },
+    {
+      "id": "case-085",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "confirm_cart",
+      "actual_route": "general_question",
+      "expected_language": "Telugu",
+      "actual_language": "Telugu",
+      "entity_failures": {},
+      "message": "అవును, జోడించండి"
+    },
+    {
+      "id": "case-086",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "confirm_cart",
+      "actual_route": "general_question",
+      "expected_language": "Hindi",
+      "actual_language": "Hindi",
+      "entity_failures": {},
+      "message": "हाँ, जोड़ दीजिए"
+    },
+    {
+      "id": "case-089",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "confirm_cart",
+      "actual_route": "general_question",
+      "expected_language": "Roman Telugu",
+      "actual_language": "Roman Telugu",
+      "entity_failures": {},
+      "message": "sare, add cheyyandi"
+    },
+    {
+      "id": "case-090",
+      "passed": false,
+      "failures": [
+        "route",
+        "language"
+      ],
+      "expected_route": "confirm_cart",
+      "actual_route": "general_question",
+      "expected_language": "Hinglish",
+      "actual_language": "English",
+      "entity_failures": {},
+      "message": "haan, add kar do"
+    },
+    {
+      "id": "case-094",
+      "passed": false,
+      "failures": [
+        "language"
+      ],
+      "expected_route": "checkout",
+      "actual_route": "checkout",
+      "expected_language": "Hinglish",
+      "actual_language": "English",
+      "entity_failures": {},
+      "message": "checkout par le chalo"
+    },
+    {
+      "id": "case-095",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "checkout",
+      "actual_route": "general_question",
+      "expected_language": "Telugu",
+      "actual_language": "Telugu",
+      "entity_failures": {},
+      "message": "చెకౌట్‌కు తీసుకెళ్లండి"
+    },
+    {
+      "id": "case-096",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "checkout",
+      "actual_route": "general_question",
+      "expected_language": "Hindi",
+      "actual_language": "Hindi",
+      "entity_failures": {},
+      "message": "चेकआउट पर ले जाइए"
+    },
+    {
+      "id": "case-100",
+      "passed": false,
+      "failures": [
+        "language"
+      ],
+      "expected_route": "checkout",
+      "actual_route": "checkout",
+      "expected_language": "Hinglish",
+      "actual_language": "English",
+      "entity_failures": {},
+      "message": "checkout par le chalo"
+    },
+    {
+      "id": "case-104",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "track_order",
+      "actual_route": "general_question",
+      "expected_language": "Hinglish",
+      "actual_language": "Hinglish",
+      "entity_failures": {},
+      "message": "mera order kahan hai?"
+    },
+    {
+      "id": "case-106",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "track_order",
+      "actual_route": "check_stock",
+      "expected_language": "Hindi",
+      "actual_language": "Hindi",
+      "entity_failures": {},
+      "message": "मेरा ऑर्डर कहाँ है?"
+    },
+    {
+      "id": "case-110",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "track_order",
+      "actual_route": "general_question",
+      "expected_language": "Hinglish",
+      "actual_language": "Hinglish",
+      "entity_failures": {},
+      "message": "mera order kahan hai?"
+    },
+    {
+      "id": "case-113",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "store_question",
+      "actual_route": "check_price",
+      "expected_language": "Roman Telugu",
+      "actual_language": "Roman Telugu",
+      "entity_failures": {},
+      "message": "delivery entha time padutundi?"
+    },
+    {
+      "id": "case-115",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "store_question",
+      "actual_route": "general_question",
+      "expected_language": "Telugu",
+      "actual_language": "Telugu",
+      "entity_failures": {},
+      "message": "డెలివరీకి ఎంత సమయం పడుతుంది?"
+    },
+    {
+      "id": "case-116",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "store_question",
+      "actual_route": "general_question",
+      "expected_language": "Hindi",
+      "actual_language": "Hindi",
+      "entity_failures": {},
+      "message": "डिलीवरी में कितना समय लगेगा?"
+    },
+    {
+      "id": "case-119",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "store_question",
+      "actual_route": "check_price",
+      "expected_language": "Roman Telugu",
+      "actual_language": "Roman Telugu",
+      "entity_failures": {},
+      "message": "delivery entha time padutundi?"
+    },
+    {
+      "id": "case-123",
+      "passed": false,
+      "failures": [
+        "language"
+      ],
+      "expected_route": "store_question",
+      "actual_route": "store_question",
+      "expected_language": "Roman Telugu",
+      "actual_language": "English",
+      "entity_failures": {},
+      "message": "return policy enti?"
+    },
+    {
+      "id": "case-126",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "store_question",
+      "actual_route": "check_stock",
+      "expected_language": "Hindi",
+      "actual_language": "Hindi",
+      "entity_failures": {},
+      "message": "रिटर्न पॉलिसी क्या है?"
+    },
+    {
+      "id": "case-129",
+      "passed": false,
+      "failures": [
+        "language"
+      ],
+      "expected_route": "store_question",
+      "actual_route": "store_question",
+      "expected_language": "Roman Telugu",
+      "actual_language": "English",
+      "entity_failures": {},
+      "message": "return policy enti?"
+    },
+    {
+      "id": "case-133",
+      "passed": false,
+      "failures": [
+        "language"
+      ],
+      "expected_route": "store_question",
+      "actual_route": "store_question",
+      "expected_language": "Roman Telugu",
+      "actual_language": "English",
+      "entity_failures": {},
+      "message": "cash on delivery accept chestara?"
+    },
+    {
+      "id": "case-134",
+      "passed": false,
+      "failures": [
+        "language"
+      ],
+      "expected_route": "store_question",
+      "actual_route": "store_question",
+      "expected_language": "Hinglish",
+      "actual_language": "English",
+      "entity_failures": {},
+      "message": "cash on delivery accept karte ho?"
+    },
+    {
+      "id": "case-135",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "store_question",
+      "actual_route": "check_stock",
+      "expected_language": "Telugu",
+      "actual_language": "Telugu",
+      "entity_failures": {},
+      "message": "క్యాష్ ఆన్ డెలివరీ ఉందా?"
+    },
+    {
+      "id": "case-136",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "store_question",
+      "actual_route": "check_stock",
+      "expected_language": "Hindi",
+      "actual_language": "Hindi",
+      "entity_failures": {},
+      "message": "क्या कैश ऑन डिलीवरी है?"
+    },
+    {
+      "id": "case-139",
+      "passed": false,
+      "failures": [
+        "language"
+      ],
+      "expected_route": "store_question",
+      "actual_route": "store_question",
+      "expected_language": "Roman Telugu",
+      "actual_language": "English",
+      "entity_failures": {},
+      "message": "cash on delivery accept chestara?"
+    },
+    {
+      "id": "case-140",
+      "passed": false,
+      "failures": [
+        "language"
+      ],
+      "expected_route": "store_question",
+      "actual_route": "store_question",
+      "expected_language": "Hinglish",
+      "actual_language": "English",
+      "entity_failures": {},
+      "message": "cash on delivery accept karte ho?"
+    },
+    {
+      "id": "case-144",
+      "passed": false,
+      "failures": [
+        "language"
+      ],
+      "expected_route": "store_question",
+      "actual_route": "store_question",
+      "expected_language": "Hinglish",
+      "actual_language": "English",
+      "entity_failures": {},
+      "message": "store se contact kaise karun?"
+    },
+    {
+      "id": "case-145",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "store_question",
+      "actual_route": "general_question",
+      "expected_language": "Telugu",
+      "actual_language": "Telugu",
+      "entity_failures": {},
+      "message": "స్టోర్‌ను ఎలా సంప్రదించాలి?"
+    },
+    {
+      "id": "case-146",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "store_question",
+      "actual_route": "general_question",
+      "expected_language": "Hindi",
+      "actual_language": "Hindi",
+      "entity_failures": {},
+      "message": "स्टोर से संपर्क कैसे करें?"
+    },
+    {
+      "id": "case-150",
+      "passed": false,
+      "failures": [
+        "language"
+      ],
+      "expected_route": "store_question",
+      "actual_route": "store_question",
+      "expected_language": "Hinglish",
+      "actual_language": "English",
+      "entity_failures": {},
+      "message": "store se contact kaise karun?"
+    },
+    {
+      "id": "case-152",
+      "passed": false,
+      "failures": [
+        "entities"
+      ],
+      "expected_route": "customization",
+      "actual_route": "customization",
+      "expected_language": "English",
+      "actual_language": "English",
+      "entity_failures": {
+        "category": {
+          "expected": "shirt",
+          "actual": "t-shirt"
+        }
+      },
+      "message": "I want my name on a black polo T-shirts under 1500"
+    },
+    {
+      "id": "case-155",
+      "passed": false,
+      "failures": [
+        "route",
+        "entities"
+      ],
+      "expected_route": "customization",
+      "actual_route": "product_search",
+      "expected_language": "Telugu",
+      "actual_language": "Telugu",
+      "entity_failures": {
+        "catalog_type": {
+          "expected": "customization",
+          "actual": null
+        }
+      },
+      "message": "I want my నా లోగో on a చొక్కా"
+    },
+    {
+      "id": "case-156",
+      "passed": false,
+      "failures": [
+        "route",
+        "entities"
+      ],
+      "expected_route": "customization",
+      "actual_route": "product_search",
+      "expected_language": "Hindi",
+      "actual_language": "Hindi",
+      "entity_failures": {
+        "catalog_type": {
+          "expected": "customization",
+          "actual": null
+        }
+      },
+      "message": "I want my मेरा नाम on a सफेद शर्ट"
+    },
+    {
+      "id": "case-157",
+      "passed": false,
+      "failures": [
+        "route",
+        "entities"
+      ],
+      "expected_route": "customization",
+      "actual_route": "product_search",
+      "expected_language": "English",
+      "actual_language": "English",
+      "entity_failures": {
+        "catalog_type": {
+          "expected": "customization",
+          "actual": null
+        }
+      },
+      "message": "I want my artwork on a oversized hoodies"
+    },
+    {
+      "id": "case-158",
+      "passed": false,
+      "failures": [
+        "entities"
+      ],
+      "expected_route": "customization",
+      "actual_route": "customization",
+      "expected_language": "English",
+      "actual_language": "English",
+      "entity_failures": {
+        "category": {
+          "expected": "saree",
+          "actual": null
+        }
+      },
+      "message": "I want my photo on a wedding sarees"
+    },
+    {
+      "id": "case-162",
+      "passed": false,
+      "failures": [
+        "entities"
+      ],
+      "expected_route": "customization",
+      "actual_route": "customization",
+      "expected_language": "English",
+      "actual_language": "English",
+      "entity_failures": {
+        "category": {
+          "expected": "shirt",
+          "actual": "t-shirt"
+        }
+      },
+      "message": "put this image on my black polo T-shirts under 1500"
+    },
+    {
+      "id": "case-168",
+      "passed": false,
+      "failures": [
+        "entities"
+      ],
+      "expected_route": "customization",
+      "actual_route": "customization",
+      "expected_language": "English",
+      "actual_language": "English",
+      "entity_failures": {
+        "category": {
+          "expected": "saree",
+          "actual": null
+        }
+      },
+      "message": "put this image on my wedding sarees"
+    },
+    {
+      "id": "case-173",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "design_library",
+      "actual_route": "general_question",
+      "expected_language": "Roman Telugu",
+      "actual_language": "Roman Telugu",
+      "entity_failures": {},
+      "message": "designs chupinchandi"
+    },
+    {
+      "id": "case-174",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "design_library",
+      "actual_route": "general_question",
+      "expected_language": "Hinglish",
+      "actual_language": "Hinglish",
+      "entity_failures": {},
+      "message": "designs dikhao"
+    },
+    {
+      "id": "case-175",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "design_library",
+      "actual_route": "general_question",
+      "expected_language": "Telugu",
+      "actual_language": "Telugu",
+      "entity_failures": {},
+      "message": "డిజైన్లు చూపించండి"
+    },
+    {
+      "id": "case-176",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "design_library",
+      "actual_route": "general_question",
+      "expected_language": "Hindi",
+      "actual_language": "Hindi",
+      "entity_failures": {},
+      "message": "डिज़ाइन दिखाइए"
+    },
+    {
+      "id": "case-179",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "design_library",
+      "actual_route": "general_question",
+      "expected_language": "Roman Telugu",
+      "actual_language": "Roman Telugu",
+      "entity_failures": {},
+      "message": "designs chupinchandi"
+    },
+    {
+      "id": "case-180",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "design_library",
+      "actual_route": "general_question",
+      "expected_language": "Hinglish",
+      "actual_language": "Hinglish",
+      "entity_failures": {},
+      "message": "designs dikhao"
+    },
+    {
+      "id": "case-183",
+      "passed": false,
+      "failures": [
+        "language"
+      ],
+      "expected_route": "human_handoff",
+      "actual_route": "human_handoff",
+      "expected_language": "Roman Telugu",
+      "actual_language": "English",
+      "entity_failures": {},
+      "message": "customization team tho matladali"
+    },
+    {
+      "id": "case-185",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "human_handoff",
+      "actual_route": "general_question",
+      "expected_language": "Telugu",
+      "actual_language": "Telugu",
+      "entity_failures": {},
+      "message": "కస్టమైజేషన్ టీమ్‌తో మాట్లాడాలి"
+    },
+    {
+      "id": "case-186",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "human_handoff",
+      "actual_route": "check_stock",
+      "expected_language": "Hindi",
+      "actual_language": "Hindi",
+      "entity_failures": {},
+      "message": "कस्टमाइज़ेशन टीम से बात करनी है"
+    },
+    {
+      "id": "case-189",
+      "passed": false,
+      "failures": [
+        "language"
+      ],
+      "expected_route": "human_handoff",
+      "actual_route": "human_handoff",
+      "expected_language": "Roman Telugu",
+      "actual_language": "English",
+      "entity_failures": {},
+      "message": "customization team tho matladali"
+    },
+    {
+      "id": "case-193",
+      "passed": false,
+      "failures": [
+        "language"
+      ],
+      "expected_route": "unsupported",
+      "actual_route": "general_question",
+      "expected_language": "Roman Telugu",
+      "actual_language": "English",
+      "entity_failures": {},
+      "message": "medical advice ivvagalara?"
+    },
+    {
+      "id": "case-196",
+      "passed": false,
+      "failures": [
+        "route"
+      ],
+      "expected_route": "unsupported",
+      "actual_route": "check_stock",
+      "expected_language": "Hindi",
+      "actual_language": "Hindi",
+      "entity_failures": {},
+      "message": "क्या आप मेडिकल सलाह दे सकते हैं?"
+    },
+    {
+      "id": "case-199",
+      "passed": false,
+      "failures": [
+        "language"
+      ],
+      "expected_route": "unsupported",
+      "actual_route": "general_question",
+      "expected_language": "Roman Telugu",
+      "actual_language": "English",
+      "entity_failures": {},
+      "message": "medical advice ivvagalara?"
+    }
+  ]
+}

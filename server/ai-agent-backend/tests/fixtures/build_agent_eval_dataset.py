@@ -30,8 +30,8 @@ specs = [
 variants = [
     ("English", {"item": "white cotton shirts", "item_typo": "whit cottn shirts", "design": "logo", "n": "2", "size": "L"}),
     ("English", {"item": "black polo T-shirts under 1500", "item_typo": "blak poloo tshrits", "design": "name", "n": "1", "size": "XL"}),
-    ("Telugu-English", {"item": "white shirts kavali", "item_typo": "blak tshrit kavali", "design": "my photo", "n": "3", "size": "M"}),
-    ("Hindi-English", {"item": "black hoodie chahiye", "item_typo": "whte shirt chahiye", "design": "mera logo", "n": "2", "size": "S"}),
+    ("Roman Telugu", {"item": "white shirts kavali", "item_typo": "blak tshrit kavali", "design": "my photo", "n": "3", "size": "M"}),
+    ("Hinglish", {"item": "black hoodie chahiye", "item_typo": "whte shirt chahiye", "design": "mera logo", "n": "2", "size": "S"}),
     ("Telugu", {"item": "చొక్కా", "item_typo": "షర్ట్", "design": "నా లోగో", "n": "1", "size": "L"}),
     ("Hindi", {"item": "सफेद शर्ट", "item_typo": "सफेद शर्ट", "design": "मेरा नाम", "n": "3", "size": "XL"}),
     ("English", {"item": "oversized hoodies", "item_typo": "oversizd hodie", "design": "artwork", "n": "2", "size": "M"}),
@@ -40,11 +40,64 @@ variants = [
     ("Hinglish", {"item": "shaadi ke liye saree chahiye", "item_typo": "saree dikhwo", "design": "mera photo", "n": "3", "size": "Free size"}),
 ]
 
+# Keep native-script variants as real Unicode values. These overrides also
+# protect the generator from older mojibake values that may exist in a local
+# copy of this file.
+variants[4] = ("Telugu", {"item": "చొక్కా", "item_typo": "షర్ట్", "design": "నా లోగో", "n": "1", "size": "L"})
+variants[5] = ("Hindi", {"item": "सफेद शर्ट", "item_typo": "सफेद शर्ट", "design": "मेरा नाम", "n": "3", "size": "XL"})
+
+LOCALIZED_TEMPLATES = {
+    "Roman Telugu": {
+        "price": "option {n} price entha?", "stock": "option {n} {size} lo available unda?",
+        "photos": "option {n} photos pampandi", "link": "option {n} link pampandi",
+        "cart": "option {n} ni cart lo add cheyyandi", "confirm": "sare, add cheyyandi",
+        "checkout": "checkout ki teesukellandi", "tracking": "naa order ekkada undi?",
+        "delivery": "delivery entha time padutundi?", "returns": "return policy enti?",
+        "payment": "cash on delivery accept chestara?", "contact": "store ni ela contact cheyyali?",
+        "design_library": "designs chupinchandi", "handoff": "customization team tho matladali",
+        "unsupported": "medical advice ivvagalara?",
+    },
+    "Hinglish": {
+        "price": "option {n} ka price kya hai?", "stock": "option {n} {size} mein available hai?",
+        "photos": "option {n} ki photos bhejo", "link": "option {n} ka link bhejo",
+        "cart": "option {n} ko cart mein add karo", "confirm": "haan, add kar do",
+        "checkout": "checkout par le chalo", "tracking": "mera order kahan hai?",
+        "delivery": "delivery mein kitna time lagega?", "returns": "return policy kya hai?",
+        "payment": "cash on delivery accept karte ho?", "contact": "store se contact kaise karun?",
+        "design_library": "designs dikhao", "handoff": "customization team se baat karni hai",
+        "unsupported": "kya aap medical advice de sakte ho?",
+    },
+    "Telugu": {
+        "price": "ఆప్షన్ {n} ధర ఎంత?", "stock": "ఆప్షన్ {n} సైజ్ {size} లో ఉందా?",
+        "photos": "ఆప్షన్ {n} ఫోటోలు పంపండి", "link": "ఆప్షన్ {n} లింక్ పంపండి",
+        "cart": "ఆప్షన్ {n} కార్ట్‌లో పెట్టండి", "confirm": "అవును, జోడించండి",
+        "checkout": "చెకౌట్‌కు తీసుకెళ్లండి", "tracking": "నా ఆర్డర్ ఎక్కడ ఉంది?",
+        "delivery": "డెలివరీకి ఎంత సమయం పడుతుంది?", "returns": "రిటర్న్ పాలసీ ఏమిటి?",
+        "payment": "క్యాష్ ఆన్ డెలివరీ ఉందా?", "contact": "స్టోర్‌ను ఎలా సంప్రదించాలి?",
+        "design_library": "డిజైన్లు చూపించండి", "handoff": "కస్టమైజేషన్ టీమ్‌తో మాట్లాడాలి",
+        "unsupported": "మెడికల్ సలహా ఇవ్వగలరా?",
+    },
+    "Hindi": {
+        "price": "ऑप्शन {n} की कीमत क्या है?", "stock": "ऑप्शन {n} साइज़ {size} में उपलब्ध है?",
+        "photos": "ऑप्शन {n} की तस्वीरें भेजिए", "link": "ऑप्शन {n} का लिंक भेजिए",
+        "cart": "ऑप्शन {n} को कार्ट में डालिए", "confirm": "हाँ, जोड़ दीजिए",
+        "checkout": "चेकआउट पर ले जाइए", "tracking": "मेरा ऑर्डर कहाँ है?",
+        "delivery": "डिलीवरी में कितना समय लगेगा?", "returns": "रिटर्न पॉलिसी क्या है?",
+        "payment": "क्या कैश ऑन डिलीवरी है?", "contact": "स्टोर से संपर्क कैसे करें?",
+        "design_library": "डिज़ाइन दिखाइए", "handoff": "कस्टमाइज़ेशन टीम से बात करनी है",
+        "unsupported": "क्या आप मेडिकल सलाह दे सकते हैं?",
+    },
+}
+
+
+def render_message(variant: str, scenario: str, template: str, values: dict) -> str:
+    return LOCALIZED_TEMPLATES.get(variant, {}).get(scenario, template).format(**values)
+
 cases = []
 for row, (scenario, route, action, template, notes) in enumerate(specs):
     for variant, values in variants:
         index = len(cases) + 1
-        message = template.format(**values)
+        message = render_message(variant, scenario, template, values)
         context = {}
         if route in {"price", "check_price"} or scenario == "price":
             context = {"recommended_products": 3}
@@ -85,5 +138,11 @@ for row, (scenario, route, action, template, notes) in enumerate(specs):
         })
 
 assert len(cases) == 200
-OUT.write_text(json.dumps(cases, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+serialized = json.dumps(cases, ensure_ascii=False, indent=2) + "\n"
+# Fail fast if a future edit accidentally reintroduces text that was decoded
+# as Latin-1/Windows-1252 after being encoded as UTF-8.
+mojibake_markers = ("à¤", "à°", "Ã", "â€", "ðŸ")
+if any(marker in serialized for marker in mojibake_markers):
+    raise ValueError("Evaluation fixture contains mojibake; write it as UTF-8")
+OUT.write_text(serialized, encoding="utf-8", newline="\n")
 print(f"Wrote {len(cases)} cases to {OUT}")

@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
 
+from app.services.product_taxonomy import normalize_category
+
 
 @dataclass
 class CatalogueQualityReport:
@@ -25,6 +27,8 @@ def validate_catalogue_record(product: dict[str, Any]) -> CatalogueQualityReport
         report.errors.append("missing_name")
     if not str(product.get("category") or "").strip():
         report.errors.append("missing_category")
+    elif normalize_category(product.get("category")) is None:
+        report.warnings.append("non_canonical_category")
     if product.get("price") is None:
         report.errors.append("missing_price")
     if product.get("stock") is None:
