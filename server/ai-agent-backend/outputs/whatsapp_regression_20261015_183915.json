@@ -1,0 +1,844 @@
+{
+ "name": "WhatsApp agent regression 2026-10-15 18:39",
+ "channel": "whatsapp",
+ "created_at": "2026-10-15 18:39:15.710450+00:00",
+ "total_cases": 26,
+ "passed_cases": 25,
+ "failed_cases": 1,
+ "pass_rate": 0.9615,
+ "average_latency_ms": 14484,
+ "by_group": {
+  "cart": {
+   "passed": 9,
+   "total": 9
+  },
+  "orders": {
+   "passed": 10,
+   "total": 10
+  },
+  "handoff": {
+   "passed": 6,
+   "total": 7
+  }
+ },
+ "results": [
+  {
+   "id": "WK01",
+   "group": "cart",
+   "passed": true,
+   "message": "add the oversized black cotton tee in L to my cart",
+   "latency_ms": 24069,
+   "checks": {
+    "turn1:cart_has": true,
+    "turn1:says_any": true,
+    "turn1:no_photos": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "add the oversized black cotton tee in L to my cart",
+      "reply": "Added the Oversized Black Cotton T-Shirt (L) to your cart. Your current subtotal is ₹799. Would you like to proceed to checkout?",
+      "photos": 0,
+      "buttons": [],
+      "tools": [
+       "search_products",
+       "add_to_cart"
+      ],
+      "latency_ms": 24069
+     }
+    ]
+   }
+  },
+  {
+   "id": "WK02",
+   "group": "cart",
+   "passed": true,
+   "message": "add the charcoal fleece hoodie to my cart",
+   "latency_ms": 21802,
+   "checks": {
+    "turn1:cart_empty": true,
+    "turn1:says_any": true,
+    "turn2:cart_has": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "add the charcoal fleece hoodie to my cart",
+      "reply": "Which size would you like in the Charcoal Fleece Hoodie? Available sizes are S, M, L, XL, and XXL.\nOption 1\nCharcoal Fleece Hoodie\nINR 1399\nAvailable\nCharcoal Grey, Cotton-Poly Fleece, 320 GSM\nReply with this product name or number for details.\nhttps://www.maitrova.in/products/hoodies/men-hoodies/charcoal-fleece-hoodie",
+      "photos": 1,
+      "buttons": [],
+      "tools": [
+       "search_products"
+      ],
+      "latency_ms": 26053
+     },
+     {
+      "sent": "XL",
+      "reply": "Added the Charcoal Fleece Hoodie (XL) to your cart. Your current subtotal is ₹1399. Would you like to proceed to checkout?",
+      "photos": 0,
+      "buttons": [],
+      "tools": [
+       "add_to_cart"
+      ],
+      "latency_ms": 17551
+     }
+    ]
+   }
+  },
+  {
+   "id": "WK03",
+   "group": "cart",
+   "passed": true,
+   "message": "what's in my cart and what's my total?",
+   "latency_ms": 19070,
+   "checks": {
+    "turn1:says_any": true,
+    "turn1:no_photos": true,
+    "turn2:cart_has": true,
+    "turn3:cart_lacks": true,
+    "turn3:says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "what's in my cart and what's my total?",
+      "reply": "Your cart contains:\n\n1. Oversized Black Cotton T-Shirt (L) - ₹799\n2. Charcoal Fleece Hoodie (M) - ₹1,399\n\nYour total is ₹2,198. Would you like to proceed to checkout?",
+      "photos": 0,
+      "buttons": [],
+      "tools": [
+       "view_cart"
+      ],
+      "latency_ms": 13062
+     },
+     {
+      "sent": "make the black tee 2",
+      "reply": "Updated the quantity of your Oversized Black Cotton T-Shirt to 2. Your new total is ₹2,997.",
+      "photos": 0,
+      "buttons": [],
+      "tools": [
+       "view_cart",
+       "update_cart_item"
+      ],
+      "latency_ms": 20082
+     },
+     {
+      "sent": "remove the hoodie from my cart",
+      "reply": "Removed the Charcoal Fleece Hoodie from your cart. Your new total is ₹1,598.",
+      "photos": 0,
+      "buttons": [],
+      "tools": [
+       "view_cart",
+       "remove_cart_item"
+      ],
+      "latency_ms": 24065
+     }
+    ]
+   }
+  },
+  {
+   "id": "WK04",
+   "group": "cart",
+   "passed": true,
+   "message": "add 3 classic white crew neck tees in M",
+   "latency_ms": 17040,
+   "checks": {
+    "turn1:cart_has": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "add 3 classic white crew neck tees in M",
+      "reply": "Added 3 Classic White Crew Neck T-Shirts (Size M) to your cart. Your current subtotal is ₹1797. Would you like to proceed to checkout?",
+      "photos": 0,
+      "buttons": [],
+      "tools": [
+       "search_products",
+       "add_to_cart"
+      ],
+      "latency_ms": 17040
+     }
+    ]
+   }
+  },
+  {
+   "id": "WK05",
+   "group": "cart",
+   "passed": true,
+   "message": "add the maroon zip hoodie in L",
+   "latency_ms": 15040,
+   "checks": {
+    "turn1:cart_empty": true,
+    "turn1:says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "add the maroon zip hoodie in L",
+      "reply": "I'm sorry, the Maroon Zip Hoodie is currently out of stock. Would you like me to look for similar hoodies for you?\nOption 1\nMaroon Zip Hoodie\nINR 1999\nOut of stock\nMaroon, Cotton Fleece\nReply with this product name or number for details.\nhttps://www.maitrova.in/products/hoodies/men-hoodies/maroon-zip-hoodie",
+      "photos": 1,
+      "buttons": [],
+      "tools": [
+       "search_products"
+      ],
+      "latency_ms": 15040
+     }
+    ]
+   }
+  },
+  {
+   "id": "WK06",
+   "group": "cart",
+   "passed": true,
+   "message": "add 50 classic white crew neck tees in M",
+   "latency_ms": 18081,
+   "checks": {
+    "turn1:cart_empty": true,
+    "turn1:says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "add 50 classic white crew neck tees in M",
+      "reply": "I can add up to 10 of these Classic White Crew Neck T-Shirts to your cart at a time. Would you like me to add 10 of them for you, or would you prefer to speak with our team for a bulk order of 50?",
+      "photos": 0,
+      "buttons": [],
+      "tools": [
+       "search_products",
+       "add_to_cart"
+      ],
+      "latency_ms": 18081
+     }
+    ]
+   }
+  },
+  {
+   "id": "WK07",
+   "group": "cart",
+   "passed": true,
+   "message": "I want to checkout",
+   "latency_ms": 17079,
+   "checks": {
+    "turn1:link": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "I want to checkout",
+      "reply": "To keep your order details private, open this secure link:\nhttps://www.maitrova.in/whatsapp-connect?token=ZvrFBDKsWHZOoq9-1twLgFFJv5b9CFrpFgUzSrTaMpc\n\nIt expires in 15 minutes. You’ll receive order updates here; send STOP anytime to turn them off.",
+      "photos": 0,
+      "buttons": [],
+      "tools": [
+       "checkout_link"
+      ],
+      "latency_ms": 17079
+     }
+    ]
+   }
+  },
+  {
+   "id": "WK08",
+   "group": "cart",
+   "passed": true,
+   "message": "Olive Henley L size naa cart lo add cheyyi",
+   "latency_ms": 24576,
+   "checks": {
+    "turn1:cart_has": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "Olive Henley L size naa cart lo add cheyyi",
+      "reply": "Olive Henley T-Shirt (L size) ni mee cart lo add chesanu. Ippudu checkout cheyala leda inkemaina chudala?",
+      "photos": 0,
+      "buttons": [],
+      "tools": [
+       "search_products",
+       "add_to_cart"
+      ],
+      "latency_ms": 24576
+     }
+    ]
+   }
+  },
+  {
+   "id": "WK09",
+   "group": "cart",
+   "passed": true,
+   "message": "is the olive henley available in L?",
+   "latency_ms": 14045,
+   "checks": {
+    "turn1:cart_empty": true,
+    "turn2:cart_has": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "is the olive henley available in L?",
+      "reply": "Yes, the Olive Henley T-Shirt is available in size L. Would you like me to add it to your cart?\nOption 1\nOlive Henley T-Shirt\nINR 849\nAvailable\nOlive, Slub Cotton\nReply with this product name or number for details.\nhttps://www.maitrova.in/products/t-shirts/men-t-shirts/olive-henley-t-shirt",
+      "photos": 1,
+      "buttons": [],
+      "tools": [
+       "search_products"
+      ],
+      "latency_ms": 16054
+     },
+     {
+      "sent": "yes please add it",
+      "reply": "Added the Olive Henley T-Shirt (size L) to your cart. Your current subtotal is ₹849. Would you like to proceed to checkout?",
+      "photos": 0,
+      "buttons": [],
+      "tools": [
+       "add_to_cart"
+      ],
+      "latency_ms": 12036
+     }
+    ]
+   }
+  },
+  {
+   "id": "WO01",
+   "group": "orders",
+   "passed": true,
+   "message": "where is my order?",
+   "latency_ms": 14037,
+   "checks": {
+    "turn1:tools_any": true,
+    "turn1:says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "where is my order?",
+      "reply": "You have a few recent orders. Could you please let me know which one you are asking about?\n\n1. Order #44FE2A88 (placed 15 Oct): Being prepared\n2. Order #44FE2A8C (placed 12 Oct): Shipped\n\nFor orders that have been shipped, the estimated delivery time is usually 3–7 business days depending on your location (https://www.maitrova.in/payment-shipping-cancellation-policy).",
+      "photos": 0,
+      "buttons": [
+       "Talk to a person"
+      ],
+      "tools": [
+       "track_order",
+       "search_store_info"
+      ],
+      "latency_ms": 14037
+     }
+    ]
+   }
+  },
+  {
+   "id": "WO02",
+   "group": "orders",
+   "passed": true,
+   "message": "status of order #44FE2A92",
+   "latency_ms": 15536,
+   "checks": {
+    "turn1:says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "status of order #{order:delivered}",
+      "reply": "Your order #44FE2A92 for the White Chikankari Kurta was delivered on 10 Oct 2026. You can view the full details here: https://www.maitrova.in/orders.",
+      "photos": 0,
+      "buttons": [
+       "Talk to a person"
+      ],
+      "tools": [
+       "track_order"
+      ],
+      "latency_ms": 15536
+     }
+    ]
+   }
+  },
+  {
+   "id": "WO03",
+   "group": "orders",
+   "passed": true,
+   "message": "when will my hoodie arrive?",
+   "latency_ms": 17543,
+   "checks": {
+    "turn1:says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "when will my hoodie arrive?",
+      "reply": "Your Charcoal Fleece Hoodie (order #44FE2A8C) was shipped on October 14. Deliveries typically take 3–7 business days from shipping, depending on your location.\n\nPlease note that your other order for the Retro Racer Hoodie (#44FE2AA4) shows a payment failure, so that item has not been processed.",
+      "photos": 0,
+      "buttons": [
+       "Talk to a person"
+      ],
+      "tools": [
+       "track_order",
+       "search_store_info"
+      ],
+      "latency_ms": 17543
+     }
+    ]
+   }
+  },
+  {
+   "id": "WO04",
+   "group": "orders",
+   "passed": true,
+   "message": "do I have any refunds pending?",
+   "latency_ms": 13543,
+   "checks": {
+    "turn1:says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "do I have any refunds pending?",
+      "reply": "You have one refund in progress for order #44FE2A9F (Galaxy Oversized Tee), which was initiated on 12 Oct 2026. Additionally, your return request for the Sky Blue Linen Shirt (order #44FE2A99) is currently under review. You can check the status of these at https://www.maitrova.in/orders.",
+      "photos": 0,
+      "buttons": [
+       "Talk to a person"
+      ],
+      "tools": [
+       "track_order"
+      ],
+      "latency_ms": 13543
+     }
+    ]
+   }
+  },
+  {
+   "id": "WO05",
+   "group": "orders",
+   "passed": true,
+   "message": "naa order ekkada undi?",
+   "latency_ms": 10561,
+   "checks": {
+    "turn1:tools_any": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "naa order ekkada undi?",
+      "reply": "Meeru adigina order 44FE2A88 (Oversized Black Cotton T-Shirt, Classic White Crew Neck T-Shirt) ippudu 'Being prepared' status lo undi.\n\nMeeku inkemaina order gurinchi telusukovala?",
+      "photos": 0,
+      "buttons": [
+       "Talk to a person"
+      ],
+      "tools": [
+       "track_order"
+      ],
+      "latency_ms": 10561
+     }
+    ]
+   }
+  },
+  {
+   "id": "WO06",
+   "group": "orders",
+   "passed": true,
+   "message": "cancel my hoodie order",
+   "latency_ms": 15556,
+   "checks": {
+    "turn1:says_any": true,
+    "turn1:also_says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "cancel my hoodie order",
+      "reply": "I see you have two hoodie orders: one for a \"Charcoal Fleece Hoodie\" (order #44FE2A8C) which has already been shipped, and one for a \"Retro Racer Hoodie\" (order #44FE2AA4) where the payment failed.\n\nAccording to our policy, orders can only be cancelled before they are shipped. Since the Charcoal Fleece Hoodie has already been shipped, it cannot be cancelled.\n\nIf you would like to discuss this further, I can have our support team follow up with you. Would you like me to do that?",
+      "photos": 0,
+      "buttons": [
+       "Talk to a person"
+      ],
+      "tools": [
+       "track_order",
+       "search_store_info"
+      ],
+      "latency_ms": 15556
+     }
+    ]
+   }
+  },
+  {
+   "id": "WO07",
+   "group": "orders",
+   "passed": true,
+   "message": "where is my order?",
+   "latency_ms": 11032,
+   "checks": {
+    "turn1:says_any": true,
+    "turn1:never_says": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "where is my order?",
+      "reply": "To check your order status, could you please provide your order number and the email address you used for the purchase? Alternatively, I can send you a secure link to connect your WhatsApp number to your store account so you can view your orders directly.",
+      "photos": 0,
+      "buttons": [
+       "Talk to a person"
+      ],
+      "tools": [
+       "track_order"
+      ],
+      "latency_ms": 11032
+     }
+    ]
+   }
+  },
+  {
+   "id": "WO08",
+   "group": "orders",
+   "passed": true,
+   "message": "track order 44FE2A8C, my email is nagalahemanth411@gmail.com",
+   "latency_ms": 20061,
+   "checks": {
+    "turn1:says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "track order {order:shipped}, my email is {email}",
+      "reply": "Your order 44FE2A8C for the Charcoal Fleece Hoodie (XL) is currently shipped. It was placed on 12 Oct 2026 and was shipped on 14 Oct 2026. You can view more details on your order page: https://www.maitrova.in/orders",
+      "photos": 0,
+      "buttons": [
+       "Talk to a person"
+      ],
+      "tools": [
+       "track_order"
+      ],
+      "latency_ms": 20061
+     }
+    ]
+   }
+  },
+  {
+   "id": "WO09",
+   "group": "orders",
+   "passed": true,
+   "message": "order 44FE2A8C email someone@example.com",
+   "latency_ms": 20049,
+   "checks": {
+    "turn1:never_says": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "order {order:shipped} email someone@example.com",
+      "reply": "I couldn't find an order with that number and email address. Please double-check the details, or you can use the link below to sign in to your account to view your orders directly.\n\nWould you like me to send you a secure link to connect your account?",
+      "photos": 0,
+      "buttons": [
+       "Talk to a person"
+      ],
+      "tools": [
+       "track_order"
+      ],
+      "latency_ms": 20049
+     }
+    ]
+   }
+  },
+  {
+   "id": "WO10",
+   "group": "orders",
+   "passed": true,
+   "message": "where is my order?",
+   "latency_ms": 14051,
+   "checks": {
+    "turn1:tools_any": true,
+    "turn1:says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "where is my order?",
+      "reply": "I couldn't find any orders linked to your account. Could you please provide your order number and the email address or mobile number you used to place the order so I can look it up for you?",
+      "photos": 0,
+      "buttons": [
+       "Talk to a person"
+      ],
+      "tools": [
+       "track_order"
+      ],
+      "latency_ms": 14051
+     }
+    ]
+   }
+  },
+  {
+   "id": "WH01",
+   "group": "handoff",
+   "passed": true,
+   "message": "my parcel arrived damaged, the hoodie is torn",
+   "latency_ms": 9026,
+   "checks": {
+    "turn1:person_offered": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "my parcel arrived damaged, the hoodie is torn",
+      "reply": "I'm very sorry to hear that your hoodie arrived damaged. To help you with this, could you please provide your order number and the email address you used for the purchase? Alternatively, I can send you a secure link to connect your account so you can manage your orders directly.",
+      "photos": 0,
+      "buttons": [
+       "Talk to a person"
+      ],
+      "tools": [
+       "track_order"
+      ],
+      "latency_ms": 9026
+     }
+    ]
+   }
+  },
+  {
+   "id": "WH02",
+   "group": "handoff",
+   "passed": true,
+   "message": "Talk to a person",
+   "latency_ms": 5548,
+   "checks": {
+    "turn1:alert": true,
+    "turn1:says_any": true,
+    "turn1:never_says": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "Talk to a person",
+      "reply": "I've asked our store team to reply to you here on WhatsApp. They'll get back to you as soon as they can, and I can keep helping in the meantime.",
+      "photos": 0,
+      "buttons": [],
+      "tools": [],
+      "latency_ms": 5548
+     }
+    ]
+   }
+  },
+  {
+   "id": "WH03",
+   "group": "handoff",
+   "passed": true,
+   "message": "Talk to a person",
+   "latency_ms": 7248,
+   "checks": {
+    "turn1:alert": true,
+    "turn2:delivered": true,
+    "turn3:replies_max": true,
+    "turn3:says_any": true,
+    "turn4:no_reply": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "Talk to a person",
+      "reply": "I've asked our store team to reply to you here on WhatsApp. They'll get back to you as soon as they can, and I can keep helping in the meantime.",
+      "photos": 0,
+      "buttons": [],
+      "tools": [],
+      "latency_ms": 6051
+     },
+     {
+      "sent": "team_reply",
+      "reply": "Hi, this is the Maitrova team. How can we help?",
+      "photos": 0,
+      "buttons": [],
+      "tools": [],
+      "latency_ms": 1865
+     },
+     {
+      "sent": "thanks! my hoodie came with a hole, can I get a replacement?",
+      "reply": "Thanks, our team has your message and will reply here shortly.",
+      "photos": 0,
+      "buttons": [],
+      "tools": [],
+      "latency_ms": 6027
+     },
+     {
+      "sent": "hello?",
+      "reply": "",
+      "photos": 0,
+      "buttons": [],
+      "tools": [],
+      "latency_ms": 15048
+     }
+    ]
+   }
+  },
+  {
+   "id": "WH04",
+   "group": "handoff",
+   "passed": true,
+   "message": "Talk to a person",
+   "latency_ms": 5380,
+   "checks": {
+    "turn1:alert": true,
+    "turn2:delivered": true,
+    "turn4:says_any": true,
+    "turn4:never_says": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "Talk to a person",
+      "reply": "I've asked our store team to reply to you here on WhatsApp. They'll get back to you as soon as they can, and I can keep helping in the meantime.",
+      "photos": 0,
+      "buttons": [],
+      "tools": [],
+      "latency_ms": 6024
+     },
+     {
+      "sent": "team_reply",
+      "reply": "Hi, the team here. Looking into it.",
+      "photos": 0,
+      "buttons": [],
+      "tools": [],
+      "latency_ms": 1948
+     },
+     {
+      "sent": "age_handoff",
+      "reply": "",
+      "photos": 0,
+      "buttons": [],
+      "tools": [],
+      "latency_ms": 10
+     },
+     {
+      "sent": "is the charcoal fleece hoodie available in L?",
+      "reply": "Yes, the Charcoal Fleece Hoodie is available in size L. Would you like me to add it to your cart?\nOption 1\nCharcoal Fleece Hoodie\nINR 1399\nAvailable\nCharcoal Grey, Cotton-Poly Fleece, 320 GSM\nReply with this product name or number for details.\nhttps://www.maitrova.in/products/hoodies/men-hoodies/charcoal-fleece-hoodie",
+      "photos": 1,
+      "buttons": [],
+      "tools": [
+       "search_products"
+      ],
+      "latency_ms": 13538
+     }
+    ]
+   }
+  },
+  {
+   "id": "WH05",
+   "group": "handoff",
+   "passed": true,
+   "message": "STOP",
+   "latency_ms": 5528,
+   "checks": {
+    "turn1:says_any": true,
+    "turn1:replies_max": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "STOP",
+      "reply": "Done. This number isn't signed up for order updates or connected to a store account, so we won't send you anything unless you message us. Message us anytime to shop.",
+      "photos": 0,
+      "buttons": [],
+      "tools": [],
+      "latency_ms": 5528
+     }
+    ]
+   }
+  },
+  {
+   "id": "WH07",
+   "group": "handoff",
+   "passed": false,
+   "message": "STOP",
+   "latency_ms": 9545,
+   "checks": {
+    "turn1:agent": true,
+    "turn1:says_any": false
+   },
+   "failures": [
+    "turn 1 (says_any): reply lacks any of ['turned off']"
+   ],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "STOP",
+      "reply": "I want to make sure I help with the right request. Please choose one:\n1. Find or recommend a product\n2. Check price, size, color, or stock\n3. Track an order, delivery, return, or refund",
+      "photos": 0,
+      "buttons": [],
+      "tools": [
+       "intent_validation"
+      ],
+      "latency_ms": 9545
+     }
+    ]
+   }
+  },
+  {
+   "id": "WH06",
+   "group": "handoff",
+   "passed": true,
+   "message": "I want to talk to someone about a bulk order of 50 tees for my company",
+   "latency_ms": 11532,
+   "checks": {
+    "turn1:alert": true,
+    "turn1:never_says": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "I want to talk to someone about a bulk order of 50 tees for my company",
+      "reply": "I've notified our team about your request for a bulk order of 50 custom t-shirts, and they will reach out to you here on WhatsApp to discuss the details and provide a quote. Is there anything else I can help you with today?",
+      "photos": 0,
+      "buttons": [],
+      "tools": [
+       "request_human"
+      ],
+      "latency_ms": 11532
+     }
+    ]
+   }
+  }
+ ]
+}

@@ -1,11 +1,12 @@
 import express from 'express';
 import { addProduct, deleteProduct, getProductById, getProducts, getProductsByMainCategory, getProductsBySubCategory, updateProduct, upload } from '../controllers/products.js';
+import { protect, requireAdmin } from "../middleware/authMiddleware.js";
 
 
 const productrouter = express.Router();
 
 // Use multer middleware for multiple file uploads (max 5 images)
-productrouter.post('/add-product', upload.array('images', 5), addProduct);
+productrouter.post('/add-product', protect, requireAdmin, upload.array('images', 5), addProduct);
 productrouter.get('/products', getProducts);
 
 // Get products by main category
@@ -17,10 +18,10 @@ productrouter.get('/products/category/:mainCategory/:subCategory', getProductsBy
 productrouter.get('/products/:id', getProductById);
 
 // Update product with optional file upload
-productrouter.put('/update/:id', upload.array('images', 5), updateProduct);
+productrouter.put('/update/:id', protect, requireAdmin, upload.array('images', 5), updateProduct);
 
 
-productrouter.delete('/products/delete/:id', deleteProduct); 
+productrouter.delete('/products/delete/:id', protect, requireAdmin, deleteProduct); 
 
 
 

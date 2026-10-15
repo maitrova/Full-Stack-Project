@@ -6,7 +6,8 @@ import json
 from fastapi import APIRouter, Depends, Query, Request, HTTPException
 from app.config.settings import settings
 from app.services.whatsapp_queue import enqueue
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
+from pydantic import BaseModel, Field
 
 from app.database.mongodb import get_database
 from app.services.whatsapp_service import WhatsAppService
@@ -48,3 +49,51 @@ async def receive_webhook(
         raise HTTPException(400, "Invalid JSON")
     count = await enqueue(get_database(), payload)
     return {"status": "accepted", "queued": count}
+
+
+def require_internal_key(request: Request) -> None:
+    """Calls from the store backend, authenticated with the shared commerce key."""
+    expected = settings.whatsapp_commerce_key or ""
+    if not expected or not hmac.compare_digest(expected, request.headers.get("x-commerce-key", "")):
+        raise HTTPException(401, "Unauthorized")
+
+
+def get_outbound():
+    from app.database.mongodb import get_ecommerce_database
+    from app.services.whatsapp_outbound import WhatsAppOutbound
+
+    return WhatsAppOutbound(get_database(), get_ecommerce_database())
+
+
+class TeamReply(BaseModel):
+    conversation_id: str
+    text: str = Field(min_length=1, max_length=4096)
+    admin_id: str | None = None
+    admin_name: str | None = Field(default=None, max_length=120)
+
+
+class OrderUpdate(BaseModel):
+    user_id: str
+    order_id: str
+    event: str = Field(min_length=1, max_length=40)
+    total: str | None = Field(default=None, max_length=40)
+
+
+@router.post("/internal/team-reply", dependencies=[Depends(require_internal_key)])
+async def team_reply(payload: TeamReply, outbound=Depends(get_outbound)):
+    from app.services.whatsapp_outbound import OutboundError
+
+    try:
+        return await outbound.team_reply(payload.conversation_id, payload.text, payload.admin_id, payload.admin_name)
+    except OutboundError as exc:
+        return JSONResponse({"message": exc.message, **exc.extra}, status_code=exc.status_code)
+
+
+@router.post("/internal/order-update", dependencies=[Depends(require_internal_key)])
+async def order_update(payload: OrderUpdate, outbound=Depends(get_outbound)):
+    from app.services.whatsapp_outbound import OutboundError
+
+    try:
+        return await outbound.order_update(payload.user_id, payload.order_id, payload.event, payload.total)
+    except OutboundError as exc:
+        return JSONResponse({"message": exc.message, **exc.extra}, status_code=exc.status_code)

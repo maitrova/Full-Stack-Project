@@ -102,5 +102,28 @@ class ProductSearchFilterTests(unittest.TestCase):
         self.assertEqual(intent.size, "XL")
 
 
+class IntentGateWordBoundaryTests(unittest.TestCase):
+    def make(self, name, category, **attributes):
+        from datetime import datetime, timezone
+        from app.schemas.product import ProductPublic
+
+        now = datetime.now(timezone.utc)
+        return ProductPublic.model_validate({
+            "_id": name, "business_id": "store", "name": name, "category": category, "price": 999,
+            "stock": 5, "attributes": attributes, "created_at": now, "updated_at": now,
+        })
+
+    def test_fit_followed_by_shirt_is_not_a_t_shirt(self):
+        from app.schemas.ai import IntentResult
+        from app.tools.product_tools import ProductTools
+
+        linen = self.make("Sky Blue Linen Shirt", "Shirts", fit="Relaxed Fit", product_type="Shirt")
+        tee = self.make("Classic Crew Neck T-Shirt", "T-Shirts", fit="Regular Fit")
+        self.assertTrue(ProductTools._matches_intent(linen, IntentResult(category="shirt")))
+        self.assertFalse(ProductTools._matches_intent(tee, IntentResult(category="shirt")))
+        self.assertTrue(ProductTools._matches_intent(tee, IntentResult(category="t-shirts")))
+        self.assertFalse(ProductTools._matches_intent(linen, IntentResult(category="t-shirt")))
+
+
 if __name__ == "__main__":
     unittest.main()

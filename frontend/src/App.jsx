@@ -50,6 +50,7 @@ import ComboPacksPage from "./pages/ComboPacksPage.jsx";
 import ComboPackDetailPage from "./pages/ComboPackDetailPage.jsx";
 import WhatsAppChatAdmin from "./pages/WhatsAppChatAdmin.jsx";
 import AIAgentEvaluation from "./pages/AIAgentEvaluation.jsx";
+import AgentWorkflow from "./pages/AgentWorkflow.jsx";
 // You'll need to create this
 
 // Layout component with header for all pages except auth
@@ -208,6 +209,8 @@ function App() {
             <AIAgentEvaluation />
           </AdminRoute>
         } />
+
+        <Route path="/agent-workflow" element={<AdminRoute><AgentWorkflow /></AdminRoute>} />
 
         <Route path="/publish-design" element={
           <MainLayout>

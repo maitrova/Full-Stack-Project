@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -18,8 +18,10 @@ class UserPublic(BaseModel):
     id: str = Field(alias="_id")
     name: str
     email: EmailStr
-    created_at: datetime
-    updated_at: datetime
+    # Legacy users created by the MERN server may not have timestamp fields.
+    # Defaults keep those shared records compatible with the AI service.
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     model_config = ConfigDict(populate_by_name=True)
 

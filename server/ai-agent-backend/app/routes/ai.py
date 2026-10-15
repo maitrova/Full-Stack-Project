@@ -2,37 +2,50 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 import hmac
+import logging
+import re
 import time
 
 from app.ai.sales_agent import SalesAgent
+from app.ai.web_agent import WebAgent, tools_agent_enabled
 from app.config.settings import settings
 from app.database.mongodb import get_database, get_ecommerce_database
-from app.dependencies.auth import get_current_user
+from app.dependencies.auth import get_current_user, get_optional_user
 from app.repositories.business_repository import BusinessRepository
 from app.repositories.conversation_repository import ConversationRepository
 from app.repositories.message_repository import MessageRepository
+from app.repositories.user_repository import UserRepository
 from app.repositories.ecommerce_product_repository import EcommerceProductRepository
-from app.schemas.ai import AiChatRequest, AiChatResponse
+from app.schemas.ai import AiChatRequest, AiChatResponse, AiRecommendationRequest
 from app.schemas.evaluation import EvaluationRequest
 from app.schemas.user import UserPublic
 from app.services.agent_evaluation import AgentEvaluator
 from app.services.catalogue_quality import validate_catalogue_record
+from app.services.chat_rate_limit import enforce_chat_rate_limit
+from app.services.offers import active_combo_offers
+from app.services.web_agent_monitor import web_agent_summary
+from app.services.whatsapp_monitor import whatsapp_health
 from app.services.quality_monitor import build_quality_alerts
 from app.services.website_knowledge import WebsiteKnowledgeSync
 from app.ai.gemini_client import GeminiClient
-from app.tools.product_tools import ProductTools
+from app.tools.product_tools import ProductSearchParams, ProductTools
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai", tags=["ai"])
 _evaluation_hits: dict[str, list[float]] = {}
+# Browser-generated chat session ids (UUIDs in practice).
+WEB_SESSION_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{16,128}")
 
 
 def get_sales_agent() -> SalesAgent:
     database = get_database()
+    knowledge_db = get_ecommerce_database()
     return SalesAgent(
         business_repository=BusinessRepository(database),
         conversation_repository=ConversationRepository(database),
         message_repository=MessageRepository(database),
-        product_tools=ProductTools(EcommerceProductRepository(get_ecommerce_database())),
+        product_tools=ProductTools(EcommerceProductRepository(knowledge_db)),
+        knowledge_db=knowledge_db,
     )
 
 
@@ -107,13 +120,100 @@ async def ai_workflow(current_user: UserPublic = Depends(get_current_user)):
     }
 
 
+async def get_storefront_business() -> dict:
+    """Resolve the one storefront tenant that serves website shoppers.
+
+    Shoppers never own a business. Using the configured tenant keeps website
+    conversations, leads, and metrics in the same place as WhatsApp.
+    """
+    business_id = settings.resolved_storefront_business_id
+    if not business_id:
+        logger.error("Website chat needs STOREFRONT_BUSINESS_ID or WHATSAPP_BUSINESS_ID")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="The shopping assistant is not configured yet.")
+    business = await BusinessRepository(get_database()).find_by_id(business_id)
+    if business is None:
+        logger.error("Storefront business %s was not found", business_id)
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="The shopping assistant is not configured yet.")
+    return business
+
+
+def get_web_session_id(x_ai_session_id: str | None = Header(default=None)) -> str:
+    session_id = (x_ai_session_id or "").strip()
+    if not WEB_SESSION_ID_PATTERN.fullmatch(session_id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="A valid x-ai-session-id header is required.")
+    return session_id
+
+
 @router.post("/chat", response_model=AiChatResponse, response_model_by_alias=False)
 async def chat(
     payload: AiChatRequest,
-    current_user: UserPublic = Depends(get_current_user),
+    request: Request,
+    current_user: UserPublic | None = Depends(get_optional_user),
+    web_session_id: str = Depends(get_web_session_id),
+    business: dict = Depends(get_storefront_business),
     sales_agent: SalesAgent = Depends(get_sales_agent),
 ):
-    return await sales_agent.handle_chat(payload, current_user)
+    await enforce_chat_rate_limit(get_database(), request, web_session_id)
+    if tools_agent_enabled(web_session_id):
+        return await WebAgent(sales_agent).handle_chat(payload, current_user, business, web_session_id)
+    return await sales_agent.handle_chat(
+        payload,
+        current_user,
+        business=business,
+        web_session_id=web_session_id,
+    )
+
+
+@router.post("/recommendations")
+async def recommendations(
+    payload: AiRecommendationRequest,
+    business: dict = Depends(get_storefront_business),
+    sales_agent: SalesAgent = Depends(get_sales_agent),
+):
+    """Return page-aware recommendations for the storefront recommendations tab.
+
+    Recommendations use the same verified catalogue and conversation handling as
+    chat, while keeping the response shape expected by the web client. They are
+    public, like the product pages they are shown on.
+    """
+    business_id = str(business["_id"])
+    context = payload.page_context or {}
+    page_type = str(context.get("page_type") or "")
+    ref = context.get("product_id") or context.get("productId") or context.get("product_slug") or context.get("productSlug") or context.get("slug")
+    page_product = None
+    if ref:
+        try:
+            page_product = await sales_agent.product_tools.get_product_details(business_id, str(ref))
+        except Exception as exc:
+            logger.warning("Recommendation page product lookup failed: %s", exc.__class__.__name__)
+    if page_product:
+        products = await sales_agent.product_tools.recommend_alternatives(
+            business_id=business_id, product_id=page_product.id, cheaper=False,
+        )
+        response = f"More like {page_product.name}."
+    else:
+        products = await sales_agent.product_tools.search_products(ProductSearchParams(
+            business_id=business_id,
+            category=context.get("category") or context.get("subCategory"),
+            limit=5,
+        ))
+        response = {
+            "cart": "Before you check out: combo offers and products that go well with your cart.",
+            "home": "Popular picks and current combo offers.",
+            "combo_listing": "Current combo offers.",
+            "combo_detail": "More combo offers and products you may like.",
+        }.get(page_type, "Products you may like and current combo offers.")
+    offers = await active_combo_offers(
+        get_ecommerce_database(), product_id=str(page_product.id) if page_product else None, limit=3,
+    )
+    if page_product and offers:
+        response += " Save more with a combo offer."
+    return {
+        "session_id": None,
+        "response": response,
+        "products": products,
+        "offers": offers,
+    }
 
 
 @router.post("/evaluate")
@@ -219,13 +319,29 @@ async def get_evaluation(
     return {"found": True, "report": report}
 
 
+async def get_monitored_business(current_user: UserPublic) -> dict | None:
+    """The store whose AI activity this user may monitor.
+
+    Website chats are filed under the configured storefront business, which
+    no shopper or admin account owns. Store staff (admin/superuser) monitor
+    that business; other merchants see the business they own.
+    """
+    database = get_database()
+    user = await UserRepository(database).find_by_id(current_user.id)
+    if user and user.get("role") in {"admin", "superuser"} and settings.resolved_storefront_business_id:
+        business = await BusinessRepository(database).find_by_id(settings.resolved_storefront_business_id)
+        if business is not None:
+            return business
+    return await BusinessRepository(database).find_by_owner_id(current_user.id)
+
+
 @router.get("/metrics")
 async def ai_metrics(
     current_user: UserPublic = Depends(get_current_user),
 ):
     """Privacy-safe 24-hour quality/latency summary for the business owner."""
     database = get_database()
-    business = await BusinessRepository(database).find_by_owner_id(current_user.id)
+    business = await get_monitored_business(current_user)
     if business is None:
         return {
             "period_hours": 24,
@@ -248,7 +364,8 @@ async def ai_metrics(
         }
     since = datetime.now(timezone.utc) - timedelta(hours=24)
     rows = await database.ai_agent_metrics.aggregate([
-        {"$match": {"business_id": business["_id"], "created_at": {"$gte": since}}},
+        # Fallback event rows describe the web agent, not a separate request.
+        {"$match": {"business_id": business["_id"], "created_at": {"$gte": since}, "event": {"$exists": False}}},
         {"$group": {
             "_id": None,
             "requests": {"$sum": 1},
@@ -300,8 +417,70 @@ async def ai_metrics(
             summary.get("handoff_requests", 0) / summary.get("requests", 1), 4
         ) if summary.get("requests") else 0,
     }
-    summary["alerts"] = build_quality_alerts(summary)
+    summary["web_agent"] = await web_agent_summary(database, business["_id"], since, channel="web")
+    summary["whatsapp_agent"] = await web_agent_summary(database, business["_id"], since, channel="whatsapp")
+    summary["whatsapp_health"] = await whatsapp_health(database, get_ecommerce_database(), business["_id"], since)
+    summary["alerts"] = (build_quality_alerts(summary) + summary["web_agent"]["alerts"]
+                         + summary["whatsapp_agent"]["alerts"] + summary["whatsapp_health"]["alerts"])
     return summary
+
+
+@router.get("/review-sample")
+async def review_sample(
+    limit: int = 20,
+    days: int = 7,
+    current_user: UserPublic = Depends(get_current_user),
+):
+    """Random recent website conversations for the weekly quality review.
+
+    Each AI reply is flagged when it fell back, was rate-limited, needed a
+    grounding retry, had a cart claim corrected, or handed off to the team.
+    Turn anything wrong into a case in tests/fixtures/web_agent_scenarios.json.
+    """
+    database = get_database()
+    business = await get_monitored_business(current_user)
+    if business is None:
+        return {"conversations": []}
+    since = datetime.now(timezone.utc) - timedelta(days=max(1, min(days, 90)))
+    sample = await database.conversations.aggregate([
+        {"$match": {"business_id": business["_id"], "channel": "web", "last_message_at": {"$gte": since}}},
+        {"$sample": {"size": max(1, min(limit, 50))}},
+    ]).to_list(length=50)
+    conversations = []
+    for conversation in sample:
+        messages = await database.messages.find(
+            {"conversation_id": conversation["_id"]},
+            {"sender": 1, "content": 1, "created_at": 1, "metadata.agent_mode": 1, "metadata.tool_calls": 1,
+             "metadata.grounding_retry": 1, "metadata.cart_actions": 1, "metadata.order_cards": 1},
+        ).sort("created_at", 1).limit(60).to_list(length=60)
+        turns = []
+        for message in messages:
+            metadata = message.get("metadata") or {}
+            turn = {"sender": message.get("sender"), "content": message.get("content"), "at": message.get("created_at")}
+            if message.get("sender") == "ai":
+                flags = []
+                if metadata.get("agent_mode") != "tools":
+                    flags.append("rules_agent")
+                if metadata.get("grounding_retry"):
+                    flags.append("grounding_retry")
+                if "Sorry, I'm getting a lot of questions" in str(message.get("content") or ""):
+                    flags.append("busy")
+                if "couldn't make that change to your cart" in str(message.get("content") or ""):
+                    flags.append("cart_claim_corrected")
+                turn["tools"] = [call.get("name") for call in metadata.get("tool_calls") or []]
+                turn["cart_actions"] = metadata.get("cart_actions") or []
+                turn["flags"] = flags
+            turns.append(turn)
+        conversations.append({
+            "conversation_id": str(conversation["_id"]),
+            "signed_in": bool(conversation.get("customer_id")),
+            "handoff": conversation.get("status") == "handoff",
+            "last_message_at": conversation.get("last_message_at"),
+            "flagged_replies": sum(1 for turn in turns if turn.get("flags")),
+            "turns": turns,
+        })
+    conversations.sort(key=lambda item: -item["flagged_replies"])
+    return {"days": days, "conversations": conversations}
 
 
 @router.get("/metrics/trace/{request_id}")

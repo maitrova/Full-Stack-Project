@@ -85,6 +85,9 @@ class GeminiClient:
         async with httpx.AsyncClient(timeout=45) as client:
             for model_index, model in enumerate(models):
                 payload = {"model": model, "input": input_data, "store": False}
+                # Reset per model: a network error leaves no response, and the
+                # next model must be tried instead of reading a stale/unset one.
+                response = None
                 for attempt in range(2):
                     try:
                         response = await client.post(
@@ -101,10 +104,14 @@ class GeminiClient:
                         await asyncio.sleep(1)
                         continue
                     break
+                if response is None:
+                    continue
                 if not response.is_error or response.status_code not in {404, 429, 500, 502, 503, 504}:
                     break
                 if model_index < len(models) - 1:
                     logger.info("Gemini %s model %s unavailable; trying fallback", operation, model)
+        if response is None:
+            raise RuntimeError(f"Gemini {operation} unreachable")
         if response.is_error:
             self._log_api_error(response, operation, model)
         response.raise_for_status()

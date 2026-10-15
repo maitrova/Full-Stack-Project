@@ -16,6 +16,7 @@ from PIL import Image, ImageOps
 from pymongo import ReturnDocument
 
 from app.ai.sales_agent import SalesAgent
+from app.ai.web_agent import WebAgent, whatsapp_tools_enabled
 from app.config.settings import settings
 from app.database.mongodb import get_ecommerce_database
 from app.repositories.business_repository import BusinessRepository
@@ -61,7 +62,7 @@ class WhatsAppClient:
         if reply_to_message_id:
             payload["context"] = {"message_id": reply_to_message_id}
 
-        url = f"https://graph.facebook.com/{self.graph_api_version}/{self.phone_number_id}/messages"
+        url = f"{settings.whatsapp_graph_api_base_url.rstrip('/')}/{self.graph_api_version}/{self.phone_number_id}/messages"
         headers = {"Authorization": f"Bearer {self.access_token}", "Content-Type": "application/json"}
         async with httpx.AsyncClient(timeout=20) as client:
             response = await client.post(url, json=payload, headers=headers)
@@ -71,6 +72,22 @@ class WhatsAppClient:
                 logger.error("WhatsApp send failed: %s", response.text)
                 raise
             return response.json()
+
+    async def send_template(self, to: str, name: str, language: str, parameters: list[str]) -> dict[str, Any] | None:
+        """A Meta-approved template: the only message allowed outside the 24-hour window."""
+        if not self.is_configured:
+            return None
+        return await self._send_message_payload({
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to,
+            "type": "template",
+            "template": {
+                "name": name,
+                "language": {"code": language},
+                "components": [{"type": "body", "parameters": [{"type": "text", "text": str(value)[:1024]} for value in parameters]}],
+            },
+        })
 
     async def send_reply_buttons(
         self,
@@ -112,6 +129,8 @@ class WhatsAppClient:
             return "change_sizes"
         if normalized in {"no", "cancel", "not now"}:
             return "decline_cart"
+        if normalized == "talk to a person":
+            return "talk_to_person"
         option = re.fullmatch(r"option ([1-5])", normalized)
         return f"option_{option[1]}" if option else f"reply_{index}"
 
@@ -151,7 +170,7 @@ class WhatsAppClient:
         return await self._send_message_payload(payload)
 
     async def _send_message_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
-        url = f"https://graph.facebook.com/{self.graph_api_version}/{self.phone_number_id}/messages"
+        url = f"{settings.whatsapp_graph_api_base_url.rstrip('/')}/{self.graph_api_version}/{self.phone_number_id}/messages"
         headers = {"Authorization": f"Bearer {self.access_token}", "Content-Type": "application/json"}
         async with httpx.AsyncClient(timeout=20) as client:
             response = await client.post(url, json=payload, headers=headers)
@@ -195,7 +214,7 @@ class WhatsAppClient:
         if reply_to_message_id:
             payload["context"] = {"message_id": reply_to_message_id}
 
-        url = f"https://graph.facebook.com/{self.graph_api_version}/{self.phone_number_id}/messages"
+        url = f"{settings.whatsapp_graph_api_base_url.rstrip('/')}/{self.graph_api_version}/{self.phone_number_id}/messages"
         headers = {"Authorization": f"Bearer {self.access_token}", "Content-Type": "application/json"}
         async with httpx.AsyncClient(timeout=20) as client:
             response = await client.post(url, json=payload, headers=headers)
@@ -243,7 +262,7 @@ class WhatsAppClient:
             output = io.BytesIO()
             image.save(output, format="JPEG", quality=90, optimize=True)
 
-        url = f"https://graph.facebook.com/{self.graph_api_version}/{self.phone_number_id}/media"
+        url = f"{settings.whatsapp_graph_api_base_url.rstrip('/')}/{self.graph_api_version}/{self.phone_number_id}/media"
         headers = {"Authorization": f"Bearer {self.access_token}"}
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(
@@ -279,7 +298,7 @@ class WhatsAppClient:
             return None
 
         headers = {"Authorization": f"Bearer {self.access_token}"}
-        metadata_url = f"https://graph.facebook.com/{self.graph_api_version}/{media_id}"
+        metadata_url = f"{settings.whatsapp_graph_api_base_url.rstrip('/')}/{self.graph_api_version}/{media_id}"
         # Meta media URLs may redirect to a short-lived CDN URL.
         async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
             metadata_response = await self._get_media_with_retry(client, metadata_url, headers)
@@ -325,6 +344,8 @@ class WhatsAppService:
             message_repository=MessageRepository(database),
             product_tools=ProductTools(EcommerceProductRepository(self.ecommerce_database)),
             commerce=WhatsAppCommerce(self.ecommerce_database),
+            # Store policies, orders and offers for the tool-calling agent.
+            knowledge_db=self.ecommerce_database,
         )
         self.message_repository = MessageRepository(database)
         self.client = WhatsAppClient()
@@ -541,6 +562,9 @@ class WhatsAppService:
                 {"_id": message.get("id")}, {"$set": {"processing_stage": "image_agent"}}, upsert=True,
             )
         admin_media_id = await self._store_admin_media(business, message, image_payload)
+        # The tool-calling agent answers text when enabled for this customer;
+        # photos keep the existing image-search flow.
+        web_agent = WebAgent(self.sales_agent) if whatsapp_tools_enabled(from_phone) and not image_payload else None
         return await self.sales_agent.handle_external_chat(
             business=business,
             message=text,
@@ -560,6 +584,7 @@ class WhatsAppService:
                 "whatsapp_quoted_product_id": quoted_product_id,
             },
             quoted_product_id=quoted_product_id,
+            web_agent=web_agent,
         )
 
     async def _rate_limited(self, from_phone: str) -> bool:
@@ -594,21 +619,31 @@ class WhatsAppService:
         if conversation is None or conversation.get("status") != "handoff":
             return False
 
-        # A customization lead or an open handoff alert must not permanently
-        # silence the assistant. Pause automation only while a teammate has
-        # actively taken ownership, or when the customer explicitly asks for
-        # a human. Otherwise resume AI for ordinary product/store questions.
-        normalized_text = str(text or "").lower().strip()
-        explicitly_human = bool(re.search(
-            r"\b(?:human|real person|someone from (?:the )?(?:shop|store)|"
-            r"talk to (?:a )?(?:person|staff|agent)|store team)\b",
-            normalized_text,
-        ))
-        assigned_alert = await self.conversation_repository.collection.database.whatsapp_handoff_alerts.find_one(
-            {"conversation_id": conversation["_id"], "status": "assigned"},
-            {"_id": 1},
-        )
-        if not explicitly_human and assigned_alert is None:
+        # The AI pauses only while a teammate owns the chat (claimed it, paused
+        # the AI, or replied from the dashboard). A request nobody has picked up
+        # yet must not silence the assistant: it keeps answering, and the alert
+        # stays open on the dashboard. A takeover with no team reply for
+        # WHATSAPP_HANDOFF_IDLE_HOURS ends by itself.
+        alerts = self.conversation_repository.collection.database.whatsapp_handoff_alerts
+        assigned_alert = await alerts.find_one({"conversation_id": conversation["_id"], "status": "assigned"})
+        now = datetime.now(timezone.utc)
+        if assigned_alert is not None:
+            team_times = [value for value in (assigned_alert.get("last_human_reply_at"), assigned_alert.get("assigned_at"))
+                          if isinstance(value, datetime)]
+            if not team_times and isinstance(assigned_alert.get("created_at"), datetime):
+                team_times = [assigned_alert["created_at"]]
+            last_team_activity = max((value.replace(tzinfo=value.tzinfo or timezone.utc) for value in team_times), default=now)
+            if now - last_team_activity > timedelta(hours=settings.whatsapp_handoff_idle_hours):
+                await alerts.update_one(
+                    {"_id": assigned_alert["_id"]},
+                    {"$set": {"status": "resumed", "auto_resumed": True, "resolved_at": now, "updated_at": now}},
+                )
+                await self.conversation_repository.collection.update_one(
+                    {"_id": conversation["_id"]}, {"$set": {"handoff_status": "resumed", "handoff_resolved_at": now}},
+                )
+                logger.info("Resuming AI for WhatsApp conversation %s after the team went quiet", conversation.get("_id"))
+                assigned_alert = None
+        if assigned_alert is None:
             await self.conversation_repository.collection.update_one(
                 {"_id": conversation["_id"], "business_id": business["_id"]},
                 {
@@ -653,6 +688,20 @@ class WhatsAppService:
                 {"_id": conversation["_id"], "business_id": business["_id"]},
                 {"$set": {"customer_name": customer_name}},
             )
+        if not assigned_alert.get("customer_ack_sent"):
+            # One note per takeover, so the customer knows a person has it.
+            ack = "Thanks, our team has your message and will reply here shortly."
+            try:
+                if await self.client.send_text(from_phone, ack, message.get("id")):
+                    await alerts.update_one({"_id": assigned_alert["_id"]}, {"$set": {"customer_ack_sent": True}})
+                    await self.message_repository.create_message(
+                        business_id=str(business["_id"]), conversation_id=str(conversation["_id"]),
+                        customer_id=str(conversation["customer_id"]) if conversation.get("customer_id") else None,
+                        payload={"sender": "ai", "content": ack, "message_type": "text", "metadata": {"handoff_ack": True}},
+                    )
+            except httpx.HTTPError:
+                logger.warning("WhatsApp handoff acknowledgement failed")
+        await alerts.update_one({"_id": assigned_alert["_id"]}, {"$set": {"last_customer_message_at": now, "updated_at": now}})
         logger.info("Stored WhatsApp message %s without AI reply because conversation is in handoff", message.get("id"))
         return True
 
@@ -770,6 +819,8 @@ class WhatsAppService:
                 body.lower(),
             ):
                 return await self.client.send_option_list(to, body, products, message_id), "list"
+            if len(body) <= 1024 and response.ai_message.metadata.get("offer_human"):
+                return await self.client.send_reply_buttons(to, body, ["Talk to a person"], message_id), "buttons"
         except httpx.HTTPStatusError:
             logger.warning("Interactive WhatsApp reply failed; falling back to text")
         return await self.client.send_text(to, body, message_id), "text"
@@ -791,6 +842,8 @@ class WhatsAppService:
                     return "no"
                 if reply_id == "change_sizes":
                     return "show sizes"
+                if reply_id == "talk_to_person":
+                    return "Talk to a person"
                 return reply.get("title", "").strip()
             if interactive.get("type") == "list_reply":
                 return interactive.get("list_reply", {}).get("title", "").strip()
@@ -871,10 +924,13 @@ class WhatsAppService:
         if delivery_id:
             previous = await self.deliveries.find_one({"_id": delivery_id}) or {}
             seen_image_urls.update(previous.get("sent_images", []))
+        # Keyed per product: two products sharing a photo must both be sent,
+        # or "Option N" captions stop matching the numbered list.
         for number, product in enumerate(products[:5], 1):
             urls = (getattr(product, "images", None) or [])[:6 if gallery else 1]
             for image_url in urls:
-                if not self._is_public_image_url(image_url) or image_url in seen_image_urls:
+                image_key = f"{product.id}|{image_url}"
+                if not self._is_public_image_url(image_url) or image_key in seen_image_urls:
                     continue
                 try:
                     caption = self._product_image_caption(product)
@@ -887,10 +943,10 @@ class WhatsAppService:
                     if delivery_id:
                         await self.deliveries.update_one(
                             {"_id": delivery_id},
-                            {"$addToSet": {"sent_images": image_url}, "$inc": {"outbound_messages": 1}},
+                            {"$addToSet": {"sent_images": image_key}, "$inc": {"outbound_messages": 1}},
                         )
                     sent += 1
-                    seen_image_urls.add(image_url)
+                    seen_image_urls.add(image_key)
                 except Exception as exc:
                     logger.warning("WhatsApp product image send failed: %s", exc.__class__.__name__)
                     if delivery_id:

@@ -33,6 +33,14 @@ export const protect = async (req, res, next) => {
   }
 };
 
+// Use after `protect`: only store staff may continue.
+export const requireAdmin = (req, res, next) => {
+  if (!req.user || !["admin", "superuser"].includes(req.user.role)) {
+    return res.status(403).json({ message: "Admin access required" });
+  }
+  next();
+};
+
 export const optionalProtect = async (req, _res, next) => {
   try {
     await attachUserFromToken(req);

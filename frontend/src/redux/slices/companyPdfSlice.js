@@ -3,9 +3,15 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+// Saving and uploading policy documents requires an admin login.
+const authHeaders = (getState) => {
+  const token = getState().user?.userInfo?.token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 export const uploadCompanyPdf = createAsyncThunk(
   'companyPdf/upload',
-  async ({ file, name }, { rejectWithValue }) => {
+  async ({ file, name }, { rejectWithValue, getState }) => {
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -14,6 +20,7 @@ export const uploadCompanyPdf = createAsyncThunk(
       const response = await axios.post(`${API_URL}/company-pdfs/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
+          ...authHeaders(getState),
         },
       });
 
@@ -26,12 +33,13 @@ export const uploadCompanyPdf = createAsyncThunk(
 
 export const saveCompanyDocument = createAsyncThunk(
   'companyPdf/saveDocument',
-  async ({ name, content }, { rejectWithValue }) => {
+  async ({ name, content }, { rejectWithValue, getState }) => {
     try {
-      const response = await axios.post(`${API_URL}/company-pdfs/company-documents`, {
-        name,
-        content,
-      });
+      const response = await axios.post(
+        `${API_URL}/company-pdfs/company-documents`,
+        { name, content },
+        { headers: authHeaders(getState) }
+      );
 
       return response.data;
     } catch (error) {

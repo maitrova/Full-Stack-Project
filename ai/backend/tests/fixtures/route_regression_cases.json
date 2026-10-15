@@ -1,0 +1,10 @@
+[
+  {"message": "show me some black hoodies", "route": "product_search"},
+  {"message": "which hoodie would you recommend for a gift?", "route": "product_search"},
+  {"message": "option 2", "route": "product_selection", "state": {"recommended_product_ids": ["1", "2", "3"]}},
+  {"message": "what sizes are available for this hoodie?", "route": "product_details", "state": {"selected_product_id": "1"}},
+  {"message": "add my logo to a hoodie", "route": "customization"},
+  {"message": "please ask the customization team to contact me", "route": "human_handoff"},
+  {"message": "any floral designs for hoodies?", "route": "design_library"},
+  {"message": "can you give me medical advice?", "route": "unsupported"}
+]

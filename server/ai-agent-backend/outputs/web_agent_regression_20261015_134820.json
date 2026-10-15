@@ -1,0 +1,112 @@
+{
+ "name": "Web agent regression 2026-10-15 13:48",
+ "created_at": "2026-10-15 13:48:20.320830+00:00",
+ "total_cases": 2,
+ "passed_cases": 2,
+ "failed_cases": 0,
+ "pass_rate": 1.0,
+ "average_latency_ms": 6758,
+ "by_group": {
+  "orders_guest": {
+   "passed": 1,
+   "total": 1
+  },
+  "cart": {
+   "passed": 1,
+   "total": 1
+  }
+ },
+ "results": [
+  {
+   "id": "G06",
+   "group": "orders_guest",
+   "message": "refund status for order 44FE2A9F, email nagalahemanth411@gmail.com",
+   "passed": true,
+   "latency_ms": 3787,
+   "checks": {
+    "turn1:orders": true,
+    "turn1:says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "intent": "tools",
+    "route": "tools_agent",
+    "confidence": 1.0,
+    "product_count": 0,
+    "products": [],
+    "turns": [
+     {
+      "reply": "Your refund for order 44FE2A9F is currently in progress. It was initiated on 12 October 2026 for the amount of ₹1099.\n\nRefunds typically take 5–7 business days to process after approval, though bank processing times may vary. You can check the status of your order at any time on your order page: https://www.maitrova.in/orders.",
+      "tools": [
+       "search_store_info",
+       "track_order"
+      ],
+      "orders": [
+       "44FE2A9F"
+      ],
+      "cards": [],
+      "latency_ms": 3787,
+      "mode": "tools"
+     }
+    ]
+   }
+  },
+  {
+   "id": "K14",
+   "group": "cart",
+   "message": "what's in my cart and what's my total?",
+   "passed": true,
+   "latency_ms": 9728,
+   "checks": {
+    "turn1:no_actions": true,
+    "turn1:says_any": true,
+    "turn2:actions": true,
+    "turn2:cart_has": true,
+    "turn3:actions": true,
+    "turn3:cart_lacks": true
+   },
+   "failures": [],
+   "actual": {
+    "intent": "tools",
+    "route": "tools_agent",
+    "confidence": 1.0,
+    "product_count": 0,
+    "products": [],
+    "turns": [
+     {
+      "reply": "Your cart contains two items: one Oversized Black Cotton T-Shirt (size L) for ₹799 and one Charcoal Fleece Hoodie (size XL) for ₹1399. Your current total is ₹2198.\n\nWould you like to proceed to checkout or make any changes to your items?",
+      "tools": [
+       "view_cart"
+      ],
+      "orders": [],
+      "cards": [],
+      "latency_ms": 3852,
+      "mode": "tools"
+     },
+     {
+      "reply": "I'm updating the quantity of the Oversized Black Cotton T-Shirt to 2 in your cart.\n\nWould you like to check anything else before you head to checkout?",
+      "tools": [
+       "view_cart",
+       "update_cart_item"
+      ],
+      "orders": [],
+      "cards": [],
+      "latency_ms": 5016,
+      "mode": "tools"
+     },
+     {
+      "reply": "I'm removing the Charcoal Fleece Hoodie from your cart.\n\nWould you like to see the updated total or continue shopping?",
+      "tools": [
+       "view_cart",
+       "remove_cart_item"
+      ],
+      "orders": [],
+      "cards": [],
+      "latency_ms": 20315,
+      "mode": "tools"
+     }
+    ]
+   }
+  }
+ ]
+}

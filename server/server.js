@@ -55,6 +55,7 @@ const app = express();
 const outputsDir = path.join(__dirname, "outputs");
 const defaultCorsOrigins = [
   "http://localhost:5173",
+  "http://127.0.0.1:8000/api/ai/recommendations",
   "http://maitrova.in",
   "https://maitrova.in",
   "http://www.maitrova.in",

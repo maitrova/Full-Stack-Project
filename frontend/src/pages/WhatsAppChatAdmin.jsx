@@ -15,6 +15,7 @@ import {
   Paintbrush,
   RefreshCw,
   Search,
+  Send,
   UserRound,
   UserCheck,
   Users,
@@ -100,6 +101,9 @@ export default function WhatsAppChatAdmin() {
   const [mobilePane, setMobilePane] = useState("list");
   const [overview, setOverview] = useState(null);
   const [showDebug, setShowDebug] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [loadedAt, setLoadedAt] = useState(0);
 
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
@@ -135,6 +139,7 @@ export default function WhatsAppChatAdmin() {
     try {
       const { data } = await axios.get(`${API_URL}/admin/whatsapp-chats/${id}`, { headers });
       setDetail(data);
+      setLoadedAt(Date.now());
       setLeadNote(data?.conversation?.lead_note || "");
       setError("");
     } catch (requestError) {
@@ -214,6 +219,26 @@ export default function WhatsAppChatAdmin() {
 
   const selectedConversation = detail?.conversation;
   const messages = detail?.messages || [];
+  // WhatsApp allows free-form replies only within 24 hours of the customer's last message.
+  const lastCustomerAt = [...messages].reverse().find((message) => message.sender === "customer")?.created_at;
+  const windowOpen = Boolean(lastCustomerAt) && loadedAt - new Date(lastCustomerAt).getTime() < 24 * 60 * 60 * 1000;
+
+  const sendReply = async (event) => {
+    event.preventDefault();
+    const text = replyText.trim();
+    if (!selectedId || !text) return;
+    setSending(true);
+    try {
+      await axios.post(`${API_URL}/admin/whatsapp-chats/${selectedId}/reply`, { text }, { headers });
+      setReplyText("");
+      await Promise.all([loadChats({ quiet: true }), loadDetail(selectedId, { quiet: true })]);
+      setError("");
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || "Could not send the reply.");
+    } finally {
+      setSending(false);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-[#f0f2f5] text-slate-900">
@@ -246,13 +271,15 @@ export default function WhatsAppChatAdmin() {
         {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
         {overview && (
-          <div className="mb-4 grid grid-cols-2 gap-2 lg:grid-cols-6">
+          <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[
               ["24h requests", overview.requests, Activity],
               ["Avg latency", `${overview.average_latency_ms} ms`, Clock3],
               ["Open handoffs", overview.active_handoffs, Users],
               ["Image failures", overview.image_failures, AlertTriangle],
               ["Delivery errors", overview.delivery_errors, AlertTriangle],
+              ["Not delivered by Meta", overview.meta_delivery_failures ?? 0, AlertTriangle],
+              ["Order updates not sent", overview.order_updates_not_sent ?? 0, AlertTriangle],
               ["AI cost", `$${Number(overview.estimated_cost_usd || 0).toFixed(4)}`, Activity],
             ].map(([label, value, Icon]) => (
               <div key={label} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
@@ -344,7 +371,7 @@ export default function WhatsAppChatAdmin() {
                         <div className={`max-w-[88%] rounded-lg px-3 py-2 shadow-[0_1px_2px_rgba(15,23,42,.12)] sm:max-w-[78%] ${customer ? "rounded-tr-none bg-[#d9fdd3]" : human ? "rounded-tl-none border border-amber-200 bg-amber-50" : "rounded-tl-none bg-white"}`}>
                           <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
                             {customer ? <UserRound className="h-3 w-3" /> : human ? <Users className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
-                            {customer ? "Customer" : human ? "Team" : "AI"}
+                            {customer ? "Customer" : human ? (message.metadata?.sent_by || "Team") : "AI"}
                           </div>
                           {message.message_type === "image" && (
                             <ChatImage conversationId={selectedConversation._id} messageId={message._id} headers={headers} />
@@ -364,6 +391,28 @@ export default function WhatsAppChatAdmin() {
                     );
                   })}
                 </div>
+                <form onSubmit={sendReply} className="border-t border-slate-200 bg-[#f0f2f5] p-2 sm:p-3">
+                  {windowOpen ? (
+                    <p className="mb-1.5 px-1 text-[11px] text-slate-500">Replying pauses the AI for this chat until you press Resume AI (or after 12 hours without a team reply).</p>
+                  ) : (
+                    <p className="mb-1.5 px-1 text-[11px] font-medium text-amber-700">WhatsApp only allows replies within 24 hours of the customer's last message. Wait for them to write again.</p>
+                  )}
+                  <div className="flex items-end gap-2">
+                    <textarea
+                      value={replyText}
+                      onChange={(event) => setReplyText(event.target.value)}
+                      onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) sendReply(event); }}
+                      rows={2}
+                      maxLength={4096}
+                      disabled={!windowOpen || sending}
+                      className="min-w-0 flex-1 resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 disabled:bg-slate-100"
+                      placeholder={windowOpen ? "Reply as the store team" : "Reply window closed"}
+                    />
+                    <button type="submit" disabled={!windowOpen || sending || !replyText.trim()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50" aria-label="Send reply">
+                      {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </form>
               </>
             )}
           </section>

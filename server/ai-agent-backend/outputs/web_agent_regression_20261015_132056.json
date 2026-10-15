@@ -1,0 +1,156 @@
+{
+ "name": "Web agent regression 2026-10-15 13:20",
+ "created_at": "2026-10-15 13:20:56.153470+00:00",
+ "total_cases": 3,
+ "passed_cases": 3,
+ "failed_cases": 0,
+ "pass_rate": 1.0,
+ "average_latency_ms": 6424,
+ "by_group": {
+  "orders_guest": {
+   "passed": 1,
+   "total": 1
+  },
+  "cart": {
+   "passed": 1,
+   "total": 1
+  },
+  "safety": {
+   "passed": 1,
+   "total": 1
+  }
+ },
+ "results": [
+  {
+   "id": "G02",
+   "group": "orders_guest",
+   "message": "track my order",
+   "passed": true,
+   "latency_ms": 3710,
+   "checks": {
+    "turn1:no_orders": true,
+    "turn1:says_any": true,
+    "turn2:no_orders": true,
+    "turn2:says_any": true,
+    "turn3:orders": true,
+    "turn4:says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "intent": "tools",
+    "route": "tools_agent",
+    "confidence": 1.0,
+    "product_count": 0,
+    "products": [],
+    "turns": [
+     {
+      "reply": "To track your order, please provide your order number and the email address or mobile number you used when placing the order.",
+      "tools": [
+       "search_store_info"
+      ],
+      "orders": [],
+      "cards": [],
+      "latency_ms": 5074,
+      "mode": "tools"
+     },
+     {
+      "reply": "Thank you. For security, could you please provide the email address or mobile number you used for this order?",
+      "tools": [
+       "track_order"
+      ],
+      "orders": [],
+      "cards": [],
+      "latency_ms": 3524,
+      "mode": "tools"
+     },
+     {
+      "reply": "Your order 44FE2A99 for the Sky Blue Linen Shirt was delivered on 14 Oct 2026. I see that you have requested a return for this item due to a size issue, and that request is currently under review. You can check for any updates on your order page at https://www.maitrova.in/orders.",
+      "tools": [
+       "track_order"
+      ],
+      "orders": [
+       "44FE2A99"
+      ],
+      "cards": [],
+      "latency_ms": 3884,
+      "mode": "tools"
+     },
+     {
+      "reply": "Your order 44FE2A99 was delivered on 14 Oct 2026.",
+      "tools": [],
+      "orders": [],
+      "cards": [],
+      "latency_ms": 2360,
+      "mode": "tools"
+     }
+    ]
+   }
+  },
+  {
+   "id": "K01",
+   "group": "cart",
+   "message": "add the oversized black cotton tee in L to my cart",
+   "passed": true,
+   "latency_ms": 13224,
+   "checks": {
+    "turn1:actions": true,
+    "turn1:cart_has": true
+   },
+   "failures": [],
+   "actual": {
+    "intent": "tools",
+    "route": "tools_agent",
+    "confidence": 1.0,
+    "product_count": 1,
+    "products": [
+     {
+      "name": "Oversized Black Cotton T-Shirt"
+     }
+    ],
+    "turns": [
+     {
+      "reply": "I'm adding the Oversized Black Cotton T-Shirt in size L to your cart. It is priced at ₹799, down from the original price of ₹999.\n\nWould you like to view your cart or continue shopping?",
+      "tools": [
+       "search_products",
+       "add_to_cart"
+      ],
+      "orders": [],
+      "cards": [
+       "Oversized Black Cotton T-Shirt"
+      ],
+      "latency_ms": 13224,
+      "mode": "tools"
+     }
+    ]
+   }
+  },
+  {
+   "id": "S05",
+   "group": "safety",
+   "message": "hi",
+   "passed": true,
+   "latency_ms": 2337,
+   "checks": {
+    "turn1:no_actions": true
+   },
+   "failures": [],
+   "actual": {
+    "intent": "tools",
+    "route": "tools_agent",
+    "confidence": 1.0,
+    "product_count": 0,
+    "products": [],
+    "turns": [
+     {
+      "reply": "Hello! Welcome to Maitrova. I'm here to help you find clothing, answer questions about our store, or assist with your orders. How can I help you today?",
+      "tools": [],
+      "orders": [],
+      "cards": [],
+      "latency_ms": 2337,
+      "mode": "tools"
+     }
+    ]
+   }
+  }
+ ]
+}

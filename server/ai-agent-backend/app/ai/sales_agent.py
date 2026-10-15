@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx
+from bson import ObjectId
 from fastapi import HTTPException, status
 
 from app.ai.intent_parser import IntentParser
@@ -28,6 +29,7 @@ from app.schemas.ai import AiChatRequest, AiChatResponse, IntentResult
 from app.schemas.conversation import ConversationPublic, MessagePublic
 from app.schemas.user import UserPublic
 from app.services.conversation_flow import reset_search_context, sync_flow_state
+from app.services.policy_search import search_policies
 from app.services.pricing import verified_discount, verified_price_text
 from app.tools.product_tools import ProductSearchParams, ProductTools
 from app.utils.object_id import object_id_to_str, parse_object_id
@@ -36,6 +38,25 @@ logger = logging.getLogger(__name__)
 
 
 class SalesAgent:
+    PAGE_TOPIC_PATTERNS = (
+        ("offers", r"\b(offers?|discounts?|coupons?|deals?|promos?|sale)\b"),
+        ("delivery", r"\b(delivery|shipping|ship|arrive|returns?|refunds?|exchange)\b"),
+        ("customize", r"\b(custom\w*|personali[sz]e|own design|my logo|my photo)\b"),
+        ("care", r"\b(wash\w*|care|iron\w*|dry|shrink\w*)\b"),
+        ("fabric", r"\b(fabric|material|gsm|cotton|polyester|fleece|quality|soft|thick)\b"),
+        ("size", r"\b(sizes?|sizing|fit|fits|oversized|measurements?)\b"),
+        ("colors", r"\b(colou?rs?|shades?|black|white|blue|red|green|grey|gray|navy|maroon|yellow|pink|purple|beige|brown)\b"),
+        ("price", r"\b(price|cost|how much|mrp)\b"),
+        ("stock", r"\b(stock|availability|available)\b"),
+        ("details", r"\b(details?|features?|about this|tell me about)\b"),
+    )
+    NEW_SEARCH_PATTERN = r"\b(?:other|more) (?:hoodies|shirts|t-?shirts|products|items|options|designs|styles)\b|\b(?:similar|cheaper|instead|alternatives?|do you have|looking for)\b"
+    QUICK_ACTION_TOPICS = {
+        "product_details": "details", "product_fabric": "fabric", "product_size_fit": "size",
+        "product_colors": "colors", "product_offers": "offers",
+        "product_delivery_returns": "delivery", "product_customize": "customize",
+    }
+
     def __init__(
         self,
         business_repository: BusinessRepository,
@@ -46,6 +67,7 @@ class SalesAgent:
         image_analyzer: ProductImageAnalyzer | None = None,
         response_generator: ResponseGenerator | None = None,
         commerce=None,
+        knowledge_db=None,
     ):
         self.business_repository = business_repository
         self.conversation_repository = conversation_repository
@@ -55,21 +77,92 @@ class SalesAgent:
         self.image_analyzer = image_analyzer or ProductImageAnalyzer()
         self.response_generator = response_generator or ResponseGenerator()
         self.commerce = commerce
+        self.knowledge_db = knowledge_db
         self._catalog_category_cache: tuple[float, list[str]] | None = None
 
-    async def handle_chat(self, payload: AiChatRequest, current_user: UserPublic) -> AiChatResponse:
+    async def handle_chat(
+        self,
+        payload: AiChatRequest,
+        current_user: UserPublic | None,
+        business: dict | None = None,
+        web_session_id: str | None = None,
+    ) -> AiChatResponse:
+        """Handle one chat turn.
+
+        Website callers pass the storefront ``business`` and the browser's
+        ``web_session_id``; ``current_user`` is None for guests. Internal
+        callers (WhatsApp) omit both and resolve the business from the owner.
+        """
         start_usage_tracking()
         started_at = time.monotonic()
         request_id = uuid4().hex
-        business = await self.business_repository.find_by_owner_id(current_user.id)
         if business is None:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Create a business before using AI chat",
-            )
+            business = await self.business_repository.find_by_owner_id(current_user.id)
+            if business is None:
+                business = await self.business_repository.ensure_default_storefront_business(current_user.id)
 
         business_id = str(business["_id"])
-        conversation = await self._get_or_create_conversation(payload.conversation_id, business_id)
+        if web_session_id is not None:
+            conversation = await self._get_or_create_web_conversation(
+                payload.conversation_id,
+                business_id,
+                web_session_id=web_session_id,
+                customer_id=current_user.id if current_user else None,
+            )
+        else:
+            conversation = await self._get_or_create_conversation(payload.conversation_id, business_id)
+
+        # Resolve the product page before parsing intent. This keeps page context
+        # factual and lets actions such as price/stock/size use the same selected
+        # product as the response generator.
+        page_product = None
+        page_resolution_calls = []
+        page_context = payload.page_context or {}
+        page_product_ref = (
+            page_context.get("product_id")
+            or page_context.get("productId")
+            or page_context.get("product_slug")
+            or page_context.get("productSlug")
+            or page_context.get("slug")
+        )
+        if page_product_ref:
+            try:
+                page_ref = str(page_product_ref)
+                cached = (conversation.get("conversation_state") or {}).get("page_product_cache") or {}
+                slugify = lambda value: re.sub(r"[^a-z0-9]+", "-", str(value or "").lower().replace("&", " and ")).strip("-")
+                category_slug = slugify(page_context.get("category"))
+                subcategory_slug = slugify(page_context.get("subCategory"))
+                if cached.get("ref") == page_ref and cached.get("product_id"):
+                    lookup_ref = str(cached["product_id"])
+                    page_product = await self.product_tools.get_product_details(business_id, lookup_ref)
+                else:
+                    page_product = await self.product_tools.get_product_details(
+                        business_id, page_ref, category_slug or None, subcategory_slug or None,
+                    )
+                if page_product:
+                    conversation.setdefault("conversation_state", {})["page_product_cache"] = {
+                        "ref": page_ref, "product_id": str(page_product.id),
+                    }
+                    page_resolution_calls.append({"name": "page_product_resolved", "product_id": page_product.id, "title": page_product.name})
+                else:
+                    logger.warning("Page product could not be resolved: ref=%s", page_ref)
+            except Exception as exc:
+                logger.warning("Page product lookup failed: %s", exc.__class__.__name__)
+                page_product = None
+            if page_product:
+                selected_product_id = str(page_product.id)
+                conversation_state = dict(conversation.get("conversation_state") or {})
+                conversation_state["selected_product_id"] = selected_product_id
+                conversation["selected_product_id"] = selected_product_id
+                conversation["conversation_state"] = conversation_state
+                conversation_state["selected_from_page"] = True
+        elif page_context.get("page_type") != "product_detail":
+            state = dict(conversation.get("conversation_state") or {})
+            if state.get("selected_from_page"):
+                state.pop("selected_product_id", None)
+                state.pop("selected_from_page", None)
+                conversation["selected_product_id"] = None
+                conversation["conversation_state"] = state
 
         has_image = bool(payload.image_url or payload.image_data)
         display_message = payload.message.strip() or "Photo enquiry"
@@ -140,6 +233,9 @@ class SalesAgent:
         else:
             parse_message = payload.message or self._image_analysis_to_search_text(effective_image_analysis)
         conversation = self._prepare_context(conversation, parse_message, catalog_categories)
+        if page_product and not self._is_new_search_request(self.intent_parser._normalize_text(payload.message).lower()):
+            conversation["selected_product_id"] = str(page_product.id)
+            conversation.setdefault("conversation_state", {})["selected_product_id"] = str(page_product.id)
         intent = await self.intent_parser.parse(
             parse_message,
             conversation.get("conversation_state", {}),
@@ -260,7 +356,9 @@ class SalesAgent:
         if effective_image_analysis:
             updated_state["last_image_analysis"] = effective_image_analysis
         store_question = StoreKnowledge.is_store_question(payload.message) or intent.intent == "store_question"
-        store_context = await StoreKnowledge(self.commerce.db if self.commerce else None).load(business, payload.message, include_all=intent.intent == "store_question")
+        # Motor databases can't be truth-tested, so compare with None explicitly.
+        knowledge_db = self.knowledge_db if self.knowledge_db is not None else (self.commerce.db if self.commerce else None)
+        store_context = await StoreKnowledge(knowledge_db).load(business, payload.message, include_all=intent.intent == "store_question")
         normalized_message = self.intent_parser._normalize_text(payload.message).strip().lower()
         is_greeting = normalized_message in {
             "hi", "hello", "hey", "hai", "namaste", "namaskar", "good morning",
@@ -389,15 +487,25 @@ class SalesAgent:
             or ambiguous_general
             or route_blocked
         )
+        page_topic = None
+        if (page_product and not has_image and not is_greeting and not policy_blocked
+                and not (intent.action and intent.action not in read_only_product_actions)):
+            page_topic = self._page_topic(payload.message, getattr(payload, "quick_action", None))
+        page_freeform = bool(page_product and not page_topic and ambiguous_general
+                             and not has_image and not store_question and not is_greeting)
+        if page_topic or page_freeform:
+            route_blocked = False
+            ambiguous_general = False
+            needs_clarification = False
         follow_up = (
             None
-            if more_options_request
+            if more_options_request or page_topic or page_freeform
             else self._detect_follow_up(payload.message, conversation, updated_state)
         )
         retry_options = self._is_retry_options_request(payload.message) and updated_state.get("last_search_had_results") is False
         products = []
-        selected_product = None
-        tool_calls = []
+        selected_product = page_product
+        tool_calls = page_resolution_calls
         response_goal = "answer"
         presentation = None
         if customization_link_confirmation:
@@ -418,14 +526,16 @@ class SalesAgent:
                     [],
                     "none",
                 )
-        elif design_library_request and not image_lookup and not needs_clarification:
+        elif design_library_request and not image_lookup and not needs_clarification and not page_topic:
             presentation = await self._design_library_presentation(
                 business_id,
                 payload.message,
                 conversation,
                 updated_state,
             )
-        if self.commerce and not image_lookup and not presentation and not needs_clarification:
+        # An opt-out must never be met with a clarification menu.
+        opt_out = payload.message.lower().strip().rstrip(".!") in {"stop", "unsubscribe", "opt out", "stop updates"}
+        if self.commerce and not image_lookup and not presentation and (opt_out or (not needs_clarification and not page_topic)):
             presentation = await self.commerce.handle(
                 payload.message,
                 conversation,
@@ -436,7 +546,7 @@ class SalesAgent:
             )
         # An uploaded customer image is input for vision/search. It must not be
         # mistaken for a request to resend photos from the previous turn.
-        if not presentation and not has_image and not needs_clarification:
+        if not presentation and not has_image and not needs_clarification and not page_topic:
             presentation = await self._presentation_request(
                 business_id,
                 payload.message,
@@ -446,7 +556,17 @@ class SalesAgent:
                 intent_option=intent.product_option,
             )
 
-        if needs_clarification:
+        if page_topic:
+            ai_text = self._answer_page_topic(page_topic, payload.message, page_product, store_context)
+            products = [page_product]
+            response_goal = "answered from the open product's own data"
+            tool_calls.append({"name": "page_product_answer", "topic": page_topic, "product_id": page_product.id})
+            updated_state["selected_product_id"] = page_product.id
+        elif page_freeform:
+            ai_text = self._build_detail_response(page_product)
+            products = [page_product]
+            response_goal = "answer about the open product using only its data; do not run a search"
+        elif needs_clarification:
             if ambiguous_general or route_blocked:
                 ai_text = (
                     "I want to make sure I help with the right request. Please choose one:\n"
@@ -493,7 +613,7 @@ class SalesAgent:
             selected_id = updated_state.get("selected_product_id") or conversation.get("selected_product_id")
             if selected_id:
                 selected_product = await self.product_tools.get_product_details(business_id, str(selected_id))
-            ai_text = StoreKnowledge.fallback(store_context)
+            ai_text = await self._policy_section_answer(payload.message) or StoreKnowledge.fallback(store_context)
             response_goal = "answer the store question from verified store information; acknowledge any missing facts"
         elif presentation:
             ai_text, products, media_mode = presentation
@@ -762,7 +882,7 @@ class SalesAgent:
             or design_library_request
             or intent.attributes.get("catalog_type") == "customization"
         )
-        if customization_assistance:
+        if customization_assistance and not page_product:
             # Customization is handled as a service lead, not as a normal
             # catalogue recommendation. Product data may be used internally
             # to validate suggestions, but WhatsApp must not send product
@@ -772,7 +892,7 @@ class SalesAgent:
             if presentation:
                 presentation = (presentation[0], [], "none")
 
-        if not presentation and (not image_analysis_failed or customization_request):
+        if not presentation and not page_topic and (not image_analysis_failed or customization_request):
             ai_text = await self.response_generator.generate(
                 customer_message=payload.message,
                 intent=intent,
@@ -832,6 +952,7 @@ class SalesAgent:
                     "recommended_product_ids": [product.id for product in products],
                     "recommended_products": [self._product_card(product) for product in products],
                     "selected_product_id": updated_state.get("selected_product_id"),
+                    "page_product": ({"id": page_product.id, "name": page_product.name, "customizable": bool(page_product.attributes.get("customizable"))} if page_product else None),
                     "flow_phase": flow_phase,
                     "merchant_prompt_version": (business.get("ai_prompt_config") or {}).get("version") or settings.merchant_prompt_version,
                 },
@@ -974,12 +1095,29 @@ class SalesAgent:
             "AI chat handled request=%s conversation=%s intent=%s confidence=%.2f results=%s",
             request_id, conversation["_id"], intent.intent, float(intent.confidence or 0), len(products),
         )
+        # Admin-safe observability: expose the deterministic stages that handled
+        # this request without exposing prompts, provider payloads, or secrets.
+        workflow_trace = [
+            {"id": "received", "label": "Message received", "status": "completed", "detail": "Text" + (" + image" if has_image else "")},
+            {"id": "state", "label": "Conversation state loaded", "status": "completed", "detail": "Follow-up context and page context checked"},
+            {"id": "classification", "label": "Route classified", "status": "completed", "detail": f"{intent.intent} · {intent.confidence:.0%} confidence"},
+            {"id": "entities", "label": "Entities extracted", "status": "completed", "detail": ", ".join(f"{key}={value}" for key, value in {"category": intent.category, "color": intent.color, "size": intent.size, "min_price": intent.min_price, "max_price": intent.max_price}.items() if value is not None) or "No explicit product entities"},
+        ]
+        if intent.intent in {"product_search", "product_recommendation", "product_details", "product_selection"} or products:
+            workflow_trace.append({"id": "filters", "label": "Hard product filters applied", "status": "completed", "detail": f"{len(products)} verified catalogue match(es)"})
+            workflow_trace.append({"id": "ranking", "label": "Products ranked", "status": "completed", "detail": "Semantic/image ranking used only after hard filters"})
+        elif has_image:
+            workflow_trace.append({"id": "image", "label": "Image analyzed", "status": "completed", "detail": "Visual attributes and similarity context checked"})
+        if intent.action == "human_handoff" or updated_state.get("handoff_requested"):
+            workflow_trace.append({"id": "handoff", "label": "Human handoff selected", "status": "completed", "detail": "Store team follow-up requested"})
+        workflow_trace.append({"id": "response", "label": "Response generated", "status": "completed", "detail": "Verified response and conversation state saved"})
         return AiChatResponse(
             conversation=ConversationPublic.model_validate(object_id_to_str(refreshed_conversation)),
             customer_message=MessagePublic.model_validate(object_id_to_str(customer_message)),
             ai_message=MessagePublic.model_validate(object_id_to_str(ai_message)),
             intent=intent,
             recommended_products=products,
+            workflow_trace=workflow_trace,
         )
 
     async def handle_external_chat(
@@ -994,7 +1132,13 @@ class SalesAgent:
         image_mime_type: str | None = None,
         inbound_metadata: dict | None = None,
         quoted_product_id: str | None = None,
+        web_agent=None,
     ) -> AiChatResponse:
+        """Handle a message from an external channel (WhatsApp).
+
+        With `web_agent`, text turns go to the tool-calling agent; it hands
+        commerce turns and images back to this rules agent.
+        """
         business_id = str(business["_id"])
         account_ref = hashlib.sha256(f"{business_id}:{external_customer_ref}".encode()).hexdigest()
         linked_identity = (
@@ -1057,16 +1201,22 @@ class SalesAgent:
                 }},
             )
 
-        response = await self.handle_chat(
-            AiChatRequest(
-                message=message,
-                conversation_id=str(conversation["_id"]),
-                image_url=image_url,
-                image_data=image_data,
-                image_mime_type=image_mime_type,
-            ),
-            SimpleNamespace(id=str(business["owner_id"])),
+        request = AiChatRequest(
+            message=message,
+            conversation_id=str(conversation["_id"]),
+            image_url=image_url,
+            image_data=image_data,
+            image_mime_type=image_mime_type,
         )
+        if web_agent is not None and not (image_url or image_data):
+            response = await web_agent.handle_chat(
+                request, None, business,
+                web_session_id=hashlib.sha256(f"whatsapp:{external_customer_ref}".encode()).hexdigest(),
+                conversation=conversation,
+                channel=channel,
+            )
+        else:
+            response = await self.handle_chat(request, SimpleNamespace(id=str(business["owner_id"])))
 
         metadata = inbound_metadata or {}
         if metadata:
@@ -1076,6 +1226,30 @@ class SalesAgent:
             )
 
         return response
+
+    async def _policy_section_answer(self, message: str) -> str | None:
+        """Quote the single policy section that best answers the question.
+
+        Used when the model is unavailable, so the reply must be the
+        merchant's own wording; a short section beats whole documents.
+        """
+        if self.knowledge_db is None:
+            return None
+        try:
+            sections = await search_policies(self.knowledge_db, message, limit=1)
+        except Exception as exc:
+            logger.warning("Policy section search failed: %s", exc.__class__.__name__)
+            return None
+        if not sections:
+            return None
+        section = sections[0]
+        content = section["content"]
+        if len(content) > 700:
+            content = content[:700].rsplit("\n", 1)[0] + "\n..."
+        reply = f"{section['section']}\n{content}"
+        if section.get("source_url"):
+            reply += f"\n\nFull policy: {section['source_url']}"
+        return reply
 
     def _prepare_context(
         self,
@@ -1593,7 +1767,9 @@ class SalesAgent:
         if color:
             filters["color"] = color
 
-        size_match = re.search(r"\b(xs|s|m|l|xl|xxl|xxxl)\b", text)
+        size_match = re.search(r"\bsize\s*(xs|s|m|l|xl|xxl|xxxl)\b", text)
+        if not size_match and re.fullmatch(r"(xs|s|m|l|xl|xxl|xxxl)", text.strip()):
+            size_match = re.fullmatch(r"(xs|s|m|l|xl|xxl|xxxl)", text.strip())
         if not size_match:
             size_match = re.search(r"\bsize\s*([5-9]|1[0-2])\b", text)
         if size_match:
@@ -1604,6 +1780,66 @@ class SalesAgent:
             filters["attributes"] = {"fabric": fabric}
 
         return filters
+
+    def _is_new_search_request(self, normalized: str) -> bool:
+        return bool(re.search(self.NEW_SEARCH_PATTERN, normalized))
+
+    def _page_topic(self, message: str, quick_action: str | None = None) -> str | None:
+        if quick_action in self.QUICK_ACTION_TOPICS:
+            return self.QUICK_ACTION_TOPICS[quick_action]
+        text = self.intent_parser._normalize_text(message).lower()
+        if self._is_new_search_request(text):
+            return None
+        for topic, pattern in self.PAGE_TOPIC_PATTERNS:
+            if re.search(pattern, text):
+                return topic
+        return None
+
+    def _answer_page_topic(self, topic, message, product, store_context) -> str:
+        attrs = product.attributes or {}
+        name = self._product_display_name(product)
+        unknown = "I don't have that detail for this product right now. Send 'human' and our team will confirm it for you."
+
+        def value(*keys):
+            for key in keys:
+                raw = attrs.get(key)
+                if raw:
+                    return ", ".join(str(item) for item in raw) if isinstance(raw, (list, tuple, set)) else str(raw)
+            return None
+
+        if topic == "details":
+            return self._build_detail_response(product)
+        if topic in {"fabric", "care"}:
+            lines = []
+            if topic == "fabric":
+                if value("fabric", "material"): lines.append(f"Fabric: {value('fabric', 'material')}")
+                if value("gsm"): lines.append(f"GSM: {value('gsm')}")
+            if value("care"): lines.append(f"Care: {value('care')}")
+            return f"{name}\n" + "\n".join(lines) if lines else unknown
+        if topic == "size":
+            lines = [f"Sizes: {value('sizes')}" if value("sizes") else "", f"Fit: {value('fit')}" if value("fit") else ""]
+            lines = [line for line in lines if line]
+            return f"{name}\n" + "\n".join(lines) if lines else unknown
+        if topic == "colors":
+            colors = attrs.get("colors") or ([attrs["color"]] if attrs.get("color") else [])
+            return unknown if not colors else f"{name} colors: {', '.join(str(color) for color in colors)}."
+        if topic == "price":
+            return f"{name} is {verified_price_text(product)}."
+        if topic == "stock":
+            return f"Yes, {name} is available." if product.stock > 0 else f"{name} is currently out of stock."
+        if topic == "offers":
+            return (f"{name} is on sale right now: {verified_price_text(product)}."
+                    if verified_discount(product.price, product.sale_price)
+                    else "I don't see a discount listed on this product right now. Send 'human' to ask the team about coupons or bulk pricing.")
+        if topic == "delivery":
+            docs = (store_context or {}).get("published_information") or []
+            return docs[0]["content"][:600] if docs else unknown
+        if topic == "customize":
+            if not attrs.get("customizable"):
+                return f"{name} is a ready-made product and can't be customized. Want to see our customizable products?"
+            url = attrs.get("product_url") or str(settings.ecommerce_customization_url or "")
+            return "\n".join(filter(None, [f"Yes, you can customize {name}. Choose size and color, then add your image or text in the designer.", url if url.startswith("https://") else None]))
+        return unknown
 
     def _first_match(self, text: str, values: list[str]) -> str | None:
         return next((value for value in values if value in text), None)
@@ -1837,6 +2073,44 @@ class SalesAgent:
         return await self.conversation_repository.create_conversation(
             business_id=business_id,
             payload={"channel": "web", "customer_id": None},
+        )
+
+    async def _get_or_create_web_conversation(
+        self,
+        conversation_id: str | None,
+        business_id: str,
+        web_session_id: str,
+        customer_id: str | None,
+    ) -> dict:
+        """Resume a website conversation only for the shopper who owns it.
+
+        A conversation linked to an account is resumed only by that account.
+        A guest conversation is resumed only by the same browser session; if
+        the guest signs in, the conversation is linked to their account. Any
+        other case (unknown id, another shopper, legacy record) starts a fresh
+        conversation instead of failing, so a stale browser id never blocks chat.
+        """
+        conversation = None
+        if conversation_id and ObjectId.is_valid(conversation_id):
+            conversation = await self.conversation_repository.find_by_id(conversation_id, business_id)
+        if conversation is not None and conversation.get("channel") == "web":
+            owner_id = str(conversation.get("customer_id") or "")
+            if owner_id:
+                if customer_id and owner_id == str(customer_id):
+                    return conversation
+            elif web_session_id and conversation.get("web_session_id") == web_session_id:
+                if customer_id:
+                    await self.conversation_repository.collection.update_one(
+                        {"_id": conversation["_id"]},
+                        {"$set": {"customer_id": parse_object_id(customer_id)}},
+                    )
+                    conversation["customer_id"] = parse_object_id(customer_id)
+                return conversation
+            logger.info("Web conversation %s is not owned by this shopper; starting a new one", conversation_id)
+
+        return await self.conversation_repository.create_conversation(
+            business_id=business_id,
+            payload={"channel": "web", "customer_id": customer_id, "web_session_id": web_session_id},
         )
 
     def _merge_conversation_state(self, current_state: dict, intent: IntentResult) -> dict:
@@ -2195,6 +2469,7 @@ class SalesAgent:
         policy_blocked: bool = False,
         provider_usage: list[dict] | None = None,
         request_id: str | None = None,
+        extra: dict | None = None,
     ) -> None:
         """Store operational counters without message text, media, or customer identifiers."""
         try:
@@ -2225,6 +2500,7 @@ class SalesAgent:
                     "total_tokens": sum(item.get("total_tokens", 0) for item in provider_usage or []),
                     "estimated_cost_usd": round(sum(item.get("estimated_cost_usd", 0) for item in provider_usage or []), 8),
                     "created_at": datetime.now(timezone.utc),
+                    **(extra or {}),
                 }
             )
         except Exception as exc:

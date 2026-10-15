@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 import logging
+import re
 from typing import Any
 
 from pydantic import ValidationError
@@ -201,14 +202,8 @@ class ProductTools:
         ).lower()
 
         def normalized(value: Any) -> str:
-            return (
-                str(value or "")
-                .lower()
-                .replace("t-shirts", "tshirt")
-                .replace("t-shirt", "tshirt")
-                .replace("t shirts", "tshirt")
-                .replace("t shirt", "tshirt")
-            )
+            # Whole words only: "Relaxed Fit Shirt" must not read as "...tshirt".
+            return re.sub(r"\bt[\s-]?shirts?\b", "tshirt", str(value or "").lower())
 
         requested_category = normalized(intent.category)
         if requested_category:
@@ -296,8 +291,8 @@ class ProductTools:
         validated = self._validated_products(products)
         return [product for product in validated if self._matches_intent(product, intent)]
 
-    async def get_product_details(self, business_id: str, product_id: str) -> ProductPublic | None:
-        product = await self.product_repository.find_by_id(product_id, business_id)
+    async def get_product_details(self, business_id: str, product_id: str, category_slug: str | None = None, subcategory_slug: str | None = None) -> ProductPublic | None:
+        product = await self.product_repository.find_by_id(product_id, business_id, category_slug, subcategory_slug)
         if product is None:
             return None
         return self._validated_product(product)

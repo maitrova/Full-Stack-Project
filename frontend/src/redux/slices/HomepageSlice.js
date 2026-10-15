@@ -1,12 +1,13 @@
 // features/homepage/homepageSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
+import { attachApiAuth } from '../../utils/apiAuth.js';
 
 // Create axios instances with base configuration
-const homepageAPI = axios.create({
+const homepageAPI = attachApiAuth(axios.create({
   baseURL: `${import.meta.env.VITE_API_URL}/homepage`,
   timeout: 10000,
-});
+}));
 
 // Async thunks for New Arrivals
 export const fetchEligibleNewArrivals = createAsyncThunk(

@@ -52,6 +52,17 @@ envVars:
   GEMINI_MODEL: gemini-3.1-flash-lite
   OPENAI_MODEL: gpt-4.1-mini
   MERCHANT_PROMPT_VERSION: "2026-10-01"
+  # Website chat engine: "rules" or "tools". While on rules, the rollout
+  # percentage of browser sessions uses the tool-calling agent.
+  WEB_AGENT_MODE: "tools"
+  WEB_AGENT_ROLLOUT_PERCENT: "0"
+  # WhatsApp engine rollout (see OPERATIONS.md): allowlist -> percentage -> "tools".
+  WHATSAPP_AGENT_MODE: "rules"
+  WHATSAPP_AGENT_ALLOWLIST: ""
+  WHATSAPP_AGENT_ROLLOUT_PERCENT: "0"
+  WHATSAPP_HANDOFF_IDLE_HOURS: "12"
+  # Set to "order_update" once Meta approves the template.
+  WHATSAPP_ORDER_UPDATE_TEMPLATE: ""
   GEMINI_INPUT_COST_PER_MILLION: "0"
   GEMINI_OUTPUT_COST_PER_MILLION: "0"
   OPENAI_INPUT_COST_PER_MILLION: "0"

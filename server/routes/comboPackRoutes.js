@@ -11,6 +11,7 @@ import {
   updateComboPack,
 } from "../controllers/comboPackController.js";
 import upload from "../middleware/readymadeProductUpload.middleware.js";
+import { protect, requireAdmin } from "../middleware/authMiddleware.js";
 
 const comboPackRouter = express.Router();
 
@@ -26,8 +27,8 @@ comboPackRouter.get("/products/search", searchComboProducts);
 comboPackRouter.get("/product/:productId", listPublicComboPacksByProduct);
 comboPackRouter.get("/slug/:slug", getPublicComboPackBySlug);
 comboPackRouter.get("/:id", getComboPackById);
-comboPackRouter.post("/", comboImageUpload, createComboPack);
-comboPackRouter.put("/:id", comboImageUpload, updateComboPack);
-comboPackRouter.delete("/:id", deleteComboPack);
+comboPackRouter.post("/", protect, requireAdmin, comboImageUpload, createComboPack);
+comboPackRouter.put("/:id", protect, requireAdmin, comboImageUpload, updateComboPack);
+comboPackRouter.delete("/:id", protect, requireAdmin, deleteComboPack);
 
 export default comboPackRouter;

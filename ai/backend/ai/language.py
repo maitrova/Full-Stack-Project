@@ -1,0 +1,133 @@
+import re
+
+
+TELUGU_SCRIPT_RE = re.compile(r"[\u0c00-\u0c7f]")
+DEVANAGARI_SCRIPT_RE = re.compile(r"[\u0900-\u097f]")
+
+ROMAN_TELUGU_TERMS = {
+    "bagundi",
+    "bagunnaya",
+    "cheera",
+    "cheppu",
+    "chupinchu",
+    "chupinchandi",
+    "dorukutunda",
+    "inka",
+    "ivvandi",
+    "kavali",
+    "kavala",
+    "ki",
+    "koncham",
+    "lo",
+    "nachindi",
+    "undi",
+    "undha",
+    "unda",
+    "unnaya",
+    "telupu",
+    "dani",
+    "pampandi",
+    "pampistara",
+    "entha",
+    "ela",
+    "cheyyali",
+    "cheyyandi",
+    "meeda",
+    "ni",
+    "lo",
+    "padutundi",
+    "ekkada",
+    "naku",
+    "naaku",
+    "cheyyandi",
+}
+
+ROMAN_HINDI_TERMS = {
+    "acha",
+    "achha",
+    "chahiye",
+    "dikhao",
+    "dikhana",
+    "hai",
+    "kya",
+    "mehenga",
+    "sasta",
+    "shaadi",
+    "mujhe",
+    "iske",
+    "iska",
+    "isko",
+    "bhej",
+    "bhejo",
+    "karna",
+    "karo",
+    "batao",
+    "kitne",
+    "mein",
+    "kab",
+    "mera",
+    "chahiye",
+}
+
+
+def detect_customer_language(message: str, default_language: str | None = None) -> dict[str, str]:
+    text = message.strip()
+    lowered = text.lower()
+    words = set(re.findall(r"[a-z]+", lowered))
+
+    if TELUGU_SCRIPT_RE.search(text):
+        return {
+            "language": "Telugu",
+            "script": "Telugu",
+            "reply_instruction": "Reply in Telugu using Telugu script.",
+        }
+
+    if DEVANAGARI_SCRIPT_RE.search(text):
+        return {
+            "language": "Hindi",
+            "script": "Devanagari",
+            "reply_instruction": "Reply in Hindi using Devanagari script.",
+        }
+
+    if words & ROMAN_TELUGU_TERMS:
+        return {
+            "language": "Roman Telugu",
+            "script": "Latin",
+            "reply_instruction": (
+                "Reply in the same Roman Telugu plus English mix. Use Telugu words in Latin script, "
+                "and do not switch to only English."
+            ),
+        }
+
+    if words & ROMAN_HINDI_TERMS:
+        return {
+            "language": "Hinglish",
+            "script": "Latin",
+            "reply_instruction": (
+                "Reply in the same Hinglish style. Use Hindi words in Latin script, "
+                "and do not switch to only English."
+            ),
+        }
+
+    if str(default_language or "").strip().casefold() in {"roman telugu", "telugu latin"}:
+        return {
+            "language": "Roman Telugu",
+            "script": "Latin",
+            "reply_instruction": (
+                "Reply mainly in natural Roman Telugu with simple English product words. "
+                "Use Telugu words in Latin script and do not switch to only English."
+            ),
+        }
+
+    if str(default_language or "").strip().casefold() == "telugu":
+        return {
+            "language": "Telugu",
+            "script": "Telugu",
+            "reply_instruction": "Reply mainly in Telugu using Telugu script, keeping product names and URLs unchanged.",
+        }
+
+    return {
+        "language": "English",
+        "script": "Latin",
+        "reply_instruction": "Reply in the same language and tone as the customer.",
+    }

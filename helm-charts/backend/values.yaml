@@ -38,6 +38,8 @@ envVars:
   ADMIN_NOTIFICATION_EMAIL:  orders@maitrova.in
   ADMIN_NOTIFICATION_EMAILS:  orders@maitrova.in,founder@maitrova.in,nagalahemanth411@gmail.com
   ADMIN_NOTIFICATION_NAME: Maitrova Admin
+  # The AI service sends all WhatsApp messages (dashboard replies, order updates).
+  AI_SERVICE_URL: "http://ai-agent:8000/api"
 
 # Secret Environment Variables (non-sensitive enough for Helm, stored in cluster secret)
 envSecrets:

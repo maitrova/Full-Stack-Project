@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { callWhatsAppService } from "../services/whatsappOrderService.js";
 
 const LEAD_STATUSES = new Set(["new", "contacted", "qualified", "converted", "closed"]);
 const CONVERSATION_STATUSES = new Set(["open", "handoff", "closed"]);
@@ -24,7 +25,7 @@ export const getWhatsAppOverview = async (req, res) => {
   try {
     const database = mongoose.connection.db;
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [metricRows, openChats, handoffs, deliveryErrors, oldestHandoff] = await Promise.all([
+    const [metricRows, openChats, handoffs, deliveryErrors, oldestHandoff, metaFailures, updatesNotSent] = await Promise.all([
       database.collection("ai_agent_metrics").aggregate([
         { $match: { created_at: { $gte: since } } },
         { $group: {
@@ -50,9 +51,16 @@ export const getWhatsAppOverview = async (req, res) => {
         { status: { $in: ["open", "assigned"] } },
         { sort: { created_at: 1 }, projection: { created_at: 1 } }
       ),
+      // Messages Meta reported as undelivered (template rejections, closed 24-hour windows, blocked numbers).
+      database.collection("whatsapp_delivery_failures").countDocuments({ created_at: { $gte: since } }),
+      // Order updates that were skipped (no template outside 24 hours) or failed.
+      database.collection("whatsapp_notification_log").countDocuments({
+        created_at: { $gte: since },
+        status: { $in: ["failed", "skipped"] },
+      }),
     ]);
     const metrics = metricRows[0] || {};
-    const errorCount = Number(metrics.image_failures || 0) + Number(metrics.checkout_failures || 0) + deliveryErrors;
+    const errorCount = Number(metrics.image_failures || 0) + Number(metrics.checkout_failures || 0) + deliveryErrors + metaFailures;
     res.json({
       window_hours: 24,
       generated_at: new Date(),
@@ -61,6 +69,8 @@ export const getWhatsAppOverview = async (req, res) => {
       active_handoffs: handoffs,
       oldest_handoff_at: oldestHandoff?.created_at || null,
       delivery_errors: deliveryErrors,
+      meta_delivery_failures: metaFailures,
+      order_updates_not_sent: updatesNotSent,
       requests: Number(metrics.requests || 0),
       average_latency_ms: Math.round(Number(metrics.average_latency_ms || 0)),
       max_latency_ms: Math.round(Number(metrics.max_latency_ms || 0)),
@@ -237,7 +247,8 @@ export const updateWhatsAppChat = async (req, res) => {
     if (conversationStatus !== undefined) set.status = conversationStatus;
     if (leadNote !== undefined) set.lead_note = leadNote.trim().slice(0, 2000);
     if (handoffStatus !== undefined) set.handoff_status = handoffStatus;
-    if (assignToMe) {
+    const takeOver = assignToMe || conversationStatus === "handoff";
+    if (takeOver) {
       set.handoff_status = "assigned";
       set.handoff_assigned_to = req.user._id;
       set.handoff_assigned_name = req.user.name || req.user.email || "Admin";
@@ -254,12 +265,12 @@ export const updateWhatsAppChat = async (req, res) => {
     const conversation = result?.value || result;
     if (!conversation) return res.status(404).json({ message: "WhatsApp chat not found" });
 
-    if (assignToMe || handoffStatus !== undefined) {
-      await database.collection("whatsapp_handoff_alerts").updateMany(
+    if (takeOver || handoffStatus !== undefined) {
+      const alertUpdate = await database.collection("whatsapp_handoff_alerts").updateMany(
         { conversation_id: conversationId, status: { $in: ["open", "assigned"] } },
         { $set: {
-          status: assignToMe ? "assigned" : handoffStatus,
-          ...(assignToMe ? {
+          status: takeOver ? "assigned" : handoffStatus,
+          ...(takeOver ? {
             assigned_to: req.user._id,
             assigned_name: req.user.name || req.user.email || "Admin",
             assigned_at: now,
@@ -268,6 +279,24 @@ export const updateWhatsAppChat = async (req, res) => {
           ...(["resolved", "resumed"].includes(handoffStatus) ? { resolved_at: now } : {}),
         } }
       );
+      if (takeOver && !alertUpdate.matchedCount) {
+        await database.collection("whatsapp_handoff_alerts").insertOne({
+          business_id: conversation.business_id,
+          conversation_id: conversationId,
+          channel: "whatsapp",
+          customer_name: conversation.customer_name,
+          external_customer_ref: conversation.external_customer_ref,
+          status: "assigned",
+          reason: "team_paused_ai",
+          summary: "The team paused the AI from the dashboard.",
+          urgency: "normal",
+          assigned_to: req.user._id,
+          assigned_name: req.user.name || req.user.email || "Admin",
+          assigned_at: now,
+          created_at: now,
+          updated_at: now,
+        });
+      }
     }
 
     if (conversationStatus === "open") {
@@ -292,5 +321,26 @@ export const updateWhatsAppChat = async (req, res) => {
   } catch (error) {
     console.error("Update WhatsApp chat failed:", error.message);
     res.status(500).json({ message: "Could not update this WhatsApp chat" });
+  }
+};
+
+export const sendWhatsAppReply = async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const conversationId = parseConversationId(req.params.id);
+  if (!conversationId) return res.status(400).json({ message: "Invalid conversation id" });
+  const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+  if (!text || text.length > 4096) return res.status(400).json({ message: "Write a reply of up to 4096 characters." });
+
+  try {
+    const { status, data } = await callWhatsAppService("team-reply", {
+      conversation_id: String(conversationId),
+      text,
+      admin_id: String(req.user._id),
+      admin_name: req.user.name || req.user.email || "Store team",
+    });
+    return res.status(status).json(data);
+  } catch (error) {
+    console.error("Send WhatsApp reply failed:", error.message);
+    return res.status(502).json({ message: "Could not reach the WhatsApp service. Please try again." });
   }
 };

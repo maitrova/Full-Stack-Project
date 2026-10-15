@@ -292,8 +292,11 @@ class EcommerceProductRepository:
             return 0.0
         return max(0.0, min(1.0, dot / (left_norm * right_norm)))
 
-    async def find_by_id(self, product_id: str, business_id: str) -> dict | None:
-        object_id = parse_object_id(product_id)
+    async def find_by_id(self, product_id: str, business_id: str, category_slug: str | None = None, subcategory_slug: str | None = None) -> dict | None:
+        try:
+            object_id = parse_object_id(product_id)
+        except Exception:
+            return await self.find_by_slug(product_id, business_id, category_slug, subcategory_slug)
         readymade, drop, customization = await asyncio.gather(
             self.collection.find_one({"_id": object_id, "isActive": {"$ne": False}}),
             self.drop_collection.find_one({"_id": object_id, "isActive": {"$ne": False}}),
@@ -306,6 +309,51 @@ class EcommerceProductRepository:
             return self._normalize_drop(drop, business_id)
         if customization is not None:
             return self._normalize_customization(customization, business_id)
+        return None
+
+    @staticmethod
+    def _slugify(value) -> str:
+        return re.sub(r"[^a-z0-9]+", "-", str(value or "").lower().replace("&", " and ")).strip("-")
+
+    async def find_by_slug(self, slug: str, business_id: str, category_slug: str | None = None, subcategory_slug: str | None = None) -> dict | None:
+        value = str(slug or "").strip()
+        if not value:
+            return None
+        product = await self.collection.find_one({"urlSlug": value, "isActive": {"$ne": False}})
+        if product is not None:
+            names = await self._lookup_names([product])
+            return self._normalize_readymade(product, business_id, names)
+        for collection in (self.collection, self.drop_collection, self.customization_collection):
+            product = await collection.find_one({"slug": value, "isActive": {"$ne": False}})
+            if product is not None:
+                if collection is self.collection:
+                    names = await self._lookup_names([product])
+                    return self._normalize_readymade(product, business_id, names)
+                if collection is self.drop_collection:
+                    return self._normalize_drop(product, business_id)
+                return self._normalize_customization(product, business_id)
+        wanted = self._slugify(value)
+        parts = [token for token in wanted.split("-") if token][:16]
+        token_re = ["(?:and|&)" if token == "and" else re.escape(token) for token in parts]
+        pattern = r"^[^a-z0-9]*" + r"[^a-z0-9]*".join(token_re) + r"[^a-z0-9]*$" if token_re else ""
+        if parts and len(wanted) <= 200:
+            candidates = await self.collection.find(
+                {"title": {"$regex": pattern, "$options": "i"}, "isActive": {"$ne": False}}
+            ).limit(50).to_list(length=50)
+            exact = [candidate for candidate in candidates if self._slugify(candidate.get("title")) == wanted]
+            names = None
+            if len(exact) > 1:
+                names = await self._lookup_names(exact)
+                if category_slug or subcategory_slug:
+                    exact = [candidate for candidate in exact if
+                        (not category_slug or self._slugify(names["category"].get(str(candidate.get("category")), "")) == category_slug)
+                        and (not subcategory_slug or self._slugify(names["subCategory"].get(str(candidate.get("subCategory")), "")) == subcategory_slug)]
+                elif len(exact) > 1:
+                    logger.warning("Ambiguous product slug %s (%d matches, no category given)", wanted, len(exact))
+                    return None
+            if exact:
+                names = names or await self._lookup_names(exact[:1])
+                return self._normalize_readymade(exact[0], business_id, names)
         return None
 
     async def find_similar_products(
@@ -821,9 +869,7 @@ class EcommerceProductRepository:
         origin = settings.ecommerce_storefront_url
         if not origin or not origin.startswith("https://"):
             return None
-        def slug(value):
-            return re.sub(r"[^a-z0-9]+", "-", value.lower().replace("&", " and ")).strip("-")
-        parts = [slug(category), slug(subcategory), slug(str(document.get("title") or ""))]
+        parts = [self._slugify(category), self._slugify(subcategory), self._slugify(document.get("title"))]
         path = "products/" + "/".join(parts) if all(parts) else "readymade/" + str(document["_id"])
         return origin.rstrip("/") + "/" + path
 

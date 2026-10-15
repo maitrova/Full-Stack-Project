@@ -32,6 +32,7 @@ class ConversationRepository:
             "external_customer_ref": payload.get("external_customer_ref"),
             "customer_name": payload.get("customer_name"),
             "canonical_customer_ref": payload.get("canonical_customer_ref"),
+            "web_session_id": payload.get("web_session_id"),
             "status": "open",
             "current_intent": None,
             "conversation_state": {},

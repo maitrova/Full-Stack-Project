@@ -1,0 +1,564 @@
+{
+ "name": "Web agent regression 2026-10-15 13:45",
+ "created_at": "2026-10-15 13:45:37.876303+00:00",
+ "total_cases": 14,
+ "passed_cases": 13,
+ "failed_cases": 1,
+ "pass_rate": 0.9286,
+ "average_latency_ms": 6781,
+ "by_group": {
+  "products": {
+   "passed": 13,
+   "total": 14
+  }
+ },
+ "results": [
+  {
+   "id": "P01",
+   "group": "products",
+   "message": "show me t-shirts",
+   "passed": true,
+   "latency_ms": 4483,
+   "checks": {
+    "turn1:tools_any": true,
+    "turn1:cards": true,
+    "turn1:no_actions": true
+   },
+   "failures": [],
+   "actual": {
+    "intent": "tools",
+    "route": "tools_agent",
+    "confidence": 1.0,
+    "product_count": 2,
+    "products": [
+     {
+      "name": "Classic White Crew Neck T-Shirt"
+     },
+     {
+      "name": "Oversized Black Cotton T-Shirt"
+     }
+    ],
+    "turns": [
+     {
+      "reply": "We have some great t-shirt options for you. Our Classic White Crew Neck T-Shirt is a soft, everyday essential for ₹599. We also have an Oversized Black Cotton T-Shirt, which is currently on sale for ₹799, down from ₹999 (a 20% discount).\n\nWould you like to see more details on either of these, or perhaps check out our customizable options?",
+      "tools": [
+       "search_products"
+      ],
+      "orders": [],
+      "cards": [
+       "Classic White Crew Neck T-Shirt",
+       "Oversized Black Cotton T-Shirt"
+      ],
+      "latency_ms": 4483,
+      "mode": "tools"
+     }
+    ]
+   }
+  },
+  {
+   "id": "P02",
+   "group": "products",
+   "message": "black t-shirts under 1000",
+   "passed": true,
+   "latency_ms": 6595,
+   "checks": {
+    "turn1:cards_include": true,
+    "turn1:says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "intent": "tools",
+    "route": "tools_agent",
+    "confidence": 1.0,
+    "product_count": 2,
+    "products": [
+     {
+      "name": "Oversized Black Cotton T-Shirt"
+     },
+     {
+      "name": "Black Graphic Print T-Shirt"
+     }
+    ],
+    "turns": [
+     {
+      "reply": "I found a couple of black t-shirts for you under ₹1000.\n\nThe Black Graphic Print T-Shirt is available for ₹699. We also have an Oversized Black Cotton T-Shirt on sale for ₹799, which is 20% off its original price of ₹999.\n\nWould you like to know more about either of these, or should I help you find something else?",
+      "tools": [
+       "search_products"
+      ],
+      "orders": [],
+      "cards": [
+       "Oversized Black Cotton T-Shirt",
+       "Black Graphic Print T-Shirt"
+      ],
+      "latency_ms": 6595,
+      "mode": "tools"
+     }
+    ]
+   }
+  },
+  {
+   "id": "P03",
+   "group": "products",
+   "message": "something comfortable for hot summer days",
+   "passed": true,
+   "latency_ms": 4716,
+   "checks": {
+    "turn1:cards_include_any": true
+   },
+   "failures": [],
+   "actual": {
+    "intent": "tools",
+    "route": "tools_agent",
+    "confidence": 1.0,
+    "product_count": 3,
+    "products": [
+     {
+      "name": "Classic White Crew Neck T-Shirt"
+     },
+     {
+      "name": "Sky Blue Linen Shirt"
+     },
+     {
+      "name": "Mustard Cotton Kurta"
+     }
+    ],
+    "turns": [
+     {
+      "reply": "For hot summer days, I recommend our lightweight cotton tees or our breathable linen shirts, which are designed to keep you cool and comfortable.\n\nThe Classic White Crew Neck T-Shirt is a great everyday choice at ₹599. If you prefer something a bit more relaxed, our Sky Blue Linen Shirt is currently on sale for ₹1,499, down from ₹1,899 (a 21% discount).\n\nWould you like to see more details on any of these, or should I check for other options?",
+      "tools": [
+       "search_products"
+      ],
+      "orders": [],
+      "cards": [
+       "Classic White Crew Neck T-Shirt",
+       "Sky Blue Linen Shirt",
+       "Mustard Cotton Kurta"
+      ],
+      "latency_ms": 4716,
+      "mode": "tools"
+     }
+    ]
+   }
+  },
+  {
+   "id": "P04",
+   "group": "products",
+   "message": "do you have the oversized black cotton tee in XXL?",
+   "passed": false,
+   "latency_ms": 7379,
+   "checks": {
+    "turn1:says_any": false,
+    "turn1:also_says_any": true
+   },
+   "failures": [
+    "turn 1 (says_any): reply lacks any of ['not available in XXL', 'not in XXL', 'XXL is', 'sold out in XXL', 'out of stock in XXL']"
+   ],
+   "actual": {
+    "intent": "tools",
+    "route": "tools_agent",
+    "confidence": 1.0,
+    "product_count": 2,
+    "products": [
+     {
+      "name": "Oversized Black Cotton T-Shirt"
+     },
+     {
+      "name": "Black Graphic Print T-Shirt"
+     }
+    ],
+    "turns": [
+     {
+      "reply": "The Oversized Black Cotton T-Shirt is currently available, but unfortunately not in size XXL. It is available in sizes S, M, L, and XL.\n\nWould you like to see other black t-shirts available in XXL, or perhaps look at our graphic print options?",
+      "tools": [
+       "search_products"
+      ],
+      "orders": [],
+      "cards": [
+       "Oversized Black Cotton T-Shirt",
+       "Black Graphic Print T-Shirt"
+      ],
+      "latency_ms": 7379,
+      "mode": "tools"
+     }
+    ]
+   }
+  },
+  {
+   "id": "P05",
+   "group": "products",
+   "message": "do you have jeans in 34 waist?",
+   "passed": true,
+   "latency_ms": 12873,
+   "checks": {
+    "turn1:says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "intent": "tools",
+    "route": "tools_agent",
+    "confidence": 1.0,
+    "product_count": 1,
+    "products": [
+     {
+      "name": "Dark Blue Slim Fit Jeans"
+     }
+    ],
+    "turns": [
+     {
+      "reply": "I have these Dark Blue Slim Fit Jeans, but they are currently available in sizes S, M, L, and XL. I don't have them in a 34 waist size at the moment.\n\nWould you like me to check if we have any other styles or if there's something else I can help you find?",
+      "tools": [
+       "search_products"
+      ],
+      "orders": [],
+      "cards": [
+       "Dark Blue Slim Fit Jeans"
+      ],
+      "latency_ms": 12873,
+      "mode": "tools"
+     }
+    ]
+   }
+  },
+  {
+   "id": "P06",
+   "group": "products",
+   "message": "is the maroon zip hoodie available in L?",
+   "passed": true,
+   "latency_ms": 5476,
+   "checks": {
+    "turn1:says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "intent": "tools",
+    "route": "tools_agent",
+    "confidence": 1.0,
+    "product_count": 1,
+    "products": [
+     {
+      "name": "Maroon Zip Hoodie"
+     }
+    ],
+    "turns": [
+     {
+      "reply": "The maroon zip hoodie is currently out of stock, so it is not available in size L. Would you like me to look for other hoodies in maroon or perhaps another style?",
+      "tools": [
+       "search_products"
+      ],
+      "orders": [],
+      "cards": [
+       "Maroon Zip Hoodie"
+      ],
+      "latency_ms": 5476,
+      "mode": "tools"
+     }
+    ]
+   }
+  },
+  {
+   "id": "P07",
+   "group": "products",
+   "message": "kurta for my brother's wedding under 2000",
+   "passed": true,
+   "latency_ms": 5515,
+   "checks": {
+    "turn1:says_any": true,
+    "turn1:also_says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "intent": "tools",
+    "route": "tools_agent",
+    "confidence": 1.0,
+    "product_count": 1,
+    "products": [
+     {
+      "name": "White Chikankari Kurta"
+     }
+    ],
+    "turns": [
+     {
+      "reply": "I found a great option for a wedding that fits your budget. The White Chikankari Kurta is a beautiful choice, currently priced at ₹1799 (originally ₹2199, which is an 18% discount). It is available in sizes S, M, L, XL, and XXL.\n\nWould you like to know more about this kurta or see other options?",
+      "tools": [
+       "search_products"
+      ],
+      "orders": [],
+      "cards": [
+       "White Chikankari Kurta"
+      ],
+      "latency_ms": 5515,
+      "mode": "tools"
+     }
+    ]
+   }
+  },
+  {
+   "id": "P08",
+   "group": "products",
+   "message": "what's the cheapest t-shirt you have?",
+   "passed": true,
+   "latency_ms": 5451,
+   "checks": {
+    "turn1:says_any": true,
+    "turn1:also_says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "intent": "tools",
+    "route": "tools_agent",
+    "confidence": 1.0,
+    "product_count": 1,
+    "products": [
+     {
+      "name": "Classic White Crew Neck T-Shirt"
+     }
+    ],
+    "turns": [
+     {
+      "reply": "The cheapest t-shirt we currently have is the Classic White Crew Neck T-Shirt, which is priced at ₹599. It is available in sizes S, M, L, XL, and XXL.\n\nWould you like me to add this to your cart for you?",
+      "tools": [
+       "search_products"
+      ],
+      "orders": [],
+      "cards": [
+       "Classic White Crew Neck T-Shirt"
+      ],
+      "latency_ms": 5451,
+      "mode": "tools"
+     }
+    ]
+   }
+  },
+  {
+   "id": "P09",
+   "group": "products",
+   "message": "compare the white formal cotton shirt and the sky blue linen shirt",
+   "passed": true,
+   "latency_ms": 17050,
+   "checks": {
+    "turn1:says_any": true,
+    "turn1:also_says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "intent": "tools",
+    "route": "tools_agent",
+    "confidence": 1.0,
+    "product_count": 2,
+    "products": [
+     {
+      "name": "White Formal Cotton Shirt"
+     },
+     {
+      "name": "Sky Blue Linen Shirt"
+     }
+    ],
+    "turns": [
+     {
+      "reply": "The White Formal Cotton Shirt is a slim-fit, cotton poplin shirt designed for office wear and interviews, priced at ₹1299. The Sky Blue Linen Shirt is a relaxed-fit, 100% linen shirt perfect for casual or summer occasions, currently priced at ₹1499 (originally ₹1899, a 21% discount). Both are available in sizes S, M, L, XL, and XXL.\n\nWould you like me to add either of these to your cart?",
+      "tools": [
+       "search_products",
+       "search_products"
+      ],
+      "orders": [],
+      "cards": [
+       "White Formal Cotton Shirt",
+       "Sky Blue Linen Shirt"
+      ],
+      "latency_ms": 17050,
+      "mode": "tools"
+     }
+    ]
+   }
+  },
+  {
+   "id": "P10",
+   "group": "products",
+   "message": "show me t-shirts under 700",
+   "passed": true,
+   "latency_ms": 6109,
+   "checks": {
+    "turn1:cards": true,
+    "turn2:says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "intent": "tools",
+    "route": "tools_agent",
+    "confidence": 1.0,
+    "product_count": 1,
+    "products": [
+     {
+      "name": "Classic White Crew Neck T-Shirt"
+     }
+    ],
+    "turns": [
+     {
+      "reply": "I found these t-shirts for you under ₹700:\n\n- Classic White Crew Neck T-Shirt: ₹599, available in S, M, L, XL, XXL.\n- Black Graphic Print T-Shirt: ₹699, available in M, L, XL, XXL.\n\nWould you like to know more about one of these, or should I add one to your cart?",
+      "tools": [
+       "search_products"
+      ],
+      "orders": [],
+      "cards": [
+       "Classic White Crew Neck T-Shirt",
+       "Black Graphic Print T-Shirt"
+      ],
+      "latency_ms": 8451,
+      "mode": "tools"
+     },
+     {
+      "reply": "Yes, the Classic White Crew Neck T-Shirt is available in size S. Would you like me to add it to your cart for you?",
+      "tools": [
+       "get_product_details"
+      ],
+      "orders": [],
+      "cards": [
+       "Classic White Crew Neck T-Shirt"
+      ],
+      "latency_ms": 3767,
+      "mode": "tools"
+     }
+    ]
+   }
+  },
+  {
+   "id": "P11",
+   "group": "products",
+   "message": "is this available in small?",
+   "passed": true,
+   "latency_ms": 7521,
+   "checks": {
+    "turn1:says_any": true,
+    "turn1:also_says_any": true,
+    "turn2:says_any": true,
+    "turn2:also_says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "intent": "tools",
+    "route": "tools_agent",
+    "confidence": 1.0,
+    "product_count": 0,
+    "products": [],
+    "turns": [
+     {
+      "reply": "I'm sorry, but this Navy Striped Polo T-Shirt is not available in size Small. It is currently in stock in sizes M, L, and XL.\n\nWould you like me to look for other polo shirts that might be available in Small?",
+      "tools": [],
+      "orders": [],
+      "cards": [],
+      "latency_ms": 2366,
+      "mode": "tools"
+     },
+     {
+      "reply": "Yes, this Navy Striped Polo T-Shirt is currently on sale! You can get it for ₹999, which is a 17% discount off the original price of ₹1199.",
+      "tools": [
+       "get_offers"
+      ],
+      "orders": [],
+      "cards": [],
+      "latency_ms": 12676,
+      "mode": "tools"
+     }
+    ]
+   }
+  },
+  {
+   "id": "P12",
+   "group": "products",
+   "message": "Product details",
+   "passed": true,
+   "latency_ms": 2619,
+   "checks": {
+    "turn1:says_any": true,
+    "turn1:also_says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "intent": "tools",
+    "route": "tools_agent",
+    "confidence": 1.0,
+    "product_count": 0,
+    "products": [],
+    "turns": [
+     {
+      "reply": "The Charcoal Fleece Hoodie is a warm 320 GSM brushed fleece pullover with a kangaroo pocket and a lined hood. It is a regular fit, unisex style made from Cotton-Poly fleece, perfect for winter or travel.\n\nIt is currently priced at ₹1399, which is a 22% discount from the original price of ₹1799. It is available in Charcoal Grey in sizes S, M, L, XL, and XXL. You can pay via COD or online.\n\nWould you like me to add one to your cart? Please let me know your preferred size.",
+      "tools": [],
+      "orders": [],
+      "cards": [],
+      "latency_ms": 2619,
+      "mode": "tools"
+     }
+    ]
+   }
+  },
+  {
+   "id": "P13",
+   "group": "products",
+   "message": "how do I wash it?",
+   "passed": true,
+   "latency_ms": 3261,
+   "checks": {
+    "turn1:says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "intent": "tools",
+    "route": "tools_agent",
+    "confidence": 1.0,
+    "product_count": 0,
+    "products": [],
+    "turns": [
+     {
+      "reply": "You should wash this hoodie inside out and avoid tumble drying it. Would you like me to add this to your cart for you?",
+      "tools": [],
+      "orders": [],
+      "cards": [],
+      "latency_ms": 3261,
+      "mode": "tools"
+     }
+    ]
+   }
+  },
+  {
+   "id": "P14",
+   "group": "products",
+   "message": "ee hoodie lo XL size undha?",
+   "passed": true,
+   "latency_ms": 5885,
+   "checks": {
+    "turn1:says_any": true,
+    "turn1:never_says": true
+   },
+   "failures": [],
+   "actual": {
+    "intent": "tools",
+    "route": "tools_agent",
+    "confidence": 1.0,
+    "product_count": 2,
+    "products": [
+     {
+      "name": "Charcoal Fleece Hoodie"
+     },
+     {
+      "name": "Retro Racer Hoodie - Drop 01"
+     }
+    ],
+    "turns": [
+     {
+      "reply": "Meeru adigina Charcoal Fleece Hoodie lo XL size undhi, idhi ₹1399 ki labhistondhi (original price ₹1799, 22% discount). Retro Racer Hoodie - Drop 01 lo kuda XL size undhi, kani idhi drop collection kabatti meeru product page nundi direct ga order cheyyali.\n\nCharcoal Fleece Hoodie ni cart lo add cheyyamantara?",
+      "tools": [
+       "search_products"
+      ],
+      "orders": [],
+      "cards": [
+       "Charcoal Fleece Hoodie",
+       "Retro Racer Hoodie - Drop 01"
+      ],
+      "latency_ms": 5885,
+      "mode": "tools"
+     }
+    ]
+   }
+  }
+ ]
+}

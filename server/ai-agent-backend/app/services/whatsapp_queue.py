@@ -18,6 +18,7 @@ async def enqueue(db, payload):
     for entry in payload.get("entry", []):
         for change in entry.get("changes", []):
             value = change.get("value", {})
+            await record_delivery_failures(db, value.get("statuses") or [])
             for message in value.get("messages", []):
                 if not message.get("id") or not message.get("from"):
                     continue
@@ -30,6 +31,29 @@ async def enqueue(db, payload):
                 except DuplicateKeyError:
                     pass
     return count
+
+
+async def record_delivery_failures(db, statuses: list[dict]) -> None:
+    """Keep Meta's "failed" delivery statuses for monitoring (no message text or phone).
+
+    Template rejections and closed 24-hour windows arrive here as error codes.
+    """
+    for status in statuses:
+        if status.get("status") != "failed" or not status.get("id"):
+            continue
+        errors = status.get("errors") or [{}]
+        now = datetime.now(timezone.utc)
+        try:
+            await db.whatsapp_delivery_failures.insert_one({
+                "_id": status["id"],
+                "error_code": errors[0].get("code"),
+                "error_title": str(errors[0].get("title") or "")[:200],
+                "pricing_category": (status.get("pricing") or {}).get("category"),
+                "created_at": now,
+                "expires_at": now + timedelta(days=30),
+            })
+        except DuplicateKeyError:
+            pass
 
 
 async def worker(db):

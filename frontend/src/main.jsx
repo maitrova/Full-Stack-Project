@@ -6,6 +6,11 @@ import { Provider } from "react-redux";
 import { PersistGate } from 'redux-persist/integration/react';
 import { persistor, store } from "./redux/store.js";
 import { GoogleOAuthProvider } from "@react-oauth/google";
+import { attachApiAuth, setApiTokenReader } from "./utils/apiAuth.js";
+
+// Admin endpoints require the signed-in user's token on every request.
+setApiTokenReader(() => store.getState().user?.userInfo?.token);
+attachApiAuth();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

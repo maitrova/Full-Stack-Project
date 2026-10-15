@@ -50,8 +50,34 @@ class BusinessRepository:
             raise RuntimeError("Configured WhatsApp business could not be loaded")
         return business, result.upserted_id is not None
 
+    async def find_by_id(self, business_id: str) -> dict | None:
+        return await self.collection.find_one({"_id": parse_object_id(business_id)})
+
     async def find_by_owner_id(self, owner_id: str) -> dict | None:
         return await self.collection.find_one({"owner_id": parse_object_id(owner_id)})
+
+    async def ensure_default_storefront_business(self, owner_id: str) -> dict:
+        """Provision the single storefront tenant for legacy MERN users."""
+        owner_object_id = parse_object_id(owner_id)
+        now = utc_now()
+        await self.collection.update_one(
+            {"owner_id": owner_object_id},
+            {"$setOnInsert": {
+                "owner_id": owner_object_id,
+                "business_name": "Maitrova",
+                "business_type": "ecommerce",
+                "description": "Maitrova storefront AI sales agent",
+                "currency": "INR",
+                "timezone": "Asia/Kolkata",
+                "created_at": now,
+                "updated_at": now,
+            }},
+            upsert=True,
+        )
+        business = await self.find_by_owner_id(owner_id)
+        if business is None:
+            raise RuntimeError("Default storefront business could not be loaded")
+        return business
 
     async def find_by_id_and_owner_id(self, business_id: str, owner_id: str) -> dict | None:
         return await self.collection.find_one(

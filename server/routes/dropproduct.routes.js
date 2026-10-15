@@ -12,6 +12,7 @@ import {
   updateDropproduct,
   deleteDropproduct,
 } from "../controllers/dropproduct.controller.js";
+import { protect, requireAdmin } from "../middleware/authMiddleware.js";
 
 const droprouter = express.Router();
 const __filename = fileURLToPath(import.meta.url);
@@ -81,11 +82,11 @@ const handleDropUpload = (req, res, next) => {
 };
 
 /* 🔹 Routes */
-droprouter.post("/", handleDropUpload, createDropproduct);
+droprouter.post("/", protect, requireAdmin, handleDropUpload, createDropproduct);
 droprouter.get("/", getAllDropproducts);
 droprouter.get("/slug/:slug", getDropproductBySlug);
 droprouter.get("/:id", getDropproductById);
-droprouter.put("/:id", handleDropUpload, updateDropproduct);
-droprouter.delete("/:id", deleteDropproduct);
+droprouter.put("/:id", protect, requireAdmin, handleDropUpload, updateDropproduct);
+droprouter.delete("/:id", protect, requireAdmin, deleteDropproduct);
 
 export default droprouter;

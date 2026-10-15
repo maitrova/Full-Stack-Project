@@ -1,0 +1,237 @@
+{
+ "name": "WhatsApp agent regression 2026-10-15 18:11",
+ "channel": "whatsapp",
+ "created_at": "2026-10-15 18:11:29.114386+00:00",
+ "total_cases": 5,
+ "passed_cases": 4,
+ "failed_cases": 1,
+ "pass_rate": 0.8,
+ "average_latency_ms": 11182,
+ "by_group": {
+  "products": {
+   "passed": 1,
+   "total": 1
+  },
+  "cart": {
+   "passed": 1,
+   "total": 1
+  },
+  "orders": {
+   "passed": 1,
+   "total": 1
+  },
+  "handoff": {
+   "passed": 0,
+   "total": 1
+  },
+  "order_updates": {
+   "passed": 1,
+   "total": 1
+  }
+ },
+ "results": [
+  {
+   "id": "WP01",
+   "group": "products",
+   "passed": true,
+   "message": "show me t-shirts",
+   "latency_ms": 16550,
+   "checks": {
+    "turn1:tools_any": true,
+    "turn1:photos_min": true,
+    "turn1:photos_max": true,
+    "turn1:no_markdown": true,
+    "turn1:max_chars": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "show me t-shirts",
+      "reply": "Here are some of our available t-shirts:\n\n1. Classic White Crew Neck T-Shirt - ₹599\n2. Oversized Black Cotton T-Shirt - ₹799 (was ₹999, 20% off)\n\nWould you like to know more about any of these, or should I help you add one to your cart?\nOption 1\nClassic White Crew Neck T-Shirt\nINR 599\nAvailable\nWhite, Combed Cotton, 180 GSM\nReply with this product name or number for details.\nhttps://www.maitrova.in/products/t-shirts/men-t-shirts/classic-white-crew-neck-t-shirt\nOption 2\nOversized Black Cotton T-Shirt\nINR 799\nAvailable\nBlack, 100% Cotton, 220 GSM\nReply with this product name or number for details.\nhttps://www.maitrova.in/products/t-shirts/men-t-shirts/oversized-black-cotton-t-shirt",
+      "photos": 2,
+      "buttons": [],
+      "tools": [
+       "search_products"
+      ],
+      "latency_ms": 16550
+     }
+    ]
+   }
+  },
+  {
+   "id": "WK03",
+   "group": "cart",
+   "passed": true,
+   "message": "what's in my cart and what's my total?",
+   "latency_ms": 17220,
+   "checks": {
+    "turn1:says_any": true,
+    "turn1:no_photos": true,
+    "turn2:cart_has": true,
+    "turn3:cart_lacks": true,
+    "turn3:says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "what's in my cart and what's my total?",
+      "reply": "Your cart contains:\n1. Oversized Black Cotton T-Shirt (Size: L) - ₹799\n2. Charcoal Fleece Hoodie (Size: M) - ₹1399\n\nYour current total is ₹2198. Would you like to proceed to checkout?",
+      "photos": 0,
+      "buttons": [],
+      "tools": [
+       "view_cart"
+      ],
+      "latency_ms": 11034
+     },
+     {
+      "sent": "make the black tee 2",
+      "reply": "Updated the quantity of the Oversized Black Cotton T-Shirt to 2. Your new total is ₹2997.",
+      "photos": 0,
+      "buttons": [],
+      "tools": [
+       "view_cart",
+       "update_cart_item",
+       "view_cart",
+       "update_cart_item"
+      ],
+      "latency_ms": 27074
+     },
+     {
+      "sent": "remove the hoodie from my cart",
+      "reply": "Removed the Charcoal Fleece Hoodie from your cart.",
+      "photos": 0,
+      "buttons": [],
+      "tools": [
+       "view_cart",
+       "remove_cart_item"
+      ],
+      "latency_ms": 13551
+     }
+    ]
+   }
+  },
+  {
+   "id": "WO01",
+   "group": "orders",
+   "passed": true,
+   "message": "where is my order?",
+   "latency_ms": 13071,
+   "checks": {
+    "turn1:tools_any": true,
+    "turn1:says_any": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "where is my order?",
+      "reply": "You have a few recent orders. Which one are you asking about?\n\n1. Order #44FE2A88 (placed 15 Oct): Being prepared.\n2. Order #44FE2A8C (placed 12 Oct): Shipped.\n3. Order #44FE2AA4 (placed 13 Oct): Payment failed.\n\nYou can also view your full order history here: https://www.maitrova.in/orders",
+      "photos": 0,
+      "buttons": [
+       "Talk to a person"
+      ],
+      "tools": [
+       "track_order"
+      ],
+      "latency_ms": 13071
+     }
+    ]
+   }
+  },
+  {
+   "id": "WH03",
+   "group": "handoff",
+   "passed": false,
+   "message": "Talk to a person",
+   "latency_ms": 7135,
+   "checks": {
+    "turn1:alert": true,
+    "turn2:delivered": true,
+    "turn3:replies_max": true,
+    "turn3:says_any": true,
+    "turn3:answered_by_tools_agent": false,
+    "turn4:no_reply": true
+   },
+   "failures": [
+    "turn 3 (answered_by_tools_agent): answered by rules"
+   ],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "Talk to a person",
+      "reply": "I've asked our store team to reply to you here on WhatsApp. They'll get back to you as soon as they can, and I can keep helping in the meantime.",
+      "photos": 0,
+      "buttons": [],
+      "tools": [],
+      "latency_ms": 6036
+     },
+     {
+      "sent": "team_reply",
+      "reply": "Hi, this is the Maitrova team. How can we help?",
+      "photos": 0,
+      "buttons": [],
+      "tools": [],
+      "latency_ms": 1920
+     },
+     {
+      "sent": "thanks! my hoodie came with a hole, can I get a replacement?",
+      "reply": "Thanks, our team has your message and will reply here shortly.",
+      "photos": 0,
+      "buttons": [],
+      "tools": [],
+      "latency_ms": 5528
+     },
+     {
+      "sent": "hello?",
+      "reply": "",
+      "photos": 0,
+      "buttons": [],
+      "tools": [],
+      "latency_ms": 15055
+     }
+    ]
+   }
+  },
+  {
+   "id": "WN01",
+   "group": "order_updates",
+   "passed": true,
+   "message": "order_update",
+   "latency_ms": 1934,
+   "checks": {
+    "turn1:update_result": true,
+    "turn1:says_any": true,
+    "turn2:update_result": true,
+    "turn2:no_reply": true
+   },
+   "failures": [],
+   "actual": {
+    "route": "whatsapp",
+    "turns": [
+     {
+      "sent": "order_update",
+      "reply": "Your Maitrova order #49CD44B3 is shipped. You can follow it under My Orders. Send STOP to turn off these updates.",
+      "photos": 0,
+      "buttons": [],
+      "tools": [],
+      "latency_ms": 2341
+     },
+     {
+      "sent": "order_update",
+      "reply": "",
+      "photos": 0,
+      "buttons": [],
+      "tools": [],
+      "latency_ms": 1526
+     }
+    ]
+   }
+  }
+ ]
+}

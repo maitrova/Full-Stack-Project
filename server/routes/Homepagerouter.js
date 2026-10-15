@@ -1,6 +1,7 @@
 // routes/homepageRoutes.js
 import express from "express";
 import { getEligibleBestSellers, getEligibleNewArrivals, getHomepageBestSellers, getHomepageNewArrivals, setHomepageBestSellers, setHomepageNewArrivals } from "../controllers/homepageController.js";
+import { protect, requireAdmin } from "../middleware/authMiddleware.js";
 
 const homepagerouter = express.Router();
 
@@ -8,7 +9,7 @@ const homepagerouter = express.Router();
 homepagerouter.get("/new-arrivals/eligible", getEligibleNewArrivals);
 
 // Set selected items for homepage
-homepagerouter.post("/new-arrivals/select", setHomepageNewArrivals);
+homepagerouter.post("/new-arrivals/select", protect, requireAdmin, setHomepageNewArrivals);
 
 // Get selected new arrivals for frontend
 homepagerouter.get("/new-arrivals", getHomepageNewArrivals);
@@ -16,7 +17,7 @@ homepagerouter.get("/new-arrivals", getHomepageNewArrivals);
 homepagerouter.get("/best-sellers/eligible", getEligibleBestSellers);
 
 // Set selected items for homepage best sellers
-homepagerouter.post("/best-sellers/select", setHomepageBestSellers);
+homepagerouter.post("/best-sellers/select", protect, requireAdmin, setHomepageBestSellers);
 
 // Get selected best sellers for frontend
 homepagerouter.get("/best-sellers", getHomepageBestSellers);

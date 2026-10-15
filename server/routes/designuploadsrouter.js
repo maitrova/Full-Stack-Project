@@ -8,27 +8,28 @@ import {
   deleteImageFromFolder,
   deleteCategoryFolder,
 } from "../controllers/designuploads.js";
+import { protect, requireAdmin } from "../middleware/authMiddleware.js";
 
 const designuploadsrouter = express.Router();
 
 // base: /api/admin-designs
 
 // Create folder: { "name": "car designs" }
-designuploadsrouter.post("/folders", createCategoryFolder);
+designuploadsrouter.post("/folders", protect, requireAdmin, createCategoryFolder);
 
 // List all folders
 designuploadsrouter.get("/folders", listCategoryFolders);
 
 // Upload single/multiple images to a folder (field name: "images")
-designuploadsrouter.post("/:folder/upload", adminDesignUpload.array("images", 2000), uploadImagesToFolder);
+designuploadsrouter.post("/:folder/upload", protect, requireAdmin, adminDesignUpload.array("images", 2000), uploadImagesToFolder);
 
 // List images inside folder
 designuploadsrouter.get("/:folder/files", listImagesInFolder);
 
 // Optional: delete a file
-designuploadsrouter.delete("/:folder/files/:filename", deleteImageFromFolder);
+designuploadsrouter.delete("/:folder/files/:filename", protect, requireAdmin, deleteImageFromFolder);
 
 // Optional: delete folder (only if empty)
-designuploadsrouter.delete("/folders/:folder", deleteCategoryFolder);
+designuploadsrouter.delete("/folders/:folder", protect, requireAdmin, deleteCategoryFolder);
 
 export default designuploadsrouter;

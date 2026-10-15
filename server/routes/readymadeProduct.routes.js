@@ -23,6 +23,7 @@ import {
   
 } from "../controllers/readymadeProduct.controller.js";
 import upload from "../middleware/readymadeProductUpload.middleware.js";
+import { protect, requireAdmin } from "../middleware/authMiddleware.js";
 
 const readymadeproducts = express.Router();
 
@@ -59,19 +60,19 @@ readymadeproducts.get("/filters/available", getProductFilters);
 // These routes should be protected with admin authentication
 
 // Product management
-readymadeproducts.post("/admin/create", productUpload, createReadymadeProduct);
-readymadeproducts.put("/admin/update/:id", productUpload, updateReadymadeProduct);
-readymadeproducts.delete("/admin/delete/:id", deleteReadymadeProduct);
+readymadeproducts.post("/admin/create", protect, requireAdmin, productUpload, createReadymadeProduct);
+readymadeproducts.put("/admin/update/:id", protect, requireAdmin, productUpload, updateReadymadeProduct);
+readymadeproducts.delete("/admin/delete/:id", protect, requireAdmin, deleteReadymadeProduct);
 
 // Product list management (for admin panel)
-readymadeproducts.get("/admin/all", getAllReadymadeProducts); // Get all products for admin
-readymadeproducts.get("/admin/filtered", getFilteredProducts); // Filter products for admin
-readymadeproducts.get("/admin/export", exportReadymadeProducts);
-readymadeproducts.post("/admin/import", express.json({ limit: "25mb" }), importReadymadeProducts);
+readymadeproducts.get("/admin/all", protect, requireAdmin, getAllReadymadeProducts); // Get all products for admin
+readymadeproducts.get("/admin/filtered", protect, requireAdmin, getFilteredProducts); // Filter products for admin
+readymadeproducts.get("/admin/export", protect, requireAdmin, exportReadymadeProducts);
+readymadeproducts.post("/admin/import", protect, requireAdmin, express.json({ limit: "25mb" }), importReadymadeProducts);
 
 // Bulk operations
-readymadeproducts.patch("/admin/bulk/update-flags", updateProductList); // Bulk update flags
-readymadeproducts.patch("/admin/toggle-status/:id", toggleProductStatus); // Toggle status
+readymadeproducts.patch("/admin/bulk/update-flags", protect, requireAdmin, updateProductList); // Bulk update flags
+readymadeproducts.patch("/admin/toggle-status/:id", protect, requireAdmin, toggleProductStatus); // Toggle status
 
 readymadeproducts.get("/:id", getReadymadeProductById); // Get single product
 
