@@ -120,16 +120,17 @@ jobs:
         uses: appleboy/ssh-action@v1.2.0
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          WHATSAPP_COMMERCE_KEY: ${{ secrets.WHATSAPP_COMMERCE_KEY }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           port: ${{ secrets.VPS_PORT }}
           password: ${{ secrets.VPS_PASSWORD }}
-          envs: JWT_SECRET
+          envs: JWT_SECRET,WHATSAPP_COMMERCE_KEY
           script: |
             set -e
-            if [ -z "${JWT_SECRET:-}" ]; then
-              echo "ERROR: JWT_SECRET GitHub Actions secret is required" >&2
+            if [ -z "${JWT_SECRET:-}" ] || [ -z "${WHATSAPP_COMMERCE_KEY:-}" ]; then
+              echo "ERROR: JWT_SECRET and WHATSAPP_COMMERCE_KEY GitHub Actions secrets are required" >&2
               exit 1
             fi
             helm upgrade --install backend /tmp/backend \
@@ -138,6 +139,7 @@ jobs:
               --history-max 3 \
               --set image.tag=${{ needs.build_and_push.outputs.backend_tag }} \
               --set-string envSecrets.JWT_SECRET="$JWT_SECRET" \
+              --set-string envSecrets.WHATSAPP_COMMERCE_KEY="$WHATSAPP_COMMERCE_KEY" \
               --wait \
               --atomic
             
@@ -228,22 +230,24 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           AI_EVALUATION_KEY: ${{ secrets.AI_EVALUATION_KEY }}
+          WHATSAPP_COMMERCE_KEY: ${{ secrets.WHATSAPP_COMMERCE_KEY }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           port: ${{ secrets.VPS_PORT }}
           password: ${{ secrets.VPS_PASSWORD }}
-          envs: GEMINI_API_KEY,OPENAI_API_KEY,JWT_SECRET,AI_EVALUATION_KEY
+          envs: GEMINI_API_KEY,OPENAI_API_KEY,JWT_SECRET,AI_EVALUATION_KEY,WHATSAPP_COMMERCE_KEY
           script: |
             set -e
-            if [ -z "${GEMINI_API_KEY:-}" ] || [ -z "${JWT_SECRET:-}" ] || [ -z "${AI_EVALUATION_KEY:-}" ]; then
-              echo "ERROR: GEMINI_API_KEY, JWT_SECRET, and AI_EVALUATION_KEY GitHub Actions secrets are required for the AI agent deployment" >&2
+            if [ -z "${GEMINI_API_KEY:-}" ] || [ -z "${JWT_SECRET:-}" ] || [ -z "${AI_EVALUATION_KEY:-}" ] || [ -z "${WHATSAPP_COMMERCE_KEY:-}" ]; then
+              echo "ERROR: GEMINI_API_KEY, JWT_SECRET, AI_EVALUATION_KEY and WHATSAPP_COMMERCE_KEY GitHub Actions secrets are required for the AI agent deployment" >&2
               exit 1
             fi
             set --
             set -- --set-string "envSecrets.GEMINI_API_KEY=${GEMINI_API_KEY}"
             set -- "$@" --set-string "envSecrets.JWT_SECRET=${JWT_SECRET}"
             set -- "$@" --set-string "envSecrets.AI_EVALUATION_KEY=${AI_EVALUATION_KEY}"
+            set -- "$@" --set-string "envSecrets.WHATSAPP_COMMERCE_KEY=${WHATSAPP_COMMERCE_KEY}"
             if [ -n "${OPENAI_API_KEY:-}" ]; then
               set -- "$@" --set-string "envSecrets.OPENAI_API_KEY=${OPENAI_API_KEY}"
             fi
