@@ -196,6 +196,14 @@ class WhatsAppClient:
         image_reference = {"link": image_url}
         if local_path:
             image_reference = {"id": await self._upload_local_image(local_path)}
+        elif "/mockups/" in urlsplit(image_url).path:
+            # Designer mockups are stored upside down (the WebGL designer flips
+            # them on load); send a corrected copy, never the raw file.
+            try:
+                image_reference = {"id": await self._upload_remote_image(image_url, flip=True)}
+            except (httpx.HTTPError, OSError, ValueError, RuntimeError):
+                logger.warning("Could not prepare a designer mockup for WhatsApp; skipping that photo")
+                return {"skipped": True}
         elif urlsplit(image_url).path.lower().endswith(".webp"):
             try:
                 image_reference = {"id": await self._upload_remote_image(image_url)}
@@ -245,13 +253,15 @@ class WhatsAppClient:
         """Convert catalogue formats to JPEG and upload them to Meta before sending."""
         return await self._upload_image_bytes(path.read_bytes(), path.stem)
 
-    async def _upload_remote_image(self, image_url: str) -> str:
+    async def _upload_remote_image(self, image_url: str, flip: bool = False) -> str:
         content, _, final_url = await fetch_remote_image(image_url)
-        return await self._upload_image_bytes(content, Path(urlsplit(final_url).path).stem)
+        return await self._upload_image_bytes(content, Path(urlsplit(final_url).path).stem, flip=flip)
 
-    async def _upload_image_bytes(self, source_bytes: bytes, filename: str) -> str:
+    async def _upload_image_bytes(self, source_bytes: bytes, filename: str, flip: bool = False) -> str:
         with Image.open(io.BytesIO(source_bytes)) as source:
             image = ImageOps.exif_transpose(source)
+            if flip:
+                image = ImageOps.flip(image)  # vertical flip, matching the designer
             if image.mode in {"RGBA", "LA"}:
                 background = Image.new("RGB", image.size, "white")
                 background.paste(image.convert("RGBA"), mask=image.convert("RGBA").getchannel("A"))
@@ -939,6 +949,8 @@ class WhatsAppService:
                     sent_response = await self.client.send_image(to, image_url, caption)
                     if not sent_response:
                         raise RuntimeError("WhatsApp sender is not configured")
+                    if sent_response.get("skipped"):  # better no photo than an upside-down one
+                        continue
                     await self._remember_outbound_context(sent_response, to, [str(product.id)], "product_image")
                     if delivery_id:
                         await self.deliveries.update_one(
@@ -956,10 +968,17 @@ class WhatsAppService:
 
     def _product_image_caption(self, product: Any) -> str:
         price = product.sale_price if product.sale_price is not None else product.price
+        price_text = f"{product.currency} {int(price)}"
+        attributes = product.attributes or {}
+        if attributes.get("source_type") == "customization":
+            # The designer prices the blank garment per size; quote the lowest, as replies do.
+            size_prices = [float(v["effective_price"]) for v in attributes.get("variants") or [] if v.get("effective_price")]
+            if size_prices:
+                price_text = f"From {product.currency} {int(min(size_prices))}"
         stock_text = "Available" if product.stock > 0 else "Out of stock"
         lines = [
             str(product.name),
-            f"{product.currency} {int(price)}",
+            price_text,
             stock_text,
         ]
 

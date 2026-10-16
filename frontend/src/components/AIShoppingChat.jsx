@@ -165,8 +165,13 @@ const formatPrice = (value) => {
 const normalizeAgentProduct = (product = {}) => {
   const attributes = product.attributes || {};
   const sourceType = attributes.source_type || "readymade";
-  const price = Number(product.sale_price ?? product.price ?? 0);
-  const originalPrice = Number(product.price ?? price);
+  // A customizable product's blank garment is priced per size in the designer;
+  // show the lowest size price ("From"), as the assistant's reply does.
+  const sizePrices = sourceType === "customization"
+    ? (attributes.variants || []).map((variant) => Number(variant.effective_price)).filter((value) => value > 0)
+    : [];
+  const price = sizePrices.length ? Math.min(...sizePrices) : Number(product.sale_price ?? product.price ?? 0);
+  const originalPrice = sizePrices.length ? price : Number(product.price ?? price);
   const discountPercent = product.discountPercent ?? (
     originalPrice > price && originalPrice > 0 ? Math.round(((originalPrice - price) / originalPrice) * 100) : 0
   );
@@ -181,6 +186,7 @@ const normalizeAgentProduct = (product = {}) => {
     originalPrice,
     discountPercent,
     sourceType,
+    priceIsFrom: sizePrices.length > 0,
     // Only readymade products use the readymade cart; drop and custom
     // products are bought from their own pages.
     canAddToCart: sourceType === "readymade",
@@ -299,9 +305,14 @@ const buildCartSnapshot = (cart, summary) => {
   };
 };
 
+// Designer mockups (/mockups/...) are stored upside down: the WebGL designer
+// loads them with UNPACK_FLIP_Y. Flip them back for a plain <img>.
+const isDesignerMockup = (url) => /\/mockups\//.test(String(url || ""));
+
 const ProductCard = ({ product, addingProductId, onAddToCart, onClick }) => {
   const productPath = product.path || buildReadymadeProductPath(product);
   const imageUrl = buildImageUrl(product.image || product.thumbnail);
+  const flipImage = isDesignerMockup(product.image || product.thumbnail);
   const canAddToCart = product.canAddToCart !== false;
   const adding = addingProductId === product._id;
 
@@ -317,6 +328,7 @@ const ProductCard = ({ product, addingProductId, onAddToCart, onClick }) => {
             src={imageUrl}
             alt={product.name || "Product"}
             className="h-full w-full object-cover"
+            style={flipImage ? { transform: "scaleY(-1)" } : undefined}
             loading="lazy"
           />
         ) : (
@@ -338,7 +350,10 @@ const ProductCard = ({ product, addingProductId, onAddToCart, onClick }) => {
         )}
         <div className="mt-auto flex items-end justify-between gap-2 pt-1.5">
           <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
-            <span className="text-sm font-semibold text-gray-950">{formatPrice(product.price)}</span>
+            <span className="text-sm font-semibold text-gray-950">
+              {product.priceIsFrom && <span className="mr-1 text-[11px] font-normal text-gray-500">From</span>}
+              {formatPrice(product.price)}
+            </span>
             {product.discountPercent > 0 && (
               <>
                 {product.originalPrice > product.price && (

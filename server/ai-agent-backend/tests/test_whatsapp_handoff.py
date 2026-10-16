@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from bson import ObjectId
 
@@ -65,6 +65,46 @@ class ButtonTests(unittest.IsolatedAsyncioTestCase):
         _, kind = await service._send_primary_response(PHONE, "wamid.in", response)
         self.assertEqual(kind, "buttons")
         self.assertEqual(service.client.buttons[0][2], ["Talk to a person"])
+
+
+class DesignerMockupPhotoTests(unittest.IsolatedAsyncioTestCase):
+    """Designer mockups are stored upside down; WhatsApp must get a corrected copy."""
+
+    def client(self):
+        client = WhatsAppClient(access_token="token", phone_number_id="123")
+        response = SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"messages": [{"id": "wamid.1"}]})
+        http = SimpleNamespace(post=AsyncMock(return_value=response))
+        context = MagicMock()
+        context.__aenter__ = AsyncMock(return_value=http)
+        context.__aexit__ = AsyncMock(return_value=False)
+        return client, http, context
+
+    async def test_mockups_are_uploaded_flipped(self):
+        client, http, context = self.client()
+        client._upload_remote_image = AsyncMock(return_value="media-1")
+        with patch("app.services.whatsapp_service.httpx.AsyncClient", return_value=context):
+            await client.send_image(PHONE, "https://www.maitrova.in/mockups/hoodie/front.png", "Hoodie")
+        client._upload_remote_image.assert_awaited_once_with("https://www.maitrova.in/mockups/hoodie/front.png", flip=True)
+        self.assertEqual(http.post.await_args.kwargs["json"]["image"]["id"], "media-1")
+
+    async def test_other_photos_are_sent_as_links(self):
+        client, http, context = self.client()
+        client._upload_remote_image = AsyncMock()
+        with patch("app.services.whatsapp_service.httpx.AsyncClient", return_value=context):
+            await client.send_image(PHONE, "https://www.maitrova.in/uploads/tee.jpg", "Tee")
+        client._upload_remote_image.assert_not_awaited()
+        self.assertEqual(http.post.await_args.kwargs["json"]["image"]["link"], "https://www.maitrova.in/uploads/tee.jpg")
+
+    async def test_a_mockup_that_cannot_be_prepared_is_skipped(self):
+        client, _, _ = self.client()
+        client._upload_remote_image = AsyncMock(side_effect=OSError("broken image"))
+        self.assertEqual(await client.send_image(PHONE, "https://www.maitrova.in/mockups/hoodie/front.png"), {"skipped": True})
+
+    def test_flip_is_vertical(self):
+        from PIL import Image, ImageOps
+        image = Image.new("RGB", (2, 2))
+        image.putpixel((0, 0), (255, 0, 0))  # red top-left
+        self.assertEqual(ImageOps.flip(image).getpixel((0, 1)), (255, 0, 0))  # bottom-left, not bottom-right
 
 
 class OrderUpdateTextTests(unittest.TestCase):
