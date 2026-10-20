@@ -395,6 +395,54 @@ export const removeCartItem = createAsyncThunk(
   }
 );
 
+// Replaces loose cart items with a combo line. Errors stay with the caller
+// (shown next to the combo offer), so the cart's global error is untouched.
+export const convertToCombo = createAsyncThunk(
+  "cart/convertToCombo",
+  async ({ comboPackId, selections }, { rejectWithValue, getState }) => {
+    try {
+      const state = getState();
+      const api = createApi();
+
+      const response = await api.post(
+        "/cart/convert-to-combo",
+        { comboPackId, selections },
+        { headers: getAuthHeaders(state) }
+      );
+
+      return response.data;
+    } catch (error) {
+      return rejectWithValue({
+        message: error.response?.data?.message || "Could not switch to the combo",
+        status: error.response?.status || 500,
+      });
+    }
+  }
+);
+
+// Takes one unit of a combo made from cart items back apart, restoring the
+// customer's original items. Errors stay with the caller, as above.
+export const undoCombo = createAsyncThunk(
+  "cart/undoCombo",
+  async (itemId, { rejectWithValue, getState }) => {
+    try {
+      const state = getState();
+      const api = createApi();
+
+      const response = await api.post(`/cart/item/${itemId}/undo-combo`, {}, {
+        headers: getAuthHeaders(state),
+      });
+
+      return response.data;
+    } catch (error) {
+      return rejectWithValue({
+        message: error.response?.data?.message || "Could not remove the combo",
+        status: error.response?.status || 500,
+      });
+    }
+  }
+);
+
 export const clearCart = createAsyncThunk(
   "cart/clearCart",
   async (_, { rejectWithValue, getState }) => {
@@ -605,6 +653,20 @@ const cartSlice = createSlice({
         state.error = action.payload?.message || "Failed to remove item";
         state.success = false;
       });
+
+    // Convert to Combo
+    builder.addCase(convertToCombo.fulfilled, (state, action) => {
+      state.cart = action.payload.cart;
+      state.cartSummary = calculateCartSummary(action.payload.cart);
+      state.lastAction = "convertToCombo";
+    });
+
+    // Undo Combo
+    builder.addCase(undoCombo.fulfilled, (state, action) => {
+      state.cart = action.payload.cart;
+      state.cartSummary = calculateCartSummary(action.payload.cart);
+      state.lastAction = "undoCombo";
+    });
 
     // Clear Cart
     builder

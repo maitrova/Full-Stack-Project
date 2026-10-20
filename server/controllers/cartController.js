@@ -14,6 +14,11 @@ import {
   getGapRecommendations,
   toOfferLine,
 } from "../services/cartOfferService.js";
+import {
+  getComboSuggestions as findComboSuggestions,
+  resolveConvertSelections,
+  toComboLine,
+} from "../services/comboSuggestionService.js";
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 const normalizeId = (value) => String(value?._id || value || "").trim();
 const GUEST_CART_COOKIE = "guest_cart_id_v2";
@@ -563,6 +568,80 @@ const validateComboSelections = (combo, rawSelections, qty) => {
   return normalizedSelections;
 };
 
+// A READYMADE cart line for a product (ReadymadeProduct or Dropproduct) and
+// the size picked via getReadymadeVariantSelection.
+const buildReadymadeCartItem = ({ product, sourceType = "READYMADE", selection, qty }) => ({
+  kind: "READYMADE",
+  readymadeProduct: sourceType === "READYMADE" ? product._id : null,
+  dropproduct: sourceType === "DROP" ? product._id : null,
+  design: null,
+  product: null,
+  qty,
+  size: selection.size,
+  unitPrice: Number(selection.unitPrice || 0),
+  basePrice: selection.basePrice,
+  priceDetails: selection.priceDetails,
+  currency: product.currency || "INR",
+  previewImage: sanitizePreviewImage(extractProductPreviewImage(product)),
+  // Signature includes source to avoid collisions between models
+  signature: `${sourceType}:${product._id.toString()}:SIZE:${selection.size}`,
+});
+
+// Validates the selections against a populated combo and returns the COMBO
+// cart line to insert. Throws with a customer-facing message when invalid.
+const buildComboCartItem = (combo, rawSelections, qty) => {
+  const normalizedSelections = validateComboSelections(combo, rawSelections, qty);
+
+  const selectionSignature = normalizedSelections
+    .map((selection) =>
+      `${selection.productId}:${selection.size || "-"}:${selection.color?.value || "-"}`
+    )
+    .join("|");
+  const signature = `COMBO:${combo._id.toString()}:${selectionSignature}`;
+
+  const hasSelectionGroups = Array.isArray(combo.selectionGroups) && combo.selectionGroups.length > 0;
+  const originalPrice = hasSelectionGroups
+    ? normalizedSelections.reduce((sum, selection) => sum + Number(selection.basePrice || selection.unitPrice || 0), 0)
+    : Number(combo.originalPriceOverride || 0) > 0
+    ? Number(combo.originalPriceOverride)
+    : normalizedSelections.reduce((sum, selection) => {
+        const comboItem = combo.items.find(
+          (item) => normalizeId(item.product?._id) === selection.productId
+        );
+        const product = comboItem?.product;
+        const variant = Array.isArray(product?.variants)
+          ? product.variants.find((entry) => entry.size === selection.size)
+          : null;
+        const pricing = getReadymadePricing(product, { variant });
+        return sum + Number(pricing.effectivePrice || product?.price || 0);
+      }, 0);
+  const comboPrice = Number(combo.comboPrice || 0);
+
+  return {
+    kind: "COMBO",
+    readymadeProduct: null,
+    dropproduct: null,
+    comboPack: combo._id,
+    comboSelections: normalizedSelections,
+    comboName: combo.name || "Combo Pack",
+    design: null,
+    product: null,
+    qty,
+    size: "",
+    unitPrice: comboPrice,
+    basePrice: originalPrice,
+    priceDetails: {
+      originalPrice,
+      savingsAmount: Math.max(originalPrice - comboPrice, 0),
+      discountPercentage:
+        originalPrice > 0 ? Math.round(((originalPrice - comboPrice) / originalPrice) * 100) : 0,
+    },
+    currency: combo.currency || "INR",
+    previewImage: sanitizePreviewImage(extractComboPreviewImage(combo)),
+    signature,
+  };
+};
+
 const findActiveCartWithDetails = ({ userId = null, guestId = null }) => {
   if (!userId && !guestId) {
     return null;
@@ -806,26 +885,8 @@ export const addToCart = async (req, res) => {
         return res.status(400).json({ message: "Not enough stock" });
       }
 
-      const finalSize = selection.size;
-
-      // ✅ Signature includes source to avoid collisions between models
-      signature = `${sourceType}:${product._id.toString()}:SIZE:${finalSize}`;
-
-      itemToInsert = {
-        kind: "READYMADE",
-        readymadeProduct: sourceType === "READYMADE" ? product._id : null,
-        dropproduct: sourceType === "DROP" ? product._id : null,   // ✅ NEW
-        design: null,
-        product: null,
-        qty: parsedQty,
-        size: finalSize,
-        unitPrice,
-        basePrice: selection.basePrice,
-        priceDetails: selection.priceDetails,
-        currency: product.currency || "INR",
-        previewImage: sanitizePreviewImage(extractProductPreviewImage(product)),
-        signature,
-      };
+      itemToInsert = buildReadymadeCartItem({ product, sourceType, selection, qty: parsedQty });
+      signature = itemToInsert.signature;
     }
 
     // =========================
@@ -846,68 +907,8 @@ export const addToCart = async (req, res) => {
         return res.status(404).json({ message: "Combo pack not found or inactive" });
       }
 
-      const normalizedSelections = validateComboSelections(
-        combo,
-        parseComboSelections(body.comboSelections),
-        parsedQty
-      );
-
-      const selectionSignature = normalizedSelections
-        .map((selection) =>
-          `${selection.productId}:${selection.size || "-"}:${selection.color?.value || "-"}`
-        )
-        .join("|");
-      signature = `COMBO:${combo._id.toString()}:${selectionSignature}`;
-
-      const hasSelectionGroups = Array.isArray(combo.selectionGroups) && combo.selectionGroups.length > 0;
-      const originalPrice = hasSelectionGroups
-        ? normalizedSelections.reduce((sum, selection) => sum + Number(selection.basePrice || selection.unitPrice || 0), 0)
-        : Number(combo.originalPriceOverride || 0) > 0
-        ? Number(combo.originalPriceOverride)
-        : normalizedSelections.reduce((sum, selection) => {
-            const comboItem = combo.items.find(
-              (item) => normalizeId(item.product?._id) === selection.productId
-            );
-            const product = comboItem?.product;
-            const variant = Array.isArray(product?.variants)
-              ? product.variants.find((entry) => entry.size === selection.size)
-              : null;
-            const pricing = getReadymadePricing(product, { variant });
-            return sum + Number(pricing.effectivePrice || product?.price || 0);
-          }, 0);
-      const comboPrice = hasSelectionGroups
-        ? Number(combo.comboPrice || 0)
-        : Number(combo.comboPrice || 0);
-
-      itemToInsert = {
-        kind: "COMBO",
-        readymadeProduct: null,
-        dropproduct: null,
-        comboPack: combo._id,
-        comboSelections: normalizedSelections,
-        comboName: combo.name || "Combo Pack",
-        design: null,
-        product: null,
-        qty: parsedQty,
-        size: "",
-        unitPrice: comboPrice,
-        basePrice: originalPrice,
-        priceDetails: {
-          originalPrice,
-          savingsAmount: Math.max(originalPrice - comboPrice, 0),
-          discountPercentage:
-            hasSelectionGroups
-              ? originalPrice > 0
-                ? Math.round(((originalPrice - comboPrice) / originalPrice) * 100)
-                : 0
-              : originalPrice > 0
-                ? Math.round(((originalPrice - Number(combo.comboPrice || 0)) / originalPrice) * 100)
-                : 0,
-        },
-        currency: combo.currency || "INR",
-        previewImage: sanitizePreviewImage(extractComboPreviewImage(combo)),
-        signature,
-      };
+      itemToInsert = buildComboCartItem(combo, parseComboSelections(body.comboSelections), parsedQty);
+      signature = itemToInsert.signature;
     }
 
     // =========================
@@ -1142,6 +1143,185 @@ export const getCartOffers = async (req, res) => {
     return res.status(200).json({ ...result, recommendations });
   } catch (err) {
     console.error("getCartOffers error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const getComboSuggestions = async (req, res) => {
+  try {
+    const { userId, guestId } = resolveCartOwner(req, res);
+    const cart = await findActiveCartWithDetails({ userId, guestId });
+    const lines = enrichCartItems(cart?.items || []).map(toComboLine);
+
+    const suggestions = await findComboSuggestions({ lines });
+    return res.status(200).json({ suggestions });
+  } catch (err) {
+    console.error("getComboSuggestions error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Replaces loose cart items (and optionally a newly picked product) with one
+// COMBO line. Each loose item gives up one unit; the rest of its qty stays.
+export const convertToCombo = async (req, res) => {
+  try {
+    const { userId, guestId } = resolveCartOwner(req, res);
+    if (!userId && !guestId) return res.status(404).json({ message: "Cart not found" });
+
+    const { comboPackId, selections } = req.body || {};
+    if (!comboPackId || !isValidObjectId(comboPackId)) {
+      return res.status(400).json({ message: "Valid comboPackId is required" });
+    }
+
+    const [cart, combo] = await Promise.all([
+      Cart.findOne(userId ? { user: userId, status: "ACTIVE" } : { guestId, status: "ACTIVE" }),
+      ComboPack.findById(comboPackId)
+        .populate("items.product")
+        .populate("selectionGroups.category", "name")
+        .populate("selectionGroups.eligibleProducts")
+        .lean(),
+    ]);
+    if (!cart) return res.status(404).json({ message: "Cart not found" });
+    if (!combo || combo.status !== "ACTIVE") {
+      return res.status(404).json({ message: "Combo pack not found or inactive" });
+    }
+
+    let usedItemIds;
+    let comboItem;
+    let existingIndex;
+    try {
+      const resolved = resolveConvertSelections({
+        combo,
+        cartLines: cart.items.map(toComboLine),
+        selections,
+      });
+      usedItemIds = resolved.usedItemIds;
+      comboItem = buildComboCartItem(combo, resolved.rawSelections, 1);
+      existingIndex = cart.items.findIndex((item) => item.signature === comboItem.signature);
+      if (existingIndex >= 0) {
+        // Same combo with the same picks is already in the cart: bump its qty.
+        comboItem = buildComboCartItem(
+          combo,
+          resolved.rawSelections,
+          Number(cart.items[existingIndex].qty || 0) + 1
+        );
+      }
+    } catch (err) {
+      return res.status(400).json({ message: err.message });
+    }
+
+    // Remember what went in, so "Remove combo, keep my item" can undo it.
+    const convertedSet = {
+      items: usedItemIds.map((itemId) => {
+        const item = cart.items.id(itemId);
+        const productId = normalizeId(item.readymadeProduct);
+        const selection = comboItem.comboSelections.find((entry) => entry.productId === productId);
+        return { readymadeProduct: item.readymadeProduct, size: item.size, title: selection?.productName || "" };
+      }),
+    };
+
+    for (const itemId of usedItemIds) {
+      const item = cart.items.id(itemId);
+      if (item.qty > 1) item.qty -= 1;
+      else cart.items.pull(itemId);
+    }
+
+    if (existingIndex >= 0) {
+      const existing = cart.items.find((item) => item.signature === comboItem.signature);
+      Object.assign(existing, {
+        qty: comboItem.qty,
+        unitPrice: comboItem.unitPrice,
+        basePrice: comboItem.basePrice,
+        priceDetails: comboItem.priceDetails,
+        comboSelections: comboItem.comboSelections,
+      });
+      existing.convertedFrom.push(convertedSet);
+    } else {
+      cart.items.push({ ...comboItem, convertedFrom: [convertedSet] });
+    }
+    await cart.save();
+
+    const responseCart = await buildActiveCartResponse({ userId, guestId });
+    return res.status(200).json({
+      message: "Switched to combo",
+      cart: responseCart,
+      savings: Number(comboItem.priceDetails?.savingsAmount || 0),
+    });
+  } catch (err) {
+    console.error("convertToCombo error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Undoes the latest convert-to-combo on a combo line: one combo unit goes,
+// and the cart items it was made from come back at their current price.
+// Products that were only added for the combo are dropped.
+export const undoCombo = async (req, res) => {
+  try {
+    const { userId, guestId } = resolveCartOwner(req, res);
+    if (!userId && !guestId) return res.status(404).json({ message: "Cart not found" });
+
+    const { itemId } = req.params;
+    if (!isValidObjectId(itemId)) return res.status(400).json({ message: "Invalid itemId" });
+
+    const cart = await Cart.findOne(userId ? { user: userId, status: "ACTIVE" } : { guestId, status: "ACTIVE" });
+    const comboLine = cart?.items.id(itemId);
+    if (!comboLine) return res.status(404).json({ message: "Item not found in cart" });
+    const convertedSet = comboLine.convertedFrom?.[comboLine.convertedFrom.length - 1];
+    if (comboLine.kind !== "COMBO" || !convertedSet?.items?.length) {
+      return res.status(400).json({ message: "This combo was not made from your cart items" });
+    }
+
+    // Check every item first, so the cart is only changed if all come back.
+    const restored = [];
+    for (const entry of convertedSet.items) {
+      const product = await ReadymadeProduct.findById(entry.readymadeProduct).lean();
+      const name = product?.title || entry.title || "This item";
+      if (!product || product.isActive === false) {
+        return res.status(400).json({ message: `${name} is no longer available` });
+      }
+      const selection = getReadymadeVariantSelection(product, entry.size);
+      if (!selection) return res.status(400).json({ message: `${name} in size ${entry.size} is no longer available` });
+
+      const line = buildReadymadeCartItem({ product, selection, qty: 1 });
+      const existing = cart.items.find((item) => item.signature === line.signature);
+      const alreadyRestored = restored.filter((r) => r.line.signature === line.signature).length;
+      const neededQty = Number(existing?.qty || 0) + alreadyRestored + 1;
+      if (Number(selection.availableStock || 0) < neededQty) {
+        return res.status(400).json({ message: `${name} is out of stock` });
+      }
+      restored.push({ line, title: product.title });
+    }
+
+    const savingsLost = Math.max(Number(comboLine.basePrice || 0) - Number(comboLine.unitPrice || 0), 0);
+    comboLine.convertedFrom.pop();
+    if (comboLine.qty > 1) comboLine.qty -= 1;
+    else cart.items.pull(itemId);
+
+    for (const { line } of restored) {
+      const existing = cart.items.find((item) => item.signature === line.signature);
+      if (existing) {
+        Object.assign(existing, {
+          qty: existing.qty + 1,
+          unitPrice: line.unitPrice,
+          basePrice: line.basePrice,
+          priceDetails: line.priceDetails,
+        });
+      } else {
+        cart.items.push(line);
+      }
+    }
+    await cart.save();
+
+    const responseCart = await buildActiveCartResponse({ userId, guestId });
+    return res.status(200).json({
+      message: "Combo removed",
+      cart: responseCart,
+      restored: restored.map((r) => r.title),
+      savingsLost,
+    });
+  } catch (err) {
+    console.error("undoCombo error:", err);
     return res.status(500).json({ message: "Server error" });
   }
 };

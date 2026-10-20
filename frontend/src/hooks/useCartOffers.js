@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import { useSelector } from "react-redux";
+import { selectCurrentToken } from "../redux/slices/Userslice.js";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -18,6 +20,7 @@ export const useCartOffers = (cartItems = [], { couponApplied = false } = {}) =>
   const [data, setData] = useState(emptyOffers);
   const [loading, setLoading] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const token = useSelector(selectCurrentToken);
 
   const cartKey = useMemo(
     () => cartItems.map((item) => `${item._id}:${item.qty}:${item.unitPrice}`).join("|"),
@@ -32,6 +35,8 @@ export const useCartOffers = (cartItems = [], { couponApplied = false } = {}) =>
         setLoading(true);
         const res = await axios.get(`${API_URL}/cart/offers`, {
           params: couponApplied ? { couponApplied: true } : {},
+          // The server reads the login from this header, not from cookies.
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
           withCredentials: true,
         });
         if (!cancelled) setData({ ...emptyOffers, ...res.data });
@@ -47,7 +52,7 @@ export const useCartOffers = (cartItems = [], { couponApplied = false } = {}) =>
     return () => {
       cancelled = true;
     };
-  }, [cartKey, couponApplied, reloadKey]);
+  }, [cartKey, couponApplied, reloadKey, token]);
 
   const refresh = useCallback(() => setReloadKey((key) => key + 1), []);
 

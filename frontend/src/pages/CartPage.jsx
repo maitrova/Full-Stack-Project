@@ -25,6 +25,10 @@ import { buildCatalogueDesignPath } from "../utils/catalogueDesignRoutes.js";
 import { trackBeginCheckoutOnce } from "../utils/analytics.js";
 import { useCartOffers } from "../hooks/useCartOffers.js";
 import CartOffersPanel from "../components/CartOffersPanel.jsx";
+import { useComboSuggestions } from "../hooks/useComboSuggestions.js";
+import ComboOffersPanel from "../components/ComboOffersPanel.jsx";
+import { ComboImageCollage, ComboItemsList, ComboSavingBadge, ComboUndoControl } from "../components/ComboCartLine.jsx";
+import { getComboSavingsTotal } from "../utils/comboSavings.js";
 
 // Constants
 const ensureImageUrl = (imagePath) => buildImageUrl(imagePath) || null;
@@ -81,11 +85,15 @@ const CartPage = () => {
   const cartSummary = useSelector(selectCartSummary);
   const cartItemCount = useSelector(selectCartItemCount);
   const cartOffers = useCartOffers(cartItems);
+  const comboSuggestions = useComboSuggestions(cartItems);
   const offerDiscount = Math.min(Number(cartOffers.discount || 0), Number(cartSummary.total || 0));
   const summaryWithOffers = {
     ...cartSummary,
     offerDiscount,
     offerName: cartOffers.applied?.name || "",
+    // Already inside the subtotal (combos are priced at the combo price);
+    // shown so the customer sees what the combos saved them.
+    comboSavings: getComboSavingsTotal(cartItems),
     total: Math.max(0, Number(cartSummary.total || 0) - offerDiscount),
   };
   
@@ -549,6 +557,10 @@ const CartPage = () => {
           {/* Cart Items */}
           <div className="lg:col-span-8">
             <CartOffersPanel offers={cartOffers} />
+            <ComboOffersPanel
+              suggestions={comboSuggestions}
+              onConverted={(message) => setNotification({ show: true, message, type: 'success' })}
+            />
             <div className="bg-mt-surface rounded-xl shadow-sm overflow-hidden">
               <div className="p-4 sm:p-6 border-b border-mt-line">
                 <h2 className="text-lg font-normal text-mt-text">Cart Items</h2>
@@ -577,7 +589,17 @@ const CartPage = () => {
                           className="flex-shrink-0 w-full sm:w-32 mb-4 sm:mb-0 cursor-pointer"
                           onClick={() => handleImageClick(item)}
                         >
-                          {imageUrl ? (
+                          {item.kind === "COMBO" &&
+                          (item.comboSelections || []).filter((selection) => selection.productImage).length >= 2 ? (
+                            <div className="relative w-full h-48 sm:h-auto rounded-lg overflow-hidden group">
+                              <ComboImageCollage item={item} />
+                              <div className="absolute inset-0 bg-black/30 sm:bg-transparent sm:group-hover:bg-black/40 transition-all duration-300 flex items-center justify-center">
+                                <span className="text-white text-sm font-medium px-3 py-1.5 bg-black/70 rounded-lg sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-300">
+                                  View Combo
+                                </span>
+                              </div>
+                            </div>
+                          ) : imageUrl ? (
                             <div className="relative w-full h-48 sm:h-32 rounded-lg overflow-hidden group">
                               <img
                                 src={imageProps.src || imageUrl}
@@ -647,26 +669,12 @@ const CartPage = () => {
                                 </div>
                               )}
 
-                              {item.kind === "COMBO" && Array.isArray(item.comboSelections) && item.comboSelections.length > 0 && (
-                                <div className="mb-2 space-y-1.5 rounded-lg bg-mt-bg p-3">
-                                  {item.comboSelections.map((selection, selectionIndex) => (
-                                    <div
-                                      key={`${selection.productId || selection.productName}-${selectionIndex}`}
-                                      className="flex items-center justify-between gap-3 text-xs text-mt-muted"
-                                    >
-                                      <span className="min-w-0 truncate font-medium">
-                                        {selection.productName || `Item ${selectionIndex + 1}`}
-                                      </span>
-                                      <span className="flex-shrink-0 text-mt-subtle">
-                                        {selection.size ? `Size: ${selection.size}` : ""}
-                                        {selection.color?.label || selection.color?.value
-                                          ? `${selection.size ? " | " : ""}Color: ${selection.color.label || selection.color.value}`
-                                          : ""}
-                                      </span>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
+                              <ComboItemsList item={item} />
+                              <ComboSavingBadge item={item} />
+                              <ComboUndoControl
+                                item={item}
+                                onUndone={(message) => setNotification({ show: true, message, type: 'success' })}
+                              />
 
                               {/* Price - Mobile */}
                               <div className="flex justify-between items-center sm:hidden mt-2">
@@ -680,7 +688,7 @@ const CartPage = () => {
                                 </p>
                                 {Number(item.basePrice || 0) > Number(item.unitPrice || 0) && (
                                   <p className="text-xs text-mt-subtle line-through">
-                                    {formatPrice(item.basePrice, item.currency)} MRP
+                                    {formatPrice(item.basePrice, item.currency)} {item.kind === "COMBO" ? "separately" : "MRP"}
                                   </p>
                                 )}
                               </div>
@@ -735,7 +743,7 @@ const CartPage = () => {
                               </p>
                               {Number(item.basePrice || 0) > Number(item.unitPrice || 0) && (
                                 <p className="text-xs text-mt-subtle line-through">
-                                  {formatPrice(item.basePrice, item.currency)} MRP
+                                  {formatPrice(item.basePrice, item.currency)} {item.kind === "COMBO" ? "separately" : "MRP"}
                                 </p>
                               )}
                             </div>
@@ -852,10 +860,27 @@ const OrderSummaryContent = ({
 }) => (
   <>
     <div className="space-y-3 sm:space-y-4">
-      <div className="flex justify-between">
-        <span className="text-sm sm:text-base text-mt-muted">Subtotal</span>
-        <span className="text-sm sm:text-base font-medium">{formatPrice(cartSummary.subtotal, 'INR')}</span>
-      </div>
+      {cartSummary.comboSavings > 0 ? (
+        <>
+          <div className="flex justify-between">
+            <span className="text-sm sm:text-base text-mt-muted">Price without combo deals</span>
+            <span className="text-sm sm:text-base font-medium">
+              {formatPrice(cartSummary.subtotal + cartSummary.comboSavings, 'INR')}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-sm sm:text-base text-mt-muted">🎁 Combo offer savings</span>
+            <span className="text-sm sm:text-base font-medium text-mt-success">
+              -{formatPrice(cartSummary.comboSavings, 'INR')}
+            </span>
+          </div>
+        </>
+      ) : (
+        <div className="flex justify-between">
+          <span className="text-sm sm:text-base text-mt-muted">Subtotal</span>
+          <span className="text-sm sm:text-base font-medium">{formatPrice(cartSummary.subtotal, 'INR')}</span>
+        </div>
+      )}
 
       {cartSummary.offerDiscount > 0 && (
         <div className="flex justify-between">
@@ -875,6 +900,11 @@ const OrderSummaryContent = ({
             {formatPrice(cartSummary.total, 'INR')}
           </span>
         </div>
+        {(cartSummary.comboSavings || 0) + (cartSummary.offerDiscount || 0) > 0 && (
+          <p className="mt-2 rounded-md bg-mt-success/10 px-3 py-2 text-sm font-medium text-mt-success">
+            You're saving {formatPrice((cartSummary.comboSavings || 0) + (cartSummary.offerDiscount || 0), 'INR')} on this order
+          </p>
+        )}
       </div>
     </div>
 

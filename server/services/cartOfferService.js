@@ -159,8 +159,31 @@ export const evaluateCartOffers = async ({ lines = [], couponApplied = false, ru
   };
 };
 
-const getProductImage = (product) =>
+export const getProductImage = (product) =>
   product?.thumbnail || product?.images?.[0]?.url || product?.images?.[0] || null;
+
+/**
+ * The sizes of a readymade product that can be bought right now, each with
+ * its current price. Products without variants come back as one size: null.
+ */
+export const getInStockSizeOptions = (product) => {
+  const toSizeOption = (variant = null) => {
+    const pricing = getReadymadePricing(product, { variant });
+    return {
+      size: variant?.size || null,
+      price: pricing.effectivePrice,
+      mrp: pricing.mrp,
+      saleActive: pricing.saleActive,
+    };
+  };
+
+  if (Array.isArray(product?.variants) && product.variants.length > 0) {
+    return product.variants
+      .filter((variant) => Number(variant.stock || 0) > 0)
+      .map((variant) => toSizeOption(variant));
+  }
+  return Number(product?.stock || 0) > 0 ? [toSizeOption()] : [];
+};
 
 /**
  * In-stock readymade products that count towards the given rule, ranked so
@@ -185,28 +208,9 @@ export const getGapRecommendations = async ({ gapAmount, ruleId, excludeProductI
     .limit(150)
     .lean();
 
-  const toSizeOption = (product, variant = null) => {
-    const pricing = getReadymadePricing(product, { variant });
-    return {
-      size: variant?.size || null,
-      price: pricing.effectivePrice,
-      mrp: pricing.mrp,
-      saleActive: pricing.saleActive,
-    };
-  };
-
   const candidates = [];
   for (const product of products) {
-    const hasVariants = Array.isArray(product.variants) && product.variants.length > 0;
-    let sizes = [];
-    if (hasVariants) {
-      sizes = product.variants
-        .filter((variant) => Number(variant.stock || 0) > 0)
-        .map((variant) => toSizeOption(product, variant));
-    } else if (Number(product.stock || 0) > 0) {
-      sizes = [toSizeOption(product)];
-    }
-
+    const sizes = getInStockSizeOptions(product);
     if (!sizes.length) continue;
     if (rule && !rule.includeSaleItems && sizes.some((entry) => entry.saleActive)) continue;
 

@@ -1,5 +1,26 @@
 import mongoose from "mongoose";
 
+// The loose cart items one combo unit was made from (see convert-to-combo),
+// so the customer can undo the combo and get them back.
+const convertedFromSetSchema = new mongoose.Schema(
+  {
+    items: {
+      type: [
+        new mongoose.Schema(
+          {
+            readymadeProduct: { type: mongoose.Schema.Types.ObjectId, ref: "ReadymadeProduct", required: true },
+            size: { type: String, default: "" },
+            title: { type: String, default: "" },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
+  },
+  { _id: false }
+);
+
 const cartItemSchema = new mongoose.Schema(
   {
     kind: {
@@ -39,6 +60,9 @@ const cartItemSchema = new mongoose.Schema(
     },
 
     comboName: { type: String, default: "" },
+
+    // One entry per combo unit that was made from cart items, newest last.
+    convertedFrom: { type: [convertedFromSetSchema], default: [] },
 
     product: {
       type: mongoose.Schema.Types.ObjectId,

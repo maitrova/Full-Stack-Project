@@ -4,7 +4,8 @@ import axios from "axios";
 import DOMPurify from "dompurify";
 import { AlertCircle, Check, ChevronLeft, ChevronRight, CreditCard, Eye, Package, Undo2 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
-import { addToCart, getCart, selectCartLoading } from "../redux/slices/Cartslice.js";
+import { addToCart, convertToCombo, getCart, selectCartLoading } from "../redux/slices/Cartslice.js";
+import { parseFromCartParam } from "../utils/comboCartLink.js";
 import { buildImageUrl } from "../utils/responsiveImage.js";
 import { buildReadymadeProductPath } from "../utils/readymadeRoutes.js";
 import {
@@ -80,6 +81,45 @@ const getVariantStock = (product, size) => {
   return Number(variant?.stock || 0);
 };
 
+// Slot ids in the same order and format the cart API uses: selection group
+// ids, or `item-<index>` for combos with fixed products.
+const getComboSlotIds = (combo) =>
+  combo?.selectionGroups?.length
+    ? [...combo.selectionGroups]
+        .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
+        .map((group) => String(group._id))
+    : (combo?.items || []).map((_, index) => `item-${index}`);
+
+// Pre-picks the cart items the customer came from (see ComboOffersPanel).
+// A pick stays linked to its cart item while product and size are unchanged.
+const getSelectionsFromCart = (combo, search) => {
+  const slotIds = getComboSlotIds(combo);
+  const groups = combo?.selectionGroups?.length
+    ? [...combo.selectionGroups].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
+    : [];
+  const selections = {};
+
+  for (const pick of parseFromCartParam(search)) {
+    const index = slotIds.indexOf(String(pick.slotId));
+    if (index < 0) continue;
+    const product = groups.length
+      ? (groups[index].eligibleProducts || []).find((entry) => entry._id === pick.productId)
+      : combo.items[index]?.product?._id === pick.productId
+      ? combo.items[index].product
+      : null;
+    if (!product) continue;
+
+    const variant = (product.variants || []).find(
+      (entry) => String(entry.size || "").toUpperCase() === String(pick.size || "").toUpperCase()
+    );
+    const size = variant?.size || "";
+    selections[index] = { productId: pick.productId, size, color: "", cartItemId: pick.itemId, cartSize: size };
+  }
+  return selections;
+};
+
+const isLinkedToCart = (selection) => Boolean(selection?.cartItemId) && selection.size === selection.cartSize;
+
 const ComboPackDetailPage = () => {
   const { slug } = useParams();
   const dispatch = useDispatch();
@@ -104,7 +144,7 @@ const ComboPackDetailPage = () => {
       try {
         const response = await axios.get(`${API_URL}/combo-packs/slug/${slug}`);
         setCombo(response.data.data);
-        setSelections({});
+        setSelections(getSelectionsFromCart(response.data.data, location.search));
         setActiveSelectionGroupIndex(0);
         setProductImageIndexes({});
         setQuantity(1);
@@ -115,7 +155,7 @@ const ComboPackDetailPage = () => {
       }
     };
     loadCombo();
-  }, [slug]);
+  }, [slug, location.search]);
 
   const updateSelection = (index, field, value) => {
     setSelections((current) => ({
@@ -297,16 +337,45 @@ const ComboPackDetailPage = () => {
         color: selections[index]?.color || "",
       }));
 
-      await dispatch(
-        addToCart({
-          kind: "COMBO",
-          comboPackId: combo._id,
-          comboSelections: selectionGroups.length ? groupSelections : comboSelections,
-          qty: quantity,
-        })
-      ).unwrap();
+      // Picks that came from the cart are swapped into the combo instead of
+      // being bought twice; any extra combos are added the usual way.
+      const slotIds = getComboSlotIds(combo);
+      const fromCart = slotIds.some((_, index) => isLinkedToCart(selections[index]));
+      let remaining = quantity;
+      if (fromCart) {
+        const sourceSelections = selectionGroups.length ? groupSelections : comboSelections;
+        await dispatch(
+          convertToCombo({
+            comboPackId: combo._id,
+            selections: slotIds.map((slotId, index) =>
+              isLinkedToCart(selections[index])
+                ? { slotId, itemId: selections[index].cartItemId }
+                : { slotId, ...sourceSelections[index] }
+            ),
+          })
+        ).unwrap();
+        remaining -= 1;
+      }
+      if (remaining > 0) {
+        await dispatch(
+          addToCart({
+            kind: "COMBO",
+            comboPackId: combo._id,
+            comboSelections: selectionGroups.length ? groupSelections : comboSelections,
+            qty: remaining,
+          })
+        ).unwrap();
+      }
       await dispatch(getCart());
-      setNotice("Combo pack added to cart");
+      if (fromCart) {
+        // The cart item is in the combo now; a second add must not reuse it.
+        setSelections((current) =>
+          Object.fromEntries(
+            Object.entries(current).map(([key, value]) => [key, { ...value, cartItemId: undefined }])
+          )
+        );
+      }
+      setNotice(fromCart ? "Combo added. Your cart item was moved into it." : "Combo pack added to cart");
       setShowSuccessAnimation(true);
       setTimeout(() => setShowSuccessAnimation(false), 2000);
       return true;
@@ -528,6 +597,11 @@ const ComboPackDetailPage = () => {
                   style={{ width: `${totalSlots ? Math.min(100, (completedSelectionCount / totalSlots) * 100) : 0}%` }}
                 />
               </div>
+              {Object.values(selections).some(isLinkedToCart) ? (
+                <p className="mt-2 text-xs text-mt-muted">
+                  We've picked the item from your cart. It moves into the combo, so you won't pay for it twice.
+                </p>
+              ) : null}
             </div>
 
             <div className="hidden lg:block">
