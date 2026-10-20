@@ -285,18 +285,18 @@ const ReadymadeProductList = () => {
   // Error state
   if (hasError) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)] flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 rounded-full mb-6">
-            <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-mt-danger/10 rounded-full mb-6">
+            <svg className="w-10 h-10 text-mt-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-3">Something went wrong</h2>
-          <p className="text-gray-600 mb-6">Failed to load products. Please try again later.</p>
+          <h2 className="text-2xl font-normal text-mt-text mb-3">Something went wrong</h2>
+          <p className="text-mt-muted mb-6">Failed to load products. Please try again later.</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition duration-200"
+            className="px-6 py-3 bg-mt-btn text-mt-btn-text rounded-lg font-medium hover:bg-mt-btn-hover transition duration-200"
           >
             Retry
           </button>
@@ -307,23 +307,23 @@ const ReadymadeProductList = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading products...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-mt-text mx-auto mb-4"></div>
+          <p className="text-mt-muted">Loading products...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)] py-8">
       {/* Notification Toast */}
       {notification.show && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in-down">
-          <div className={`rounded-lg shadow-lg p-4 max-w-sm ${notification.type === 'success' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+          <div className={`rounded-lg shadow-lg p-4 max-w-sm ${notification.type === 'success' ? 'bg-mt-success/10 border border-mt-success/30' : 'bg-mt-danger/10 border border-mt-danger/30'}`}>
             <div className="flex items-center">
-              <div className={`flex-shrink-0 ${notification.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
+              <div className={`flex-shrink-0 ${notification.type === 'success' ? 'text-mt-success' : 'text-mt-danger'}`}>
                 {notification.type === 'success' ? (
                   <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -335,7 +335,7 @@ const ReadymadeProductList = () => {
                 )}
               </div>
               <div className="ml-3">
-                <p className={`text-sm font-medium ${notification.type === 'success' ? 'text-green-800' : 'text-red-800'}`}>
+                <p className={`text-sm font-medium ${notification.type === 'success' ? 'text-mt-success' : 'text-mt-danger'}`}>
                   {notification.message}
                 </p>
               </div>
@@ -347,15 +347,15 @@ const ReadymadeProductList = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Ready-made Collection</h1>
-          <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+          <h1 className="text-4xl font-normal text-mt-text mb-4">Ready-made Collection</h1>
+          <p className="text-lg text-mt-muted max-w-3xl mx-auto">
             Discover our exclusive collection of high-quality products, carefully crafted for your style and comfort.
           </p>
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-xl">
+          <div className="mb-6 bg-mt-danger/10 border border-mt-danger/30 text-mt-danger px-6 py-4 rounded-xl">
             <div className="flex items-center justify-center">
               <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -366,7 +366,7 @@ const ReadymadeProductList = () => {
         )}
 
         {/* Filters and Search */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
+        <div className="bg-mt-surface rounded-xl shadow-sm p-6 mb-8">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="w-full md:w-2/5">
               <div className="relative">
@@ -375,9 +375,9 @@ const ReadymadeProductList = () => {
                   placeholder="Search products by name or description..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+                  className="w-full pl-12 pr-4 py-3 border border-mt-line-strong rounded-lg focus:ring-2 focus:ring-mt-text focus:border-mt-text transition duration-200"
                 />
-                <svg className="absolute left-4 top-3.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="absolute left-4 top-3.5 w-5 h-5 text-mt-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
@@ -387,7 +387,7 @@ const ReadymadeProductList = () => {
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 w-full md:w-48"
+                className="border border-mt-line-strong rounded-lg px-4 py-3 focus:ring-2 focus:ring-mt-text focus:border-mt-text transition duration-200 w-full md:w-48"
               >
                 <option value="">All Categories</option>
                 {categories.map(category => (
@@ -398,7 +398,7 @@ const ReadymadeProductList = () => {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 w-full md:w-48"
+                className="border border-mt-line-strong rounded-lg px-4 py-3 focus:ring-2 focus:ring-mt-text focus:border-mt-text transition duration-200 w-full md:w-48"
               >
                 <option value="newest">New Arrivals</option>
                 <option value="price-low">Price: Low to High</option>
@@ -429,12 +429,12 @@ const ReadymadeProductList = () => {
             return (
               <div 
                 key={product?._id || Math.random()} 
-                className="group bg-white rounded-2xl shadow-sm hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100 transform hover:-translate-y-1"
+                className="group bg-mt-surface rounded-2xl shadow-sm hover:shadow-2xl transition-all duration-300 overflow-hidden border border-mt-line transform hover:-translate-y-1"
                 onMouseEnter={() => handleMouseEnter(product?._id, productImages.length)}
                 onMouseLeave={() => handleMouseLeave(product?._id, productImages.length)}
               >
                 {/* Product Image with Slideshow */}
-                <div className="relative h-64 bg-gray-100 overflow-hidden">
+                <div className="relative h-64 bg-mt-photo overflow-hidden">
                   {imageUrl ? (
                     <img
                       src={imageUrl}
@@ -460,7 +460,7 @@ const ReadymadeProductList = () => {
                       }}
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                    <div className="w-full h-full flex items-center justify-center text-mt-subtle">
                       <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
@@ -472,7 +472,7 @@ const ReadymadeProductList = () => {
                     <>
                       <button
                         onClick={(e) => handleImageNav(product._id, 'prev', productImages.length, e)}
-                        className="absolute left-3 top-1/2 transform -translate-y-1/2 bg-white/80 hover:bg-white text-gray-800 p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                        className="absolute left-3 top-1/2 transform -translate-y-1/2 bg-mt-surface/80 hover:bg-mt-tint/10 text-mt-text p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -480,7 +480,7 @@ const ReadymadeProductList = () => {
                       </button>
                       <button
                         onClick={(e) => handleImageNav(product._id, 'next', productImages.length, e)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-white/80 hover:bg-white text-gray-800 p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-mt-surface/80 hover:bg-mt-tint/10 text-mt-text p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -503,7 +503,7 @@ const ReadymadeProductList = () => {
                               startSlideshow(product._id, productImages.length);
                             }
                           }}
-                          className={`w-2 h-2 rounded-full transition-all duration-300 ${index === currentIndex ? 'bg-white w-4' : 'bg-white/50'}`}
+                          className={`w-2 h-2 rounded-full transition-all duration-300 ${index === currentIndex ? 'bg-mt-surface w-4' : 'bg-white/50'}`}
                         />
                       ))}
                     </div>
@@ -512,17 +512,17 @@ const ReadymadeProductList = () => {
                   {/* Product Badges */}
                   <div className="absolute top-4 left-4 flex flex-col space-y-2">
                     {isOutOfStock && (
-                      <span className="px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                      <span className="px-3 py-1 text-xs font-semibold rounded-full bg-mt-danger/10 text-mt-danger">
                         Sold Out
                       </span>
                     )}
                     {isLowStock && !isOutOfStock && (
-                      <span className="px-3 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                      <span className="px-3 py-1 text-xs font-semibold rounded-full bg-amber-400/10 text-mt-warning">
                         Low Stock
                       </span>
                     )}
                     {isInCart && !isOutOfStock && (
-                      <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                      <span className="px-3 py-1 text-xs font-semibold rounded-full bg-mt-success/10 text-mt-success">
                         In Cart ({cartQuantity})
                       </span>
                     )}
@@ -533,28 +533,28 @@ const ReadymadeProductList = () => {
                 <div className="p-6">
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900 text-lg mb-1 truncate">
+                      <h3 className="font-semibold text-mt-text text-lg mb-1 truncate">
                         {product?.title || 'Unnamed Product'}
                       </h3>
-                      <p className="text-sm text-gray-500 mb-2">
+                      <p className="text-sm text-mt-subtle mb-2">
                         {product?.category || 'Uncategorized'}
                       </p>
                     </div>
-                    <span className="text-2xl font-bold text-blue-600 ml-4">
+                    <span className="text-2xl font-bold text-mt-text ml-4">
                       {product?.currency === 'INR' ? '₹' : '$'}{product?.price || '0.00'}
                     </span>
                   </div>
                   
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                  <p className="text-mt-muted text-sm mb-4 line-clamp-2">
                     {product?.description || 'No description available.'}
                   </p>
                   
-                  <div className="flex items-center justify-between text-sm text-gray-500 mb-6">
+                  <div className="flex items-center justify-between text-sm text-mt-subtle mb-6">
                     <div className="flex items-center">
-                      <svg className="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 mr-2 text-mt-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                       </svg>
-                      <span className={isOutOfStock ? 'text-red-500' : ''}>
+                      <span className={isOutOfStock ? 'text-mt-danger' : ''}>
                         {isOutOfStock ? 'Out of Stock' : `${product?.stock || 0} in stock`}
                       </span>
                     </div>
@@ -564,7 +564,7 @@ const ReadymadeProductList = () => {
                   <div className="flex space-x-3">
                     <Link
                       to={buildReadymadeProductPath(product) || `/readymade/${product?._id}`}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium text-center transition-all duration-200 transform hover:scale-[1.02] shadow-md hover:shadow-lg"
+                      className="flex-1 bg-mt-btn hover:bg-mt-btn-hover text-mt-btn-text px-6 py-3 rounded-lg font-medium text-center transition-all duration-200 transform hover:scale-[1.02] shadow-md hover:shadow-lg"
                     >
                       View Details
                     </Link>
@@ -575,8 +575,8 @@ const ReadymadeProductList = () => {
                         disabled={isAdding || cartLoading}
                         className={`px-6 py-3 rounded-lg font-medium transition-all duration-200 transform hover:scale-[1.02] min-w-[120px] ${
                           isInCart 
-                            ? 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg' 
-                            : 'border-2 border-blue-600 text-blue-600 hover:bg-blue-50'
+                            ? 'bg-mt-success hover:bg-mt-success/85 text-white shadow-md hover:shadow-lg' 
+                            : 'border-2 border-mt-text text-mt-text hover:bg-mt-tint/10'
                         } ${isAdding ? 'opacity-70 cursor-not-allowed' : ''}`}
                       >
                         {isAdding ? (
@@ -610,7 +610,7 @@ const ReadymadeProductList = () => {
           <div className="mt-8 flex justify-center">
             <button
               onClick={() => setVisibleCount((count) => count + 12)}
-              className="rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              className="rounded-lg border border-mt-line-strong bg-mt-surface px-5 py-2.5 text-sm font-medium text-mt-muted transition-colors hover:bg-mt-tint/5"
             >
               Load More Products
             </button>
@@ -620,13 +620,13 @@ const ReadymadeProductList = () => {
         {/* Empty State */}
         {sortedProducts.length === 0 && (
           <div className="text-center py-20">
-            <div className="inline-flex items-center justify-center w-24 h-24 bg-blue-50 rounded-full mb-6">
-              <svg className="w-12 h-12 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="inline-flex items-center justify-center w-24 h-24 bg-mt-tint/10 rounded-full mb-6">
+              <svg className="w-12 h-12 text-mt-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
               </svg>
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-3">No products found</h3>
-            <p className="text-gray-600 max-w-md mx-auto mb-8">
+            <h3 className="text-2xl font-bold text-mt-text mb-3">No products found</h3>
+            <p className="text-mt-muted max-w-md mx-auto mb-8">
               {searchTerm || categoryFilter 
                 ? 'No products match your search criteria. Try adjusting your filters.' 
                 : 'Our collection is currently empty. Check back soon!'}
@@ -637,7 +637,7 @@ const ReadymadeProductList = () => {
                   setSearchTerm('');
                   setCategoryFilter('');
                 }}
-                className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-blue-600 bg-blue-50 hover:bg-blue-100"
+                className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-mt-text bg-mt-tint/10 hover:bg-mt-tint/10"
               >
                 Clear all filters
               </button>

@@ -8,7 +8,9 @@ import {
 } from "../redux/slices/HomepageSlice.js";
 import { Link } from "react-router-dom";
 import { buildImageUrl, getRawImagePath, getResponsiveImageProps } from "../utils/responsiveImage.js";
-import { getHomepageItemPricing } from "../utils/homepageProductPricing.js";
+import { formatHomepagePrice, getHomepageItemPricing } from "../utils/homepageProductPricing.js";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button, SectionHeader, Skeleton } from "./ui/index.js";
 import { buildReadymadeProductPath } from "../utils/readymadeRoutes.js";
 import { buildCatalogueDesignPath } from "../utils/catalogueDesignRoutes.js";
 
@@ -108,8 +110,8 @@ const getItemImages = (item) => {
 
     if (!images.length) {
       return (
-        <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-          <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="w-full h-full bg-mt-photo flex items-center justify-center">
+          <svg className="w-12 h-12 text-mt-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
         </div>
@@ -118,7 +120,7 @@ const getItemImages = (item) => {
 
     return (
       <div 
-        className="relative w-full h-full bg-white"
+        className="relative w-full h-full bg-mt-photo"
         onMouseEnter={() => setIsImageHovered(true)}
         onMouseLeave={() => setIsImageHovered(false)}
       >
@@ -166,26 +168,26 @@ const getItemImages = (item) => {
           <>
             <button
               onClick={prevSlide}
-              className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-white/90 hover:bg-white 
-                border border-gray-200 rounded-sm flex items-center justify-center shadow-sm 
+              className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-black/60 hover:bg-black/80 
+                rounded-full flex items-center justify-center 
                 transition-all duration-200 ${isImageHovered ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
               aria-label="Previous image"
               type="button"
             >
-              <svg className="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
 
             <button
               onClick={nextSlide}
-              className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-white/90 hover:bg-white 
-                border border-gray-200 rounded-sm flex items-center justify-center shadow-sm 
+              className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-black/60 hover:bg-black/80 
+                rounded-full flex items-center justify-center 
                 transition-all duration-200 ${isImageHovered ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
               aria-label="Next image"
               type="button"
             >
-              <svg className="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
               </svg>
             </button>
@@ -201,35 +203,33 @@ const getItemImages = (item) => {
     const label = item.name || item.title;
     const pricing = getHomepageItemPricing(item);
     const detailPath = item.type === "design" ? (buildCatalogueDesignPath(item) || `/catalogue/${item._id}`) : (buildReadymadeProductPath(item) || `/readymade/${item._id}`);
-    
+
     return (
-      <Link
-        to={detailPath}
-        className="group block overflow-hidden rounded-lg border border-gray-200 bg-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
-      >
-        {/* Image Section */}
-        <div className="relative h-52 bg-gray-50 overflow-hidden">
-          <ImageSlider 
-            images={images} 
+      <Link to={detailPath} className="group block font-brand">
+        <div className="relative aspect-[4/5] overflow-hidden rounded-mt-btn bg-mt-photo">
+          <ImageSlider
+            images={images}
             alt={label}
             autoScrollInterval={4000}
           />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-gray-300/80 via-gray-100/30 to-transparent" />
-
-          <div className="absolute right-2 top-2">
-            {pricing.hasOffer && (
-              <span className="rounded bg-red-600 px-1.5 py-1 text-[9px] font-semibold tracking-wide text-white shadow-sm">
-                {pricing.discountPercent}% OFF
-              </span>
-            )}
-          </div>
-          <div className="absolute inset-x-0 bottom-2 flex justify-center px-2">
-            <div className="flex max-w-full items-center gap-2 rounded-md bg-white px-3 py-1.5 text-gray-900 shadow">
-              <span className="truncate text-xs font-medium text-gray-900 sm:text-sm">
-                {label}
-              </span>
-            </div>
-          </div>
+          {pricing.hasOffer && (
+            <span className="absolute left-2 top-2 z-10 rounded-mt-btn bg-black/80 px-2 py-0.5 text-[10px] font-medium text-white">
+              {pricing.discountPercent}% off
+            </span>
+          )}
+        </div>
+        <div className="mt-2 flex flex-col gap-0.5">
+          <span className="truncate text-sm text-mt-text">{label}</span>
+          {pricing.currentPrice > 0 && (
+            <span className="flex items-baseline gap-2 text-xs text-mt-muted sm:text-sm">
+              {formatHomepagePrice(pricing.currentPrice, pricing.currency)}
+              {pricing.hasOffer && (
+                <span className="text-[11px] text-mt-subtle line-through">
+                  {formatHomepagePrice(pricing.originalPrice, pricing.currency)}
+                </span>
+              )}
+            </span>
+          )}
         </div>
       </Link>
     );
@@ -252,29 +252,22 @@ const getItemImages = (item) => {
       setCurrentScrollIndex(prev => Math.min(maxIndex, prev + 1));
     }
   };
+  const scrollButtonClasses = `absolute top-[38%] z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-mt-line-strong bg-mt-surface/90 text-mt-text backdrop-blur transition-opacity duration-200 hover:bg-mt-surface-raised sm:flex ${
+    isHovered ? "opacity-100" : "pointer-events-none opacity-0"
+  }`;
 
   // Loading State
   if (loading) {
     return (
-      <section className="bg-white">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center mb-2">
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-              </svg>
-              <h1 className="text-2xl font-bold text-gray-900">Best Sellers</h1>
+      <section className="mx-auto max-w-7xl px-4 pt-10 sm:px-6 sm:pt-14">
+        <Skeleton className="mb-4 h-7 w-40" />
+        <div className="flex gap-2 overflow-hidden sm:gap-3">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="w-[calc(50%-0.25rem)] shrink-0 sm:w-[220px] lg:w-[240px]">
+              <Skeleton className="aspect-[4/5] w-full" />
+              <Skeleton className="mt-2 h-4 w-3/4" />
             </div>
-            <div className="h-4 w-64 bg-gray-200 rounded mx-auto animate-pulse"></div>
-          </div>
-
-          <div className="flex overflow-x-auto scrollbar-hide gap-1 pb-4">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="min-w-[240px] max-w-[240px] flex-shrink-0 bg-white border border-gray-200 rounded-lg overflow-hidden animate-pulse">
-                <div className="h-52 bg-gray-200"></div>
-              </div>
-            ))}
-          </div>
+          ))}
         </div>
       </section>
     );
@@ -283,22 +276,19 @@ const getItemImages = (item) => {
   // Error State
   if (error) {
     return (
-      <section className="bg-white">
-        <div className="container mx-auto px-4">
-          <div className="max-w-md mx-auto text-center">
-            <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.998-.833-2.73 0L4.346 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Unable to Load Best Sellers</h2>
-            <p className="text-gray-600 mb-6">{error}</p>
-            <button
-              onClick={() => dispatch(fetchHomepageBestSellers())}
-              className="text-sm text-gray-700 hover:text-gray-900 underline"
-              type="button"
-            >
-              Retry
-            </button>
-          </div>
+      <section className="mx-auto max-w-7xl px-4 pt-10 sm:px-6 sm:pt-14">
+        <SectionHeader title="Best sellers" className="mb-3 sm:mb-5" />
+        <div className="rounded-mt-card border border-mt-line bg-mt-surface px-5 py-8 text-center">
+          <p className="text-sm text-mt-text">Unable to load best sellers</p>
+          <p className="mt-1 text-xs text-mt-subtle">{error}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4"
+            onClick={() => dispatch(fetchHomepageBestSellers())}
+          >
+            Retry
+          </Button>
         </div>
       </section>
     );
@@ -307,15 +297,11 @@ const getItemImages = (item) => {
   // Empty State
   if (!items || items.length === 0) {
     return (
-      <section className="bg-white">
-        <div className="container mx-auto px-4">
-          <div className="max-w-md mx-auto text-center">
-            <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-            </svg>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">No Best Sellers Available</h2>
-            <p className="text-gray-600">Best sellers will be updated soon.</p>
-          </div>
+      <section className="mx-auto max-w-7xl px-4 pt-10 sm:px-6 sm:pt-14">
+        <SectionHeader title="Best sellers" className="mb-3 sm:mb-5" />
+        <div className="rounded-mt-card border border-mt-line bg-mt-surface px-5 py-8 text-center">
+          <p className="text-sm text-mt-text">No best sellers yet</p>
+          <p className="mt-1 text-xs text-mt-subtle">Best sellers will be updated soon.</p>
         </div>
       </section>
     );
@@ -323,101 +309,50 @@ const getItemImages = (item) => {
 
   // Main Render
   return (
-    <section className="py-4 bg-white">
-      <div className="container mx-auto px-4">
-        {/* Header */}
-        <div className="text-center mb-5">
-          <div className="flex items-center justify-center mb-2">
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-            </svg>
-            <h1 className="text-2xl font-bold text-gray-900">Best Sellers</h1>
-          </div>
-          <p className="text-gray-600 text-sm">
-            Our most popular items
-          </p>
-        </div>
+    <section className="mx-auto max-w-7xl px-4 pt-10 sm:px-6 sm:pt-14">
+      <SectionHeader title="Best sellers" actionTo="/products?filter=bestSellers" className="mb-3 sm:mb-5" />
 
-        {/* Products Container with Scroll */}
-        <div 
-          className="relative"
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-        >
-          {/* Left Scroll Button - visible on mobile, hover on desktop */}
-          {items.length > 2 && (
-            <button
-              onClick={scrollLeft}
-              className={`
-                absolute left-0 top-1/2 -translate-y-1/2 z-10
-                w-8 h-8 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-sm
-                hover:bg-gray-50 transition-all duration-200
-                opacity-100
-                sm:-translate-x-4 sm:${isHovered ? "opacity-100" : "opacity-0 pointer-events-none"}
-              `}
-              aria-label="Scroll left"
-              type="button"
-            >
-              <svg className="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-          )}
-
-          {/* Products Grid - Mobile shows 2 items, Horizontal scroll */}
-          <div
-            ref={containerRef}
-            className="flex overflow-x-auto scrollbar-hide gap-1 pb-4 px-2 sm:px-0"
-            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      <div
+        className="relative"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {items.length > 2 && (
+          <button
+            onClick={scrollLeft}
+            className={`${scrollButtonClasses} -left-3`}
+            aria-label="Scroll left"
+            type="button"
           >
-            {items.map((item) => (
-              <div
-                key={`${item.type}-${item._id}`}
-                className="
-                  flex-shrink-0
-                  w-[calc(50%-0.375rem)]  /* mobile: 2 items visible */
-                  sm:min-w-[240px] sm:max-w-[240px]
-                "
-              >
-                <ProductCard item={item} />
-              </div>
-            ))}
-          </div>
+            <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+          </button>
+        )}
 
-          {/* Right Scroll Button - visible on mobile, hover on desktop */}
-          {items.length > 2 && (
-            <button
-              onClick={scrollRight}
-              className={`
-                absolute right-0 top-1/2 -translate-y-1/2 z-10
-                w-8 h-8 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-sm
-                hover:bg-gray-50 transition-all duration-200
-                opacity-100
-                sm:translate-x-4 sm:${isHovered ? "opacity-100" : "opacity-0 pointer-events-none"}
-              `}
-              aria-label="Scroll right"
-              type="button"
+        {/* Mobile shows 2 items per screen; swipe to scroll */}
+        <div
+          ref={containerRef}
+          className="flex snap-x gap-2 overflow-x-auto pb-2 sm:gap-3"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        >
+          {items.map((item) => (
+            <div
+              key={`${item.type}-${item._id}`}
+              className="w-[calc(50%-0.25rem)] shrink-0 snap-start sm:w-[220px] lg:w-[240px]"
             >
-              <svg className="w-4 h-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          )}
+              <ProductCard item={item} />
+            </div>
+          ))}
         </div>
 
-        {/* Footer - Small */}
-        {items.length > 0 && (
-          <div className="mt-2 text-center">
-            <div className="text-xs text-gray-500 mb-2">
-              Showing {items.length} best sellers
-            </div>
-            <Link
-              to="/products?filter=bestSellers"
-              className="inline-block text-sm text-gray-700 hover:text-gray-900 font-medium transition-colors"
-            >
-              View All →
-            </Link>
-          </div>
+        {items.length > 2 && (
+          <button
+            onClick={scrollRight}
+            className={`${scrollButtonClasses} -right-3`}
+            aria-label="Scroll right"
+            type="button"
+          >
+            <ChevronRight className="h-5 w-5" aria-hidden="true" />
+          </button>
         )}
       </div>
     </section>

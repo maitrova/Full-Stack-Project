@@ -9,7 +9,15 @@ import {
   setCurrentFolder,
   clearCurrentFolder
 } from "../redux/slices/admindesignuploads.js";
+import { ArrowLeft, Bookmark, LayoutGrid, Palette, RotateCcw, Type, Upload, UserRound, X } from "lucide-react";
 import RecolorEditor from "./RecolorEditor.jsx";
+import OrderPanel, { OrderOptions } from "./customizer/OrderPanel.jsx";
+import MobileDock from "./customizer/MobileDock.jsx";
+import CanvasFooter from "./customizer/CanvasFooter.jsx";
+import UploadPanel from "./customizer/UploadPanel.jsx";
+import TextPanel from "./customizer/TextPanel.jsx";
+import LibraryPanel from "./customizer/LibraryPanel.jsx";
+import { PrimaryPurchaseButton, ProductToast } from "./product/ProductPageParts.jsx";
 import { selectCurrentToken, selectCurrentUser } from "../redux/slices/Userslice.js";
 import { addToCart } from "../redux/slices/Cartslice.js";
 
@@ -222,12 +230,18 @@ const getCustomizableViews = (views = []) => {
   return filteredViews.length > 0 ? filteredViews : (views || []);
 };
 
-const MOBILE_TOOL_TABS = [
-  { key: TABS.PRODUCT_COLORS, label: "Color" },
-  { key: TABS.DESIGNS, label: "Design" },
-  { key: TABS.TEXT, label: "Text" },
-  { key: TABS.DESIGN_LIBRARY, label: "Library" },
+// Tool tabs in the left panel (colour, size and quantity live in the order panel).
+const TOOL_TABS = [
+  { key: TABS.DESIGNS, label: "Upload", icon: Upload },
+  { key: TABS.DESIGN_LIBRARY, label: "Library", icon: LayoutGrid },
+  { key: TABS.TEXT, label: "Text", icon: Type },
 ];
+
+// Phones also get colour / size / quantity as a tool (desktop shows it in the order panel).
+const MOBILE_TOOLS = [...TOOL_TABS, { key: TABS.PRODUCT_COLORS, label: "Colour", icon: Palette }];
+
+const TOP_BAR_LINK =
+  "inline-flex h-9 items-center gap-1.5 rounded-mt-btn border border-mt-line-strong px-3 text-xs font-medium text-mt-text transition-colors hover:bg-mt-tint/10";
 
 const DEFAULT_COLOR_OPTIONS = [
   { value: "#FFFFFF", label: "White" },
@@ -785,9 +799,6 @@ const getSizeBasePrice = (prod, size) => {
   const inStockSizePricing = availableSizePricing.filter(
     (entry) => entry?.stock === undefined || Number(entry.stock) > 0
   );
-  const availableSizes = (inStockSizePricing.length > 0 ? inStockSizePricing : availableSizePricing).map(
-    (x) => x.size
-  );
   // Edit mode state
   const editDesignId = searchParams.get("edit");
   const [isEditMode, setIsEditMode] = useState(false);
@@ -796,17 +807,11 @@ const getSizeBasePrice = (prod, size) => {
   const [editModeInitialized, setEditModeInitialized] = useState(false);
 
   // Active tab state
-  const [activeTab, setActiveTab] = useState(TABS.PRODUCT_COLORS);
-  const [showMobilePriceDetails, setShowMobilePriceDetails] = useState(false);
+  const [activeTab, setActiveTab] = useState(TABS.DESIGNS);
   const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false);
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
   const [cropDraft, setCropDraft] = useState(() => normalizeImageCrop());
-  const [isDesktopToolsLayout, setIsDesktopToolsLayout] = useState(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      return true;
-    }
-    return window.matchMedia("(min-width: 640px)").matches;
-  });
 
   const editorRef = useRef(null);
   const viewStatesRef = useRef({});
@@ -859,30 +864,7 @@ const getSizeBasePrice = (prod, size) => {
     .trim()
     .toLowerCase() === "hoodie";
 
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return undefined;
-
-    const mediaQuery = window.matchMedia("(min-width: 640px)");
-    const handleMediaChange = (event) => {
-      setIsDesktopToolsLayout(event.matches);
-    };
-
-    setIsDesktopToolsLayout(mediaQuery.matches);
-
-    if (typeof mediaQuery.addEventListener === "function") {
-      mediaQuery.addEventListener("change", handleMediaChange);
-      return () => mediaQuery.removeEventListener("change", handleMediaChange);
-    }
-
-    mediaQuery.addListener(handleMediaChange);
-    return () => mediaQuery.removeListener(handleMediaChange);
-  }, []);
-
   const shouldShowToolSection = (tabKey) => activeTab === tabKey;
-
-  const jumpToToolSection = (tabKey) => {
-    setActiveTab(tabKey);
-  };
 
   const handleToolTabChange = (tabKey) => {
     setActiveTab(tabKey);
@@ -1674,7 +1656,6 @@ setPriceBreakdown((prev) => ({
     .filter((value, index, array) => array.indexOf(value) === index);
   const visibleCustomizationNames = customizationNames.slice(0, 3);
   const remainingCustomizationCount = Math.max(0, customizationNames.length - visibleCustomizationNames.length);
-  const refreshPriceLabel = calculatingPrice ? "Refreshing..." : "Refresh price";
 
   const getLibraryImageUrl = (folderName, filename) =>
     `${IMAGE_URL}/outputs/adminuploadeddesigns/${folderName}/${filename}`;
@@ -2892,8 +2873,8 @@ const startCropPreviewPan = (event, mode = "move") => {
 
   if (currentStatus === "loading" || loadingEditData) {
     return (
-      <div className="flex h-screen items-center justify-center bg-neutral-100">
-        <div className="rounded-md bg-white px-4 py-3 shadow text-sm">
+      <div className="flex h-screen items-center justify-center bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)]">
+        <div className="rounded-md bg-mt-surface px-4 py-3 shadow text-sm">
           {loadingEditData ? "Loading design for editing..." : "Loading product…"}
         </div>
       </div>
@@ -2902,8 +2883,8 @@ const startCropPreviewPan = (event, mode = "move") => {
 
   if (currentStatus === "failed") {
     return (
-      <div className="flex h-screen items-center justify-center bg-neutral-100">
-        <div className="rounded-md bg-white px-4 py-3 shadow text-sm text-red-600">
+      <div className="flex h-screen items-center justify-center bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)]">
+        <div className="rounded-md bg-mt-surface px-4 py-3 shadow text-sm text-mt-danger">
           Failed to load product: {currentError}
         </div>
       </div>
@@ -2912,8 +2893,8 @@ const startCropPreviewPan = (event, mode = "move") => {
 
   if (!product) {
     return (
-      <div className="flex h-screen items-center justify-center bg-neutral-100">
-        <div className="rounded-md bg-white px-4 py-3 shadow text-sm text-red-600">
+      <div className="flex h-screen items-center justify-center bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)]">
+        <div className="rounded-md bg-mt-surface px-4 py-3 shadow text-sm text-mt-danger">
           Product not found. Please check the URL.
         </div>
       </div>
@@ -2924,6 +2905,73 @@ const startCropPreviewPan = (event, mode = "move") => {
   const currentView = customizableViews.find((v) => v.code === viewCode) || customizableViews[0] || product.views[0];
   const mockupUrl = currentView?.mockupUrl;
   const maskUrl = currentView?.maskUrl;
+  const zoneChoices = availableZonesForView.map((zone) => ({ value: zone, label: ZONE_LABELS[zone] || zone }));
+
+  // Tapping something on the product opens its editor in the tools panel.
+  const selectTextFromCanvas = (idOrUpdater) => {
+    handleSetActiveTextId(idOrUpdater);
+    if (typeof idOrUpdater === "string" && idOrUpdater) setActiveTab(TABS.TEXT);
+  };
+  const selectDesignFromCanvas = (idOrUpdater) => {
+    handleSetActiveDesignId(idOrUpdater);
+    if (typeof idOrUpdater === "string" && idOrUpdater) setActiveTab(TABS.DESIGNS);
+  };
+
+  // Colour / size / quantity pickers: shared by the order panel and the phone "Colour" sheet.
+  const orderOptionProps = {
+    colors: productColorOptions.map((option) => {
+      const available = isColorAvailable(option);
+      const label = option.label || getColorLabel(option.value, productColorOptions);
+      return {
+        value: String(option.value).toLowerCase(),
+        hex: option.value,
+        label: available ? label : `${label} (out of stock)`,
+        disabled: !available,
+      };
+    }),
+    selectedColor: productColor,
+    selectedColorName: productColorName,
+    onColorChange: (value) => {
+      const option = productColorOptions.find((o) => String(o.value).toLowerCase() === value);
+      if (option && isColorAvailable(option)) handleColorChange(option.value, option.label);
+    },
+    sizes: (inStockSizePricing.length > 0 ? inStockSizePricing : availableSizePricing).map((entry) => {
+      const isOutOfStock = entry?.stock !== undefined && Number(entry?.stock ?? 0) <= 0;
+      return {
+        value: entry.size,
+        disabled: isOutOfStock,
+        title: isOutOfStock ? "Out of stock" : `₹${getSizeBasePrice(product, entry.size)}`,
+      };
+    }),
+    selectedSize,
+    onSizeChange: setSelectedSize,
+    basePrice: BASE_PRICE,
+    quantity: selectedQuantity,
+    maxQuantity: maxOrderQuantity,
+    onQuantityChange: updateSelectedQuantity,
+    isOutOfStock: isSelectionOutOfStock,
+    stockNote: isSelectionOutOfStock
+      ? "Out of stock in this size and colour"
+      : maxOrderQuantity <= 10
+        ? `Only ${maxOrderQuantity} left`
+        : "",
+  };
+
+  // Phones: the tools panel opens as a bottom sheet (also when a library link asks for it).
+  const isToolSheetOpen = mobileSheetOpen || isLibraryModalOpen;
+  const closeToolSheet = () => {
+    setMobileSheetOpen(false);
+    setIsLibraryModalOpen(false);
+  };
+  const handleDockTool = (key) => {
+    if (isToolSheetOpen && activeTab === key) {
+      closeToolSheet();
+      return;
+    }
+    setActiveTab(key);
+    setMobileSheetOpen(true);
+  };
+  const toolSheetTitle = MOBILE_TOOLS.find((tool) => tool.key === activeTab)?.label || "Tools";
   const canAddSavedDesignToCart = Boolean(savedDesignId || editDesignId);
   const primarySaveActionLabel = token
     ? (saving ? "Saving…" : isEditMode ? "Update Design" : "Save Design")
@@ -2933,1337 +2981,308 @@ const startCropPreviewPan = (event, mode = "move") => {
     : "Login for Cart";
 
   return (
-    <div className="flex min-h-[100dvh] flex-col overflow-x-hidden bg-gradient-to-b from-slate-100 via-white to-slate-100 text-slate-900 sm:min-h-screen sm:overflow-visible">
-      {/* Top bar */}
-      <header className="sticky top-0 z-20 hidden flex-col gap-3 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur sm:flex sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:gap-4">
-          <div className="flex items-center gap-3">
-            <div className="text-lg font-extrabold tracking-wide text-orange-500">
-              Customization
-            </div>
-            
-            <Link
-              to={token ? "/usersaved_designs" : "/login"}
-              state={token ? undefined : { from: customizerReturnPath }}
-              className="rounded-full border border-sky-600 px-3 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-50 transition"
-            >
-              {token ? "My Designs" : "Login"}
-            </Link>
-          </div>
-
-          <div className="text-xs text-slate-500">
-            {isEditMode ? "Edit Design" : "My Designs"} <span className="mx-1">›</span>{" "}
-            <span className="font-medium text-slate-700">
-              {product?.name || "Untitled design"}
-              {isEditMode && " (Editing)"}
-            </span>
-          </div>
+    <div className="min-h-[100dvh] bg-mt-bg pb-40 font-brand text-mt-text [color-scheme:var(--mt-scheme)] lg:pb-12">
+      {/* Top bar: what is being customized + account / admin links */}
+      <div className="mx-auto flex max-w-[1500px] flex-wrap items-end justify-between gap-x-4 gap-y-2 px-4 pt-4 sm:px-6 lg:px-8">
+        <div className="min-w-0">
+          <p className="text-[11px] uppercase tracking-[0.24em] text-mt-subtle">
+            {isEditMode ? "Editing saved design" : "Customize"}
+          </p>
+          <h1 className="mt-1 truncate text-2xl leading-tight text-mt-text sm:text-3xl">
+            {product?.name || "Custom product"}
+          </h1>
         </div>
-
-        <div className="flex flex-col gap-2 text-xs sm:flex-row sm:items-center sm:gap-4">
-          <div className="flex flex-wrap gap-2">
-            {isEditMode && (
-              <button onClick={handleBackToAdmin} className="text-sky-700 hover:underline">
-                Back to Admin
-              </button>
-            )}
-
-            {isEditMode && originalDesign && (
-              <button onClick={handleResetToOriginal} className="rounded-full border border-slate-300 px-3 py-1 text-slate-700 hover:bg-slate-50">
-                Reset to Original
-              </button>
-            )}
-          </div>
-
-          <div className="flex flex-col text-left sm:items-end sm:text-right">
-            <span className="text-xs text-slate-500">Total Price</span>
-            <span className="text-xl font-bold text-green-600">₹{price.toFixed(2)}</span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 sm:hidden">
-            <button
-              onClick={handleSaveDesign}
-              disabled={saving || addingToCart}
-              className="rounded-full border border-sky-600 bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
-            >
-              {primarySaveActionLabel}
+        <div className="flex flex-wrap items-center gap-2">
+          {isEditMode && (
+            <button type="button" onClick={handleBackToAdmin} className={TOP_BAR_LINK}>
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              Back to admin
             </button>
-
-            <button
-              type="button"
-              id="customization-add-to-cart-header-mobile"
-              onClick={handleSaveAndAddToCart}
-              aria-label="Add customized product to cart"
-              data-meta-track="add-to-cart"
-              disabled={saving || addingToCart}
-              className="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-            >
-              {primaryCartActionLabel}
+          )}
+          {isEditMode && originalDesign && (
+            <button type="button" onClick={handleResetToOriginal} className={TOP_BAR_LINK}>
+              <RotateCcw className="h-4 w-4" aria-hidden="true" />
+              Reset to original
             </button>
-          </div>
-
-          <div className="hidden flex-wrap items-center gap-2 sm:flex">
-            <button
-              onClick={handleSaveDesign}
-              disabled={saving || addingToCart}
-              className="rounded-full border border-sky-600 bg-sky-600 px-4 py-1 text-xs font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
-            >
-              {primarySaveActionLabel}
-            </button>
-
-            <button
-              type="button"
-              id="customization-add-to-cart-header-desktop"
-              onClick={handleSaveAndAddToCart}
-              aria-label="Add customized product to cart"
-              data-meta-track="add-to-cart"
-              disabled={saving || addingToCart}
-              className="rounded-full border border-emerald-600 bg-emerald-600 px-4 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-            >
-              {primaryCartActionLabel}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main area */}
-      <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-x-hidden px-2 pb-2 pt-2 sm:gap-6 sm:overflow-visible sm:px-6 sm:pb-6 sm:pt-3">
-        {!token && (
-          <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-            Explore and customize freely. Login is only required when you want to save the design or add it to your cart.
-          </div>
-        )}
-        <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-x-hidden lg:grid lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)_minmax(0,320px)] lg:items-start lg:gap-6 lg:overflow-visible">
-          {/* Mobile helper card */}
-          <div className="hidden">
-            <div className="rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 text-[11px] text-slate-600 shadow-sm">
-              <p className="mb-1 font-semibold text-slate-800">Design tips</p>
-              <p className="text-[11px] leading-tight text-slate-600">
-                Tap any design or text on the mockup to edit it. All controls are available below, and the jump chips take you straight to the section you need.
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => jumpToToolSection(TABS.DESIGNS)}
-                  className="rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 hover:border-slate-300 hover:bg-slate-50"
-                >
-                  Open designs
-                </button>
-                <button
-                  type="button"
-                  onClick={() => jumpToToolSection(TABS.TEXT)}
-                  className="rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 hover:border-slate-300 hover:bg-slate-50"
-                >
-                  Add text
-                </button>
-                <button
-                  type="button"
-                  onClick={() => jumpToToolSection(TABS.PRODUCT_COLORS)}
-                  className="rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 hover:border-slate-300 hover:bg-slate-50"
-                >
-                  Pick colors
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="hidden">
-            <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-3">
-              <div className="rounded-2xl bg-slate-50 px-3 py-2">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Size</div>
-                <div className="mt-1 text-sm font-semibold text-slate-800">{selectedSize || "Default"}</div>
-                <div className="text-[11px] text-slate-500">Base Rs.{BASE_PRICE.toFixed(2)}</div>
-              </div>
-              <div className="rounded-2xl bg-slate-50 px-3 py-2">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">View</div>
-                <div className="mt-1 text-sm font-semibold text-slate-800">
-                  {product?.views?.find((v) => v.code === viewCode)?.label || "Front"}
-                </div>
-                <div className="text-[11px] text-slate-500">
-                  {designLayers.length} design{designLayers.length !== 1 ? "s" : ""}, {textLayers.length} text
-                </div>
-              </div>
-              <div className="rounded-2xl bg-emerald-50 px-3 py-2">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-500">Live total</div>
-                <div className="mt-1 text-lg font-bold text-emerald-700">Rs.{price.toFixed(2)}</div>
-                <button
-                  type="button"
-                  onClick={() => calculatePrice()}
-                  disabled={calculatingPrice}
-                  className="mt-1 text-[11px] font-medium text-emerald-700 disabled:opacity-60"
-                >
-                  {refreshPriceLabel}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Left sidebar - Controls */}
-          <aside
-            className={`${
-              isDesktopToolsLayout
-                ? "order-1 flex w-full min-h-[220px] max-h-[42vh] flex-col gap-4 overflow-hidden rounded-[22px] border border-slate-200 bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.08)] sm:h-auto sm:max-h-none sm:rounded-2xl sm:p-4 sm:shadow-sm lg:order-1 lg:w-auto lg:gap-6"
-                : "order-2 flex w-full flex-col gap-4 overflow-hidden rounded-[22px] border border-slate-200 bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.08)]"
-            }`}
+          )}
+          <Link
+            to={token ? "/usersaved_designs" : "/login"}
+            state={token ? undefined : { from: customizerReturnPath }}
+            className={TOP_BAR_LINK}
           >
-          <div className="grid grid-cols-4 gap-1 border-b border-slate-100 pb-3 sm:hidden">
-            {MOBILE_TOOL_TABS.map((item) => {
-              const isActive = activeTab === item.key;
+            {token ? <Bookmark className="h-4 w-4" aria-hidden="true" /> : <UserRound className="h-4 w-4" aria-hidden="true" />}
+            {token ? "My designs" : "Log in"}
+          </Link>
+        </div>
+      </div>
+      {!token && (
+        <p className="mx-auto max-w-[1500px] px-4 pt-2 text-xs text-mt-muted sm:px-6 lg:px-8">
+          Design freely — you only need to log in to save your design or add it to your cart.
+        </p>
+      )}
+
+      <div className="mx-auto grid max-w-[1500px] gap-4 px-4 pt-4 sm:px-6 lg:grid-cols-[300px_minmax(0,1fr)_340px] lg:items-start lg:gap-6 lg:px-8">
+        {/* Left: design tools */}
+        <aside
+          aria-label="Design tools"
+          className={`${isToolSheetOpen ? "flex" : "hidden"} fixed inset-x-0 bottom-0 z-50 max-h-[58dvh] min-h-0 flex-col gap-4 rounded-t-[14px] border-t border-mt-line bg-mt-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-16px_40px_rgba(0,0,0,0.18)] lg:sticky lg:inset-x-auto lg:bottom-auto lg:top-40 lg:z-auto lg:order-1 lg:flex lg:max-h-[calc(100dvh-11rem)] lg:rounded-mt-card lg:border lg:shadow-none`}
+        >
+          {/* Phone sheet header */}
+          <div className="flex items-center justify-between gap-3 lg:hidden">
+            <p className="text-sm font-medium text-mt-text">{toolSheetTitle}</p>
+            <button
+              type="button"
+              onClick={closeToolSheet}
+              className="h-9 rounded-mt-btn bg-mt-btn px-4 text-xs font-medium text-mt-btn-text hover:bg-mt-btn-hover"
+            >
+              Done
+            </button>
+          </div>
+          <div role="tablist" aria-label="Design tools" className="hidden grid-cols-3 gap-1 rounded-mt-btn bg-mt-bg p-1 lg:grid">
+            {TOOL_TABS.map(({ key, label, icon }) => {
+              const Icon = icon;
+              const isActive = activeTab === key;
               return (
                 <button
-                  key={item.key}
+                  key={key}
                   type="button"
-                  onClick={() => handleToolTabChange(item.key)}
-                  className={`rounded-[14px] px-2 py-2 text-[10px] font-semibold transition ${
-                    isActive
-                      ? "bg-sky-600 text-white shadow-sm"
-                      : "border border-slate-200 bg-white text-slate-600"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => handleToolTabChange(key)}
+                  className={`flex h-10 items-center justify-center gap-1.5 rounded-[2px] text-xs font-medium transition-colors ${
+                    isActive ? "bg-mt-surface text-mt-text shadow-sm" : "text-mt-muted hover:text-mt-text"
                   }`}
                 >
-                  {item.label}
+                  <Icon className="h-4 w-4" aria-hidden="true" />
+                  {label}
                 </button>
               );
             })}
           </div>
 
-          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-3 sm:hidden">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Total</p>
-                <p className="text-base font-bold text-emerald-800">Rs.{price.toFixed(2)}</p>
-                <p className="truncate text-[11px] text-emerald-700/80">
-                  {productColorName} / {customizableViews.find((v) => v.code === viewCode)?.label || "Front view"} / {selectedSize || "Default"}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => calculatePrice()}
-                disabled={calculatingPrice}
-                className="rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-emerald-700 disabled:opacity-50"
-              >
-                {refreshPriceLabel}
-              </button>
-            </div>
-          </div>
-
-          {/* Edit mode indicator */}
-          {isEditMode && (
-            <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2">
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-                <span className="text-xs font-medium text-amber-700">Edit Mode</span>
-              </div>
-              <p className="mt-1 text-[10px] text-amber-600">
-                Editing design ID: {editDesignId?.slice(0, 8)}...
-              </p>
-            </div>
-          )}
-
-          <div className="hidden sm:block" />
-
-          {/* Tab navigation */}
-          <div className="grid grid-cols-2 gap-1.5 border-b border-slate-200 pb-2 sm:grid-cols-3 lg:grid-cols-5">
-            <button
-              onClick={() => handleToolTabChange(TABS.PRODUCT_COLORS)}
-              className={`w-full rounded-xl px-2 py-2 text-[11px] font-medium ${activeTab === TABS.PRODUCT_COLORS ? 'bg-sky-50 text-sky-600' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}
-            >
-              Product Colors
-            </button>
-            <button
-              onClick={() => handleToolTabChange(TABS.DESIGNS)}
-              className={`w-full rounded-xl px-2 py-2 text-[11px] font-medium ${activeTab === TABS.DESIGNS ? 'bg-sky-50 text-sky-600' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}
-            >
-              Designs
-            </button>
-            <button
-              onClick={() => handleToolTabChange(TABS.TEXT)}
-              className={`w-full rounded-xl px-2 py-2 text-[11px] font-medium ${activeTab === TABS.TEXT ? 'bg-sky-50 text-sky-600' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}
-            >
-              Text
-            </button>
-            <button
-              onClick={() => handleToolTabChange(TABS.VIEWS)}
-              className={`w-full rounded-xl px-2 py-2 text-[11px] font-medium ${activeTab === TABS.VIEWS ? 'bg-sky-50 text-sky-600' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}
-            >
-              Views
-            </button>
-            <button
-              onClick={() => handleToolTabChange(TABS.DESIGN_LIBRARY)}
-              className={`w-full rounded-xl px-2 py-2 text-[11px] font-medium sm:col-span-2 lg:col-span-1 ${activeTab === TABS.DESIGN_LIBRARY ? 'bg-sky-50 text-sky-600' : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}
-            >
-              Design Library
-            </button>
-          </div>
-
           {/* Tab content */}
-          <div className="flex-1 overflow-auto">
-            {/* Product Colors Tab */}
-            {shouldShowToolSection(TABS.PRODUCT_COLORS) && (
-              <section
-                id={`tool-section-${TABS.PRODUCT_COLORS}`}
-                className="mb-4 space-y-6 rounded-2xl border border-slate-200 bg-slate-50/40 p-4 scroll-mt-24 sm:mb-0 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0"
-              >
-                <div>
-                  <h3 className="mb-3 font-semibold text-sm">Product Colors</h3>
-
-                 
-                  {/* ✅ Size Selection */}
-                  <div className="mt-5">
-                    <h3 className="mb-2 font-semibold text-sm">Size</h3>
-
-                    {availableSizes.length > 0 ? (
-                      <>
-                        <label className="mb-2 block text-xs font-medium">Select Size</label>
-
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                          {(inStockSizePricing.length > 0 ? inStockSizePricing : availableSizePricing).map((sizeEntry) => {
-                            const size = sizeEntry.size;
-                            const isActive = selectedSize === size;
-                            const sizePrice = getSizeBasePrice(product, size);
-                            const stock = Number(sizeEntry?.stock ?? 0);
-                            const isOutOfStock = sizeEntry?.stock !== undefined && stock <= 0;
-
-                            return (
-                              <button
-                                key={size}
-                                type="button"
-                                onClick={() => setSelectedSize(size)}
-                                disabled={isOutOfStock}
-                                className={`rounded border px-2 py-2 text-xs font-semibold transition ${
-                                  isActive
-                                    ? "border-sky-500 bg-sky-50 text-sky-700"
-                                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                                } ${isOutOfStock ? "cursor-not-allowed opacity-50" : ""}`}
-                              >
-                                <div>{size}</div>
-                                <div className="text-[10px] font-normal text-slate-400">
-                                  {sizeEntry?.stock === undefined
-                                    ? "Stock not set"
-                                    : isOutOfStock
-                                      ? "Out of stock"
-                                      : `${stock} in stock`}
-                                </div>
-                                <div className="text-[10px] font-normal text-slate-500">₹{sizePrice}</div>
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        <div className="mt-2 text-[11px] text-slate-500">
-                          Selected: <span className="font-medium text-slate-700">{selectedSize}</span> • Base:{" "}
-                          <span className="font-medium text-slate-700">₹{BASE_PRICE}</span>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-xs text-slate-500">
-                        No sizePricing configured for this product. Using basePrice.
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-5">
-                    <h3 className="mb-2 font-semibold text-sm">Quantity</h3>
-                    <div className="rounded-2xl border border-slate-200 bg-white p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-xs font-medium text-slate-700">Order quantity</p>
-                          <p className="mt-1 text-[11px] text-slate-500">
-                            {selectedSizeStock !== undefined
-                              ? `${Math.max(0, maxOrderQuantity)} item${Math.max(0, maxOrderQuantity) === 1 ? "" : "s"} available for size ${selectedSize || "Default"}${selectedColorOption?.label ? ` in ${selectedColorOption.label}` : ""}`
-                              : "Choose how many customized pieces you want to order."}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => updateSelectedQuantity(selectedQuantity - 1)}
-                            disabled={selectedQuantity <= 1}
-                            className="h-9 w-9 rounded-full border border-slate-300 bg-white text-base font-semibold text-slate-700 disabled:opacity-40"
-                          >
-                            -
-                          </button>
-                          <input
-                            type="number"
-                            min={1}
-                            max={maxOrderQuantity}
-                            value={selectedQuantity}
-                            onChange={(e) => updateSelectedQuantity(e.target.value)}
-                            className="w-16 rounded-xl border border-slate-300 px-2 py-2 text-center text-sm font-semibold text-slate-800 outline-none focus:border-sky-400"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => updateSelectedQuantity(selectedQuantity + 1)}
-                            disabled={selectedQuantity >= Math.max(1, maxOrderQuantity)}
-                            className="h-9 w-9 rounded-full border border-slate-300 bg-white text-base font-semibold text-slate-700 disabled:opacity-40"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Quick Select */}
-                  <div className="mb-2 hidden sm:block">
-                    <label className="mb-2 block text-xs font-medium">Quick Select</label>
-                    <div className="grid grid-cols-5 gap-2 sm:grid-cols-6">
-                      {productColorOptions.map((option) => {
-                        const currentColorKey = productColor?.toLowerCase() || "";
-                        const isActive = option.value.toLowerCase() === currentColorKey;
-                        const colorStock = getColorStockValue(option);
-                        const colorOutOfStock = !isColorAvailable(option);
-                        return (
-                          <button
-                            key={option.value}
-                            type="button"
-                            className={`relative h-8 w-8 rounded-full border-2 ${isActive ? "border-sky-500" : "border-slate-300"} ${colorOutOfStock ? "cursor-not-allowed opacity-40" : ""}`}
-                            style={{ backgroundColor: option.value }}
-                            onClick={() => !colorOutOfStock && handleColorChange(option.value, option.label)}
-                            disabled={colorOutOfStock}
-                            title={
-                              colorStock === null
-                                ? option.label
-                                : colorOutOfStock
-                                  ? `${option.label} - Out of stock`
-                                  : `${option.label} - ${colorStock} in stock`
-                            }
-                          >
-                            {colorOutOfStock ? (
-                              <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-700">
-                                ×
-                              </span>
-                            ) : null}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {selectedColorStock !== null ? (
-                      <p className="mt-2 text-[11px] text-slate-500">
-                        {selectedColorStock > 0
-                          ? `${selectedColorStock} item${selectedColorStock === 1 ? "" : "s"} available in ${productColorName}`
-                          : `${productColorName} is out of stock`}
-                      </p>
-                    ) : null}
-                  </div>
-
-                </div>
-
-                <div className="hidden text-xs text-slate-600 space-y-2 sm:block">
-                  <p className="font-medium">How to use:</p>
-                  <p>• Select a color to change the product color</p>
-                  <p>• Use the color picker for custom colors</p>
-                  <p>• Quick select colors are commonly used options</p>
-                </div>
-              </section>
-            )}
-
-            {/* Designs Tab */}
+          <div className="min-h-0 flex-1 overflow-y-auto pr-0.5">
             {shouldShowToolSection(TABS.DESIGNS) && (
-              <section
-                id={`tool-section-${TABS.DESIGNS}`}
-                className="mb-4 space-y-6 rounded-2xl border border-slate-200 bg-slate-50/40 p-4 scroll-mt-24 sm:mb-0 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0"
-              >
-                <div>
-                  <h3 className="mb-3 font-semibold text-sm">Upload Designs</h3>
-                  <p className="mb-2 text-xs text-slate-600">Upload one or more images. They will be saved to the server automatically.</p>
-                  <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
-                    {REMOVE_BG_RECOMMENDATION}
-                  </div>
-
-                  <div className="mb-3 text-xs">
-                    <input type="file" accept={SUPPORTED_DESIGN_ACCEPT} multiple onChange={handleDesignUpload} className="w-full text-xs border border-slate-300 rounded px-3 py-2" />
-                    <p className="mt-2 text-[11px] text-slate-500">Supported formats: {SUPPORTED_DESIGN_FORMATS_LABEL}.</p>
-                    </div>
-
-                  {activeDesign && (
-                    <>
-                      <div className="mb-4 p-3 bg-slate-50 rounded border border-slate-200">
-                        <div className="mb-2 flex items-center justify-between">
-                          <span className="font-medium text-slate-700 text-xs">Selected Design</span>
-                          <span className="text-[10px] text-slate-500">ID: {activeDesign.id.slice(0, 6)}…</span>
-                        </div>
-                        
-                        {selectedLibraryImage && (
-                          <div className="mb-2 px-2 py-1 bg-sky-50 border border-sky-200 rounded text-xs text-sky-700">
-                            <span className="font-medium">From Library:</span> {selectedLibraryImage}
-                          </div>
-                        )}
-                        
-                        <div className="mb-3 text-xs">
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="text-center">
-                              <div className="text-[10px] text-slate-500">Display</div>
-                              <div className="font-medium">{activeDesign.currentDisplayWidthInches?.toFixed(2)}" × {activeDesign.currentDisplayHeightInches?.toFixed(2)}"</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-[10px] text-slate-500">Print</div>
-                              <div className="font-medium">{activeDesign.currentPrintWidthInches?.toFixed(2)}" × {activeDesign.currentPrintHeightInches?.toFixed(2)}"</div>
-                            </div>
-                          </div>
-                          <div className="mt-2 text-center">
-                            <div className="text-[10px] text-slate-500">Print Area</div>
-                            <div className="font-medium">{activeDesign.currentPrintAreaInches?.toFixed(2)} sq.in</div>
-                            {activeDesign.currentAdditionalArea > 0 ? (
-                              <div className="text-[10px] text-green-600">
-                                +{activeDesign.currentAdditionalArea?.toFixed(2)} sq.in extra
-                              </div>
-                            ) : activeDesign.minimumChargeApplied && (
-                              <div className="text-[10px] text-amber-600">
-                                Minimum ₹{MINIMUM_DESIGN_CHARGE} charge
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={handleRemoveBackground}
-                            disabled={bgRemovalLoading || activeDesign.hasBgRemoved}
-                            className={`flex-1 rounded border px-2 py-1 text-xs font-medium ${
-                              bgRemovalLoading || activeDesign.hasBgRemoved
-                                ? "border-slate-300 text-slate-400"
-                                : "border-sky-500 text-sky-700 hover:bg-sky-50"
-                            }`}
-                          >
-                            {bgRemovalLoading
-                              ? "Removing…"
-                              : activeDesign.hasBgRemoved
-                                ? "BG Removed"
-                              : "Remove BG"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={openCropModal}
-                            className="rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                          >
-                            Crop
-                          </button>
-                          <button type="button" onClick={clearActiveDesign} className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">
-                            Clear
-                          </button>
-                        </div>
-
-                      </div>
-
-                      <div className="mb-4">
-                        <label className="mb-2 block text-xs font-medium">Design Size</label>
-                        <div className="flex items-center gap-2">
-                          <input type="range" min={0.1} max={1.2} step={0.02} value={activeDesign.scale} onChange={(e) => handleDesignScaleChange(e.target.value)} className="flex-1" />
-                          <span className="w-10 text-right text-xs text-slate-600">{Math.round(activeDesign.scale * 100)}%</span>
-                        </div>
-                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-slate-500">
-                          <div>Display: {activeDesign.currentDisplayWidthInches?.toFixed(2)}" × {activeDesign.currentDisplayHeightInches?.toFixed(2)}"</div>
-                          <div>Print: {activeDesign.currentPrintWidthInches?.toFixed(2)}" × {activeDesign.currentPrintHeightInches?.toFixed(2)}"</div>
-                        </div>
-                      </div>
-
-                      <div className="mb-4 space-y-3 sm:hidden">
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                          <div className="mb-2 flex items-center justify-between">
-                            <label className="text-xs font-medium text-slate-700">Width</label>
-                            <span className="text-xs font-semibold text-slate-600">
-                              {Math.round((activeDesign.scaleX ?? activeDesign.scale ?? 0.35) * 100)}%
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => nudgeDesignScaleAxis("x", -0.04)}
-                              className="h-9 w-9 rounded-full border border-slate-300 bg-white text-base font-semibold text-slate-700"
-                            >
-                              -
-                            </button>
-                            <input
-                              type="range"
-                              min={0.1}
-                              max={1.6}
-                              step={0.02}
-                              value={activeDesign.scaleX ?? activeDesign.scale ?? 0.35}
-                              onChange={(e) => handleDesignScaleXChange(e.target.value)}
-                              className="flex-1"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => nudgeDesignScaleAxis("x", 0.04)}
-                              className="h-9 w-9 rounded-full border border-slate-300 bg-white text-base font-semibold text-slate-700"
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                          <div className="mb-2 flex items-center justify-between">
-                            <label className="text-xs font-medium text-slate-700">Height</label>
-                            <span className="text-xs font-semibold text-slate-600">
-                              {Math.round((activeDesign.scaleY ?? activeDesign.scale ?? 0.35) * 100)}%
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => nudgeDesignScaleAxis("y", -0.04)}
-                              className="h-9 w-9 rounded-full border border-slate-300 bg-white text-base font-semibold text-slate-700"
-                            >
-                              -
-                            </button>
-                            <input
-                              type="range"
-                              min={0.1}
-                              max={1.6}
-                              step={0.02}
-                              value={activeDesign.scaleY ?? activeDesign.scale ?? 0.35}
-                              onChange={(e) => handleDesignScaleYChange(e.target.value)}
-                              className="flex-1"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => nudgeDesignScaleAxis("y", 0.04)}
-                              className="h-9 w-9 rounded-full border border-slate-300 bg-white text-base font-semibold text-slate-700"
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-
-                      <div className="mb-4 hidden sm:block">
-  <label className="mb-2 block text-xs font-medium">Scale X (Width)</label>
-  <div className="flex items-center gap-2">
-    <input
-      type="range"
-      min={0.1}
-      max={1.6}
-      step={0.02}
-      value={activeDesign.scaleX ?? activeDesign.scale ?? 0.35}
-      onChange={(e) => handleDesignScaleXChange(e.target.value)}
-      className="flex-1"
-    />
-    <span className="w-10 text-right text-xs text-slate-600">
-      {Math.round((activeDesign.scaleX ?? activeDesign.scale ?? 0.35) * 100)}%
-    </span>
-  </div>
-</div>
-
-<div className="mb-4 hidden sm:block">
-  <label className="mb-2 block text-xs font-medium">Scale Y (Height)</label>
-  <div className="flex items-center gap-2">
-    <input
-      type="range"
-      min={0.1}
-      max={1.6}
-      step={0.02}
-      value={activeDesign.scaleY ?? activeDesign.scale ?? 0.35}
-      onChange={(e) => handleDesignScaleYChange(e.target.value)}
-      className="flex-1"
-    />
-    <span className="w-10 text-right text-xs text-slate-600">
-      {Math.round((activeDesign.scaleY ?? activeDesign.scale ?? 0.35) * 100)}%
-    </span>
-  </div>
-</div>
-
-                      <div className="hidden text-xs text-slate-600 space-y-1 sm:block">
-                        <p>• Click on a design in the editor to select it</p>
-                        <p>• Drag to reposition, or use the resize handle</p>
-                        <p>• Click "Remove BG" for transparent background</p>
-                        <p>• Best result: use PNG artwork with a plain background</p>
-                        <p>• Supported formats: {SUPPORTED_DESIGN_FORMATS_LABEL}</p>
-                      </div>
-                    </>
-                  )}
-
-                  {!activeDesign && designLayers.length > 0 && (
-                    <div className="p-3 bg-slate-50 rounded border border-slate-200">
-                      <p className="text-xs text-slate-600 text-center">
-                        {designLayers.length} design{designLayers.length !== 1 ? 's' : ''} uploaded
-                      </p>
-                      <p className="text-[10px] text-slate-500 text-center mt-1">
-                        Click any design on the shirt to select it and edit.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </section>
+              <UploadPanel
+                accept={SUPPORTED_DESIGN_ACCEPT}
+                formatsLabel="PNG, JPG, WEBP, SVG, HEIC and more"
+                onUpload={handleDesignUpload}
+                layers={designLayers.map((layer, index) => ({
+                  id: layer.id,
+                  label: getDesignLayerDisplayName(layer, index),
+                  thumb: layer.imageUrl,
+                }))}
+                activeDesign={activeDesign}
+                onSelectLayer={handleSetActiveDesignId}
+                libraryName={selectedLibraryImage}
+                onScale={handleDesignScaleChange}
+                onScaleX={handleDesignScaleXChange}
+                onScaleY={handleDesignScaleYChange}
+                onNudge={nudgeDesignScaleAxis}
+                onRemoveBackground={handleRemoveBackground}
+                removingBackground={bgRemovalLoading}
+                onCrop={openCropModal}
+                onDelete={clearActiveDesign}
+                zones={zoneChoices}
+                activeZone={activeDesignZone}
+                onZoneChange={moveActiveDesignToZone}
+              />
             )}
 
-            {/* Text Tab */}
             {shouldShowToolSection(TABS.TEXT) && (
-              <section
-                id={`tool-section-${TABS.TEXT}`}
-                className="mb-4 space-y-6 rounded-2xl border border-slate-200 bg-slate-50/40 p-4 scroll-mt-24 sm:mb-0 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0"
-              >
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-sm">Text Customization</h3>
-                  <div className="flex gap-2">
-                    <button className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50" type="button" onClick={addNewText}>+ Add Text</button>
-                    <button className="rounded border border-rose-300 px-2 py-1 text-xs text-rose-600 hover:bg-rose-50 disabled:opacity-40" type="button" onClick={removeActiveText} disabled={!activeTextLayer}>Remove</button>
-                  </div>
-                </div>
-
-                {activeTextLayer ? (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-500">Text Content</label>
-                      <input type="text" className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-sky-500" value={activeTextLayer.text} onChange={(e) => updateActiveTextLayer({ text: e.target.value })} placeholder="Enter text here" />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-500">Font</label>
-                        <select className="w-full rounded border border-slate-300 px-2 py-1 text-xs outline-none focus:border-sky-500" value={activeTextLayer.fontFamily} onChange={(e) => updateActiveTextLayer({ fontFamily: e.target.value })}>
-                          {FONT_OPTIONS.map((f) => <option key={f} value={f}>{f.replace(/,.*$/, "")}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-500">Color</label>
-                        <input type="color" className="h-8 w-full cursor-pointer rounded border border-slate-300" value={activeTextLayer.color} onChange={(e) => updateActiveTextLayer({ color: e.target.value })} />
-                      </div>
-                    </div>
-
-                    {/* <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-500">Font Size</label>
-                      <div className="flex items-center gap-2">
-                        <input type="range" min={14} max={120} value={activeTextLayer.fontSize} onChange={(e) => updateActiveTextLayer({ fontSize: parseInt(e.target.value, 10) })} className="flex-1" />
-                        <span className="w-10 text-right text-xs text-slate-600">{activeTextLayer.fontSize}px</span>
-                      </div>
-                    </div> */}
-
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-500">Rotation</label>
-                      <div className="flex items-center gap-2">
-                        <input type="range" min={-45} max={45} value={activeTextLayer.rotation} onChange={(e) => updateActiveTextLayer({ rotation: parseInt(e.target.value, 10) })} className="flex-1" />
-                        <span className="w-10 text-right text-xs text-slate-600">{activeTextLayer.rotation}°</span>
-                      </div>
-                    </div>
-
-                    {availableZonesForView.length > 1 && (
-                      <div>
-                        <label className="mb-2 block text-xs font-medium text-slate-500">Text Position Area</label>
-                        <div className="flex flex-wrap gap-2">
-                          {availableZonesForView.map((zoneKey) => {
-                            const isCurrentZone = activeTextZone === zoneKey;
-                            return (
-                              <button
-                                key={`text-zone-${zoneKey}`}
-                                type="button"
-                                onClick={() => moveActiveTextToZone(zoneKey)}
-                                disabled={isCurrentZone}
-                                className={`rounded border px-3 py-1.5 text-xs font-medium ${
-                                  isCurrentZone
-                                    ? "cursor-default border-sky-200 bg-sky-50 text-sky-700"
-                                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                                }`}
-                              >
-                                {isCurrentZone
-                                  ? `In ${ZONE_LABELS[zoneKey] || zoneKey}`
-                                  : `Move to ${ZONE_LABELS[zoneKey] || zoneKey}`}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="text-xs text-slate-600 space-y-1">
-                      <p>• Drag the text on the shirt to reposition</p>
-                      <p>• Use the corner handle to resize</p>
-                      <p>• Click "Remove" to delete selected text</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-4 bg-slate-50 rounded border border-slate-200 text-center">
-                    <p className="text-xs text-slate-600">No text added yet.</p>
-                    <p className="text-[10px] text-slate-500 mt-1">Click "+ Add Text" to start customizing.</p>
-                  </div>
-                )}
-              </section>
+              <TextPanel
+                layers={textLayers.map((layer, index) => ({
+                  id: layer.id,
+                  label: getTextLayerDisplayName(layer, index),
+                }))}
+                activeLayer={activeTextLayer}
+                onSelectLayer={handleSetActiveTextId}
+                onAdd={addNewText}
+                onRemove={removeActiveText}
+                onChange={updateActiveTextLayer}
+                fonts={FONT_OPTIONS}
+                zones={zoneChoices}
+                activeZone={activeTextZone}
+                onZoneChange={moveActiveTextToZone}
+              />
             )}
 
-            {/* Views Tab */}
-            {shouldShowToolSection(TABS.VIEWS) && customizableViews.length > 1 && (
-              <section
-                id={`tool-section-${TABS.VIEWS}`}
-                className="mb-4 space-y-6 rounded-2xl border border-slate-200 bg-slate-50/40 p-4 scroll-mt-24 sm:mb-0 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0"
-              >
-                <div>
-                  <h3 className="mb-3 font-semibold text-sm">Product Views</h3>
-                  <p className="mb-3 text-xs text-slate-600">Switch between different views of the product to add designs/text on different areas.</p>
-
-                  <div className="space-y-2">
-                    {customizableViews.map((v) => {
-                      const viewState = viewStates[v.code];
-                      const hasLayers = viewState && (viewState.textLayers?.length > 0 || viewState.designLayers?.length > 0);
-                      const isCurrent = v.code === viewCode;
-                      
-                      return (
-                        <button
-                          key={v.code}
-                          type="button"
-                          onClick={() => setViewCode(v.code)}
-                          className={`w-full flex items-center justify-between rounded px-3 py-2 text-xs border ${isCurrent ? 'bg-sky-50 border-sky-200 text-sky-700' : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'}`}
-                        >
-                          <span>{v.label}</span>
-                          <div className="flex items-center gap-2">
-                            {hasLayers && <span className="h-2 w-2 bg-emerald-500 rounded-full"></span>}
-                            {isCurrent && (
-                              <svg className="w-3 h-3 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="hidden text-xs text-slate-600 space-y-2 sm:block">
-                  <p className="font-medium">Current View: {customizableViews.find(v => v.code === viewCode)?.label}</p>
-                  <p>• Front: Main design area</p>
-                  <p>• Back: Back of the product</p>
-                  <p>• Each view has separate text and design layers</p>
-                </div>
-              </section>
-            )}
-
-            {/* Design Library Tab - NEW */}
             {shouldShowToolSection(TABS.DESIGN_LIBRARY) && (
-              <section
-                id={`tool-section-${TABS.DESIGN_LIBRARY}`}
-                className="space-y-6 rounded-2xl border border-slate-200 bg-slate-50/40 p-4 scroll-mt-24 sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0"
-              >
-                <div>
-                  <h3 className="mb-3 font-semibold text-sm">Design Library</h3>
-                  <p className="mb-3 text-xs text-slate-600">Open the library in a popup so the sidebar stays compact.</p>
-
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800">Library Picker</p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          {currentFolder
-                            ? `Current folder: ${currentFolder}${images.length ? ` • ${images.length} design${images.length === 1 ? "" : "s"}` : ""}`
-                            : "Choose a folder and select a design in the popup."}
-                        </p>
-                        {selectedLibraryImage && (
-                          <p className="mt-2 text-xs text-sky-700">
-                            Last selected: <span className="font-medium">{selectedLibraryImage}</span>
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsLibraryModalOpen(true);
-                        }}
-                        className="rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-100"
-                      >
-                        Open Library
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="hidden text-xs text-slate-600 space-y-2 mt-4 sm:block">
-                    <p className="font-medium">How to use:</p>
-                    <p>• Select a folder to view available designs</p>
-                    <p>• Click on any design to add it to your product</p>
-                    <p>• Switch to "Designs" tab to edit the selected design</p>
-                    <p>• Background removal works for both uploaded and library designs</p>
-                  </div>
-                </div>
-              </section>
+              <LibraryPanel
+                folders={folders}
+                currentFolder={currentFolder}
+                onSelectFolder={selectDesignLibraryFolder}
+                images={currentFolderImages}
+                loading={isCurrentFolderLoading}
+                getImageUrl={getLibraryImageUrl}
+                onPick={handleSelectFromLibrary}
+                lastPicked={selectedLibraryImage}
+              />
+            )}
+            {shouldShowToolSection(TABS.PRODUCT_COLORS) && (
+              <div className="lg:hidden">
+                <OrderOptions {...orderOptionProps} />
+              </div>
             )}
           </div>
-
-          {/* Error messages */}
-        {(error || saveError || saveSuccess) && (
-            <div className="mt-4">
-              {error && <div className="rounded border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</div>}
-              {saveError && <div className="rounded border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{saveError}</div>}
-              {saveSuccess && <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{isEditMode ? "Design updated successfully!" : "Design saved successfully!"}</div>}
-            </div>
-          )}
         </aside>
 
         {isCropModalOpen && activeDesign && (
           <div
-            className="fixed inset-0 z-[210] flex items-center justify-center bg-slate-950/60 p-0 sm:p-4"
+            className="fixed inset-0 z-[210] flex items-center justify-center bg-black/60 p-0 sm:p-4"
             onClick={closeCropModal}
           >
             <div
-              className="flex h-[100dvh] w-full max-w-none flex-col overflow-hidden rounded-none border-0 bg-white shadow-2xl sm:h-auto sm:max-h-[92dvh] sm:max-w-4xl sm:rounded-[28px] sm:border sm:border-slate-200"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="crop-dialog-title"
+              className="flex h-[100dvh] w-full flex-col overflow-hidden bg-mt-surface font-brand text-mt-text shadow-2xl sm:h-auto sm:max-h-[92dvh] sm:max-w-3xl sm:rounded-mt-card sm:border sm:border-mt-line"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-6">
-                <div>
-                  <h3 className="text-base font-semibold text-slate-900">Crop image</h3>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Drag the image with your finger, or use the controls below, then click OK.
-                  </p>
+              <div className="flex items-center justify-between gap-3 border-b border-mt-line px-4 py-3 sm:px-6">
+                <div className="min-w-0">
+                  <h3 id="crop-dialog-title" className="text-lg leading-tight text-mt-text">
+                    Crop image
+                  </h3>
+                  <p className="mt-0.5 text-xs text-mt-subtle">Drag the box to move it, or its side handles to trim.</p>
                 </div>
                 <button
                   type="button"
                   onClick={closeCropModal}
-                  className="min-h-10 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  aria-label="Close"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-mt-btn text-mt-muted hover:bg-mt-tint/10 hover:text-mt-text"
                 >
-                  Close
+                  <X className="h-5 w-5" aria-hidden="true" />
                 </button>
               </div>
 
-              <div className="grid min-h-0 flex-1 gap-0 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_320px]">
-                <div className="border-b border-slate-200 bg-slate-50/70 p-4 sm:p-5 lg:border-b-0 lg:border-r lg:p-6">
-                  <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="mb-3 flex items-center justify-between text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">
-                      <span>Crop Preview</span>
-                      <span>
-                        {Math.round(cropDraftValue.widthRatio * 100)}% × {Math.round(cropDraftValue.heightRatio * 100)}%
-                      </span>
-                    </div>
-                    <div className="relative mx-auto w-full max-w-[520px] rounded-[24px] bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.14),_transparent_48%),linear-gradient(180deg,_#f8fafc_0%,_#e2e8f0_100%)] p-4">
-                      <div
-                        ref={cropPreviewFrameRef}
-                        className="relative mx-auto w-full overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-inner"
-                        style={{
-                          aspectRatio: `${Math.max(activeDesign.originalWidthPx || 1, 1)} / ${Math.max(activeDesign.originalHeightPx || 1, 1)}`,
-                          touchAction: "none",
+              <div className="grid min-h-0 flex-1 overflow-y-auto sm:grid-cols-[minmax(0,1fr)_220px]">
+                <div className="flex items-center justify-center bg-mt-photo p-4 sm:p-6">
+                  <div
+                    ref={cropPreviewFrameRef}
+                    className="relative mx-auto w-full max-w-[440px] overflow-hidden rounded-[2px] bg-mt-surface"
+                    style={{
+                      aspectRatio: `${Math.max(activeDesign.originalWidthPx || 1, 1)} / ${Math.max(activeDesign.originalHeightPx || 1, 1)}`,
+                      touchAction: "none",
+                    }}
+                  >
+                    <img
+                      src={activeDesign.imageUrl}
+                      alt="Image being cropped"
+                      className="absolute inset-0 h-full w-full select-none object-fill"
+                      draggable={false}
+                    />
+
+                    <div className="pointer-events-none absolute inset-0 bg-black/40" />
+
+                    <div
+                      className="absolute cursor-move border-2 border-white bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]"
+                      style={{
+                        left: `${cropBoxRect.left * 100}%`,
+                        top: `${cropBoxRect.top * 100}%`,
+                        width: `${cropBoxRect.width * 100}%`,
+                        height: `${cropBoxRect.height * 100}%`,
+                      }}
+                      onPointerDown={(event) => startCropPreviewPan(event, "move")}
+                    >
+                      <div className="absolute left-1/3 top-0 h-full w-px bg-white/40" />
+                      <div className="absolute left-2/3 top-0 h-full w-px bg-white/40" />
+                      <div className="absolute left-0 top-1/3 h-px w-full bg-white/40" />
+                      <div className="absolute left-0 top-2/3 h-px w-full bg-white/40" />
+
+                      <button
+                        type="button"
+                        aria-label="Crop left"
+                        className="absolute left-0 top-1/2 h-10 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/20 bg-white shadow"
+                        onPointerDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          startCropPreviewPan(event, "resize-left");
                         }}
-                      >
-                        <img
-                          src={activeDesign.imageUrl}
-                          alt="Crop editor"
-                          className="absolute inset-0 h-full w-full select-none object-fill"
-                          draggable={false}
-                        />
-
-                        <div className="absolute inset-0 bg-slate-950/45 pointer-events-none" />
-
-                        <div
-                          className="absolute border-2 border-sky-400 bg-transparent shadow-[0_0_0_9999px_rgba(2,6,23,0.38)] cursor-move"
-                          style={{
-                            left: `${cropBoxRect.left * 100}%`,
-                            top: `${cropBoxRect.top * 100}%`,
-                            width: `${cropBoxRect.width * 100}%`,
-                            height: `${cropBoxRect.height * 100}%`,
-                          }}
-                          onPointerDown={(event) => startCropPreviewPan(event, "move")}
-                        >
-                          <div className="pointer-events-none absolute inset-0 border border-white/80" />
-                          <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-white/50" />
-                          <div className="absolute top-1/2 left-0 h-px w-full -translate-y-1/2 bg-white/50" />
-
-                          <button
-                            type="button"
-                            aria-label="Crop left"
-                            className="absolute left-0 top-1/2 h-10 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-sky-500 shadow"
-                            onPointerDown={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              startCropPreviewPan(event, "resize-left");
-                            }}
-                          />
-                          <button
-                            type="button"
-                            aria-label="Crop right"
-                            className="absolute right-0 top-1/2 h-10 w-5 translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-sky-500 shadow"
-                            onPointerDown={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              startCropPreviewPan(event, "resize-right");
-                            }}
-                          />
-                          <button
-                            type="button"
-                            aria-label="Crop top"
-                            className="absolute left-1/2 top-0 h-5 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-sky-500 shadow"
-                            onPointerDown={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              startCropPreviewPan(event, "resize-top");
-                            }}
-                          />
-                          <button
-                            type="button"
-                            aria-label="Crop bottom"
-                            className="absolute bottom-0 left-1/2 h-5 w-10 -translate-x-1/2 translate-y-1/2 rounded-full border border-white bg-sky-500 shadow"
-                            onPointerDown={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              startCropPreviewPan(event, "resize-bottom");
-                            }}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="mt-4 rounded-2xl bg-white/88 px-3 py-2 text-center text-[11px] font-medium text-slate-600 shadow-sm backdrop-blur">
-                        Drag inside the box to move the crop. Drag the side handles to crop width or height.
-                      </div>
+                      />
+                      <button
+                        type="button"
+                        aria-label="Crop right"
+                        className="absolute right-0 top-1/2 h-10 w-4 -translate-y-1/2 translate-x-1/2 rounded-full border border-black/20 bg-white shadow"
+                        onPointerDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          startCropPreviewPan(event, "resize-right");
+                        }}
+                      />
+                      <button
+                        type="button"
+                        aria-label="Crop top"
+                        className="absolute left-1/2 top-0 h-4 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/20 bg-white shadow"
+                        onPointerDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          startCropPreviewPan(event, "resize-top");
+                        }}
+                      />
+                      <button
+                        type="button"
+                        aria-label="Crop bottom"
+                        className="absolute bottom-0 left-1/2 h-4 w-10 -translate-x-1/2 translate-y-1/2 rounded-full border border-black/20 bg-white shadow"
+                        onPointerDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          startCropPreviewPan(event, "resize-bottom");
+                        }}
+                      />
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-5 p-4 pb-24 sm:p-6 sm:pb-6">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900">Crop details</div>
-                      <div className="mt-1 text-xs text-slate-500">
-                        Cropping now changes the actual printed size and inches.
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={resetCropDraft}
-                      disabled={cropDraftValue.widthRatio === 1 && cropDraftValue.heightRatio === 1 && cropDraftValue.offsetX === 0 && cropDraftValue.offsetY === 0}
-                      className="min-h-10 rounded-full border border-slate-300 px-4 py-2 text-[11px] font-semibold text-slate-600 disabled:opacity-40"
-                    >
-                      Reset
-                    </button>
+                <div className="space-y-4 p-4 sm:p-5">
+                  <div>
+                    <p className="text-xs text-mt-muted">Prints at about</p>
+                    <p className="mt-1 text-xl tabular-nums text-mt-text">
+                      {getCropMeasurementInches(activeDesign, cropDraftValue, "width").toFixed(1)} ×{" "}
+                      {getCropMeasurementInches(activeDesign, cropDraftValue, "height").toFixed(1)} in
+                    </p>
+                    <p className="mt-1 text-[11px] text-mt-subtle">
+                      Keeping {Math.round(cropDraftValue.widthRatio * 100)}% × {Math.round(cropDraftValue.heightRatio * 100)}% of the image.
+                      A smaller crop prints smaller.
+                    </p>
                   </div>
-
-                  <div className="grid gap-3">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                      <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Cropped Width</div>
-                      <div className="mt-1 text-lg font-semibold text-slate-900">
-                        {getCropMeasurementInches(activeDesign, cropDraftValue, "width").toFixed(2)}"
-                      </div>
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                      <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">Cropped Height</div>
-                      <div className="mt-1 text-lg font-semibold text-slate-900">
-                        {getCropMeasurementInches(activeDesign, cropDraftValue, "height").toFixed(2)}"
-                      </div>
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
-                      This behaves like phone crop: crop inline on the image itself, and the final inches reduce with the crop box.
-                    </div>
-                  </div>
-
-                  <div className="fixed inset-x-0 bottom-0 z-10 flex gap-2 border-t border-slate-200 bg-white/96 px-4 py-3 backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
-                    <button
-                      type="button"
-                      onClick={closeCropModal}
-                      className="min-h-11 flex-1 rounded-full border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 sm:flex-none"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={applyCropDraft}
-                      className="min-h-11 flex-1 rounded-full border border-sky-600 bg-sky-600 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-700 sm:flex-none"
-                    >
-                      OK
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={resetCropDraft}
+                    disabled={cropDraftValue.widthRatio === 1 && cropDraftValue.heightRatio === 1 && cropDraftValue.offsetX === 0 && cropDraftValue.offsetY === 0}
+                    className="inline-flex items-center gap-1.5 text-xs text-mt-muted underline-offset-4 hover:text-mt-text hover:underline disabled:pointer-events-none disabled:opacity-40"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                    Reset crop
+                  </button>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
 
-        {isLibraryModalOpen && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/55 p-0 sm:p-6">
-            <div className="flex h-full w-full max-w-none flex-col overflow-hidden rounded-none border-0 bg-white shadow-2xl sm:h-[min(88vh,760px)] sm:max-w-5xl sm:rounded-[28px] sm:border sm:border-slate-200">
-              <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-6">
-                <div>
-                  <h3 className="text-base font-semibold text-slate-900">Design Library</h3>
-                  <p className="mt-1 text-xs text-slate-500">Pick a folder and tap any image to use it.</p>
-                </div>
+              <div className="flex gap-2 border-t border-mt-line px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:justify-end sm:px-6">
                 <button
                   type="button"
-                  onClick={() => setIsLibraryModalOpen(false)}
-                  className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  onClick={closeCropModal}
+                  className="h-11 flex-1 rounded-mt-btn border border-mt-text px-5 text-sm font-medium text-mt-text hover:bg-mt-tint/10 sm:flex-none"
                 >
-                  Close
+                  Cancel
                 </button>
-              </div>
-
-              <div className="grid gap-0 overflow-hidden lg:grid-cols-[260px_minmax(0,1fr)]">
-                <div className="border-b border-slate-200 bg-slate-50/80 p-4 lg:border-b-0 lg:border-r">
-                  <div>
-                    <label className="mb-2 block text-xs font-medium text-slate-700">Folders</label>
-                    <div className="space-y-2 sm:hidden">
-                      <select
-                        value={currentFolder || ""}
-                        onChange={(e) => selectDesignLibraryFolder(e.target.value)}
-                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 outline-none focus:border-sky-400"
-                      >
-                        <option value="" disabled>
-                          Select a folder
-                        </option>
-                        {folders.map((folder) => (
-                          <option key={folder} value={folder}>
-                            {folder}
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-[11px] text-slate-500">
-                        Select a collection to open its shareable design URL.
-                      </p>
-                    </div>
-                    <div className="hidden max-h-[180px] gap-2 overflow-y-auto pr-1 sm:flex sm:flex-wrap lg:max-h-[220px]">
-                      {folders.map((folder) => (
-                        <button
-                          key={folder}
-                          type="button"
-                          onClick={() => selectDesignLibraryFolder(folder)}
-                          className={`shrink-0 rounded-full border px-3 py-1.5 text-xs transition sm:shrink ${
-                            currentFolder === folder
-                              ? "border-sky-300 bg-sky-100 text-sky-700"
-                              : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
-                          }`}
-                        >
-                          {folder}
-                        </button>
-                      ))}
-                    </div>
-                    <p className="mt-2 hidden text-[11px] text-slate-500 sm:block">
-                      {folders.length} collections. Scroll this list to switch folders.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex min-h-0 flex-col">
-                  <div className="border-b border-slate-200 px-4 py-3 sm:px-6">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800">
-                          {currentFolder || "Select a folder"}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {currentFolder
-                            ? isCurrentFolderLoading
-                              ? "Loading designs..."
-                              : `${currentFolderImages.length} design${currentFolderImages.length === 1 ? "" : "s"} available`
-                            : "Choose a folder on the left to view designs."}
-                        </p>
-                      </div>
-                      {selectedLibraryImage && (
-                        <div className="hidden rounded-full bg-sky-50 px-3 py-1 text-[11px] font-medium text-sky-700 sm:block">
-                          Last selected: {selectedLibraryImage}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
-                    {isCurrentFolderLoading ? (
-                      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
-                        {Array.from({ length: 8 }).map((_, index) => (
-                          <div
-                            key={`library-skeleton-${index}`}
-                            className="overflow-hidden rounded-[22px] border border-slate-200 bg-slate-50"
-                          >
-                            <div className="aspect-square animate-pulse bg-slate-100" />
-                            <div className="space-y-2 px-3 pb-3 pt-2">
-                              <div className="h-3 w-4/5 animate-pulse rounded-full bg-slate-200" />
-                              <div className="h-2.5 w-1/2 animate-pulse rounded-full bg-slate-200" />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : currentFolder && currentFolderImages.length > 0 ? (
-                      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
-                        {currentFolderImages.map((image) => (
-                          <button
-                            key={image.filename}
-                            type="button"
-                            onClick={() => handleSelectFromLibrary(image)}
-                            className="overflow-hidden rounded-[22px] border border-slate-200 bg-slate-50 text-left transition hover:border-sky-300 hover:bg-sky-50/60"
-                          >
-                            <div className="aspect-square overflow-hidden bg-white p-3">
-                              <img
-                                src={getLibraryImageUrl(currentFolder, image.filename)}
-                                alt={image.filename}
-                                className="h-full w-full rounded-2xl object-cover"
-                                loading="lazy"
-                              />
-                            </div>
-
-                            <div className="px-3 pb-3 pt-2">
-                              <p className="truncate text-xs font-medium text-slate-700">{image.filename}</p>
-                              <p className="mt-1 text-[11px] text-slate-500">Tap image to use</p>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    ) : currentFolder ? (
-                      <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
-                        <div>
-                          <p className="text-sm font-medium text-slate-700">No designs in this folder</p>
-                          <p className="mt-1 text-xs text-slate-500">Choose another folder from the left.</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
-                        <div>
-                          <p className="text-sm font-medium text-slate-700">Select a folder to view designs</p>
-                          <p className="mt-1 text-xs text-slate-500">The popup keeps the library compact while still letting you browse everything.</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={applyCropDraft}
+                  className="h-11 flex-1 rounded-mt-btn bg-mt-btn px-5 text-sm font-medium text-mt-btn-text hover:bg-mt-btn-hover sm:flex-none"
+                >
+                  Apply crop
+                </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Center workspace */}
-        <main className="order-1 flex min-h-0 flex-1 flex-col overflow-visible sm:overflow-auto lg:order-2">
-          <div className="flex-1 min-h-0 p-0">
-            <div className="mx-auto flex h-auto min-h-[52vh] flex-col overflow-visible rounded-[28px] border border-slate-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.08)] sm:h-full sm:min-h-0 sm:overflow-hidden sm:rounded-[28px]">
-              <div className="hidden border-b border-slate-200 bg-white px-3 py-3 sm:block sm:px-5">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="min-w-0">
-                    <h2 className="truncate text-sm font-semibold text-slate-800 sm:text-base">
-                      {product?.name || "Custom Product"}
-                    </h2>
-                    <p className="text-xs text-slate-500">
-                      {productColorName} • Size {selectedSize}
-                    </p>
-                  </div>
-                  {customizableViews.length > 0 && (
-                    <div className="flex flex-col gap-2 lg:items-end">
-                      <div className="flex flex-wrap gap-2 lg:justify-end">
-                        {customizableViews.map((v) => {
-                          const isCurrentView = v.code === viewCode;
-                          return (
-                            <button
-                              key={v.code}
-                              type="button"
-                              onClick={() => setViewCode(v.code)}
-                              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                                isCurrentView
-                                  ? "bg-sky-600 text-white shadow-sm"
-                                  : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                              }`}
-                            >
-                              {v.label || v.code}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 lg:max-w-[360px]">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                          Customized Names
-                        </p>
-                        <div className="mt-2 flex flex-wrap gap-2 lg:justify-end">
-                          {visibleCustomizationNames.length > 0 ? (
-                            <>
-                              {visibleCustomizationNames.map((name) => (
-                                <span
-                                  key={name}
-                                  className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-700"
-                                >
-                                  {name}
-                                </span>
-                              ))}
-                              {remainingCustomizationCount > 0 && (
-                                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-500">
-                                  +{remainingCustomizationCount} more
-                                </span>
-                              )}
-                            </>
-                          ) : (
-                            <span className="text-[11px] text-slate-500">No customized names yet</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              {customizableViews.length > 0 && (
-                <div className="border-b border-slate-200 bg-white px-3 py-2 sm:hidden">
-                  <div className="mb-1.5 flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">View</p>
-                      <p className="text-[11px] font-medium leading-none text-slate-700">
-                        {customizableViews.find((v) => v.code === viewCode)?.label || "Front view"}
-                      </p>
-                      <div className="mt-1.5 flex items-center gap-2 overflow-x-auto pb-0.5">
-                        <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          Color
-                        </span>
-                        {productColorOptions.map((option) => {
-                          const currentColorKey = productColor?.toLowerCase() || "";
-                          const isActive = option.value.toLowerCase() === currentColorKey;
-                          const colorOutOfStock = !isColorAvailable(option);
-
-                          return (
-                            <button
-                              key={option.value}
-                              type="button"
-                              aria-label={option.label}
-                              title={colorOutOfStock ? `${option.label} - Out of stock` : option.label}
-                              onClick={() => !colorOutOfStock && handleColorChange(option.value, option.label)}
-                              disabled={colorOutOfStock}
-                              className={`h-5 w-5 shrink-0 rounded-full border ${
-                                isActive ? "border-sky-500 ring-1 ring-sky-200" : "border-slate-300"
-                              } ${colorOutOfStock ? "opacity-40" : ""}`}
-                              style={{ backgroundColor: option.value }}
-                            />
-                          );
-                        })}
-                      </div>
-                      <p className="truncate text-[10px] text-slate-500">
-                        {productColorName} / {selectedSize || "Default"} / Qty {selectedQuantity}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={handleSaveDesign}
-                        disabled={saving || addingToCart}
-                        className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-700 disabled:opacity-50"
-                      >
-                        {token ? (saving ? "Saving..." : isEditMode ? "Update" : "Save") : "Login"}
-                      </button>
-                      <button
-                        type="button"
-                        id="customization-add-to-cart-footer-mobile"
-                        onClick={handleSaveAndAddToCart}
-                        aria-label="Add customized product to cart"
-                        data-meta-track="add-to-cart"
-                        disabled={saving || addingToCart}
-                        className="rounded-full border border-emerald-600 bg-emerald-600 px-2.5 py-1 text-[10px] font-semibold text-white disabled:opacity-50"
-                      >
-                        {token
-                          ? (addingToCart
-                            ? "Adding..."
-                            : savedDesignId
-                              ? "Add to Cart"
-                              : "Save & Cart")
-                          : "Cart Login"}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-                    {customizableViews.map((v) => {
-                      const isCurrentView = v.code === viewCode;
-                      return (
-                        <button
-                          key={v.code}
-                          type="button"
-                          onClick={() => setViewCode(v.code)}
-                          className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
-                            isCurrentView
-                              ? "bg-sky-600 text-white shadow-sm"
-                              : "border border-slate-300 bg-white text-slate-700"
-                          }`}
-                        >
-                          {v.label || v.code}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              <div className="mx-auto flex min-h-[44vh] flex-1 w-full items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(14,116,214,0.05),_transparent_45%),linear-gradient(180deg,_#f8fafc_0%,_#ffffff_100%)] p-2 sm:min-h-0 sm:max-w-6xl sm:p-5 lg:p-6">
-                <div className="mx-auto w-full max-w-[960px]">
+        {/* Centre: canvas */}
+        <main className="order-1 min-w-0 lg:order-2">
+          <div className="overflow-hidden rounded-mt-card border border-mt-line bg-mt-surface">
+            <div className="flex min-h-[46vh] items-center justify-center bg-mt-photo p-2 sm:p-5 lg:min-h-[560px] lg:p-6">
+              <div className="mx-auto w-full max-w-[960px]">
                 {mockupUrl && maskUrl ? (
                   <RecolorEditor
                     ref={editorRef}
@@ -4274,12 +3293,12 @@ const startCropPreviewPan = (event, mode = "move") => {
                     textLayers={textLayers}
                     setTextLayers={handleSetTextLayers}
                     activeTextId={activeTextId}
-                    setActiveTextId={handleSetActiveTextId}
+                    setActiveTextId={selectTextFromCanvas}
                     onRemoveActiveText={removeActiveText}
                     designLayers={designLayers}
                     setDesignLayers={handleSetDesignLayers}
                     activeDesignId={activeDesignId}
-                    setActiveDesignId={handleSetActiveDesignId}
+                    setActiveDesignId={selectDesignFromCanvas}
                     onRemoveActiveDesign={clearActiveDesign}
                     bgRemovalLoading={bgRemovalLoading}
                     onDesignRenderWidthChange={setDesignRenderWidth}
@@ -4292,190 +3311,94 @@ const startCropPreviewPan = (event, mode = "move") => {
                     onMoveActiveTextToZone={moveActiveTextToZone}
                   />
                 ) : (
-                  <div className="text-sm text-slate-500 text-center">{product?.name ? `No view configuration found for ${product.name}` : "Product not loaded"}</div>
+                  <div className="text-sm text-mt-subtle text-center">{product?.name ? `No view configuration found for ${product.name}` : "Product not loaded"}</div>
                 )}
-                </div>
               </div>
-              <div className="hidden" />
             </div>
+            <CanvasFooter
+              views={customizableViews.map((v) => ({
+                code: v.code,
+                label: v.label,
+                hasLayers: Boolean(viewStates[v.code]?.textLayers?.length || viewStates[v.code]?.designLayers?.length),
+              }))}
+              currentView={viewCode}
+              onViewChange={setViewCode}
+              addedNames={visibleCustomizationNames}
+              extraCount={remainingCustomizationCount}
+            />
           </div>
         </main>
 
-        {/* Right sidebar - Price Breakdown */}
-        <aside className="order-3 hidden w-full flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm min-h-0 lg:sticky lg:top-24 lg:flex lg:w-auto">
-          <div className="mb-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-green-800">Price Breakdown</h3>
-              
-              <button
-                type="button"
-                onClick={() => calculatePrice()}
-                disabled={calculatingPrice}
-                className="rounded-full border border-emerald-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-emerald-700 disabled:opacity-50"
-              >
-                {refreshPriceLabel}
-              </button>
-            </div>
-            <div className="text-xs text-slate-500 mt-1">Real-time price calculation</div>
-          </div>
-          <div className="mb-4 grid grid-cols-2 gap-2">
-            <div className="rounded-2xl bg-slate-50 px-3 py-2">
-              <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Base</div>
-              <div className="mt-1 text-sm font-semibold text-slate-800">Rs.{BASE_PRICE.toFixed(2)}</div>
-            </div>
-            <div className="rounded-2xl bg-emerald-50 px-3 py-2">
-              <div className="text-[10px] uppercase tracking-[0.16em] text-emerald-500">Total</div>
-              <div className="mt-1 text-sm font-semibold text-emerald-700">Rs.{price.toFixed(2)}</div>
-            </div>
-          </div>
-
-          <div className="mb-4 flex items-center gap-2 lg:hidden">
-            <button
-              type="button"
-              onClick={() => setShowMobilePriceDetails((value) => !value)}
-              className="rounded-full border border-slate-300 px-3 py-1.5 text-[11px] font-semibold text-slate-700"
-            >
-              {showMobilePriceDetails ? "Hide price details" : "Show price details"}
-            </button>
-            <span className="text-[11px] text-slate-500">Keep this closed while designing.</span>
-          </div>
-
-          <div className={`${showMobilePriceDetails ? "block" : "hidden"} flex-1 overflow-auto lg:block`}>
-            <div className="space-y-4">
-              {/* Base Price */}
-              <div className="pb-3 border-b border-slate-100">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-xs font-medium text-slate-700">Base Product</span>
-                  <span className="text-sm font-semibold">₹{BASE_PRICE.toFixed(2)}</span>
-                </div>
-                <div className="text-[10px] text-slate-500">
-                  {product?.name || "Product"} base price
-                </div>
-              </div>
-              
-              {/* Images/Designs */}
-              {priceBreakdown.images.total > 0 && (
-                <div className="pb-3 border-b border-slate-100">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs font-medium text-slate-700">Designs</span>
-                    <span className="text-sm font-semibold text-green-600">+₹{priceBreakdown.images.total.toFixed(2)}</span>
-                  </div>
-                  <div className="space-y-2">
-                    {priceBreakdown.images.items.map((item, index) => (
-                      <div key={index} className="text-[10px] bg-slate-50 p-2 rounded">
-                        <div className="flex justify-between">
-                          <span className="font-medium">Design {index + 1}</span>
-                          <span>₹{item.price.toFixed(2)}</span>
-                        </div>
-                        <div className="text-slate-500 mt-1">Size: {item.displaySize}</div>
-                        <div className="text-slate-500">Print: {item.printSize}</div>
-                        <div className="text-amber-600 text-[9px] mt-1">{item.note}</div>
-                        <div className="text-amber-600 text-[9px] mt-1">{item.note}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Text */}
-              {priceBreakdown.text.total > 0 && (
-                <div className="pb-3 border-b border-slate-100">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs font-medium text-slate-700">Text</span>
-                    <span className="text-sm font-semibold text-green-600">+₹{priceBreakdown.text.total.toFixed(2)}</span>
-                  </div>
-                  <div className="space-y-2">
-                    {priceBreakdown.text.items.map((item, index) => (
-                      <div key={index} className="text-[10px] bg-slate-50 p-2 rounded">
-                        <div className="flex justify-between">
-                          <span className="font-medium">"{item.text}"</span>
-                          <span>₹{item.price.toFixed(2)}</span>
-                        </div>
-                        <div className="text-slate-500 mt-1">Size: {item.displaySize} (Display)</div>
-                        <div className="text-slate-500">Print: {item.printSize}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Text Minimum Charges */}
-              {priceBreakdown.minimumCharges > 0 && (
-                <div className="pb-3 border-b border-slate-100">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs font-medium text-amber-700">Text Minimum Charges</span>
-                    <span className="text-sm font-semibold text-amber-700">+₹{priceBreakdown.minimumCharges.toFixed(2)}</span>
-                  </div>
-                  <div className="text-[10px] text-amber-600">
-                    Applied to text layers smaller than {FIXED_SIZE_INCHES}"×{FIXED_SIZE_INCHES}"
-                  </div>
-                </div>
-              )}
-              
-              {/* Text Additional Area */}
-              {priceBreakdown.additionalArea > 0 && (
-                <div className="pb-3 border-b border-slate-100">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs font-medium text-green-700">Text Additional Area</span>
-                    <span className="text-sm font-semibold text-green-700">+₹{(priceBreakdown.additionalArea * PRICE_PER_SQ_INCH).toFixed(2)}</span>
-                  </div>
-                  <div className="text-[10px] text-green-600">
-                    {priceBreakdown.additionalArea.toFixed(2)} sq.in × ₹{PRICE_PER_SQ_INCH}/sq.in
-                  </div>
-                </div>
-              )}
-              
-              {/* Total */}
-              <div className="pt-3">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-bold text-slate-800">Total Price</span>
-                  <span className="text-xl font-bold text-green-600">₹{price.toFixed(2)}</span>
-                </div>
-                <div className="text-[10px] text-slate-500">
-                  Including all designs, text, and additional charges
-                </div>
-              </div>
-            </div>
-          </div>
-          {/* Pricing Info */}
-          <div className={`${showMobilePriceDetails ? "block" : "hidden"} mt-6 pt-4 border-t border-slate-200 lg:block`}>
-            <div className="text-xs text-slate-600 space-y-1">
-              <p className="font-medium mb-1">Pricing Information:</p>
-              <p>• Base price depends on the size you select for the product.</p>
-              <p>• Every uploaded image is charged separately based on its printed size.</p>
-              {productImagePriceRules.map((rule, index) => (
-                <p key={`${rule.maxSideInches ?? "catch-all"}-${index}`}>
-                  • {formatImagePriceRuleLabel(rule, index, productImagePriceRules)}: ₹{Number(rule.price || 0)}
-                </p>
-              ))}
-              <p>• If you upload multiple images, the charge is applied per image.</p>
-              <p>• Display: 72 DPI (screen preview)</p>
-              <p>• Print: 300 DPI (production)</p>
-            </div>
-          </div>
+        {/* Right: colour, size, quantity, price and actions */}
+        <aside aria-label="Your order" className="order-3 lg:sticky lg:top-40">
+          <OrderPanel
+            productName={product?.name}
+            price={price}
+            basePrice={BASE_PRICE}
+            priceBreakdown={priceBreakdown}
+            additionalAreaCharge={priceBreakdown.additionalArea * PRICE_PER_SQ_INCH}
+            minimumChargeNote={`For text smaller than ${FIXED_SIZE_INCHES}" × ${FIXED_SIZE_INCHES}"`}
+            pricingNotes={productImagePriceRules.map((rule, index) => ({
+              label: formatImagePriceRuleLabel(rule, index, productImagePriceRules),
+              price: Number(rule.price || 0),
+            }))}
+            viewLabel={(code) => customizableViews.find((v) => v.code === code)?.label || code || "Front"}
+            calculatingPrice={calculatingPrice}
+            onRefreshPrice={() => calculatePrice()}
+            {...orderOptionProps}
+            saveLabel={primarySaveActionLabel}
+            cartLabel={primaryCartActionLabel}
+            onSave={handleSaveDesign}
+            onAddToCart={handleSaveAndAddToCart}
+            busy={saving || addingToCart}
+            saving={saving}
+            addingToCart={addingToCart}
+            addToCartId="customization-add-to-cart-header-desktop"
+          />
         </aside>
       </div>
-      </div>
 
-      <nav className="hidden">
-        {MOBILE_TOOL_TABS.map((item) => {
-          const isActive = activeTab === item.key;
-          return (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => setActiveTab(item.key)}
-              className={`rounded-[18px] px-2 py-2.5 text-[11px] font-semibold transition ${
-                isActive
-                  ? "bg-white text-slate-950 shadow-sm"
-                  : "text-slate-300"
-              }`}
-            >
-              {item.label}
-            </button>
-          );
-        })}
-      </nav>
+      <ProductToast
+        show={Boolean(error || saveError || saveSuccess)}
+        type={error || saveError ? "error" : "success"}
+        message={error || saveError || (isEditMode ? "Design updated." : "Design saved.")}
+        onClose={() => {
+          setError("");
+          setSaveError("");
+          setSaveSuccess(false);
+        }}
+        offsetClass="bottom-36 lg:bottom-8"
+      />
+
+      <MobileDock
+        tools={MOBILE_TOOLS}
+        activeKey={isToolSheetOpen ? activeTab : null}
+        onTool={handleDockTool}
+        price={`₹${price.toFixed(2)}`}
+        caption={`${productColorName} · Size ${selectedSize} · Qty ${selectedQuantity}`}
+      >
+        <button
+          type="button"
+          onClick={handleSaveDesign}
+          disabled={saving || addingToCart}
+          aria-label={primarySaveActionLabel}
+          title={primarySaveActionLabel}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-mt-btn border border-mt-line-strong text-mt-text disabled:opacity-50"
+        >
+          <Bookmark className="h-4 w-4" aria-hidden="true" />
+        </button>
+        <PrimaryPurchaseButton
+          id="customization-add-to-cart-footer-mobile"
+          onClick={handleSaveAndAddToCart}
+          aria-label="Add customized product to cart"
+          data-meta-track="add-to-cart"
+          disabled={saving || addingToCart}
+          busy={addingToCart}
+          className="h-11 shrink-0"
+        >
+          {primaryCartActionLabel}
+        </PrimaryPurchaseButton>
+      </MobileDock>
     </div>
   );
 }

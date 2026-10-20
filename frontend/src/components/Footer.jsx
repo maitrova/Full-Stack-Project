@@ -1,4 +1,5 @@
 import React from 'react';
+import { Wordmark } from './ui/index.js';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -19,16 +20,22 @@ const Footer = () => {
   ];
 
   return (
-    <footer className="bg-white border-t border-gray-200" role="contentinfo">
-      <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+    <footer className="border-t border-mt-line bg-mt-surface-raised font-brand text-mt-text" role="contentinfo">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+        {/* Wordmark */}
+        <div className="mb-8 text-center">
+          <Wordmark size="lg" />
+          <p className="mt-3 text-sm text-mt-muted">Premium custom wear, designed by you.</p>
+        </div>
+
         {/* Main navigation */}
         <nav aria-label="Footer navigation">
-          <ul className="flex flex-wrap justify-center gap-x-8 gap-y-4 mb-10">
+          <ul className="mb-10 flex flex-wrap justify-center gap-x-8 gap-y-3">
             {mainLinks.map((link) => (
               <li key={link.label}>
                 <a
                   href={link.href}
-                  className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors duration-200 uppercase tracking-wide"
+                  className="inline-flex py-1.5 text-xs uppercase tracking-[0.18em] text-mt-muted transition-colors duration-200 hover:text-mt-text"
                 >
                   {link.label}
                 </a>
@@ -37,50 +44,52 @@ const Footer = () => {
           </ul>
         </nav>
 
-        {/* Agency credit */}
-        <div className="text-center mb-6">
-          <p className="text-xs text-gray-400 tracking-wider">
-            Site by{' '}
-            <a
-              href="https://maitrova.in/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-gray-500 hover:text-gray-700 transition-colors duration-200"
-            >
-              Maitrova
-            </a>
-          </p>
-        </div>
+        <div className="border-t border-mt-line pt-8">
+          {/* Agency credit */}
+          <div className="mb-3 text-center">
+            <p className="text-xs tracking-wider text-mt-subtle">
+              Site by{' '}
+              <a
+                href="https://maitrova.in/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-mt-muted transition-colors duration-200 hover:text-mt-text"
+              >
+                Maitrova
+              </a>
+            </p>
+          </div>
 
-        {/* Copyright */}
-        <div className="text-center mb-8">
-          <p className="text-xs text-gray-400 tracking-wider">
-            © {currentYear} Maitrova. All rights reserved.
-          </p>
-        </div>
+          {/* Copyright */}
+          <div className="mb-5 text-center">
+            <p className="text-xs tracking-wider text-mt-subtle">
+              © {currentYear} Maitrova. All rights reserved.
+            </p>
+          </div>
 
-        {/* Legal links */}
-        <nav aria-label="Legal information">
-          <ul className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs">
-            {legalLinks.map((link, index) => (
-              <React.Fragment key={link.label}>
-                <li>
-                  <a
-                    href={link.href}
-                    className="text-gray-400 hover:text-gray-600 transition-colors duration-200 tracking-wide"
-                  >
-                    {link.label}
-                  </a>
-                </li>
-                {index < legalLinks.length - 1 && (
-                  <li className="hidden sm:block text-gray-300" aria-hidden="true">
-                    |
+          {/* Legal links */}
+          <nav aria-label="Legal information">
+            <ul className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs">
+              {legalLinks.map((link, index) => (
+                <React.Fragment key={link.label}>
+                  <li>
+                    <a
+                      href={link.href}
+                      className="inline-flex py-1 tracking-wide text-mt-subtle transition-colors duration-200 hover:text-mt-text"
+                    >
+                      {link.label}
+                    </a>
                   </li>
-                )}
-              </React.Fragment>
-            ))}
-          </ul>
-        </nav>
+                  {index < legalLinks.length - 1 && (
+                    <li className="hidden text-mt-line-strong sm:block" aria-hidden="true">
+                      |
+                    </li>
+                  )}
+                </React.Fragment>
+              ))}
+            </ul>
+          </nav>
+        </div>
       </div>
     </footer>
   );

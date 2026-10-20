@@ -188,7 +188,7 @@ export default function ProductImageLightbox({
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-slate-950/95 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] bg-black/95 font-brand backdrop-blur-sm"
       onClick={handleBackdropClick}
       role="dialog"
       aria-modal="true"
@@ -198,7 +198,7 @@ export default function ProductImageLightbox({
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-white sm:px-6">
           <div className="min-w-0">
             <p className="truncate text-base font-semibold">{title}</p>
-            <p className="mt-1 text-xs text-slate-300 sm:text-sm">
+            <p className="mt-1 text-xs text-mt-line-strong sm:text-sm">
               {activeIndex + 1} / {slides.length}
               {currentItem.label ? `  •  ${currentItem.label}` : ""}
             </p>
@@ -321,7 +321,7 @@ export default function ProductImageLightbox({
                   onClick={() => updateActiveIndex(index)}
                   className={`relative h-20 w-20 flex-none overflow-hidden rounded-2xl border transition ${
                     index === activeIndex
-                      ? "border-cyan-400 ring-2 ring-cyan-400/40"
+                      ? "border-mt-text ring-2 ring-mt-text"
                       : "border-white/10 hover:border-white/30"
                   }`}
                 >

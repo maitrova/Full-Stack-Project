@@ -18,6 +18,7 @@ import { getCart, selectCartItems, selectCartSummary } from "../redux/slices/Car
 import { selectCurrentToken } from "../redux/slices/Userslice.js";
 import RazorpayPayNow from "../components/RazorpayPayNow.jsx";
 import { trackAddPaymentInfo, trackBeginCheckoutOnce, trackPurchaseOnce } from "../utils/analytics.js";
+import { useCartOffers } from "../hooks/useCartOffers.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/api";
 
@@ -70,8 +71,8 @@ const buildPurchaseItems = (items = []) =>
 function Input({ label, value, onChange, placeholder, type = "text" }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:tracking-[0.24em]">{label}</label>
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 outline-none transition duration-200 focus:border-sky-400 focus:ring-4 focus:ring-sky-100 sm:rounded-2xl sm:px-4" />
+      <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mt-subtle sm:tracking-[0.24em]">{label}</label>
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="w-full rounded-xl border border-mt-line bg-mt-surface px-3 py-3 text-sm text-mt-text outline-none transition duration-200 focus:border-mt-line-strong focus:ring-4 focus:ring-mt-tint/10 sm:rounded-2xl sm:px-4" />
     </div>
   );
 }
@@ -79,50 +80,50 @@ function Input({ label, value, onChange, placeholder, type = "text" }) {
 function TextArea({ label, value, onChange, placeholder }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:tracking-[0.24em]">{label}</label>
-      <textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} rows={4} className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900 outline-none transition duration-200 focus:border-sky-400 focus:ring-4 focus:ring-sky-100 sm:rounded-2xl sm:px-4" />
+      <label className="text-[11px] font-semibold uppercase tracking-[0.14em] text-mt-subtle sm:tracking-[0.24em]">{label}</label>
+      <textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} rows={4} className="w-full resize-none rounded-xl border border-mt-line bg-mt-surface px-3 py-3 text-sm text-mt-text outline-none transition duration-200 focus:border-mt-line-strong focus:ring-4 focus:ring-mt-tint/10 sm:rounded-2xl sm:px-4" />
     </div>
   );
 }
 
 function AddressSummary({ title, addr, onEdit, onMakeDefault, loading }) {
   return (
-    <div className="w-full min-w-0 rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,_#ffffff,_#f8fafc)] p-4 shadow-[0_20px_55px_-38px_rgba(15,23,42,0.45)] sm:rounded-[24px] sm:p-5">
+    <div className="w-full min-w-0 rounded-2xl border border-mt-line bg-mt-surface p-4 shadow-[0_20px_55px_-38px_rgba(15,23,42,0.45)] sm:rounded-[24px] sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-600 sm:tracking-[0.22em]">{title}</h4>
-            {addr?.isDefault ? <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">Default</span> : null}
+            <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-mt-muted sm:tracking-[0.22em]">{title}</h4>
+            {addr?.isDefault ? <span className="rounded-full bg-mt-success/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-mt-success">Default</span> : null}
           </div>
           {addr ? (
-            <div className="mt-3 space-y-1 break-words text-sm text-slate-700">
-              <div className="font-semibold text-slate-900">{addr.fullName}</div>
-              <div className="text-slate-600">{addr.mobileNumber}</div>
+            <div className="mt-3 space-y-1 break-words text-sm text-mt-muted">
+              <div className="font-semibold text-mt-text">{addr.fullName}</div>
+              <div className="text-mt-muted">{addr.mobileNumber}</div>
               <div>{addr.completeAddress}</div>
-              {addr.landmark ? <div className="text-slate-600">Landmark: {addr.landmark}</div> : null}
-              <div className="text-slate-600">{addr.city}, {addr.state} - {addr.pincode}</div>
+              {addr.landmark ? <div className="text-mt-muted">Landmark: {addr.landmark}</div> : null}
+              <div className="text-mt-muted">{addr.city}, {addr.state} - {addr.pincode}</div>
             </div>
-          ) : <div className="mt-2 text-sm text-slate-500">No address saved yet.</div>}
+          ) : <div className="mt-2 text-sm text-mt-subtle">No address saved yet.</div>}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2 sm:flex-col">
-          <button onClick={onEdit} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 transition hover:bg-slate-50">Edit</button>
-          {addr?._id && !addr?.isDefault ? <button disabled={loading} onClick={onMakeDefault} className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60">Make default</button> : null}
+          <button onClick={onEdit} className="rounded-xl border border-mt-line bg-mt-surface px-3 py-2 text-xs font-semibold text-mt-text transition hover:bg-mt-tint/5">Edit</button>
+          {addr?._id && !addr?.isDefault ? <button disabled={loading} onClick={onMakeDefault} className="rounded-xl bg-mt-btn px-3 py-2 text-xs font-semibold text-mt-btn-text transition hover:bg-mt-btn-hover disabled:opacity-60">Make default</button> : null}
         </div>
       </div>
     </div>
   );
 }
 
-function PriceRow({ label, value, valueClassName = "font-medium text-slate-900" }) {
-  return <div className="flex items-center justify-between text-sm"><span className="text-slate-600">{label}</span><span className={valueClassName}>{value}</span></div>;
+function PriceRow({ label, value, valueClassName = "font-medium text-mt-text" }) {
+  return <div className="flex items-center justify-between text-sm"><span className="text-mt-muted">{label}</span><span className={valueClassName}>{value}</span></div>;
 }
 
 function SectionHeader({ eyebrow, title, description }) {
   return (
     <div>
-      <div className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">{eyebrow}</div>
-      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{title}</h2>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
+      <div className="text-xs font-semibold uppercase tracking-[0.26em] text-mt-subtle">{eyebrow}</div>
+      <h2 className="mt-2 text-2xl font-normal tracking-tight text-mt-text">{title}</h2>
+      <p className="mt-2 text-sm leading-6 text-mt-muted">{description}</p>
     </div>
   );
 }
@@ -130,19 +131,19 @@ function SectionHeader({ eyebrow, title, description }) {
 function CouponCelebration({ visible, code, discount }) {
   if (!visible) return null;
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-emerald-200 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.22),_transparent_35%),linear-gradient(135deg,_#ecfdf5,_#f8fafc_55%,_#ecfeff)] p-4 shadow-sm">
+    <div className="relative overflow-hidden rounded-2xl border border-mt-success/30 bg-mt-surface bg-[radial-gradient(circle_at_top_left,_rgba(48,209,88,0.12),_transparent_40%)] p-4 shadow-sm">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-6 top-4 h-2.5 w-2.5 animate-ping rounded-full bg-emerald-400/80" />
-        <div className="absolute right-10 top-8 h-2 w-2 animate-bounce rounded-full bg-sky-400/80" />
+        <div className="absolute left-6 top-4 h-2.5 w-2.5 animate-ping rounded-full bg-mt-tint/40" />
+        <div className="absolute right-10 top-8 h-2 w-2 animate-bounce rounded-full bg-mt-tint/25" />
       </div>
       <div className="relative flex items-start gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-200">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-mt-success text-white shadow-lg shadow-emerald-200">
           <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.13 7.13a1 1 0 01-1.414 0l-3.164-3.164a1 1 0 111.414-1.415l2.457 2.457 6.423-6.423a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
         </div>
         <div>
-          <div className="text-sm font-semibold uppercase tracking-[0.22em] text-emerald-700">Savings Unlocked</div>
-          <div className="mt-1 text-lg font-semibold text-slate-900">{code} is live on this checkout</div>
-          <p className="mt-1 text-sm text-slate-600">Discount applied: <span className="font-semibold text-emerald-700">Rs. {discount.toFixed(2)}</span></p>
+          <div className="text-sm font-semibold uppercase tracking-[0.22em] text-mt-success">Savings Unlocked</div>
+          <div className="mt-1 text-lg font-semibold text-mt-text">{code} is live on this checkout</div>
+          <p className="mt-1 text-sm text-mt-muted">Discount applied: <span className="font-semibold text-mt-success">Rs. {discount.toFixed(2)}</span></p>
         </div>
       </div>
     </div>
@@ -192,17 +193,17 @@ const formatCouponExpiry = (coupon) => {
 
 function AvailableCoupons({ coupons, loading, copiedCouponCode, onCopy }) {
   return (
-    <div className="w-full min-w-0 rounded-2xl border border-emerald-100 bg-[radial-gradient(circle_at_top_right,_rgba(16,185,129,0.18),_transparent_30%),linear-gradient(180deg,_#ffffff,_#f0fdf4)] p-4 shadow-sm sm:rounded-[24px] sm:p-5">
+    <div className="w-full min-w-0 rounded-2xl border border-mt-success/30 bg-mt-surface bg-[radial-gradient(circle_at_top_left,_rgba(48,209,88,0.12),_transparent_40%)] p-4 shadow-sm sm:rounded-[24px] sm:p-5">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700 sm:tracking-[0.26em]">
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-mt-success sm:tracking-[0.26em]">
             Eligible Coupons
           </div>
-          <h4 className="mt-1 text-lg font-semibold text-slate-900">
+          <h4 className="mt-1 text-lg font-semibold text-mt-text">
             Pick an offer for this checkout
           </h4>
         </div>
-        <div className="w-fit rounded-full bg-white px-3 py-1 text-xs font-semibold text-emerald-700 shadow-sm">
+        <div className="w-fit rounded-full bg-mt-surface px-3 py-1 text-xs font-semibold text-mt-success shadow-sm">
           {loading ? "Loading..." : `${coupons.length} eligible`}
         </div>
       </div>
@@ -210,32 +211,32 @@ function AvailableCoupons({ coupons, loading, copiedCouponCode, onCopy }) {
       {loading ? (
         <div className="space-y-3">
           {[0, 1].map((item) => (
-            <div key={item} className="animate-pulse rounded-2xl border border-white/80 bg-white/90 p-3">
-              <div className="h-3 w-24 rounded bg-slate-200" />
-              <div className="mt-3 h-4 w-40 rounded bg-slate-200" />
-              <div className="mt-2 h-3 w-full rounded bg-slate-100" />
+            <div key={item} className="animate-pulse rounded-2xl border border-mt-line bg-mt-surface p-3">
+              <div className="h-3 w-24 rounded bg-mt-line" />
+              <div className="mt-3 h-4 w-40 rounded bg-mt-line" />
+              <div className="mt-2 h-3 w-full rounded bg-mt-surface-raised" />
             </div>
           ))}
         </div>
       ) : coupons.length ? (
         <div className="space-y-3">
           {coupons.map((coupon) => (
-            <div key={coupon.code} className="rounded-2xl border border-emerald-200 bg-white p-3 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
+            <div key={coupon.code} className="rounded-2xl border border-mt-success/30 bg-mt-surface p-3 shadow-[0_10px_24px_rgba(15,23,42,0.06)]">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <div className="inline-flex max-w-full rounded-full bg-slate-900 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-white">
+                  <div className="inline-flex max-w-full rounded-full bg-mt-btn px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-mt-btn-text">
                     {coupon.code}
                   </div>
-                  <p className="mt-2 text-sm font-semibold text-slate-900">
+                  <p className="mt-2 text-sm font-semibold text-mt-text">
                     {formatCouponPrimaryText(coupon)}
                   </p>
                   {Number(coupon.discountApplied || 0) > 0 ? (
-                    <p className="mt-1 text-xs font-semibold text-emerald-700">
+                    <p className="mt-1 text-xs font-semibold text-mt-success">
                       Saves Rs. {Number(coupon.discountApplied || 0).toFixed(2)}
                     </p>
                   ) : null}
                   {coupon.description ? (
-                    <p className="mt-1 text-xs leading-5 text-slate-600">{coupon.description}</p>
+                    <p className="mt-1 text-xs leading-5 text-mt-muted">{coupon.description}</p>
                   ) : null}
                 </div>
                 <button
@@ -243,8 +244,8 @@ function AvailableCoupons({ coupons, loading, copiedCouponCode, onCopy }) {
                   onClick={() => onCopy(coupon.code)}
                   className={`w-fit shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${
                     copiedCouponCode === coupon.code
-                      ? "border-emerald-200 bg-emerald-100 text-emerald-700"
-                      : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
+                      ? "border-mt-success/30 bg-mt-success/10 text-mt-success"
+                      : "border-mt-line bg-mt-bg text-mt-muted hover:border-mt-text hover:bg-mt-tint/10"
                   }`}
                 >
                   {copiedCouponCode === coupon.code ? "Copied" : "Copy"}
@@ -252,12 +253,12 @@ function AvailableCoupons({ coupons, loading, copiedCouponCode, onCopy }) {
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {formatCouponMeta(coupon) ? (
-                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
+                  <span className="rounded-full bg-mt-success/10 px-2.5 py-1 text-[11px] font-medium text-mt-success">
                     {formatCouponMeta(coupon)}
                   </span>
                 ) : null}
                 {formatCouponExpiry(coupon) ? (
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                  <span className="rounded-full bg-mt-surface-raised px-2.5 py-1 text-[11px] font-medium text-mt-muted">
                     {formatCouponExpiry(coupon)}
                   </span>
                 ) : null}
@@ -266,7 +267,7 @@ function AvailableCoupons({ coupons, loading, copiedCouponCode, onCopy }) {
           ))}
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-500">
+        <div className="rounded-2xl border border-dashed border-mt-line bg-mt-surface px-4 py-4 text-sm text-mt-subtle">
           No eligible coupons for these cart items right now.
         </div>
       )}
@@ -311,7 +312,14 @@ export default function CheckoutAddresses() {
   const checkoutDisabled = !deliverySaved || !billingSaved || cartItems.length === 0;
   const effectiveSubtotal = Number(pricingPreview?.subtotal ?? cartSummary.subtotal ?? 0);
   const effectiveShipping = Number(pricingPreview?.shipping ?? 0);
-  const effectiveDiscount = Number(pricingPreview?.discount ?? couponState.discount ?? 0);
+  const cartOffers = useCartOffers(cartItems, { couponApplied: isCouponApplied });
+  const effectiveCouponDiscount = Number(pricingPreview?.couponDiscount ?? couponState.discount ?? 0);
+  // The server re-checks this offer when the order is placed.
+  const effectiveOfferDiscount = Number(
+    pricingPreview?.offerDiscount ??
+      Math.min(Number(cartOffers.discount || 0), Math.max(0, effectiveSubtotal - effectiveCouponDiscount))
+  );
+  const effectiveDiscount = effectiveCouponDiscount + effectiveOfferDiscount;
   const effectiveTotal = Number(pricingPreview?.total ?? Math.max(0, effectiveSubtotal + effectiveShipping - effectiveDiscount));
   const hasCustomizationItems = useMemo(
     () => cartItems.some((item) => item?.kind === "DESIGN" || Boolean(item?.product)),
@@ -341,10 +349,10 @@ export default function CheckoutAddresses() {
     const allowsCod = options.includes("COD");
     const allowsOnline = options.includes("ONLINE");
 
-    if (allowsCod && allowsOnline) return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    if (allowsCod) return "border-amber-200 bg-amber-50 text-amber-800";
-    if (allowsOnline) return "border-sky-200 bg-sky-50 text-sky-700";
-    return "border-rose-200 bg-rose-50 text-rose-700";
+    if (allowsCod && allowsOnline) return "border-mt-success/30 bg-mt-success/10 text-mt-success";
+    if (allowsCod) return "border-amber-400/30 bg-amber-400/10 text-mt-warning";
+    if (allowsOnline) return "border-mt-line bg-mt-tint/10 text-mt-text";
+    return "border-mt-danger/30 bg-mt-danger/10 text-mt-danger";
   };
   const codRestrictedItems = useMemo(
     () => cartItems.filter((item) => !getPaymentOptions(item).includes("COD")),
@@ -552,7 +560,7 @@ export default function CheckoutAddresses() {
       const subtotal = Number(data.subtotal || cartSummary.subtotal || 0);
       const discount = Number(data.discount || 0);
       setCouponState({ code: normalizedCouponCode, status: "applied", message: "Coupon applied", discount, coupon: data.coupon || null, subtotal });
-      setPricingPreview({ subtotal, shipping: 0, discount, total: Math.max(0, subtotal - discount), coupon: data.coupon || null });
+      setPricingPreview({ subtotal, shipping: 0, couponDiscount: discount, coupon: data.coupon || null });
       setShowCouponCelebration(true);
     } catch (validationError) {
       setCouponState({ ...emptyCouponState, code: normalizedCouponCode, status: "error", message: validationError.message || "Failed to validate coupon" });
@@ -598,7 +606,14 @@ export default function CheckoutAddresses() {
   const handleOrderCreated = (created) => {
     const pricing = created?.pricing;
     if (!pricing) return;
-    setPricingPreview({ subtotal: Number(pricing.subtotal || 0), shipping: Number(pricing.shipping || 0), discount: Number(pricing.discount || 0), total: Number(pricing.total || 0), coupon: pricing.coupon || null });
+    setPricingPreview({
+      subtotal: Number(pricing.subtotal || 0),
+      shipping: Number(pricing.shipping || 0),
+      couponDiscount: Number(pricing.couponDiscount ?? pricing.discount ?? 0),
+      offerDiscount: Number(pricing.offerDiscount || 0),
+      total: Number(pricing.total || 0),
+      coupon: pricing.coupon || null,
+    });
   };
 
   const handleOrderSuccess = ({ orderId, paymentLabel, totalAmount }) => {
@@ -675,43 +690,43 @@ export default function CheckoutAddresses() {
   const headerTitle = mode === "edit-delivery" ? "Edit Delivery Address" : mode === "edit-billing" ? "Edit Billing Address" : "Delivery & Billing Address";
 
   return (
-    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-slate-100">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)]">
       <div className="mx-auto w-full max-w-6xl px-3 py-4 sm:px-4 sm:py-6 md:px-6 lg:py-8">
         <div className="mb-4 flex min-w-0 flex-col gap-3 sm:mb-6 md:flex-row md:items-end md:justify-between">
           <div className="min-w-0">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:text-xs sm:tracking-[0.28em]">Checkout</div>
-            <h1 className="mt-1.5 text-xl font-semibold tracking-tight text-slate-900 sm:mt-2 sm:text-3xl">Review your order</h1>
-            <p className="mt-2 max-w-2xl text-xs leading-5 text-slate-600 sm:text-sm sm:leading-6">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mt-subtle sm:text-xs sm:tracking-[0.28em]">Checkout</div>
+            <h1 className="mt-1.5 text-xl font-normal tracking-tight text-mt-text sm:mt-2 sm:text-3xl">Review your order</h1>
+            <p className="mt-2 max-w-2xl text-xs leading-5 text-mt-muted sm:text-sm sm:leading-6">
               A cleaner checkout flow focused on shipping, payment, and final review.
             </p>
           </div>
           <button
             type="button"
             onClick={() => navigate("/cart")}
-            className="inline-flex w-full items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
+            className="inline-flex w-full items-center justify-center rounded-full border border-mt-line-strong bg-mt-surface px-4 py-2 text-sm font-semibold text-mt-muted transition hover:bg-mt-tint/5 sm:w-auto"
           >
             Back to cart
           </button>
         </div>
 
         {error ? (
-          <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <div className="mb-4 rounded-2xl border border-mt-danger/30 bg-mt-danger/10 px-4 py-3 text-sm text-mt-danger">
             {error}
           </div>
         ) : null}
         {success && message ? (
-          <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <div className="mb-4 rounded-2xl border border-mt-success/30 bg-mt-success/10 px-4 py-3 text-sm text-mt-success">
             {message}
           </div>
         ) : null}
 
-        <div className="mb-4 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-xs text-slate-600 sm:mb-6 sm:px-4 sm:text-sm">
+        <div className="mb-4 rounded-2xl border border-mt-line bg-mt-surface px-3 py-3 text-xs text-mt-muted sm:mb-6 sm:px-4 sm:text-sm">
           <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
-            <span><span className="font-semibold text-slate-900">1.</span> Shipping address</span>
-            <span className="hidden text-slate-300 sm:inline">|</span>
-            <span><span className="font-semibold text-slate-900">2.</span> Payment method</span>
-            <span className="hidden text-slate-300 sm:inline">|</span>
-            <span><span className="font-semibold text-slate-900">3.</span> Review and place order</span>
+            <span><span className="font-semibold text-mt-text">1.</span> Shipping address</span>
+            <span className="hidden text-mt-line-strong sm:inline">|</span>
+            <span><span className="font-semibold text-mt-text">2.</span> Payment method</span>
+            <span className="hidden text-mt-line-strong sm:inline">|</span>
+            <span><span className="font-semibold text-mt-text">3.</span> Review and place order</span>
           </div>
         </div>
 
@@ -734,34 +749,34 @@ export default function CheckoutAddresses() {
               />
             </div>
 
-            <div className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
-              <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 md:flex-row md:items-start md:justify-between">
+            <div className="w-full min-w-0 rounded-2xl border border-mt-line bg-mt-surface p-4 shadow-sm md:p-6">
+              <div className="flex flex-col gap-3 border-b border-mt-line pb-4 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Shipping details</h2>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <h2 className="text-lg font-normal text-mt-text">Shipping details</h2>
+                  <p className="mt-1 text-sm text-mt-muted">
                     Update your delivery and billing information before paying.
                   </p>
                 </div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:text-xs sm:tracking-[0.2em]">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mt-subtle sm:text-xs sm:tracking-[0.2em]">
                   {isEditing ? "Editing" : "Create / Save"}
                 </div>
               </div>
 
               <div className="mt-5 grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
-                <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50">
+                <div className="min-w-0 rounded-2xl border border-mt-line bg-mt-bg">
                   <button
                     type="button"
                     onClick={() => setOpenDeliverySection((prev) => !prev)}
                     className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
                   >
                     <div>
-                      <div className="text-sm font-semibold text-slate-900">Delivery address</div>
-                      <div className="mt-1 text-xs text-slate-500">Click to open or close</div>
+                      <div className="text-sm font-semibold text-mt-text">Delivery address</div>
+                      <div className="mt-1 text-xs text-mt-subtle">Click to open or close</div>
                     </div>
-                    <span className="shrink-0 text-slate-500">{openDeliverySection ? "-" : "+"}</span>
+                    <span className="shrink-0 text-mt-subtle">{openDeliverySection ? "-" : "+"}</span>
                   </button>
                   {openDeliverySection ? (
-                    <div className="border-t border-slate-200 bg-white p-4">
+                    <div className="border-t border-mt-line bg-mt-surface p-4">
                       <div className="space-y-4">
                         <Input label="Full Name" value={delivery.fullName} onChange={(value) => handleChange("delivery", "fullName", value)} placeholder="Full name" />
                         <Input label="Mobile Number" value={delivery.mobileNumber} onChange={(value) => handleChange("delivery", "mobileNumber", value)} placeholder="Mobile number" type="tel" />
@@ -777,21 +792,21 @@ export default function CheckoutAddresses() {
                   ) : null}
                 </div>
 
-                <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50">
+                <div className="min-w-0 rounded-2xl border border-mt-line bg-mt-bg">
                   <button
                     type="button"
                     onClick={() => setOpenBillingSection((prev) => !prev)}
                     className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left"
                   >
                     <div>
-                      <div className="text-sm font-semibold text-slate-900">Billing address</div>
-                      <div className="mt-1 text-xs text-slate-500">Click to open or close</div>
+                      <div className="text-sm font-semibold text-mt-text">Billing address</div>
+                      <div className="mt-1 text-xs text-mt-subtle">Click to open or close</div>
                     </div>
-                    <span className="shrink-0 text-slate-500">{openBillingSection ? "-" : "+"}</span>
+                    <span className="shrink-0 text-mt-subtle">{openBillingSection ? "-" : "+"}</span>
                   </button>
                   {openBillingSection ? (
-                    <div className="border-t border-slate-200 bg-white p-4">
-                      <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                    <div className="border-t border-mt-line bg-mt-surface p-4">
+                      <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-mt-line bg-mt-bg px-4 py-3 text-sm text-mt-muted">
                         <input
                           type="checkbox"
                           className="h-4 w-4"
@@ -812,7 +827,7 @@ export default function CheckoutAddresses() {
                         <Input label="State" value={billing.state} onChange={(value) => handleChange("billing", "state", value)} placeholder="State" />
                         <Input label="Landmark" value={billing.landmark} onChange={(value) => handleChange("billing", "landmark", value)} placeholder="Landmark (optional)" />
                       </div>
-                      <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                      <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm text-mt-muted">
                         <input
                           type="checkbox"
                           className="h-4 w-4"
@@ -826,8 +841,8 @@ export default function CheckoutAddresses() {
                 </div>
               </div>
 
-              <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-[10px] uppercase tracking-[0.12em] text-slate-500 sm:text-xs sm:tracking-[0.18em]">
+              <div className="mt-5 flex flex-col gap-3 border-t border-mt-line pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-[10px] uppercase tracking-[0.12em] text-mt-subtle sm:text-xs sm:tracking-[0.18em]">
                   {isEditing ? "Updating saved address" : "Save your address before payment"}
                 </div>
                 <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
@@ -836,7 +851,7 @@ export default function CheckoutAddresses() {
                       <button
                         type="button"
                         onClick={() => setMode("create")}
-                        className="w-full rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:w-auto"
+                        className="w-full rounded-full border border-mt-line-strong bg-mt-surface px-4 py-2.5 text-sm font-semibold text-mt-muted transition hover:bg-mt-tint/5 sm:w-auto"
                       >
                         Cancel
                       </button>
@@ -844,7 +859,7 @@ export default function CheckoutAddresses() {
                         type="button"
                         disabled={loading}
                         onClick={onUpdate}
-                        className="w-full rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60 sm:w-auto"
+                        className="w-full rounded-full bg-mt-btn px-5 py-2.5 text-sm font-semibold text-mt-btn-text transition hover:bg-mt-btn-hover disabled:opacity-60 sm:w-auto"
                       >
                         {loading ? "Updating..." : "Update address"}
                       </button>
@@ -854,7 +869,7 @@ export default function CheckoutAddresses() {
                       type="button"
                       disabled={loading}
                       onClick={onSave}
-                      className="w-full rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60 sm:w-auto"
+                      className="w-full rounded-full bg-mt-btn px-5 py-2.5 text-sm font-semibold text-mt-btn-text transition hover:bg-mt-btn-hover disabled:opacity-60 sm:w-auto"
                     >
                       {loading ? "Saving..." : "Save address"}
                     </button>
@@ -865,13 +880,13 @@ export default function CheckoutAddresses() {
           </div>
 
           <div className="min-w-0 space-y-4 sm:space-y-6 lg:sticky lg:top-6 lg:self-start">
-            <div className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-              <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
+            <div className="w-full min-w-0 rounded-2xl border border-mt-line bg-mt-surface p-4 shadow-sm sm:p-5">
+              <div className="flex items-center justify-between gap-3 border-b border-mt-line pb-4">
                 <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:text-xs sm:tracking-[0.24em]">Order summary</div>
-                  <h2 className="mt-1 text-lg font-semibold text-slate-900">Review items</h2>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mt-subtle sm:text-xs sm:tracking-[0.24em]">Order summary</div>
+                  <h2 className="mt-1 text-lg font-normal text-mt-text">Review items</h2>
                 </div>
-                <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                <div className="rounded-full bg-mt-surface-raised px-3 py-1 text-xs font-semibold text-mt-muted">
                   {cartItems.length} items
                 </div>
               </div>
@@ -889,16 +904,16 @@ export default function CheckoutAddresses() {
                   const price = Number(item?.unitPrice || 0) * qty;
                   const paymentOptions = getPaymentOptions(item);
                   return (
-                    <div key={`${item?._id || index}-${index}`} className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3 sm:px-4">
+                    <div key={`${item?._id || index}-${index}`} className="flex flex-col gap-2 rounded-xl border border-mt-line bg-mt-bg px-3 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3 sm:px-4">
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-medium text-slate-900">{name}</div>
-                        <div className="mt-1 text-xs text-slate-500">
+                        <div className="truncate text-sm font-medium text-mt-text">{name}</div>
+                        <div className="mt-1 text-xs text-mt-subtle">
                           Qty: {qty}{item?.size ? ` | Size: ${item.size}` : ""}
                         </div>
                         {item?.kind === "COMBO" && Array.isArray(item.comboSelections) && item.comboSelections.length > 0 && (
-                          <div className="mt-2 space-y-1 rounded-lg bg-white px-2 py-2">
+                          <div className="mt-2 space-y-1 rounded-lg bg-mt-surface px-2 py-2">
                             {item.comboSelections.map((selection, selectionIndex) => (
-                              <div key={`${selection.productId || selectionIndex}`} className="text-[11px] text-slate-600">
+                              <div key={`${selection.productId || selectionIndex}`} className="text-[11px] text-mt-muted">
                                 <span className="font-medium">{selection.productName || `Item ${selectionIndex + 1}`}</span>
                                 {selection.size ? ` | Size: ${selection.size}` : ""}
                                 {selection.color?.label || selection.color?.value
@@ -914,37 +929,49 @@ export default function CheckoutAddresses() {
                           </span>
                         </div>
                       </div>
-                      <div className="shrink-0 text-sm font-semibold text-slate-900 sm:text-right">
+                      <div className="shrink-0 text-sm font-semibold text-mt-text sm:text-right">
                         Rs. {price.toFixed(2)}
                       </div>
                     </div>
                   );
                 }) : (
-                  <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+                  <div className="rounded-xl border border-dashed border-mt-line px-4 py-8 text-center text-sm text-mt-subtle">
                     Your cart is empty.
                   </div>
                 )}
               </div>
 
-              <div className="mt-5 space-y-2 border-t border-slate-200 pt-4">
+              <div className="mt-5 space-y-2 border-t border-mt-line pt-4">
                 <PriceRow label="Subtotal" value={`Rs. ${effectiveSubtotal.toFixed(2)}`} />
                 <PriceRow label="Shipping" value={effectiveShipping === 0 ? "FREE" : `Rs. ${effectiveShipping.toFixed(2)}`} />
-                <PriceRow label="Coupon discount" value={effectiveDiscount > 0 ? `- Rs. ${effectiveDiscount.toFixed(2)}` : "Rs. 0.00"} valueClassName="font-semibold text-emerald-700" />
-                <div className="flex items-center justify-between border-t border-dashed border-slate-200 pt-3 text-base font-semibold text-slate-900">
+                {effectiveOfferDiscount > 0 ? (
+                  <PriceRow
+                    label={`Offer discount${cartOffers.applied?.name ? ` (${cartOffers.applied.name})` : ""}`}
+                    value={`- Rs. ${effectiveOfferDiscount.toFixed(2)}`}
+                    valueClassName="font-semibold text-mt-success"
+                  />
+                ) : null}
+                <PriceRow label="Coupon discount" value={effectiveCouponDiscount > 0 ? `- Rs. ${effectiveCouponDiscount.toFixed(2)}` : "Rs. 0.00"} valueClassName="font-semibold text-mt-success" />
+                {isCouponApplied && cartOffers.offers.some((offer) => offer.blockedByCoupon && offer.tiers.some((tier) => tier.unlocked)) ? (
+                  <p className="text-xs text-mt-warning">
+                    Some cart offers can't be combined with coupons. Remove the coupon to use them instead.
+                  </p>
+                ) : null}
+                <div className="flex items-center justify-between border-t border-dashed border-mt-line pt-3 text-base font-semibold text-mt-text">
                   <span>Total</span>
                   <span>Rs. {effectiveTotal.toFixed(2)}</span>
                 </div>
               </div>
             </div>
 
-            <div className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+            <div className="w-full min-w-0 rounded-2xl border border-mt-line bg-mt-surface p-4 shadow-sm sm:p-5">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:text-xs sm:tracking-[0.24em]">Coupon</div>
-                  <h3 className="mt-1 text-lg font-semibold text-slate-900">Apply code</h3>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mt-subtle sm:text-xs sm:tracking-[0.24em]">Coupon</div>
+                  <h3 className="mt-1 text-lg font-semibold text-mt-text">Apply code</h3>
                 </div>
                 {isCouponApplied ? (
-                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                  <span className="rounded-full bg-mt-success/10 px-3 py-1 text-xs font-semibold text-mt-success">
                     Applied
                   </span>
                 ) : null}
@@ -958,13 +985,13 @@ export default function CheckoutAddresses() {
                     if (couponState.status !== "idle") resetCouponFeedback();
                   }}
                   placeholder="Enter coupon code"
-                  className="min-w-0 flex-1 rounded-full border border-slate-300 bg-white px-4 py-3 text-sm font-medium uppercase tracking-[0.08em] text-slate-900 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200 sm:tracking-[0.18em]"
+                  className="min-w-0 flex-1 rounded-full border border-mt-line-strong bg-mt-surface px-4 py-3 text-sm font-medium uppercase tracking-[0.08em] text-mt-text outline-none focus:border-mt-text focus:ring-2 focus:ring-mt-line-strong sm:tracking-[0.18em]"
                 />
                 <button
                   type="button"
                   onClick={handleValidateCoupon}
                   disabled={!normalizedCouponCode || couponState.status === "validating"}
-                  className="rounded-full bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+                  className="rounded-full bg-mt-btn px-5 py-3 text-sm font-semibold text-mt-btn-text transition hover:bg-mt-btn-hover disabled:opacity-60"
                 >
                   {couponState.status === "validating" ? "Checking..." : "Apply"}
                 </button>
@@ -973,13 +1000,13 @@ export default function CheckoutAddresses() {
                 <button
                   type="button"
                   onClick={handleRemoveCoupon}
-                  className="mt-3 text-sm font-semibold text-slate-700 underline-offset-4 hover:underline"
+                  className="mt-3 text-sm font-semibold text-mt-muted underline-offset-4 hover:underline"
                 >
                   Remove coupon
                 </button>
               ) : null}
               {couponState.message && couponState.status !== "applied" ? (
-                <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                <div className="mt-4 rounded-xl border border-mt-danger/30 bg-mt-danger/10 px-4 py-3 text-sm text-mt-danger">
                   {couponState.message}
                 </div>
               ) : null}
@@ -995,23 +1022,23 @@ export default function CheckoutAddresses() {
             <CouponCelebration
               visible={showCouponCelebration}
               code={normalizedCouponCode}
-              discount={effectiveDiscount}
+              discount={effectiveCouponDiscount}
             />
 
-            <div className="w-full min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:text-xs sm:tracking-[0.24em]">Payment</div>
-              <h3 className="mt-1 text-lg font-semibold text-slate-900">Choose how to pay</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+            <div className="w-full min-w-0 rounded-2xl border border-mt-line bg-mt-surface p-4 shadow-sm sm:p-5">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mt-subtle sm:text-xs sm:tracking-[0.24em]">Payment</div>
+              <h3 className="mt-1 text-lg font-semibold text-mt-text">Choose how to pay</h3>
+              <p className="mt-2 text-sm leading-6 text-mt-muted">
                 Complete payment with Razorpay or place a cash on delivery order if it is available.
               </p>
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="flex items-center justify-between text-sm text-slate-600">
+              <div className="mt-4 rounded-xl border border-mt-line bg-mt-bg p-4">
+                <div className="flex items-center justify-between text-sm text-mt-muted">
                   <span>Payable total</span>
-                  <span className="text-base font-semibold text-slate-900">Rs. {effectiveTotal.toFixed(2)}</span>
+                  <span className="text-base font-semibold text-mt-text">Rs. {effectiveTotal.toFixed(2)}</span>
                 </div>
                 {isCouponApplied ? (
-                  <div className="mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                    {normalizedCouponCode} applied. You saved Rs. {effectiveDiscount.toFixed(2)}.
+                  <div className="mt-3 rounded-xl bg-mt-success/10 px-3 py-2 text-sm text-mt-success">
+                    {normalizedCouponCode} applied. You saved Rs. {effectiveCouponDiscount.toFixed(2)}.
                   </div>
                 ) : null}
               </div>
@@ -1044,28 +1071,28 @@ export default function CheckoutAddresses() {
                   type="button"
                   onClick={handleCashOnDelivery}
                   disabled={codDisabled}
-                  className="w-full rounded-full border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:opacity-60"
+                  className="w-full rounded-full border border-mt-line-strong bg-mt-surface px-4 py-3 text-sm font-semibold text-mt-text transition hover:bg-mt-tint/5 disabled:opacity-60"
                 >
                   {codLoading ? "Placing COD Order..." : "Place cash on delivery order"}
                 </button>
               </div>
 
               {codHelperMessage ? (
-                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <div className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-mt-warning">
                   {codHelperMessage}
                 </div>
               ) : null}
               {onlineHelperMessage ? (
-                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <div className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-mt-warning">
                   {onlineHelperMessage}
                 </div>
               ) : null}
               {codError ? (
-                <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-800">
+                <div className="mt-3 rounded-xl border border-mt-danger/30 bg-mt-danger/10 px-4 py-2 text-sm text-mt-danger">
                   {codError}
                 </div>
               ) : null}
-              <div className="mt-4 text-xs text-slate-500">
+              <div className="mt-4 text-xs text-mt-subtle">
                 Razorpay-secured checkout and server-verified totals.
               </div>
             </div>

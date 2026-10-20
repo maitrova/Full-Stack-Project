@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { ArrowRight } from "lucide-react";
 import { buildImageUrl } from "../utils/responsiveImage.js";
+import { SectionHeader, Skeleton } from "./ui/index.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://maitrova.in/backend/api";
 
@@ -15,41 +17,35 @@ const formatDate = (value) => {
 };
 
 const BlogCard = ({ blog }) => (
-  <article className="group relative w-[260px] min-w-[260px] overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_44px_-34px_rgba(15,23,42,0.22)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_46px_-30px_rgba(15,23,42,0.26)] sm:w-[312px] sm:min-w-[312px] sm:snap-start">
-    <Link to={`/blogs/${blog.slug}`} className="grid h-full">
-      <div className="aspect-[3/2] overflow-hidden bg-slate-100">
+  <article className="group w-[260px] min-w-[260px] font-brand sm:w-[312px] sm:min-w-[312px] sm:snap-start">
+    <Link to={`/blogs/${blog.slug}`} className="flex h-full flex-col overflow-hidden rounded-mt-card border border-mt-line bg-mt-surface transition-colors hover:border-mt-line-strong">
+      <div className="aspect-[3/2] overflow-hidden bg-mt-surface-raised">
         {blog.coverImage ? (
           <img
             src={buildImageUrl(blog.coverImage)}
             alt={blog.title}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+            loading="lazy"
           />
         ) : (
-          <div className="h-full w-full bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.12),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.14),_transparent_28%),linear-gradient(135deg,_#e2e8f0,_#f8fafc_45%,_#e2e8f0)]" />
+          <div className="h-full w-full bg-[linear-gradient(135deg,var(--mt-surface-raised),var(--mt-surface))]" />
         )}
       </div>
 
-      <div className="relative flex h-full flex-col justify-between px-4 pb-4 pt-4">
+      <div className="flex flex-1 flex-col justify-between px-4 pb-4 pt-4">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">
-            {blog.category}
-          </div>
-
-          <h3 className="mt-2 line-clamp-2 text-lg font-semibold leading-tight tracking-[-0.01em] text-slate-900">
+          <div className="text-[11px] uppercase tracking-[0.2em] text-mt-subtle">{blog.category}</div>
+          <h3 className="mt-2 line-clamp-2 text-base font-medium leading-snug text-mt-text sm:text-lg">
             {blog.title}
           </h3>
+          <p className="mt-2 line-clamp-2 text-[13px] leading-5 text-mt-muted">{blog.excerpt}</p>
         </div>
 
-        <p className="mt-2 line-clamp-2 text-[13px] leading-5 text-slate-600">
-          {blog.excerpt}
-        </p>
-
-        <div className="mt-3 flex items-center justify-between border-t border-slate-200/80 pt-3">
-          <div className="text-xs font-medium text-slate-500">
-            {formatDate(blog.publishedAt)}
-          </div>
-          <span className="text-sm font-semibold text-sky-700 transition group-hover:text-sky-800">
-            Read article
+        <div className="mt-4 flex items-center justify-between border-t border-mt-line pt-3">
+          <span className="text-xs text-mt-subtle">{formatDate(blog.publishedAt)}</span>
+          <span className="inline-flex items-center gap-1 text-sm text-mt-text">
+            Read
+            <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
           </span>
         </div>
       </div>
@@ -96,46 +92,27 @@ const HomeBlogsSection = () => {
   if (!loading && blogs.length === 0) return null;
 
   return (
-    <section className="relative overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_42%,#f8fafc_100%)] px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.16),transparent_38%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.12),transparent_34%)]" />
+    <section className="mx-auto max-w-7xl px-4 pt-10 sm:px-6 sm:pt-14">
+      <SectionHeader title="From the journal" eyebrow="Blog" className="mb-3 sm:mb-5" />
 
-      <div className="relative mx-auto max-w-7xl">
-        <div className="mb-2">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-700">Blog</p>
-            <h2 className="mt-0.5 text-lg font-semibold text-slate-900 sm:text-xl">Latest from the blog</h2>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="flex gap-4 overflow-hidden">
-            {[0, 1, 2].map((item) => (
-              <div
-                key={item}
-                className="w-[260px] min-w-[260px] overflow-hidden rounded-[24px] border border-slate-200/70 bg-white p-4 shadow-[0_18px_44px_-34px_rgba(15,23,42,0.22)] sm:w-[312px] sm:min-w-[312px]"
-              >
-                <div className="aspect-[3/2] animate-pulse rounded-[18px] bg-slate-200" />
-                <div className="mt-4 h-3 w-24 animate-pulse rounded bg-slate-200" />
-                <div className="mt-3 h-7 w-4/5 animate-pulse rounded bg-slate-200" />
-                <div className="mt-3 h-12 animate-pulse rounded bg-slate-100" />
-                <div className="mt-3 h-8 animate-pulse rounded bg-slate-100" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="relative">
-            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-[#f8fafc] to-transparent" />
-            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-[#f8fafc] to-transparent" />
-            <div
-              className="flex touch-auto gap-4 overflow-x-auto overscroll-x-contain pb-3 sm:snap-x sm:snap-mandatory"
-            >
-              {blogs.map((blog) => (
-                <BlogCard key={blog._id} blog={blog} />
-              ))}
+      {loading ? (
+        <div className="flex gap-3 overflow-hidden">
+          {[0, 1, 2].map((item) => (
+            <div key={item} className="w-[260px] min-w-[260px] sm:w-[312px] sm:min-w-[312px]">
+              <Skeleton className="aspect-[3/2] w-full" />
+              <Skeleton className="mt-4 h-3 w-24" />
+              <Skeleton className="mt-3 h-6 w-4/5" />
+              <Skeleton className="mt-3 h-10 w-full" />
             </div>
-          </div>
-        )}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex touch-auto gap-3 overflow-x-auto overscroll-x-contain pb-2 sm:snap-x sm:snap-mandatory" style={{ scrollbarWidth: "none" }}>
+          {blogs.map((blog) => (
+            <BlogCard key={blog._id} blog={blog} />
+          ))}
+        </div>
+      )}
     </section>
   );
 };

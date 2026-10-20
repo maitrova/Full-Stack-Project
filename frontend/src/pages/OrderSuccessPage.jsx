@@ -49,11 +49,11 @@ export default function OrderSuccessPage() {
   if (!successPayload) return null;
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,_#eefdf5_0%,_#f8fafc_28%,_#ffffff_100%)] px-4 py-10 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)] px-4 py-10 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-3xl">
-        <div className="overflow-hidden rounded-[32px] border border-emerald-200 bg-white shadow-[0_40px_120px_-48px_rgba(15,23,42,0.45)]">
-          <div className="bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_36%),linear-gradient(135deg,_#ecfdf5,_#f8fafc,_#ffffff)] px-8 py-10 sm:px-10">
-            <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-600 text-white shadow-lg shadow-emerald-200">
+        <div className="overflow-hidden rounded-[32px] border border-mt-success/30 bg-mt-surface shadow-[0_40px_120px_-48px_rgba(15,23,42,0.45)]">
+          <div className="bg-mt-surface bg-[radial-gradient(circle_at_top_left,_rgba(48,209,88,0.12),_transparent_40%)] px-8 py-10 sm:px-10">
+            <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-mt-success text-white shadow-lg shadow-emerald-200">
               <svg className="h-8 w-8" viewBox="0 0 20 20" fill="currentColor">
                 <path
                   fillRule="evenodd"
@@ -63,41 +63,41 @@ export default function OrderSuccessPage() {
               </svg>
             </div>
 
-            <div className="mt-6 text-xs font-semibold uppercase tracking-[0.26em] text-emerald-700">
+            <div className="mt-6 text-xs font-semibold uppercase tracking-[0.26em] text-mt-success">
               Thank You
             </div>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+            <h1 className="mt-2 text-3xl font-normal tracking-tight text-mt-text sm:text-4xl">
               Your order has been placed successfully
             </h1>
-            <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
+            <p className="mt-3 text-sm leading-7 text-mt-muted sm:text-base">
               {successPayload.paymentLabel} has been recorded and your order is now confirmed.
             </p>
 
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-white px-4 py-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Order Reference</div>
-              <div className="mt-2 break-all text-sm font-semibold text-slate-900">{successPayload.orderId}</div>
+            <div className="mt-6 rounded-2xl border border-mt-line bg-mt-surface px-4 py-4">
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-mt-subtle">Order Reference</div>
+              <div className="mt-2 break-all text-sm font-semibold text-mt-text">{successPayload.orderId}</div>
             </div>
 
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-4">
+            <div className="mt-4 rounded-2xl border border-mt-line bg-mt-surface px-4 py-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Order Total</div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-mt-subtle">Order Total</div>
                   <div
                     id="purchase-total-amount"
                     data-meta-price={Number(successPayload.totalAmount || 0).toFixed(2)}
                     data-meta-currency="INR"
                     aria-label={`Order total Rs. ${Number(successPayload.totalAmount || 0).toFixed(2)}`}
-                    className="mt-2 text-lg font-semibold text-slate-900"
+                    className="mt-2 text-lg font-semibold text-mt-text"
                   >
                     Rs. {Number(successPayload.totalAmount || 0).toFixed(2)}
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Items</div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-mt-subtle">Items</div>
                   <div
                     id="purchase-total-items"
                     data-meta-item-count={Number(successPayload.itemCount || 0)}
-                    className="mt-2 text-lg font-semibold text-slate-900"
+                    className="mt-2 text-lg font-semibold text-mt-text"
                   >
                     {Number(successPayload.itemCount || 0)}
                   </div>
@@ -106,8 +106,8 @@ export default function OrderSuccessPage() {
             </div>
 
             {Array.isArray(successPayload.items) && successPayload.items.length > 0 ? (
-              <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Order Details</div>
+              <div className="mt-4 rounded-2xl border border-mt-line bg-mt-surface px-4 py-4">
+                <div className="text-xs font-semibold uppercase tracking-[0.22em] text-mt-subtle">Order Details</div>
                 <div className="mt-3 space-y-3">
                   {successPayload.items.map((item, index) => (
                     <div
@@ -117,11 +117,11 @@ export default function OrderSuccessPage() {
                       data-meta-product-name={item.name || "Product"}
                       data-meta-quantity={Number(item.quantity || 1)}
                       data-meta-item-price={Number(item.item_price || 0).toFixed(2)}
-                      className="flex items-start justify-between gap-4 border-b border-slate-100 pb-3 last:border-b-0 last:pb-0"
+                      className="flex items-start justify-between gap-4 border-b border-mt-line pb-3 last:border-b-0 last:pb-0"
                     >
                       <div>
-                        <div className="text-sm font-semibold text-slate-900">{item.name || "Product"}</div>
-                        <div className="mt-1 text-xs text-slate-500">
+                        <div className="text-sm font-semibold text-mt-text">{item.name || "Product"}</div>
+                        <div className="mt-1 text-xs text-mt-subtle">
                           Qty: {Number(item.quantity || 1)}
                           {item.size ? ` • Size: ${item.size}` : ""}
                         </div>
@@ -129,7 +129,7 @@ export default function OrderSuccessPage() {
                       <div
                         id={`purchase-item-price-${index + 1}`}
                         aria-label={`${item.name || "Product"} price Rs. ${Number(item.item_price || 0).toFixed(2)}`}
-                        className="text-sm font-semibold text-slate-900"
+                        className="text-sm font-semibold text-mt-text"
                       >
                         Rs. {Number(item.item_price || 0).toFixed(2)}
                       </div>
@@ -143,13 +143,13 @@ export default function OrderSuccessPage() {
               <Link
                 to="/orders"
                 replace
-                className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                className="inline-flex items-center justify-center rounded-2xl bg-mt-btn px-6 py-3 text-sm font-semibold text-mt-btn-text transition hover:bg-mt-btn-hover"
               >
                 View Orders
               </Link>
               <Link
                 to="/"
-                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+                className="inline-flex items-center justify-center rounded-2xl border border-mt-line bg-mt-surface px-6 py-3 text-sm font-semibold text-mt-text transition hover:bg-mt-tint/5"
               >
                 Continue Shopping
               </Link>

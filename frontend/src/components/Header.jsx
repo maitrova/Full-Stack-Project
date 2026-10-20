@@ -14,6 +14,8 @@ import {
   selectCartLoading,
 } from '../redux/slices/Cartslice.js';
 import { trackSearch } from '../utils/analytics.js';
+import { Clock, Menu, Search, ShoppingBag, Trash2, User, X } from 'lucide-react';
+import { Button, Wordmark, cx } from './ui/index.js';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://maitrova.in/backend/api';
 const DEFAULT_BANNER_MESSAGES = [
@@ -29,8 +31,6 @@ const socialLinks = [
     key: 'whatsapp',
     label: 'WhatsApp',
     href: 'https://wa.me/919390319652',
-    desktopClass: 'border-emerald-100 bg-emerald-50/80 text-emerald-600 hover:border-emerald-200 hover:bg-emerald-100/80 hover:text-emerald-700',
-    mobileIconClass: 'bg-emerald-100 text-emerald-600',
     icon: (
       <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.67-1.612-.916-2.207-.242-.579-.487-.5-.67-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.76.982.999-3.675-.236-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.897 6.994c-.004 5.45-4.438 9.88-9.888 9.88" />
@@ -41,8 +41,6 @@ const socialLinks = [
     key: 'instagram',
     label: 'Instagram',
     href: 'https://instagram.com/maitrova',
-    desktopClass: 'border-fuchsia-100 bg-fuchsia-50/80 text-fuchsia-600 hover:border-fuchsia-200 hover:bg-fuchsia-100/80 hover:text-fuchsia-700',
-    mobileIconClass: 'bg-fuchsia-100 text-fuchsia-600',
     icon: (
       <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
         <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0 3.675A6.163 6.163 0 1012 18a6.163 6.163 0 000-12.325zm0 10.162A4 4 0 1112 8a4 4 0 010 8zm6.406-11.845a1.44 1.44 0 101.441 1.44 1.441 1.441 0 00-1.441-1.44z" />
@@ -53,8 +51,6 @@ const socialLinks = [
     key: 'facebook',
     label: 'Facebook',
     href: 'https://www.facebook.com/share/1L82BUXkL1/?mibextid=wwXIfr',
-    desktopClass: 'border-sky-100 bg-sky-50/80 text-sky-600 hover:border-sky-200 hover:bg-sky-100/80 hover:text-sky-700',
-    mobileIconClass: 'bg-sky-100 text-sky-600',
     icon: (
       <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
         <path d="M24 12.073C24 5.446 18.627.073 12 .073S0 5.446 0 12.073c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
@@ -64,8 +60,10 @@ const socialLinks = [
 ];
 
 const navItems = [
+  { path: '/', label: 'Home' },
+  { path: '/customproducts', label: 'Customization' },
   { path: '/products', label: 'Products' },
-  { path: '/customproducts', label: 'Custom Design' },
+  { path: '/combo-packs', label: 'Combo Packs' },
 ];
 
 const userMenuItems = [
@@ -101,7 +99,7 @@ const getCartItemTitle = (item) =>
   'Product';
 
 const SocialMediaIcons = ({ mobile = false }) => (
-  <div className={`flex items-center ${mobile ? 'flex-wrap gap-2.5' : 'gap-2'}`}>
+  <div className={`flex items-center ${mobile ? 'flex-wrap gap-2' : 'gap-1'}`}>
     {socialLinks.map((item) => (
       <a
         key={item.key}
@@ -112,22 +110,19 @@ const SocialMediaIcons = ({ mobile = false }) => (
         aria-label={item.label}
         className={
           mobile
-            ? 'inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50'
-            : `inline-flex h-9 w-9 items-center justify-center rounded-full border shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${item.desktopClass}`
+            ? 'inline-flex h-11 items-center gap-2 rounded-mt-btn border border-mt-line px-3 text-sm text-mt-muted transition-colors hover:border-mt-line-strong hover:text-mt-text'
+            : 'inline-flex h-9 w-9 items-center justify-center rounded-full text-mt-subtle transition-colors hover:bg-mt-tint/10 hover:text-mt-text'
         }
       >
-        {mobile ? (
-          <>
-            <span className={`inline-flex h-8 w-8 items-center justify-center rounded-full ${item.mobileIconClass}`}>{item.icon}</span>
-            <span>{item.label}</span>
-          </>
-        ) : (
-          item.icon
-        )}
+        {item.icon}
+        {mobile && <span>{item.label}</span>}
       </a>
     ))}
   </div>
 );
+
+const iconButtonClasses =
+  'relative inline-flex h-11 w-11 items-center justify-center rounded-full text-mt-text transition-colors hover:bg-mt-tint/10 focus-visible:outline-2 focus-visible:outline-mt-text';
 
 const Header = () => {
   const [showDropdown, setShowDropdown] = useState(false);
@@ -349,19 +344,16 @@ const Header = () => {
   const renderSearchBox = ({ mobile = false } = {}) => (
     <div
       ref={mobile ? mobileSearchRef : desktopSearchRef}
-      className={mobile ? 'relative w-full' : 'relative w-52 xl:w-72'}
+      className={mobile ? 'relative w-full' : 'relative w-56 xl:w-72'}
     >
       <form
         onSubmit={handleSearchSubmit}
-        className={`flex items-center gap-2 border bg-white shadow-sm transition focus-within:border-slate-400 ${
-          mobile
-            ? 'rounded-2xl border-slate-200 p-2'
-            : 'h-9 rounded-xl border-slate-200 px-3'
+        role="search"
+        className={`flex items-center gap-2 rounded-mt-btn border border-mt-line bg-mt-surface transition-colors focus-within:border-mt-text ${
+          mobile ? 'h-12 pl-3 pr-1.5' : 'h-10 px-3'
         }`}
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.1} d="m21 21-4.35-4.35M10.75 18a7.25 7.25 0 1 1 0-14.5 7.25 7.25 0 0 1 0 14.5z" />
-        </svg>
+        <Search className="h-4 w-4 shrink-0 text-mt-subtle" aria-hidden="true" />
         <input
           type="text"
           inputMode="search"
@@ -371,8 +363,8 @@ const Header = () => {
             setSearchQuery(event.target.value);
             setIsSearchFocused(true);
           }}
-          placeholder={mobile ? 'Search products' : 'Search products'}
-          className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold text-slate-900 outline-none placeholder:text-slate-500"
+          placeholder="Search products"
+          className="min-w-0 flex-1 bg-transparent text-sm text-mt-text outline-none placeholder:text-mt-subtle"
           aria-label="Search products"
           autoFocus={mobile}
         />
@@ -383,33 +375,28 @@ const Header = () => {
               setSearchQuery('');
               setIsSearchFocused(true);
             }}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-mt-subtle transition-colors hover:bg-mt-tint/10 hover:text-mt-text"
             aria-label="Clear search"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.25} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X className="h-4 w-4" aria-hidden="true" />
           </button>
         )}
         {mobile && (
-          <button
-            type="submit"
-            className="h-8 shrink-0 rounded-xl bg-slate-900 px-3 text-xs font-semibold text-white transition hover:bg-slate-800"
-          >
+          <Button type="submit" size="sm" className="h-9 px-4">
             Go
-          </button>
+          </Button>
         )}
       </form>
 
       {shouldShowSearchDropdown && (
         <div
-          className={`absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_60px_-30px_rgba(15,23,42,0.45)] ${
+          className={`absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-mt-card border border-mt-line bg-mt-surface shadow-2xl shadow-mt-tint/10 ${
             mobile ? '' : 'min-w-80'
           }`}
         >
           {searchQuery.trim() ? (
-            <div className="p-2">
-              <p className="px-3 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+            <div className="p-1.5">
+              <p className="px-3 pb-1.5 pt-2 text-[11px] uppercase tracking-[0.2em] text-mt-subtle">
                 Suggestions
               </p>
               {searchSuggestions.map((item) => (
@@ -418,55 +405,43 @@ const Header = () => {
                   type="button"
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => runSearch(item.label)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-slate-50"
+                  className="flex w-full items-center gap-3 rounded-mt-btn px-3 py-2.5 text-left transition-colors hover:bg-mt-tint/5"
                 >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.1} d="m21 21-4.35-4.35M10.75 18a7.25 7.25 0 1 1 0-14.5 7.25 7.25 0 0 1 0 14.5z" />
-                    </svg>
-                  </span>
+                  <Search className="h-4 w-4 shrink-0 text-mt-subtle" aria-hidden="true" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-slate-800">{item.label}</span>
-                    <span className="block text-xs text-slate-500">{item.meta}</span>
+                    <span className="block truncate text-sm text-mt-text">{item.label}</span>
+                    <span className="block text-xs text-mt-subtle">{item.meta}</span>
                   </span>
                 </button>
               ))}
             </div>
           ) : (
-            <div className="p-2">
-              <div className="flex items-center justify-between px-3 pb-2 pt-1">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                  Recent Searches
-                </p>
-              </div>
+            <div className="p-1.5">
+              <p className="px-3 pb-1.5 pt-2 text-[11px] uppercase tracking-[0.2em] text-mt-subtle">
+                Recent searches
+              </p>
               {recentSearches.map((item) => (
                 <div
                   key={item}
-                  className="flex items-center gap-2 rounded-xl px-3 py-2 transition hover:bg-slate-50"
+                  className="flex items-center gap-1 rounded-mt-btn pl-3 transition-colors hover:bg-mt-tint/5"
                 >
                   <button
                     type="button"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => runSearch(item)}
-                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                    className="flex min-w-0 flex-1 items-center gap-3 py-2.5 text-left"
                   >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m5-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
-                      </svg>
-                    </span>
-                    <span className="truncate text-sm font-semibold text-slate-800">{item}</span>
+                    <Clock className="h-4 w-4 shrink-0 text-mt-subtle" aria-hidden="true" />
+                    <span className="truncate text-sm text-mt-text">{item}</span>
                   </button>
                   <button
                     type="button"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => deleteRecentSearch(item)}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-mt-subtle transition-colors hover:bg-mt-tint/10 hover:text-mt-danger"
                     aria-label={`Delete ${item} from recent searches`}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 7h12m-9 0V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7m-7 0 .7 12A2 2 0 0 0 10.7 21h2.6a2 2 0 0 0 2-1.9L16 7" />
-                    </svg>
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </div>
               ))}
@@ -480,19 +455,13 @@ const Header = () => {
   const CartIcon = () => (
     <Link
       to="/cart"
-      className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 hover:shadow-md"
+      className={iconButtonClasses}
+      aria-label={cartItemCount > 0 ? `Cart, ${cartItemCount} items` : 'Cart'}
       onClick={() => setIsMobileMenuOpen(false)}
     >
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={1.8}
-          d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-        />
-      </svg>
+      <ShoppingBag className="h-[22px] w-[22px]" strokeWidth={1.6} aria-hidden="true" />
       {cartItemCount > 0 && (
-        <span className="absolute -right-1.5 -top-1.5 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-slate-900 px-1 text-[10px] font-semibold text-white">
+        <span className="absolute right-1 top-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-mt-btn px-1 text-[10px] font-semibold text-mt-btn-text">
           {cartItemCount > 9 ? '9+' : cartItemCount}
         </span>
       )}
@@ -500,81 +469,78 @@ const Header = () => {
   );
 
   const CartDropdown = () => (
-    <div className="absolute right-0 mt-4 w-80 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_34px_80px_-42px_rgba(15,23,42,0.45)]">
-      <div className="border-b border-slate-100 bg-[linear-gradient(135deg,_#f8fafc,_#eef2ff)] px-5 py-4">
-        <div className="flex items-center justify-between">
+    <div className="absolute right-0 top-full z-50 w-80 pt-2">
+      <div className="overflow-hidden rounded-mt-card border border-mt-line bg-mt-surface shadow-2xl shadow-mt-tint/10">
+        <div className="flex items-center justify-between border-b border-mt-line px-5 py-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Shopping Cart</p>
-            <h3 className="mt-1 text-sm font-semibold text-slate-900">{cartItemCount ? `${cartItemCount} item${cartItemCount > 1 ? 's' : ''}` : 'No items yet'}</h3>
+            <p className="text-[11px] uppercase tracking-[0.2em] text-mt-subtle">Shopping cart</p>
+            <h3 className="mt-1 text-sm font-medium text-mt-text">
+              {cartItemCount ? `${cartItemCount} item${cartItemCount > 1 ? 's' : ''}` : 'No items yet'}
+            </h3>
           </div>
-          <Link to="/cart" className="text-xs font-semibold text-slate-600 transition hover:text-slate-900" onClick={() => setShowDropdown(false)}>
+          <Link
+            to="/cart"
+            className="text-xs text-mt-muted transition-colors hover:text-mt-text"
+            onClick={() => setShowDropdown(false)}
+          >
             Open cart
           </Link>
         </div>
-      </div>
 
-      <div className="max-h-96 overflow-y-auto p-4">
-        {cartLoading ? (
-          <div className="py-8 text-center text-sm text-slate-500">Loading cart...</div>
-        ) : cart?.items?.length ? (
-          <div className="space-y-3">
-            {cart.items.slice(0, 3).map((item) => {
-              const imageSrc = getCartItemImage(item);
-              const itemTitle = getCartItemTitle(item);
+        <div className="max-h-96 overflow-y-auto p-4">
+          {cartLoading ? (
+            <div className="py-8 text-center text-sm text-mt-muted">Loading cart...</div>
+          ) : cart?.items?.length ? (
+            <div className="space-y-3">
+              {cart.items.slice(0, 3).map((item) => {
+                const imageSrc = getCartItemImage(item);
+                const itemTitle = getCartItemTitle(item);
 
-              return (
-              <div key={item._id} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-3">
-                <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white">
-                  {imageSrc ? (
-                    <img
-                      src={imageSrc}
-                      alt={itemTitle}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-xs text-slate-400">Item</span>
-                  )}
+                return (
+                  <div key={item._id} className="flex items-center gap-3">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-mt-btn bg-mt-surface-raised">
+                      {imageSrc ? (
+                        <img src={imageSrc} alt={itemTitle} className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-xs text-mt-subtle">Item</span>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm text-mt-text">{itemTitle}</p>
+                      <p className="mt-1 text-xs text-mt-subtle">
+                        Qty {item.qty} | {formatCurrency(item.unitPrice)}
+                      </p>
+                    </div>
+                    <div className="text-sm text-mt-text">
+                      {formatCurrency((item.unitPrice || 0) * (item.qty || 0))}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {cart.items.length > 3 && (
+                <p className="text-center text-xs text-mt-subtle">+{cart.items.length - 3} more items</p>
+              )}
+
+              <div className="border-t border-mt-line pt-4">
+                <div className="mb-3 flex items-center justify-between text-sm">
+                  <span className="text-mt-muted">Subtotal</span>
+                  <span className="font-medium text-mt-text">{formatCurrency(cartSubtotal)}</span>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-slate-800">{itemTitle}</p>
-                  <p className="mt-1 text-xs text-slate-500">Qty {item.qty} | {formatCurrency(item.unitPrice)}</p>
-                </div>
-                <div className="text-sm font-semibold text-slate-900">
-                  {formatCurrency((item.unitPrice || 0) * (item.qty || 0))}
-                </div>
+                <Button to="/checkout" fullWidth arrow onClick={() => setShowDropdown(false)}>
+                  Proceed to checkout
+                </Button>
               </div>
-            )})}
-
-            {cart.items.length > 3 && (
-              <p className="text-center text-xs font-medium text-slate-500">+{cart.items.length - 3} more items</p>
-            )}
-
-            <div className="border-t border-slate-200 pt-4">
-              <div className="mb-3 flex items-center justify-between text-sm">
-                <span className="text-slate-500">Subtotal</span>
-                <span className="font-semibold text-slate-900">{formatCurrency(cartSubtotal)}</span>
-              </div>
-              <Link
-                to="/checkout"
-                className="block rounded-2xl bg-slate-900 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-slate-800"
-                onClick={() => setShowDropdown(false)}
-              >
-                Proceed to Checkout
-              </Link>
             </div>
-          </div>
-        ) : (
-          <div className="py-8 text-center">
-            <p className="mb-4 text-sm text-slate-500">Your cart is empty</p>
-            <Link
-              to="/products"
-              className="inline-flex rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
-              onClick={() => setShowDropdown(false)}
-            >
-              Start Shopping
-            </Link>
-          </div>
-        )}
+          ) : (
+            <div className="py-8 text-center">
+              <p className="mb-4 text-sm text-mt-muted">Your cart is empty</p>
+              <Button to="/products" arrow onClick={() => setShowDropdown(false)}>
+                Start shopping
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -582,24 +548,21 @@ const Header = () => {
   const UserProfile = () => (
     <Link
       to="/profile"
-      className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2 py-1.5 pr-3 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
+      className="flex h-11 items-center gap-2 rounded-full pl-1 pr-3 text-sm text-mt-text transition-colors hover:bg-mt-tint/10"
     >
-      <div className="relative">
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[linear-gradient(135deg,_#0f172a,_#334155)] text-sm font-semibold text-white">
-          {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
-        </div>
-        <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500" />
-      </div>
-      <div className="hidden lg:block">
-        <p className="text-[13px] font-semibold text-slate-800">{user?.name?.split(' ')[0] || 'User'}</p>
-      </div>
+      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-mt-surface-raised text-xs font-medium text-mt-text">
+        {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
+      </span>
+      <span className="hidden xl:inline">{user?.name?.split(' ')[0] || 'User'}</span>
     </Link>
   );
 
+  const isHome = location.pathname === '/';
+
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200/70 bg-[rgba(248,250,252,0.9)] shadow-[0_8px_28px_-24px_rgba(15,23,42,0.35)] backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-mt-line bg-mt-header font-brand text-mt-text">
       {bannerItems.length > 0 && (
-        <div className="overflow-hidden border-b border-slate-200/80 bg-[linear-gradient(90deg,_#eff6ff,_#f8fafc,_#fff7ed)] py-1.5">
+        <div className="overflow-hidden border-b border-mt-line py-2">
           <style>{`
             @keyframes headerBannerMarquee {
               0% { transform: translate3d(0, 0, 0); }
@@ -607,16 +570,16 @@ const Header = () => {
             }
           `}</style>
           <div className="relative">
-            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-slate-50 via-slate-50/90 to-transparent" />
-            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-orange-50 via-orange-50/80 to-transparent" />
-            <div className="flex w-max min-w-full items-center gap-3 whitespace-nowrap px-4 text-[12px] font-medium text-slate-600 motion-reduce:animate-none [animation:headerBannerMarquee_24s_linear_infinite]">
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-mt-header to-transparent" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-mt-header to-transparent" />
+            <div className="flex w-max min-w-full items-center gap-8 whitespace-nowrap px-4 text-[11px] uppercase tracking-[0.2em] text-mt-muted motion-reduce:animate-none [animation:headerBannerMarquee_24s_linear_infinite]">
               {marqueeBannerItems.map((item, index) => (
                 <span
                   key={`${item.key}-${index}`}
                   className={
                     item.type === 'coupon'
-                      ? 'rounded-full border border-amber-200 bg-amber-50/90 px-3 py-1 font-semibold uppercase tracking-[0.12em] text-amber-700 shadow-sm'
-                      : 'rounded-full border border-sky-100 bg-white/90 px-3 py-1 text-sky-700 shadow-sm'
+                      ? 'rounded-mt-btn border border-mt-line-strong px-2.5 py-0.5 text-mt-text'
+                      : ''
                   }
                 >
                   {item.label}
@@ -627,261 +590,218 @@ const Header = () => {
         </div>
       )}
 
-      <div className="container mx-auto px-2 py-1 sm:px-3">
-        <div className="relative overflow-visible rounded-2xl border border-white/80 bg-white/95 px-2 py-1.5 shadow-[0_18px_48px_-34px_rgba(15,23,42,0.45)] md:px-3">
-          <div className="absolute inset-0 rounded-2xl bg-[linear-gradient(135deg,_rgba(37,99,235,0.04),_transparent_38%,_rgba(249,115,22,0.05))]" />
-          <div className="relative flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 sm:gap-4">
-              <button
-                className="rounded-2xl border border-slate-200 bg-white p-2.5 text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-md md:hidden"
-                onClick={() => setIsMobileMenuOpen((open) => !open)}
-                aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  {isMobileMenuOpen ? (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.25} d="M6 18L18 6M6 6l12 12" />
-                  ) : (
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.25} d="M4 6h16M4 12h16M4 18h16" />
-                  )}
-                </svg>
-              </button>
+      <div className="mx-auto max-w-7xl px-2 sm:px-6">
+        <div className="flex h-14 items-center justify-between gap-3 sm:h-16">
+          <div className="flex items-center pl-2 sm:pl-0">
+            <Wordmark />
+          </div>
 
-              <Link to="/" className="group flex items-center gap-2.5">
-                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-white/80 bg-white shadow-sm transition group-hover:-translate-y-0.5 group-hover:shadow-md">
-                  <img
-                    src="/logo/logo.jpeg"
-                    alt="MAITROVA"
-                    className="h-full w-full object-cover"
-                    onError={(event) => {
-                      event.target.onerror = null;
-                      event.target.style.display = 'none';
-                      const fallbackNode = document.createElement('span');
-                      fallbackNode.className = 'text-sm font-bold text-slate-800';
-                      fallbackNode.textContent = 'M';
-                      event.target.parentElement.appendChild(fallbackNode);
-                    }}
-                  />
-                </div>
-                <div className="hidden sm:block">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">Maitrova</p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-[13px] font-semibold leading-tight text-slate-900">Premium custom wear</p>
-                    <span className="hidden rounded-full border border-orange-100 bg-orange-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-orange-700 xl:inline-flex">
-                      Fresh drops
-                    </span>
-                  </div>
-                </div>
-              </Link>
-              <nav className="flex items-center gap-1.5 md:hidden">
-                {navItems.map((item) => {
-                  const isActive = isRouteActive(item.path);
-                  return (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      className={`flex h-8 items-center justify-center rounded-xl border px-2 text-center text-[11px] font-semibold leading-none transition ${
-                        isActive
-                          ? 'border-transparent bg-[linear-gradient(135deg,_#2563eb,_#7c3aed)] text-white shadow-sm'
-                          : 'border-slate-200 bg-white/90 text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50'
-                      }`}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      {item.path === '/customproducts' ? 'Custom' : item.label}
-                    </Link>
-                  );
-                })}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsMobileSearchOpen((open) => !open);
-                    setIsSearchFocused(true);
-                  }}
-                  className={`flex h-8 w-8 items-center justify-center rounded-xl border text-slate-700 shadow-sm transition ${
-                    isMobileSearchOpen
-                      ? 'border-transparent bg-slate-900 text-white'
-                      : 'border-slate-200 bg-white/90 hover:border-slate-300 hover:bg-slate-50'
-                  }`}
-                  aria-label={isMobileSearchOpen ? 'Close product search' : 'Open product search'}
-                >
-                  {isMobileSearchOpen ? (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.25} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.1} d="m21 21-4.35-4.35M10.75 18a7.25 7.25 0 1 1 0-14.5 7.25 7.25 0 0 1 0 14.5z" />
-                    </svg>
-                  )}
-                </button>
-              </nav>
+          <div className="hidden md:block">{renderSearchBox()}</div>
+
+          <div className="flex items-center gap-1">
+            <div className="hidden items-center xl:flex">
+              <SocialMediaIcons />
             </div>
 
-            <nav className="hidden md:flex">
-              <div className="flex items-center gap-1 rounded-2xl border border-slate-200/80 bg-white/90 p-1 shadow-sm">
-                {navItems.map((item) => {
-                  const isActive = isRouteActive(item.path);
-                  return (
+            <div className="hidden items-center gap-1 lg:flex">
+              {isAuthenticated ? (
+                <>
+                  <UserProfile />
+                  {userMenuItems.slice(1).map((item) => (
                     <Link
                       key={item.path}
                       to={item.path}
-                      className={`rounded-xl px-3 py-1.5 text-[13px] font-semibold transition ${
-                        isActive
-                          ? 'bg-[linear-gradient(135deg,_#2563eb,_#7c3aed)] text-white shadow-sm'
-                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                      }`}
+                      className="inline-flex h-11 items-center px-2.5 text-sm text-mt-muted transition-colors hover:text-mt-text"
                     >
                       {item.label}
                     </Link>
-                  );
-                })}
-                {renderSearchBox()}
-              </div>
-            </nav>
-
-            <div className="flex items-center gap-2">
-              <div className="hidden items-center gap-3 xl:flex">
-                <SocialMediaIcons />
-              </div>
-
-              <div className="hidden items-center gap-2 lg:flex">
-                {isAuthenticated ? (
-                  <>
-                    <UserProfile />
-                    {userMenuItems.slice(1).map((item) => (
-                      <Link
-                        key={item.path}
-                        to={item.path}
-                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
-                      >
-                        {item.label}
-                      </Link>
-                    ))}
-                    <button
-                      onClick={handleLogout}
-                      className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] font-semibold text-rose-600 transition hover:bg-rose-100"
-                    >
-                      Logout
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <Link
-                      to="/login"
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-md"
-                    >
-                      Sign In
-                    </Link>
-                    <Link
-                      to="/register"
-                      className="rounded-xl bg-[linear-gradient(135deg,_#0f172a,_#1e293b)] px-3 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:opacity-95 hover:shadow-md"
-                    >
-                      Get Started
-                    </Link>
-                  </>
-                )}
-              </div>
-
-              <div
-                className="relative"
-                onMouseEnter={() => window.innerWidth > 768 && setShowDropdown(true)}
-                onMouseLeave={() => window.innerWidth > 768 && setShowDropdown(false)}
-              >
-                <div className="flex items-center gap-2 rounded-xl border border-sky-100 bg-[linear-gradient(135deg,_rgba(255,255,255,0.98),_rgba(239,246,255,0.9))] px-1.5 py-1.5 shadow-sm md:pl-1.5 md:pr-3">
-                  <CartIcon />
-                  <div className="hidden md:block">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-500">Cart Total</div>
-                    <div className="text-[13px] font-semibold text-slate-900">{formatCurrency(cartSubtotal)}</div>
-                  </div>
-                </div>
-                {showDropdown && window.innerWidth > 768 && <CartDropdown />}
-              </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="inline-flex h-11 items-center px-2.5 text-sm text-mt-muted transition-colors hover:text-mt-danger"
+                  >
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="inline-flex h-11 items-center px-2.5 text-sm text-mt-muted transition-colors hover:text-mt-text"
+                  >
+                    Sign in
+                  </Link>
+                  <Button to="/register" variant="outline" size="sm" className="ml-1">
+                    Get started
+                  </Button>
+                </>
+              )}
             </div>
-          </div>
 
-          {isMobileSearchOpen && (
-            <div className="mt-3 md:hidden">{renderSearchBox({ mobile: true })}</div>
-          )}
+            <Link
+              to={isAuthenticated ? '/profile' : '/login'}
+              className={cx(iconButtonClasses, 'hidden md:inline-flex lg:hidden')}
+              aria-label={isAuthenticated ? 'My profile' : 'Sign in'}
+            >
+              <User className="h-5 w-5" strokeWidth={1.6} aria-hidden="true" />
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsMobileSearchOpen((open) => !open);
+                setIsSearchFocused(true);
+              }}
+              className={cx(iconButtonClasses, 'md:hidden')}
+              aria-label={isMobileSearchOpen ? 'Close product search' : 'Open product search'}
+              aria-expanded={isMobileSearchOpen}
+            >
+              {isMobileSearchOpen ? (
+                <X className="h-5 w-5" aria-hidden="true" />
+              ) : (
+                <Search className="h-[22px] w-[22px]" strokeWidth={1.6} aria-hidden="true" />
+              )}
+            </button>
+
+            <div
+              className="relative"
+              onMouseEnter={() => window.innerWidth > 768 && setShowDropdown(true)}
+              onMouseLeave={() => window.innerWidth > 768 && setShowDropdown(false)}
+            >
+              <CartIcon />
+              {showDropdown && window.innerWidth > 768 && <CartDropdown />}
+            </div>
+
+            <button
+              type="button"
+              className={cx(iconButtonClasses, 'md:hidden')}
+              onClick={() => setIsMobileMenuOpen((open) => !open)}
+              aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={isMobileMenuOpen}
+            >
+              {isMobileMenuOpen ? (
+                <X className="h-5 w-5" aria-hidden="true" />
+              ) : (
+                <Menu className="h-5 w-5" aria-hidden="true" />
+              )}
+            </button>
+          </div>
         </div>
+
+        {isMobileSearchOpen && (
+          <div className="px-2 pb-3 md:hidden">{renderSearchBox({ mobile: true })}</div>
+        )}
+
+        <div className="flex items-center justify-between gap-6 px-2 sm:px-0">
+          <nav aria-label="Main" className="w-full md:w-auto">
+            <ul className="flex items-center justify-between gap-6 md:justify-start md:gap-8">
+              {navItems.map((item) => {
+                const isActive = isRouteActive(item.path);
+                return (
+                  <li key={item.path}>
+                    <Link
+                      to={item.path}
+                      aria-current={isActive ? 'page' : undefined}
+                      className={cx(
+                        '-mb-px inline-flex border-b-2 pb-2.5 pt-1 text-[13px] transition-colors sm:text-sm',
+                        isActive
+                          ? 'border-mt-accent text-mt-text'
+                          : 'border-transparent text-mt-muted hover:text-mt-text'
+                      )}
+                    >
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+
+          <div className="hidden shrink-0 items-center gap-2 pb-2 md:flex">
+            <Button to="/products" variant="accent" size="sm">
+              Shop products
+            </Button>
+            <Button to="/customproducts" size="sm">
+              Customize
+            </Button>
+          </div>
+        </div>
+
+        {isHome && (
+          <div className="grid grid-cols-2 gap-3 px-2 pb-3.5 pt-3 md:hidden">
+            <Button to="/customproducts" fullWidth className="h-10">
+              Customize
+            </Button>
+            <Button to="/products" variant="accent" fullWidth className="h-10">
+              Shop products
+            </Button>
+          </div>
+        )}
       </div>
 
       {isMobileMenuOpen && (
-        <div className="absolute inset-x-0 top-full z-40 px-3 pt-2 md:hidden">
-          <div className="mx-auto max-w-sm overflow-hidden rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(248,250,252,0.96))] shadow-[0_28px_70px_-38px_rgba(15,23,42,0.45)] backdrop-blur-xl">
-            <div className="max-h-[min(70vh,32rem)] overflow-y-auto p-3">
+        <div className="absolute inset-x-0 top-full z-40 border-b border-mt-line bg-mt-header md:hidden">
+          <div className="max-h-[min(75vh,36rem)] overflow-y-auto px-4 pb-6 pt-2">
             {isAuthenticated && (
-              <div className="mb-3 flex items-center gap-3 rounded-2xl border border-slate-100 bg-white/80 p-3 shadow-sm">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,_#0f172a,_#334155)] text-sm font-semibold text-white">
+              <div className="flex items-center gap-3 border-b border-mt-line py-4">
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-mt-surface-raised text-sm font-medium">
                   {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
-                </div>
+                </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-slate-800">{user?.name || 'User'}</p>
-                  <p className="truncate text-xs text-slate-500">{user?.email || ''}</p>
+                  <p className="truncate text-sm text-mt-text">{user?.name || 'User'}</p>
+                  <p className="truncate text-xs text-mt-subtle">{user?.email || ''}</p>
                 </div>
               </div>
             )}
 
-            <div className="space-y-2">
-              {navItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-medium transition ${
-                    isRouteActive(item.path)
-                      ? 'border-slate-900 bg-slate-900 text-white'
-                      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
-                  }`}
-                >
-                  <span>{item.label}</span>
-                  <span className={isRouteActive(item.path) ? 'text-white/70' : 'text-slate-400'}>&rarr;</span>
-                </Link>
-              ))}
+            <ul className="divide-y divide-mt-line">
+              {[...navItems, ...(isAuthenticated ? userMenuItems : [])].map((item) => {
+                const isActive = isRouteActive(item.path);
+                return (
+                  <li key={item.path}>
+                    <Link
+                      to={item.path}
+                      aria-current={isActive ? 'page' : undefined}
+                      className={cx(
+                        'flex h-14 items-center justify-between text-base transition-colors',
+                        isActive ? 'text-mt-text' : 'text-mt-muted hover:text-mt-text'
+                      )}
+                    >
+                      <span>{item.label}</span>
+                      <span aria-hidden="true" className="text-mt-subtle">
+                        &rarr;
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
 
-              {isAuthenticated &&
-                userMenuItems.map((item) => (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-medium transition ${
-                      isRouteActive(item.path)
-                        ? 'border-slate-900 bg-slate-900 text-white'
-                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
-                    }`}
-                  >
-                    <span>{item.label}</span>
-                    <span className={isRouteActive(item.path) ? 'text-white/70' : 'text-slate-400'}>&rarr;</span>
-                  </Link>
-                ))}
-            </div>
-
-            <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50/90 p-4">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Connect With Us</p>
+            <div className="mt-6">
+              <p className="mb-3 text-[11px] uppercase tracking-[0.2em] text-mt-subtle">Connect with us</p>
               <SocialMediaIcons mobile />
             </div>
 
             {isAuthenticated ? (
-              <button
+              <Button
+                variant="outline"
+                fullWidth
                 onClick={handleLogout}
-                className="mt-4 w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-600 transition hover:bg-rose-100"
+                className="mt-6 border-mt-line-strong text-mt-danger hover:bg-mt-danger/10"
               >
                 Logout
-              </button>
+              </Button>
             ) : (
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <Link
-                  to="/login"
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                >
-                  Sign In
-                </Link>
-                <Link
-                  to="/register"
-                  className="rounded-2xl bg-[linear-gradient(135deg,_#0f172a,_#1e293b)] px-4 py-3 text-center text-sm font-medium text-white transition hover:opacity-95"
-                >
-                  Get Started
-                </Link>
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <Button to="/login" variant="outline" fullWidth>
+                  Sign in
+                </Button>
+                <Button to="/register" fullWidth>
+                  Get started
+                </Button>
               </div>
             )}
-            </div>
           </div>
         </div>
       )}

@@ -1,4 +1,4 @@
-// Dropproduct.jsx - Name overlay on image (same as CategoryTilesHorizontal)
+// DropproductUserView.jsx - "Trending" drop products grid on the homepage
 import React, { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -7,7 +7,7 @@ import {
   selectAllProducts,
   selectLoading,
 } from "../redux/slices/dropproducts.js";
-import { Package } from "lucide-react";
+import { SectionHeader, Skeleton } from "./ui/index.js";
 import { buildImageUrl, getImageAltText } from "../utils/responsiveImage.js";
 import { buildDropProductPath } from "../utils/dropProductRoutes.js";
 
@@ -86,8 +86,8 @@ const ImageSlider = ({ images, alt }) => {
 
   if (!images.length) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-gray-100">
-        <span className="text-gray-400 text-2xl font-semibold">
+      <div className="w-full h-full flex items-center justify-center bg-mt-photo">
+        <span className="text-mt-subtle text-2xl font-light">
           {alt?.charAt(0) || "P"}
         </span>
       </div>
@@ -96,7 +96,7 @@ const ImageSlider = ({ images, alt }) => {
 
   return (
     <div
-      className="relative w-full h-full bg-white"
+      className="relative w-full h-full bg-mt-photo"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -120,25 +120,25 @@ const ImageSlider = ({ images, alt }) => {
         <>
           <button
             onClick={goToPrevious}
-            className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-sm border border-gray-200 bg-white/90 shadow-sm transition-all duration-200 ${
+            className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 transition-all duration-200 ${
               isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
             }`}
             aria-label="Previous image"
             type="button"
           >
-            <svg className="mx-auto h-4 w-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="mx-auto h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <button
             onClick={goToNext}
-            className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-sm border border-gray-200 bg-white/90 shadow-sm transition-all duration-200 ${
+            className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 transition-all duration-200 ${
               isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
             }`}
             aria-label="Next image"
             type="button"
           >
-            <svg className="mx-auto h-4 w-4 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="mx-auto h-4 w-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
             </svg>
           </button>
@@ -165,75 +165,55 @@ const Dropproduct = () => {
 
   if (loading && products.length === 0) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-10 h-10 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto"></div>
-          <p className="mt-3 text-gray-500 text-sm">Loading...</p>
+      <section className="mx-auto max-w-7xl px-4 pt-10 sm:px-6 sm:pt-14">
+        <Skeleton className="mb-4 h-7 w-32" />
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5">
+          {[...Array(5)].map((_, index) => (
+            <Skeleton key={index} className="aspect-[4/5] w-full" />
+          ))}
         </div>
-      </div>
+      </section>
     );
   }
 
+  if (products.length === 0) return null;
+
   return (
-    <section className="py-4 bg-white">
-      {/* Centered Header with Icon */}
-      <div className="container mx-auto px-4">
-        <div className="mb-6 flex flex-col items-center justify-center">
-          <div className="flex items-center justify-center space-x-2 mb-1">
-            <Package className="w-5 h-5 text-gray-600" />
-            <h1 className="text-xl font-medium text-gray-900">Trending</h1>
-          </div>
-          {/* <p className="text-gray-500 text-sm">{products.length} items available</p> */}
-        </div>
+    <section className="mx-auto max-w-7xl px-4 pt-10 sm:px-6 sm:pt-14">
+      <SectionHeader title="Trending" className="mb-3 sm:mb-5" />
 
-        <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-          {products.map((product) => {
-            const images = getProductImages(product);
-            const label = product.name || "Product";
-            const showOfferTag = hasActiveOffer(product);
-            const discountPercent = showOfferTag ? getOfferDiscountPercent(product) : 0;
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5">
+        {products.map((product) => {
+          const images = getProductImages(product);
+          const label = product.name || "Product";
+          const showOfferTag = hasActiveOffer(product);
+          const discountPercent = showOfferTag ? getOfferDiscountPercent(product) : 0;
 
-            return (
-              <div
-                key={product._id}
-                className="cursor-pointer group"
-                onClick={() => handleProductClick(product)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleProductClick(product);
-                }}
-              >
-                <div className="mx-auto max-w-[220px] overflow-hidden rounded-lg bg-white transition-all duration-200 hover:shadow-md">
-                  {/* Product Image + overlay name */}
-                  <div className="relative aspect-[4/5] w-full overflow-hidden">
-                    {showOfferTag && discountPercent > 0 ? (
-                      <div className="absolute left-2 top-2 z-10 rounded-full bg-red-500 px-2 py-1 text-[10px] font-bold text-white shadow">
-                        {discountPercent}% OFF
-                      </div>
-                    ) : null}
+          return (
+            <div
+              key={product._id}
+              className="group cursor-pointer rounded-mt-btn font-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mt-text"
+              onClick={() => handleProductClick(product)}
+              role="link"
+              tabIndex={0}
+              aria-label={label}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleProductClick(product);
+              }}
+            >
+              <div className="relative aspect-[4/5] w-full overflow-hidden rounded-mt-btn bg-mt-photo">
+                {showOfferTag && discountPercent > 0 ? (
+                  <span className="absolute left-2 top-2 z-10 rounded-mt-btn bg-black/80 px-2 py-0.5 text-[10px] font-medium text-white">
+                    {discountPercent}% off
+                  </span>
+                ) : null}
 
-                    <ImageSlider images={images} alt={label} />
-
-                    {/* subtle bottom fade so label always readable */}
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/35 to-transparent" />
-
-                    {/* Name badge on image (same as categories) */}
-                    <div className="absolute inset-x-0 bottom-2 flex justify-center px-2">
-                      <div className="flex max-w-full items-center gap-2 rounded-md bg-white px-3 py-1.5 text-gray-900 shadow">
-                        <span className="truncate text-xs font-medium text-gray-900 sm:text-sm">
-                          {label}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Removed below-name block to match category style */}
-                </div>
+                <ImageSlider images={images} alt={label} />
               </div>
-            );
-          })}
-        </div>
+              <p className="mt-2 truncate text-sm text-mt-text">{label}</p>
+            </div>
+          );
+        })}
       </div>
     </section>
   );

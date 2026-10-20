@@ -665,12 +665,13 @@ export default function ProductDetailPage() {
     }
   };
   
-  const formatPrice = (price, currency = 'INR') => {
-    if (currency === 'INR') {
-      return `₹${price.toFixed(2)}`;
-    }
-    return `$${price.toFixed(2)}`;
-  };
+  const formatPrice = (price, currency = 'INR') =>
+    new Intl.NumberFormat(currency === 'INR' ? 'en-IN' : 'en-US', {
+      style: 'currency',
+      currency: currency === 'INR' ? 'INR' : 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(Number(price) || 0);
 
   const copyToClipboard = async () => {
     await navigator.clipboard.writeText(window.location.href);
@@ -816,9 +817,9 @@ export default function ProductDetailPage() {
 
     if (comboOffersLoading) {
       return (
-        <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4">
-          <div className="h-4 w-36 animate-pulse rounded bg-indigo-100" />
-          <div className="mt-3 h-16 animate-pulse rounded-xl bg-white/80" />
+        <div className="rounded-mt-card border border-mt-line p-4">
+          <div className="h-3 w-32 animate-pulse rounded bg-mt-surface-raised" />
+          <div className="mt-3 h-16 animate-pulse rounded bg-mt-surface-raised" />
         </div>
       );
     }
@@ -826,23 +827,16 @@ export default function ProductDetailPage() {
     if (!comboOffers.length) return null;
 
     return (
-      <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-600">
-              Combo offer available
-            </p>
-            <h3 className={`${compact ? "text-base" : "text-lg"} font-semibold text-gray-950`}>
-              Buy this in a bundle and save more
-            </h3>
-          </div>
-          <Tag className="flex-shrink-0 text-indigo-600" size={20} />
+      <div className="rounded-mt-card border border-mt-line bg-mt-surface p-4">
+        <div className="mb-3 flex items-center gap-2">
+          <Tag className="h-4 w-4 text-mt-text" aria-hidden="true" />
+          <p className="text-sm text-mt-text">Save more in a combo</p>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2">
           {comboOffers.slice(0, compact ? 1 : 2).map((combo) => {
             const imageProps = getResponsiveImageProps(combo.displayImage, {
-              sizes: compact ? "64px" : "96px",
+              sizes: "64px",
             });
             const originalPrice = Number(combo.pricing?.originalPrice || combo.comboPrice || 0);
             const savings = Number(combo.pricing?.savingsAmount || 0);
@@ -852,9 +846,9 @@ export default function ProductDetailPage() {
               <Link
                 key={combo._id}
                 to={`/combo-packs/${combo.slug}`}
-                className="group flex gap-3 rounded-xl border border-indigo-100 bg-white p-3 transition hover:border-indigo-300 hover:shadow-sm"
+                className="group flex items-center gap-3 rounded-mt-btn p-2 transition-colors hover:bg-mt-tint/5"
               >
-                <div className={`${compact ? "h-16 w-16" : "h-20 w-20"} flex-shrink-0 overflow-hidden rounded-lg bg-gray-50`}>
+                <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-mt-btn bg-mt-photo">
                   {combo.displayImage ? (
                     <img
                       src={imageProps.src || buildImageUrl(combo.displayImage)}
@@ -866,44 +860,30 @@ export default function ProductDetailPage() {
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center">
-                      <Package className="text-gray-400" size={20} />
+                      <Package className="text-mt-subtle" size={18} aria-hidden="true" />
                     </div>
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="line-clamp-1 text-sm font-semibold text-gray-950">{combo.name}</p>
-                      <p className="mt-0.5 text-xs text-gray-500">
-                        {combo.includedProductsCount} products included
-                      </p>
-                    </div>
-                    {discount > 0 && (
-                      <span className="rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white">
-                        {discount}% OFF
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-baseline gap-1.5">
-                    <span className="text-sm font-bold text-gray-950">
+                  <p className="line-clamp-1 text-sm text-mt-text">{combo.name}</p>
+                  <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-xs text-mt-muted">
+                    <span className="text-mt-text">
                       {formatPrice(Number(combo.comboPrice || 0), combo.currency || displayData.currency)}
                     </span>
                     {originalPrice > Number(combo.comboPrice || 0) && (
-                      <span className="text-xs text-gray-400 line-through">
+                      <span className="text-mt-subtle line-through">
                         {formatPrice(originalPrice, combo.currency || displayData.currency)}
                       </span>
                     )}
-                    {savings > 0 && (
-                      <span className="text-xs font-medium text-emerald-700">
-                        Save {formatPrice(savings, combo.currency || displayData.currency)}
-                      </span>
-                    )}
-                  </div>
-                  <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-indigo-700 group-hover:text-indigo-900">
-                    View combo offer
-                    <ChevronRight size={14} />
-                  </span>
+                    {savings > 0 ? (
+                      <span className="text-mt-success">Save {formatPrice(savings, combo.currency || displayData.currency)}</span>
+                    ) : discount > 0 ? (
+                      <span className="text-mt-success">{discount}% off</span>
+                    ) : null}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-mt-subtle">{combo.includedProductsCount} products included</p>
                 </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-mt-subtle transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
               </Link>
             );
           })}
@@ -1025,16 +1005,20 @@ export default function ProductDetailPage() {
   
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative">
-            <div className="w-16 h-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
-            <Sparkles className="w-8 h-8 text-indigo-500 animate-pulse absolute -top-2 -right-2" />
+      <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)]" aria-busy="true">
+        <span className="sr-only">Loading {isReadymade ? 'product' : 'design'} details…</span>
+        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-6 sm:px-6 lg:grid-cols-12 lg:gap-12 lg:px-8 lg:py-10">
+          <div className="lg:col-span-7">
+            <div className="aspect-[4/5] w-full animate-pulse rounded-mt-card bg-mt-surface-raised" />
           </div>
-          <p className="mt-6 text-gray-700 font-medium">
-            Loading {isReadymade ? 'product' : 'design'} details...
-          </p>
-          <p className="text-sm text-gray-400 mt-1">Preparing an amazing view</p>
+          <div className="space-y-4 lg:col-span-5">
+            <div className="h-3 w-32 animate-pulse rounded bg-mt-surface-raised" />
+            <div className="h-8 w-3/4 animate-pulse rounded bg-mt-surface-raised" />
+            <div className="h-6 w-40 animate-pulse rounded bg-mt-surface-raised" />
+            <div className="h-px bg-mt-line" />
+            <div className="h-12 w-full animate-pulse rounded bg-mt-surface-raised" />
+            <div className="h-12 w-full animate-pulse rounded bg-mt-surface-raised" />
+          </div>
         </div>
       </div>
     );
@@ -1042,30 +1026,30 @@ export default function ProductDetailPage() {
 
   if (error || !displayData) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center p-4">
-        <div className="max-w-md w-full text-center bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
-          <div className="w-20 h-20 bg-gradient-to-br from-red-50 to-pink-50 rounded-full flex items-center justify-center mx-auto mb-6">
-            <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-pink-500 rounded-full flex items-center justify-center">
-              <span className="text-2xl text-white">!</span>
-            </div>
+      <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)] flex items-center justify-center p-4">
+        <div className="w-full max-w-md text-center">
+          <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-mt-surface-raised">
+            <AlertCircle className="h-6 w-6 text-mt-muted" aria-hidden="true" />
           </div>
-          <h3 className="text-xl font-bold text-gray-800 mb-2">
-            {isReadymade ? 'Product' : 'Design'} Not Found
-          </h3>
-          <p className="text-gray-600 mb-6">{error || 'The requested item is not available'}</p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <h1 className="text-xl font-medium text-mt-text">
+            {isReadymade ? 'Product' : 'Design'} not found
+          </h1>
+          <p className="mt-2 text-sm text-mt-muted">{error || 'The requested item is not available.'}</p>
+          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
             <button
+              type="button"
               onClick={handleBackNavigation}
-              className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-medium flex items-center justify-center gap-2"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-mt-btn border border-mt-text px-5 text-sm font-medium text-mt-text transition-colors hover:bg-mt-tint/10"
             >
-              <ArrowLeft className="w-4 h-4" />
-              Go Back
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              Go back
             </button>
             <button
+              type="button"
               onClick={() => navigate(isReadymade ? '/products' : '/catalogue')}
-              className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:opacity-90 transition-all font-medium"
+              className="inline-flex h-11 items-center justify-center rounded-mt-btn bg-mt-btn px-5 text-sm font-medium text-mt-btn-text transition-colors hover:bg-mt-btn-hover"
             >
-              Browse {isReadymade ? 'Products' : 'Catalogue'}
+              Browse {isReadymade ? 'products' : 'catalogue'}
             </button>
           </div>
         </div>
@@ -1079,929 +1063,678 @@ export default function ProductDetailPage() {
   const isVideo = currentMedia?.type === "video";
   const currentMediaImageProps = !isVideo
     ? getResponsiveImageProps(currentMedia?.image, {
-        sizes: "(max-width: 1024px) 100vw, 50vw",
+        sizes: "(max-width: 1024px) 100vw, 58vw",
         loading: selectedImageIndex === 0 ? "eager" : "lazy",
       })
     : null;
   const mediaUrl = isVideo ? currentMedia?.url : currentMediaImageProps?.src;
   const imageAlt = currentMedia?.alt || displayData.title;
 
-  // Size Selection Component
+  const hasDiscount = Boolean(displayData.originalPrice && displayData.price < displayData.originalPrice);
+  const needsSize = isReadymade && hasVariants && !selectedSize;
+
+  const isBusy = isAddingToCart || cartLoading;
+  const lowStock = isReadymade && !isOutOfStock && displayData.stock > 0 && displayData.stock < 5;
+  const backLabel = returnLabel || (isReadymade ? (itemData?.subCategory || 'products') : 'catalogue');
+  const productDetails = [
+    { label: 'SKU', value: displayData.sku !== 'N/A' ? displayData.sku : '' },
+    { label: 'Category', value: [displayData.category, itemData?.subCategory].filter(Boolean).join(' / ') },
+    { label: 'Material', value: displayData.material },
+    { label: 'Weight', value: displayData.weight },
+    { label: 'Dimensions', value: displayData.dimensions },
+    { label: 'Manufacturer', value: displayData.manufacturer },
+    { label: 'Warranty', value: displayData.warranty },
+  ].filter((row) => row.value && typeof row.value !== 'object');
+
+  const scrollToReviews = () => {
+    document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const renderStars = (size = 'h-4 w-4') => (
+    <span className="flex items-center" aria-hidden="true">
+      {[...Array(5)].map((_, i) => (
+        <Star
+          key={i}
+          className={`${size} ${i < Math.round(displayData.rating) ? 'fill-current text-mt-text' : 'text-mt-line-strong'}`}
+        />
+      ))}
+    </span>
+  );
+
+  const renderThumb = (item, index, className) => {
+    const isActive = selectedImageIndex === index;
+    return (
+      <button
+        key={index}
+        type="button"
+        onClick={() => setSelectedImageIndex(index)}
+        aria-label={item.type === 'video' ? 'Show video' : `Show image ${index + 1}`}
+        aria-current={isActive ? 'true' : undefined}
+        className={`relative shrink-0 overflow-hidden rounded-mt-btn bg-mt-photo transition-opacity ${className} ${
+          isActive ? 'ring-2 ring-mt-text ring-offset-2 ring-offset-mt-bg' : 'opacity-60 hover:opacity-100'
+        }`}
+      >
+        {item.type === 'video' ? (
+          <>
+            <video src={item.url} className="h-full w-full object-cover" muted />
+            <span className="absolute inset-0 flex items-center justify-center bg-black/30 text-xs text-white">▶</span>
+          </>
+        ) : (
+          (() => {
+            const thumbProps = getResponsiveImageProps(item.image, { sizes: '80px' });
+            return (
+              <img
+                src={thumbProps.src || buildImageUrl(item.image)}
+                srcSet={thumbProps.srcSet}
+                sizes={thumbProps.sizes}
+                alt=""
+                className="h-full w-full object-cover"
+                loading="lazy"
+                decoding="async"
+              />
+            );
+          })()
+        )}
+      </button>
+    );
+  };
+
+  // Size picker (single instance; the id is used to scroll here when no size is chosen)
   const SizeSelection = () => (
-    <div className="space-y-2 sm:space-y-3" id="mobile-size-selection">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-900 sm:text-lg">Select Size</h3>
-        {sizeError && (
-          <span className="flex items-center gap-1 text-[11px] text-red-600 sm:text-sm">
-            <AlertCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            {sizeError}
-          </span>
+    <div id="mobile-size-selection" className="scroll-mt-40">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm text-mt-text">
+          Size{selectedSize ? <span className="text-mt-muted">: {selectedSize}</span> : null}
+        </h2>
+        {sizeChartUrl && (
+          <a
+            href="#size-guide"
+            onClick={() => {
+              const guide = document.getElementById('size-guide');
+              if (guide) guide.open = true;
+            }}
+            className="inline-flex items-center gap-1 text-xs text-mt-accent underline underline-offset-4 hover:text-mt-accent-strong"
+          >
+            <Ruler className="h-3.5 w-3.5" aria-hidden="true" />
+            Size guide
+          </a>
         )}
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
         {itemData.variants.map((v) => {
           const isSelected = selectedSize === v.size;
           const isDisabled = Number(v.stock || 0) <= 0;
-          const stockStatus = isDisabled ? 'Out of stock' : `${v.stock} available`;
-
           return (
             <button
               key={v.size}
+              type="button"
               onClick={() => !isDisabled && handleSizeSelect(v.size)}
               disabled={isDisabled}
-              className={`
-                relative min-w-[52px] rounded-lg border px-2.5 py-1.5 text-sm font-medium transition-all duration-200 sm:min-w-[70px] sm:border-2 sm:px-4 sm:py-3 sm:text-base
-                ${isSelected 
-                  ? 'border-blue-600 bg-blue-50 text-blue-600 ring-2 ring-blue-200' 
+              aria-pressed={isSelected}
+              title={isDisabled ? 'Out of stock' : `${v.stock} available`}
+              className={`h-12 rounded-mt-btn border text-sm transition-colors ${
+                isSelected
+                  ? 'border-mt-text bg-mt-btn font-medium text-mt-btn-text'
                   : isDisabled
-                    ? 'border-gray-200 text-gray-400 cursor-not-allowed bg-gray-50 line-through'
-                    : 'border-gray-300 hover:border-gray-400 text-gray-700 hover:bg-gray-50'
-                }
-              `}
-              title={stockStatus}
+                    ? 'cursor-not-allowed border-mt-line text-mt-subtle line-through'
+                    : 'border-mt-line-strong text-mt-text hover:border-mt-text'
+              }`}
             >
-              <span className="block">{v.size}</span>
-              {!isDisabled && (
-                <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border border-white bg-green-500 sm:-right-2 sm:-top-2 sm:h-4 sm:w-4 sm:border-2"></span>
-              )}
+              {v.size}
             </button>
           );
         })}
       </div>
-      
-      {/* Selected Size Feedback */}
-      {selectedSize && (
-        <div className="mt-2 rounded-lg border border-green-200 bg-green-50 p-2 sm:p-3">
-          <div className="flex items-center gap-2 text-green-700">
-            <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            <span className="text-xs font-medium sm:text-sm">
-              Selected: Size {selectedSize} • 
-              Price: {formatPrice(Number(selectedVariant?.price || 0), displayData.currency)} • 
-              Stock: {selectedVariant?.stock} available
-            </span>
-          </div>
-        </div>
-      )}
+      {sizeError ? (
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-mt-danger" role="alert">
+          <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
+          {sizeError}
+        </p>
+      ) : selectedVariant ? (
+        <p className="mt-2 text-xs text-mt-muted">
+          {Number(selectedVariant.stock || 0) < 5
+            ? `Only ${selectedVariant.stock} left in size ${selectedSize}`
+            : `In stock in size ${selectedSize}`}
+        </p>
+      ) : null}
     </div>
   );
 
-  // Size Chart Component
-  const SizeChart = () => {
-    if (!sizeChartUrl) return null;
-    
-    return (
-      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-        <div className="p-4 sm:p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Ruler className="w-5 h-5 text-indigo-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Size Chart</h3>
-          </div>
-          <div 
-            className="relative cursor-zoom-in group"
-            onClick={() => window.open(sizeChartUrl, "_blank")}
-          >
-            <img
-              src={sizeChartUrl}
-              alt="Size Chart"
-              className="w-full rounded-lg border border-gray-200 transition-transform group-hover:scale-[1.02]"
-              srcSet={sizeChartImageProps.srcSet}
-              sizes={sizeChartImageProps.sizes}
-              loading={sizeChartImageProps.loading}
-              decoding={sizeChartImageProps.decoding}
-              fetchPriority={sizeChartImageProps.fetchPriority}
-            />
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors rounded-lg flex items-center justify-center">
-              <span className="bg-white/90 text-gray-800 px-3 py-1.5 rounded-full text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
-                Click to enlarge
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  const addToCartLabel = isBusy
+    ? (isInCart ? 'Updating…' : 'Adding…')
+    : isOutOfStock
+      ? 'Sold out'
+      : isInCart
+        ? (isReadymade && cartQuantity === quantity ? 'In cart' : `In cart (${cartQuantity})`)
+        : 'Add to cart';
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+    <div className="min-h-screen bg-mt-bg pb-24 font-brand text-mt-text [color-scheme:var(--mt-scheme)] lg:pb-0">
       {productSchema ? (
         <script type="application/ld+json">{JSON.stringify(productSchema)}</script>
       ) : null}
-      {/* Notification Toast */}
+
+      {/* Toast */}
       {notification.show && (
-        <div className="fixed top-4 right-4 z-50 animate-fade-in-down">
-          <div className={`rounded-lg shadow-lg p-4 max-w-sm ${
-            notification.type === 'success' ? 'bg-green-50 border border-green-200' :
-            notification.type === 'error' ? 'bg-red-50 border border-red-200' :
-            notification.type === 'warning' ? 'bg-yellow-50 border border-yellow-200' :
-            'bg-blue-50 border border-blue-200'
-          }`}>
-            <div className="flex items-center">
-              <div className={`flex-shrink-0 ${
-                notification.type === 'success' ? 'text-green-400' :
-                notification.type === 'error' ? 'text-red-400' :
-                notification.type === 'warning' ? 'text-yellow-400' :
-                'text-blue-400'
-              }`}>
-                {notification.type === 'success' ? (
-                  <Check className="h-5 w-5" />
-                ) : notification.type === 'error' ? (
-                  <AlertCircle className="h-5 w-5" />
-      ) : (
-                  <Info className="h-5 w-5" />
-                )}
-              </div>
-              <div className="ml-3">
-                <p className={`text-sm font-medium ${
-                  notification.type === 'success' ? 'text-green-800' :
-                  notification.type === 'error' ? 'text-red-800' :
-                  notification.type === 'warning' ? 'text-yellow-800' :
-                  'text-blue-800'
-                }`}>
-                  {notification.message}
-                </p>
-              </div>
-            </div>
+        <div className="fixed inset-x-0 bottom-24 z-50 flex justify-center px-4 lg:bottom-8" role="status" aria-live="polite">
+          <div
+            className={`flex max-w-sm items-center gap-3 rounded-mt-card border bg-mt-surface px-4 py-3 text-sm shadow-2xl shadow-mt-tint/10 ${
+              notification.type === 'success'
+                ? 'border-mt-success/40'
+                : notification.type === 'error'
+                  ? 'border-mt-danger/40'
+                  : 'border-mt-line-strong'
+            }`}
+          >
+            {notification.type === 'success' ? (
+              <Check className="h-4 w-4 shrink-0 text-mt-success" aria-hidden="true" />
+            ) : notification.type === 'error' ? (
+              <AlertCircle className="h-4 w-4 shrink-0 text-mt-danger" aria-hidden="true" />
+            ) : (
+              <Info className="h-4 w-4 shrink-0 text-mt-muted" aria-hidden="true" />
+            )}
+            <span className="text-mt-text">{notification.message}</span>
+            {notification.type === 'success' && (
+              <Link to="/cart" className="ml-1 shrink-0 text-mt-accent underline underline-offset-4 hover:text-mt-accent-strong">
+                View cart
+              </Link>
+            )}
           </div>
         </div>
       )}
 
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <button
-              onClick={handleBackNavigation}
-              className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors group"
-            >
-              <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-gray-200 transition-colors">
-                <ArrowLeft className="w-4 h-4" />
-              </div>
-              <span className="font-medium hidden sm:inline">
-                Back to {returnLabel || (isReadymade ? (displayData?.subCategory || 'Products') : 'Catalogue')}
-              </span>
-            </button>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={copyToClipboard}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                {copied ? (
-                  <>
-                    <Check className="w-4 h-4 text-green-600" />
-                    <span className="font-medium hidden sm:inline">Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Share2 className="w-4 h-4" />
-                    <span className="font-medium hidden sm:inline">Share</span>
-                  </>
-                )}
-              </button>
-              <button
-                onClick={() => setIsFavorite(!isFavorite)}
-                className={`p-2 rounded-lg ${isFavorite ? 'bg-pink-50 text-pink-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-              >
-                <Heart className={`w-5 h-5 ${isFavorite ? 'fill-current' : ''}`} />
-              </button>
-              <Link
-                to="/cart"
-                className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
-              >
-                <ShoppingCart className="w-4 h-4" />
-                <span className="font-medium hidden sm:inline">Cart</span>
-                {cartItems.length > 0 && (
-                  <span className="bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {cartItems.length}
-                  </span>
-                )}
-              </Link>
-            </div>
-          </div>
+      {/* Utility row */}
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 pt-4 sm:px-6 lg:px-8">
+        <button
+          type="button"
+          onClick={handleBackNavigation}
+          className="inline-flex h-10 items-center gap-2 text-sm text-mt-muted transition-colors hover:text-mt-text"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          <span className="capitalize">Back to {backLabel}</span>
+        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={copyToClipboard}
+            aria-label={copied ? 'Link copied' : 'Copy link to share'}
+            className="inline-flex h-10 items-center gap-2 rounded-full px-3 text-sm text-mt-muted transition-colors hover:bg-mt-tint/10 hover:text-mt-text"
+          >
+            {copied ? <Check className="h-4 w-4 text-mt-success" aria-hidden="true" /> : <Share2 className="h-4 w-4" aria-hidden="true" />}
+            <span className="hidden sm:inline">{copied ? 'Copied' : 'Share'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsFavorite(!isFavorite)}
+            aria-label={isFavorite ? 'Remove from wishlist' : 'Save to wishlist'}
+            aria-pressed={isFavorite}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full text-mt-muted transition-colors hover:bg-mt-tint/10 hover:text-mt-text"
+          >
+            <Heart className={`h-4 w-4 ${isFavorite ? 'fill-current text-mt-text' : ''}`} aria-hidden="true" />
+          </button>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Preview */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Main Preview */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-              <div className="p-4 sm:p-6">
-                {/* Header with badges */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
-                  <div className="flex items-center gap-2">
-                    <Tag className="w-4 h-4 text-gray-400" />
-                    <span className="text-xs sm:text-sm text-gray-500">
-                      {isReadymade ? 'SKU:' : 'Design ID:'} {displayData.sku}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!isReadymade && (
-                      <>
-                        <Star className="w-4 h-4 text-amber-400 fill-current" />
-                        <span className="text-xs sm:text-sm font-medium text-gray-700">Premium Design</span>
-                      </>
-                    )}
-                    {isInCart && !isOutOfStock && (
-                      <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 flex items-center gap-1">
-                        <Check className="w-3 h-3" />
-                        In Cart ({cartQuantity})
-                      </span>
-                    )}
-                  </div>
-                </div>
+      <div className="mx-auto grid max-w-7xl gap-8 px-4 pb-12 pt-3 sm:px-6 lg:grid-cols-12 lg:gap-12 lg:px-8 lg:pb-20">
+        {/* Gallery */}
+        <section aria-label="Product images" className="lg:col-span-7">
+          <div className="flex gap-3">
+            {media.length > 1 && (
+              <div className="hidden max-h-[680px] w-20 shrink-0 flex-col gap-3 overflow-y-auto lg:flex" style={{ scrollbarWidth: 'none' }}>
+                {media.map((item, index) => renderThumb(item, index, 'h-24 w-20'))}
+              </div>
+            )}
 
-                {/* Main Media Display */}
-                <div className="relative h-[300px] sm:h-[400px] md:h-[500px] bg-white rounded-xl overflow-hidden">
-                  {mediaUrl ? (
-                    isVideo ? (
-                      <video
-                        key={mediaUrl}
-                        src={mediaUrl}
-                        className="w-full h-full object-contain"
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                        controls={false}
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.parentElement.innerHTML = `
-                            <div class="flex items-center justify-center h-full">
-                              <div class="text-center">
-                                <p class="text-gray-400 font-medium">Video unavailable</p>
-                              </div>
-                            </div>
-                          `;
-                        }}
-                      />
-                    ) : (
+            <div className="relative min-w-0 flex-1">
+              <div className="relative aspect-[4/5] w-full overflow-hidden rounded-mt-card bg-mt-photo lg:max-h-[680px]">
+                {mediaUrl ? (
+                  isVideo ? (
+                    <video
+                      key={mediaUrl}
+                      src={mediaUrl}
+                      className="h-full w-full object-contain"
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      controls={false}
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsImageViewerOpen(true)}
+                      className="block h-full w-full cursor-zoom-in"
+                      aria-label="Open image in full screen"
+                    >
                       <img
                         src={mediaUrl}
                         srcSet={currentMediaImageProps?.srcSet}
                         sizes={currentMediaImageProps?.sizes}
                         alt={imageAlt}
-                        className="w-full h-full cursor-zoom-in object-contain"
-                        onClick={() => setIsImageViewerOpen(true)}
+                        className="h-full w-full object-contain"
                         onError={(e) => {
                           e.target.style.display = 'none';
-                          e.target.parentElement.innerHTML = `
-                            <div class="flex items-center justify-center h-full">
-                              <div class="text-center">
-                                <p class="text-gray-400 font-medium">Preview unavailable</p>
-                              </div>
-                            </div>
-                          `;
                         }}
                         loading={currentMediaImageProps?.loading}
                         decoding={currentMediaImageProps?.decoding}
                         fetchPriority={currentMediaImageProps?.fetchPriority}
                       />
-                    )
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="text-center">
-                        <ImageIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                        <p className="text-gray-400 font-medium">No preview available</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {!isVideo && mediaUrl && (
-                    <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
-                      <span className="rounded-full bg-black/65 px-4 py-2 text-xs font-semibold tracking-tight text-white shadow-lg backdrop-blur-sm">
-                        Tap image for full screen
-                      </span>
-                    </div>
-                  )}
-
-                  {media.length > 1 && (
-                    <>
-                      <button
-                        onClick={() => setSelectedImageIndex(prev => (prev - 1 + media.length) % media.length)}
-                        className="absolute left-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 bg-white/90 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center hover:bg-white transition-colors"
-                      >
-                        <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700 rotate-180" />
-                      </button>
-                      <button
-                        onClick={() => setSelectedImageIndex(prev => (prev + 1) % media.length)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 bg-white/90 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center hover:bg-white transition-colors"
-                      >
-                        <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
-                      </button>
-                    </>
-                  )}
-
-                  <div className="absolute top-4 left-4 flex flex-col space-y-2">
-                    {isOutOfStock && (
-                      <span className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-full bg-red-100 text-red-800">
-                        Sold Out
-                      </span>
-                    )}
-                    {isReadymade && displayData.stock < 5 && !isOutOfStock && (
-                      <span className="px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded-full bg-orange-100 text-orange-800">
-                        Only {displayData.stock} left!
-                      </span>
-                    )}
-                  </div>
-
-                  {offerTagDiscount > 0 && (
-                    <span className="absolute top-4 right-4 z-10 rounded-full bg-red-600 px-3 py-1.5 text-xs sm:text-sm font-semibold text-white shadow-lg">
-                      {offerTagDiscount}% OFF
-                    </span>
-                  )}
-                </div>
-
-                {/* Media Thumbnails */}
-                {media.length > 1 && (
-                  <div className="mt-4 sm:mt-6">
-                    <p className="text-sm font-medium text-gray-700 mb-2 sm:mb-3">
-                      {media.some(m => m.type === 'video') ? 'Photos & Videos' : 'Images'} ({media.length})
-                    </p>
-                    <div className="flex space-x-2 overflow-x-auto py-2">
-                      {media.map((item, index) => (
-                        <button
-                          key={index}
-                          onClick={() => setSelectedImageIndex(index)}
-                          className={`flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border-2 relative ${
-                            selectedImageIndex === index ? 'border-blue-500' : 'border-gray-200'
-                          }`}
-                        >
-                          {item.type === "video" ? (
-                            <>
-                              <video
-                                src={item.url}
-                                className="w-full h-full object-cover"
-                                muted
-                              />
-                              <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                                <span className="text-white text-xs">▶</span>
-                              </div>
-                            </>
-                          ) : (
-                            (() => {
-                              const thumbProps = getResponsiveImageProps(item.image, {
-                                sizes: "80px",
-                              });
-
-                              return (
-                                <img
-                                  src={thumbProps.src || buildImageUrl(item.image)}
-                                  srcSet={thumbProps.srcSet}
-                                  sizes={thumbProps.sizes}
-                                  alt={`Thumbnail ${index + 1}`}
-                                  className="w-full h-full object-cover"
-                                  loading={thumbProps.loading}
-                                  decoding={thumbProps.decoding}
-                                  fetchPriority={thumbProps.fetchPriority}
-                                />
-                              );
-                            })()
-                          )}
-                        </button>
-                      ))}
-                    </div>
+                    </button>
+                  )
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center text-mt-subtle">
+                    <ImageIcon className="h-12 w-12" aria-hidden="true" />
+                    <p className="mt-3 text-sm">No preview available</p>
                   </div>
                 )}
 
-                {/* View Thumbnails for designs */}
-                {!isReadymade && displayData.views && displayData.views.length > 1 && (
-                  <div className="mt-4 sm:mt-6">
-                    <p className="text-sm font-medium text-gray-700 mb-2 sm:mb-3">
-                      All Views ({displayData.views.length})
-                    </p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
-                      {displayData.views.map((view, index) => (
-                        <button
-                          key={view.code}
-                          onClick={() => {
-                            setActiveView(index);
-                            const previewIndex = images.findIndex(img => img === view.previewImage);
-                            if (previewIndex !== -1) setSelectedImageIndex(previewIndex);
-                          }}
-                          className={`relative rounded-lg border overflow-hidden transition-all ${activeView === index ? 'ring-2 ring-indigo-500 ring-offset-2' : 'border-gray-200 hover:border-gray-300'}`}
-                        >
-                          <div className="aspect-square bg-gray-50">
-                            {view.previewImage ? (
-                              (() => {
-                                const viewImageProps = getResponsiveImageProps(view.previewImage, {
-                                  sizes: "(max-width: 768px) 25vw, 120px",
-                                });
-
-                                return (
-                                  <img
-                                    src={viewImageProps.src || buildImageUrl(view.previewImage)}
-                                    srcSet={viewImageProps.srcSet}
-                                    sizes={viewImageProps.sizes}
-                                    alt={view.code}
-                                    className="w-full h-full object-cover"
-                                    loading={viewImageProps.loading}
-                                    decoding={viewImageProps.decoding}
-                                    fetchPriority={viewImageProps.fetchPriority}
-                                  />
-                                );
-                              })()
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Eye className="w-5 h-5 sm:w-6 sm:h-6 text-gray-300" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="absolute bottom-1 left-1 right-1 bg-black/70 text-white text-[10px] sm:text-xs px-1 sm:px-2 py-0.5 sm:py-1 rounded truncate">
-                            {view.code?.toUpperCase() || `VIEW ${index + 1}`}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Size Chart - Positioned Below Images on Desktop */}
-            {isReadymade && sizeChartUrl && (
-              <div className="hidden lg:block">
-                <SizeChart />
-              </div>
-            )}
-          </div>
-
-          {/* Right Column - Details - Desktop (lg and above) */}
-          <div className="hidden lg:block space-y-6">
-            {/* Product Info Card */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-              <div className="mb-6">
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                  {displayData.title}
-                </h1>
-                <div className="flex items-center gap-2 text-gray-500">
-                  <Package className="w-4 h-4" />
-                  <span className="font-medium">{displayData.category}</span>
+                <div className="pointer-events-none absolute left-3 top-3 flex flex-col items-start gap-2">
+                  {isOutOfStock && (
+                    <span className="rounded-mt-btn bg-black/80 px-2.5 py-1 text-xs font-medium text-white">Sold out</span>
+                  )}
+                  {offerTagDiscount > 0 && !isOutOfStock && (
+                    <span className="rounded-mt-btn bg-black/80 px-2.5 py-1 text-xs font-medium text-white">{offerTagDiscount}% off</span>
+                  )}
+                  {isInCart && !isOutOfStock && (
+                    <span className="rounded-mt-btn bg-white px-2.5 py-1 text-xs font-medium text-black">In cart · {cartQuantity}</span>
+                  )}
                 </div>
-              </div>
 
-              {/* Color Display (for designs) */}
-              {!isReadymade && displayData.productColor && (
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium text-gray-700">Product Color</span>
-                    <Palette className="w-4 h-4 text-gray-400" />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div 
-                      className="w-12 h-12 rounded-lg border-2 border-white shadow-lg"
-                      style={{ backgroundColor: displayData.productColor }}
-                    />
-                    <span className="text-gray-600">{displayData.productColor}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Price Display */}
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">Price</span>
-                  <Tag className="w-4 h-4 text-gray-400" />
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                    {formatPrice(displayData.price, displayData.currency)}
+                {!isVideo && mediaUrl && (
+                  <span className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-black/60 p-2 text-white backdrop-blur-sm" aria-hidden="true">
+                    <Eye className="h-4 w-4" />
                   </span>
-                  {displayData.originalPrice && displayData.price < displayData.originalPrice && (
-                    <span className="text-gray-400 line-through">
-                      {formatPrice(displayData.originalPrice, displayData.currency)}
-                    </span>
-                  )}
-                </div>
-                {displayData.saleActive && (
-                  <div className="mt-2 flex items-center gap-2 text-sm">
-                    <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700">
-                      {displayData.discountPercent}% OFF
-                    </span>
-                    <span className="text-emerald-700">Save {formatPrice(displayData.saveAmount, displayData.currency)}</span>
-                  </div>
                 )}
-                <p className="text-sm text-gray-500 mt-2">Inclusive of all taxes</p>
-                
-                {isInCart && (
-                  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                    <p className="text-sm text-blue-800">
-                      <span className="font-semibold">{cartQuantity} item(s)</span> in your cart • 
-                      Total: <span className="font-semibold">{formatPrice(totalInCart, displayData.currency)}</span>
-                    </p>
-                  </div>
-                )}
-              </div>
 
-              <div className="mb-6">
-                <ComboOfferBlock />
-              </div>
-
-              {/* Rating */}
-              <div className="mb-6">
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-5 h-5 ${
-                          i < Math.floor(displayData.rating)
-                            ? 'text-yellow-400 fill-current'
-                            : 'text-gray-300'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-gray-600">({displayData.reviewCount} reviews)</span>
-                </div>
-              </div>
-
-              {/* Description */}
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Description</h3>
-                <ExpandableDescription
-                  description={displayData.description}
-                  html
-                  limit={180}
-                  className="text-sm leading-relaxed text-gray-600 [&_p]:mb-3 [&_strong]:font-semibold [&_em]:italic [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:mb-1"
-                />
-              </div>
-
-              {/* Size Selection (desktop) */}
-              {isReadymade && hasVariants && <SizeSelection />}
-
-              {/* Color Selection */}
-              {isReadymade && itemData?.colors && itemData.colors.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Color</h3>
-                  <div className="flex flex-wrap gap-3">
-                    {itemData.colors.map((color) => (
-                      <button
-                        key={color}
-                        onClick={() => handleColorSelect(color)}
-                        className={`flex items-center space-x-2 px-3 py-2 border-2 rounded-lg transition-all duration-200 ${
-                          selectedColor === color
-                            ? 'border-blue-600 bg-blue-50'
-                            : 'border-gray-300 hover:border-gray-400'
-                        }`}
-                      >
-                        <div
-                          className="w-6 h-6 rounded-full border border-gray-300"
-                          style={{ backgroundColor: color.toLowerCase() }}
-                        />
-                        <span className="font-medium text-gray-700">{color}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Quantity */}
-              {isReadymade && (
-                <div className="mb-6">
-                  <div className="flex justify-between items-center mb-3">
-                    <h3 className="text-lg font-semibold text-gray-900">Quantity</h3>
-                    <span className="text-sm text-gray-600">{displayData.stock} available</span>
-                  </div>
-                  <div className="flex items-center">
-                    <button
-                      onClick={() => handleQuantityChange(-1)}
-                      disabled={quantity <= 1}
-                      className={`w-10 h-10 flex items-center justify-center border border-gray-300 rounded-l-lg ${
-                        quantity <= 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      <span className="text-lg">-</span>
-                    </button>
-                    <div className="w-12 h-10 flex items-center justify-center border-t border-b border-gray-300">
-                      <span className="text-lg font-medium">{quantity}</span>
-                    </div>
-                    <button
-                      onClick={() => handleQuantityChange(1)}
-                      disabled={quantity >= displayData.stock}
-                      className={`w-10 h-10 flex items-center justify-center border border-gray-300 rounded-r-lg ${
-                        quantity >= displayData.stock ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      <span className="text-lg">+</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons (desktop) */}
-              {
-                <div className="grid grid-cols-2 gap-4 mt-6">
-                  <button
-                    type="button"
-                    id="readymade-add-to-cart-desktop"
-                    onClick={handleAddToCart}
-                    aria-label="Add to cart"
-                    data-meta-track="add-to-cart"
-                    disabled={isOutOfStock || isAddingToCart || cartLoading || (hasVariants && !selectedSize)}
-                    className={`h-14 rounded-xl font-semibold transition-all flex items-center justify-center gap-3 ${
-                      isOutOfStock || (hasVariants && !selectedSize)
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : isInCart
-                        ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:opacity-90'
-                        : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-90'
-                    }`}
-                  >
-                    {isAddingToCart || cartLoading ? (
-                      <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                        {isInCart ? 'Updating...' : 'Adding...'}
-                      </>
-                    ) : isInCart ? (
-                      <>
-                        <Check className="w-5 h-5" />
-                        {isReadymade && cartQuantity === quantity ? 'In Cart' : `In Cart (${cartQuantity})`}
-                      </>
-                    ) : (
-                      <>
-                        <ShoppingCart className="w-5 h-5" />
-                        Add to Cart
-                      </>
-                    )}
-                  </button>
-                  
-                  <button
-                    onClick={handleBuyNow}
-                    disabled={isOutOfStock || (hasVariants && !selectedSize)}
-                    className={`h-14 rounded-xl font-semibold transition-all flex items-center justify-center gap-3 ${
-                      isOutOfStock || (hasVariants && !selectedSize)
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-gradient-to-r from-green-600 to-teal-600 text-white hover:opacity-90'
-                    }`}
-                  >
-                    <CreditCard className="w-5 h-5" />
-                    Buy Now
-                  </button>
-                </div>
-              }
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile Action Bar - Fixed at bottom with Size Selection BEFORE Add to Cart */}
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white shadow-lg">
-          <div className="space-y-2 p-2.5">
-            {/* Size Selection (Mobile - First in order) */}
-            {isReadymade && hasVariants && (
-              <div className="mb-1">
-                <SizeSelection />
-              </div>
-            )}
-
-            {/* Quantity and Action Buttons (Mobile) */}
-            <div className="space-y-2">
-              {isReadymade && (
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-gray-700">Qty</span>
-                  <div className="flex items-center">
-                    <button
-                      onClick={() => handleQuantityChange(-1)}
-                      disabled={quantity <= 1 || (hasVariants && !selectedSize)}
-                      className={`flex h-7 w-7 items-center justify-center rounded-l-lg border border-gray-300 ${
-                        quantity <= 1 || (hasVariants && !selectedSize) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      <span className="text-base">-</span>
-                    </button>
-                    <div className="flex h-7 w-8 items-center justify-center border-b border-t border-gray-300">
-                      <span className="text-sm font-medium">{quantity}</span>
-                    </div>
-                    <button
-                      onClick={() => handleQuantityChange(1)}
-                      disabled={quantity >= displayData.stock || (hasVariants && !selectedSize)}
-                      className={`flex h-7 w-7 items-center justify-center rounded-r-lg border border-gray-300 ${
-                        quantity >= displayData.stock || (hasVariants && !selectedSize) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      <span className="text-base">+</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                {
+                {media.length > 1 && (
                   <>
                     <button
                       type="button"
-                      id="readymade-add-to-cart-mobile"
-                      onClick={handleAddToCart}
-                      aria-label="Add to cart"
-                      data-meta-track="add-to-cart"
-                      disabled={isOutOfStock || isAddingToCart || cartLoading || (hasVariants && !selectedSize)}
-                      className={`flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg text-sm font-semibold transition-all ${
-                        isOutOfStock || (hasVariants && !selectedSize)
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : isInCart
-                          ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:opacity-90'
-                          : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-90'
-                      }`}
+                      onClick={() => setSelectedImageIndex((prev) => (prev - 1 + media.length) % media.length)}
+                      aria-label="Previous image"
+                      className="absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-colors hover:bg-black/75"
                     >
-                      {isAddingToCart || cartLoading ? (
-                        <>
-                          <div className="h-3.5 w-3.5 animate-spin rounded-full border-b-2 border-white"></div>
-                          <span className="text-xs">Adding...</span>
-                        </>
-                      ) : isInCart ? (
-                        <>
-                          <Check className="h-3.5 w-3.5" />
-                          <span className="text-xs">In Cart</span>
-                        </>
-                      ) : (
-                        <>
-                          <ShoppingCart className="h-3.5 w-3.5" />
-                          <span className="text-xs">Add</span>
-                        </>
-                      )}
+                      <ChevronRight className="h-5 w-5 rotate-180" aria-hidden="true" />
                     </button>
-                    
                     <button
-                      onClick={handleBuyNow}
-                      disabled={isOutOfStock || (hasVariants && !selectedSize)}
-                      className={`flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg text-sm font-semibold transition-all ${
-                        isOutOfStock || (hasVariants && !selectedSize)
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : 'bg-gradient-to-r from-green-600 to-teal-600 text-white hover:opacity-90'
-                      }`}
+                      type="button"
+                      onClick={() => setSelectedImageIndex((prev) => (prev + 1) % media.length)}
+                      aria-label="Next image"
+                      className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm transition-colors hover:bg-black/75"
                     >
-                      <CreditCard className="h-3.5 w-3.5" />
-                      <span className="text-xs">Buy</span>
+                      <ChevronRight className="h-5 w-5" aria-hidden="true" />
                     </button>
                   </>
-                }
+                )}
               </div>
+
+              {media.length > 1 && (
+                <div className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:hidden" style={{ scrollbarWidth: 'none' }}>
+                  {media.map((item, index) => renderThumb(item, index, 'h-16 w-14'))}
+                </div>
+              )}
+
+              {/* Design views (custom designs only) */}
+              {!isReadymade && displayData.views && displayData.views.length > 1 && (
+                <div className="mt-4 grid grid-cols-4 gap-2">
+                  {displayData.views.map((view, index) => (
+                    <button
+                      key={view.code}
+                      type="button"
+                      onClick={() => {
+                        setActiveView(index);
+                        const previewIndex = images.findIndex((img) => img === view.previewImage);
+                        if (previewIndex !== -1) setSelectedImageIndex(previewIndex);
+                      }}
+                      className={`relative aspect-square overflow-hidden rounded-mt-btn bg-mt-photo ${
+                        activeView === index ? 'ring-2 ring-mt-text ring-offset-2 ring-offset-mt-bg' : ''
+                      }`}
+                    >
+                      {view.previewImage ? (
+                        <img src={buildImageUrl(view.previewImage)} alt={view.code} className="h-full w-full object-cover" loading="lazy" />
+                      ) : null}
+                      <span className="absolute inset-x-1 bottom-1 rounded bg-black/70 px-1 py-0.5 text-[10px] uppercase text-white">
+                        {view.code || `View ${index + 1}`}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Mobile Product Info (Above the fixed bar) */}
-        <div className="lg:hidden space-y-6 pb-24">
-          {/* Product Title and Price */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4">
-            <h1 className="text-xl font-bold text-gray-900 mb-2">
-              {displayData.title}
-            </h1>
-            <div className="flex items-center gap-2 text-gray-500 mb-3">
-              <Package className="w-4 h-4" />
-              <span className="text-sm font-medium">{displayData.category}</span>
-            </div>
-            
-            <div className="flex items-baseline justify-between">
-              <div>
-                <span className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+        {/* Details */}
+        <section aria-label="Product details" className="lg:col-span-5">
+          <div className="lg:sticky lg:top-40">
+            <p className="text-[11px] uppercase tracking-[0.24em] text-mt-subtle">
+              {[displayData.category, itemData?.subCategory].filter(Boolean).join(' · ') || 'Maitrova'}
+            </p>
+            <h1 className="mt-2 text-2xl font-medium leading-tight text-mt-text sm:text-3xl">{displayData.title}</h1>
+
+            {isReadymade && (
+              <button
+                type="button"
+                onClick={scrollToReviews}
+                className="mt-3 inline-flex items-center gap-2 text-sm text-mt-muted transition-colors hover:text-mt-text"
+              >
+                {renderStars()}
+                {displayData.reviewCount > 0 ? (
+                  <span>
+                    {Number(displayData.rating).toFixed(1)} · {displayData.reviewCount} review{displayData.reviewCount === 1 ? '' : 's'}
+                  </span>
+                ) : (
+                  <span>No reviews yet</span>
+                )}
+              </button>
+            )}
+
+            {/* Price */}
+            <div className="mt-5">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="text-2xl font-medium text-mt-text sm:text-3xl">
                   {formatPrice(displayData.price, displayData.currency)}
                 </span>
-                {displayData.originalPrice && displayData.price < displayData.originalPrice && (
-                  <span className="text-gray-400 line-through ml-2 text-sm">
+                {hasDiscount && (
+                  <span className="text-base text-mt-subtle line-through">
                     {formatPrice(displayData.originalPrice, displayData.currency)}
                   </span>
                 )}
-                {displayData.saleActive && (
-                  <div className="mt-1 text-xs font-medium text-emerald-700">
-                    Save {formatPrice(displayData.saveAmount, displayData.currency)} • {displayData.discountPercent}% OFF
-                  </div>
+                {displayData.saleActive && displayData.discountPercent > 0 && (
+                  <span className="text-sm font-medium text-mt-success">
+                    Save {formatPrice(displayData.saveAmount, displayData.currency)} ({displayData.discountPercent}%)
+                  </span>
                 )}
               </div>
-              <div className="flex items-center gap-1">
-                <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                <span className="text-sm text-gray-600">{displayData.rating}</span>
-              </div>
-            </div>
-            
-            {isInCart && (
-              <div className="mt-3 p-2 bg-blue-50 rounded-lg">
-                <p className="text-xs text-blue-800">
-                  <span className="font-semibold">{cartQuantity} item(s)</span> in cart
-                </p>
-              </div>
-            )}
-          </div>
-
-          <ComboOfferBlock compact />
-
-          {/* Color Selection (Mobile) */}
-          {isReadymade && itemData?.colors && itemData.colors.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Color</h3>
-              <div className="flex flex-wrap gap-2">
-                {itemData.colors.map((color) => (
-                  <button
-                    key={color}
-                    onClick={() => handleColorSelect(color)}
-                    className={`flex items-center space-x-2 px-2 py-1.5 border-2 rounded-lg transition-all duration-200 ${
-                      selectedColor === color
-                        ? 'border-blue-600 bg-blue-50'
-                        : 'border-gray-300 hover:border-gray-400'
-                    }`}
-                  >
-                    <div
-                      className="w-5 h-5 rounded-full border border-gray-300"
-                      style={{ backgroundColor: color.toLowerCase() }}
-                    />
-                    <span className="font-medium text-sm text-gray-700">{color}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Description (Mobile) */}
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Description</h3>
-            <div className="relative">
-              <div
-                className={`text-gray-600 text-sm leading-relaxed transition-all duration-200
-                  [&_p]:mb-3
-                  [&_strong]:font-semibold [&_strong]:text-gray-800
-                  [&_ul]:list-disc [&_ul]:pl-5
-                  [&_ol]:list-decimal [&_ol]:pl-5
-                  [&_li]:mb-1
-                  ${isMobileDescriptionExpanded ? "" : "max-h-24 overflow-hidden"}`}
-                dangerouslySetInnerHTML={{
-                  __html: DOMPurify.sanitize(displayData.description || ""),
-                }}
-              />
-              {!isMobileDescriptionExpanded && (
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent" />
+              <p className="mt-1 text-xs text-mt-subtle">Inclusive of all taxes</p>
+              {lowStock && !hasVariants && (
+                <p className="mt-2 text-xs text-mt-warning">Only {displayData.stock} left in stock</p>
               )}
             </div>
-            {(displayData.description || "").length > 120 && (
+
+            {/* Custom design colour */}
+            {!isReadymade && displayData.productColor && (
+              <div className="mt-6 flex items-center gap-3 border-t border-mt-line pt-6">
+                <span className="h-8 w-8 rounded-full border border-mt-tint/25" style={{ backgroundColor: displayData.productColor }} />
+                <span className="text-sm text-mt-muted">Garment colour</span>
+              </div>
+            )}
+
+            {(isReadymade && (itemData?.colors?.length > 0 || hasVariants)) && (
+              <div className="mt-6 space-y-6 border-t border-mt-line pt-6">
+                {itemData?.colors?.length > 0 && (
+                  <div>
+                    <h2 className="mb-3 text-sm text-mt-text">
+                      Colour{selectedColor ? <span className="text-mt-muted">: {selectedColor}</span> : null}
+                    </h2>
+                    <div className="flex flex-wrap gap-2.5" role="radiogroup" aria-label="Colour">
+                      {itemData.colors.map((color) => {
+                        const isSelected = selectedColor === color;
+                        return (
+                          <button
+                            key={color}
+                            type="button"
+                            role="radio"
+                            aria-checked={isSelected}
+                            aria-label={color}
+                            title={color}
+                            onClick={() => handleColorSelect(color)}
+                            className={`h-9 w-9 rounded-full border border-mt-tint/25 transition-shadow ${
+                              isSelected ? 'ring-2 ring-mt-text ring-offset-2 ring-offset-mt-bg' : 'hover:ring-1 hover:ring-mt-line-strong hover:ring-offset-2 hover:ring-offset-mt-bg'
+                            }`}
+                            style={{ backgroundColor: color.toLowerCase() }}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {hasVariants && <SizeSelection />}
+              </div>
+            )}
+
+            {/* Purchase */}
+            <div className="mt-6 space-y-3 border-t border-mt-line pt-6">
+              <div className="flex gap-3">
+                {isReadymade && (
+                  <div className="flex h-12 items-center rounded-mt-btn border border-mt-line-strong" role="group" aria-label="Quantity">
+                    <button
+                      type="button"
+                      onClick={() => handleQuantityChange(-1)}
+                      disabled={quantity <= 1}
+                      aria-label="Decrease quantity"
+                      className="flex h-full w-11 items-center justify-center text-lg text-mt-text transition-colors hover:bg-mt-tint/5 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      −
+                    </button>
+                    <span className="w-8 text-center text-sm tabular-nums" aria-live="polite">{quantity}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleQuantityChange(1)}
+                      disabled={quantity >= displayData.stock}
+                      aria-label="Increase quantity"
+                      className="flex h-full w-11 items-center justify-center text-lg text-mt-text transition-colors hover:bg-mt-tint/5 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      +
+                    </button>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  id="readymade-add-to-cart-desktop"
+                  onClick={handleAddToCart}
+                  aria-label="Add to cart"
+                  data-meta-track="add-to-cart"
+                  disabled={isOutOfStock || isBusy}
+                  className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-mt-btn bg-mt-btn px-5 text-sm font-medium text-mt-btn-text transition-colors hover:bg-mt-btn-hover disabled:cursor-not-allowed disabled:bg-mt-line-strong disabled:text-mt-subtle"
+                >
+                  {isBusy ? (
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" aria-hidden="true" />
+                  ) : isInCart ? (
+                    <Check className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <ShoppingCart className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  {addToCartLabel}
+                </button>
+              </div>
               <button
                 type="button"
-                onClick={() => setIsMobileDescriptionExpanded((expanded) => !expanded)}
-                className="mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700"
+                onClick={handleBuyNow}
+                disabled={isOutOfStock}
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-mt-btn border border-mt-accent text-sm font-medium text-mt-accent-strong transition-colors hover:bg-mt-accent/10 disabled:cursor-not-allowed disabled:border-mt-line disabled:text-mt-subtle"
               >
-                {isMobileDescriptionExpanded ? "View less" : "View more"}
+                <CreditCard className="h-4 w-4" aria-hidden="true" />
+                Buy now
               </button>
-            )}
-          </div>
+              {isInCart && (
+                <p className="text-center text-xs text-mt-muted">
+                  {cartQuantity} in your cart · {formatPrice(totalInCart, displayData.currency)}{' '}
+                  <Link to="/cart" className="text-mt-accent underline underline-offset-4 hover:text-mt-accent-strong">View cart</Link>
+                </p>
+              )}
+            </div>
 
-          {/* Size Chart (Mobile) - Positioned After Description */}
-          {isReadymade && sizeChartUrl && (
-            <SizeChart />
-          )}
+            {isReadymade && (
+              <div className="mt-6">
+                <ComboOfferBlock />
+              </div>
+            )}
+
+            {/* Trust */}
+            <ul className="mt-6 grid grid-cols-3 gap-2 border-y border-mt-line py-4 text-center text-[11px] text-mt-muted sm:text-xs">
+              <li className="flex flex-col items-center gap-1.5">
+                <Truck className="h-4 w-4 text-mt-text" aria-hidden="true" />
+                Ships across India
+              </li>
+              <li className="flex flex-col items-center gap-1.5">
+                <RefreshCw className="h-4 w-4 text-mt-text" aria-hidden="true" />
+                <a href="/return-refund-policy" className="hover:text-mt-text">Easy returns</a>
+              </li>
+              <li className="flex flex-col items-center gap-1.5">
+                <Shield className="h-4 w-4 text-mt-text" aria-hidden="true" />
+                Secure checkout
+              </li>
+            </ul>
+
+            {/* Information */}
+            <div className="divide-y divide-mt-line border-b border-mt-line">
+              <details className="group" open>
+                <summary className="flex cursor-pointer list-none items-center justify-between py-4 text-sm text-mt-text [&::-webkit-details-marker]:hidden">
+                  Description
+                  <ChevronRight className="h-4 w-4 text-mt-subtle transition-transform group-open:rotate-90" aria-hidden="true" />
+                </summary>
+                <ExpandableDescription
+                  description={displayData.description}
+                  html
+                  limit={260}
+                  className="pb-5 text-sm leading-relaxed text-mt-muted [&_p]:mb-3 [&_strong]:font-medium [&_strong]:text-mt-text [&_em]:italic [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mb-1"
+                />
+              </details>
+
+              {productDetails.length > 0 && (
+                <details className="group">
+                  <summary className="flex cursor-pointer list-none items-center justify-between py-4 text-sm text-mt-text [&::-webkit-details-marker]:hidden">
+                    Product details
+                    <ChevronRight className="h-4 w-4 text-mt-subtle transition-transform group-open:rotate-90" aria-hidden="true" />
+                  </summary>
+                  <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 pb-5 text-sm">
+                    {productDetails.map((row) => (
+                      <React.Fragment key={row.label}>
+                        <dt className="text-mt-subtle">{row.label}</dt>
+                        <dd className="text-mt-text">{row.value}</dd>
+                      </React.Fragment>
+                    ))}
+                  </dl>
+                </details>
+              )}
+
+              {isReadymade && displayData.careInstructions && typeof displayData.careInstructions !== 'object' && (
+                <details className="group">
+                  <summary className="flex cursor-pointer list-none items-center justify-between py-4 text-sm text-mt-text [&::-webkit-details-marker]:hidden">
+                    Care
+                    <ChevronRight className="h-4 w-4 text-mt-subtle transition-transform group-open:rotate-90" aria-hidden="true" />
+                  </summary>
+                  <div
+                    className="pb-5 text-sm leading-relaxed text-mt-muted [&_p]:mb-2 [&_ul]:list-disc [&_ul]:pl-5"
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(String(displayData.careInstructions)) }}
+                  />
+                </details>
+              )}
+
+              {isReadymade && sizeChartUrl && (
+                <details id="size-guide" className="group scroll-mt-40">
+                  <summary className="flex cursor-pointer list-none items-center justify-between py-4 text-sm text-mt-text [&::-webkit-details-marker]:hidden">
+                    Size guide
+                    <ChevronRight className="h-4 w-4 text-mt-subtle transition-transform group-open:rotate-90" aria-hidden="true" />
+                  </summary>
+                  <button
+                    type="button"
+                    onClick={() => window.open(sizeChartUrl, '_blank')}
+                    className="mb-5 block w-full cursor-zoom-in overflow-hidden rounded-mt-btn bg-white"
+                    aria-label="Open size chart in a new tab"
+                  >
+                    <img
+                      src={sizeChartUrl}
+                      alt="Size chart"
+                      className="w-full"
+                      srcSet={sizeChartImageProps.srcSet}
+                      sizes={sizeChartImageProps.sizes}
+                      loading="lazy"
+                      decoding={sizeChartImageProps.decoding}
+                    />
+                  </button>
+                </details>
+              )}
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* Phone purchase bar */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-mt-line bg-mt-bg/95 px-4 py-3 backdrop-blur lg:hidden">
+        <div className="mx-auto flex max-w-xl items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-medium leading-tight text-mt-text">
+              {formatPrice(displayData.price, displayData.currency)}
+              {hasDiscount && (
+                <span className="ml-2 text-xs font-normal text-mt-subtle line-through">
+                  {formatPrice(displayData.originalPrice, displayData.currency)}
+                </span>
+              )}
+            </p>
+            <p className="truncate text-[11px] text-mt-subtle">
+              {needsSize ? 'Select a size' : selectedSize ? `Size ${selectedSize} · Qty ${quantity}` : `Qty ${quantity}`}
+            </p>
+          </div>
+          <button
+            type="button"
+            id="readymade-add-to-cart-mobile"
+            onClick={handleAddToCart}
+            aria-label="Add to cart"
+            data-meta-track="add-to-cart"
+            disabled={isOutOfStock || isBusy}
+            className="inline-flex h-12 min-w-[150px] items-center justify-center gap-2 rounded-mt-btn bg-mt-btn px-5 text-sm font-medium text-mt-btn-text transition-colors hover:bg-mt-btn-hover disabled:cursor-not-allowed disabled:bg-mt-line-strong disabled:text-mt-subtle"
+          >
+            {isBusy ? (
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" aria-hidden="true" />
+            ) : isInCart ? (
+              <Check className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <ShoppingCart className="h-4 w-4" aria-hidden="true" />
+            )}
+            {addToCartLabel}
+          </button>
         </div>
       </div>
+
       {shouldShowRelatedProducts && (
-        <section className="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6 lg:px-8">
-          <div className="mb-4">
+        <section className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
+          <div className="mb-5 flex items-end justify-between gap-4">
             <div>
-              <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">You may also like</h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Similar picks{displayData?.category ? ` in ${displayData.category}` : ''}. Swipe to explore.
-              </p>
+              <h2 className="text-lg font-medium text-mt-text sm:text-2xl">You may also like</h2>
+              {displayData?.category && (
+                <p className="mt-1 text-sm text-mt-subtle">More in {displayData.category}</p>
+              )}
             </div>
           </div>
 
           {relatedLoading ? (
-            <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-3 sm:gap-4">
+            <div className="flex gap-3 overflow-hidden sm:gap-4">
               {[...Array(4)].map((_, index) => (
-                <div
-                  key={index}
-                  className="w-[10rem] flex-none overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm sm:w-[11rem]"
-                >
-                  <div className="aspect-square animate-pulse bg-gray-100" />
-                  <div className="space-y-2 p-3">
-                    <div className="h-3 animate-pulse rounded bg-gray-100" />
-                    <div className="h-3 w-1/2 animate-pulse rounded bg-gray-100" />
-                  </div>
+                <div key={index} className="w-[44%] shrink-0 sm:w-[220px]">
+                  <div className="aspect-[4/5] animate-pulse rounded-mt-btn bg-mt-surface-raised" />
+                  <div className="mt-2 h-3 w-3/4 animate-pulse rounded bg-mt-surface-raised" />
                 </div>
               ))}
             </div>
           ) : (
-            <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-3 sm:gap-4">
+            <div className="flex snap-x gap-3 overflow-x-auto pb-2 sm:gap-4" style={{ scrollbarWidth: 'none' }}>
               {relatedProducts.map((relatedItem) => {
                 const relatedImage = Array.isArray(relatedItem.images)
                   ? relatedItem.images.find((image) => Boolean(getRawImagePath(image)))
                   : null;
                 const relatedImageProps = getResponsiveImageProps(relatedImage, {
-                  sizes: "(max-width: 640px) 160px, 176px",
+                  sizes: "(max-width: 640px) 44vw, 220px",
                   loading: "lazy",
                 });
-                const relatedPrice = Number(
-                  relatedItem.effectivePrice ?? relatedItem.price ?? 0
-                );
-                const relatedOriginalPrice = Number(
-                  relatedItem.mrp ?? relatedItem.price ?? relatedPrice
-                );
-                const showRelatedDiscount =
-                  relatedOriginalPrice > relatedPrice && relatedPrice > 0;
+                const relatedPrice = Number(relatedItem.effectivePrice ?? relatedItem.price ?? 0);
+                const relatedOriginalPrice = Number(relatedItem.mrp ?? relatedItem.price ?? relatedPrice);
+                const showRelatedDiscount = relatedOriginalPrice > relatedPrice && relatedPrice > 0;
 
                 return (
                   <Link
                     key={relatedItem._id}
                     to={buildReadymadeProductPath(relatedItem) || `/readymade/${relatedItem._id}`}
-                    className="group w-[10rem] flex-none snap-start overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg sm:w-[11rem]"
+                    className="group w-[44%] shrink-0 snap-start sm:w-[220px]"
                   >
-                    <div className="relative aspect-square overflow-hidden bg-gray-50">
+                    <div className="relative aspect-[4/5] overflow-hidden rounded-mt-btn bg-mt-photo">
                       {showRelatedDiscount && (
-                        <span className="absolute left-2 top-2 z-10 rounded-full bg-emerald-600 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                        <span className="absolute left-2 top-2 z-10 rounded-mt-btn bg-black/80 px-2 py-0.5 text-[10px] font-medium text-white">
                           {Math.round(((relatedOriginalPrice - relatedPrice) / relatedOriginalPrice) * 100)}% off
                         </span>
                       )}
@@ -2011,28 +1744,18 @@ export default function ProductDetailPage() {
                         sizes={relatedImageProps.sizes}
                         alt={relatedItem.title}
                         loading="lazy"
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                       />
                     </div>
-
-                    <div className="space-y-1.5 p-2.5">
-                      <div className="line-clamp-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-indigo-600">
-                        {relatedItem.category || 'Readymade'}
-                      </div>
-                      <h3 className="line-clamp-1 min-h-[1.25rem] text-sm font-medium leading-5 text-gray-900">
-                        {relatedItem.title}
-                      </h3>
-                      <div className="flex items-center gap-1">
-                        <span className="text-sm font-semibold text-gray-900">
-                          {formatPrice(relatedPrice, relatedItem.currency || 'INR')}
+                    <p className="mt-2 line-clamp-1 text-sm text-mt-text">{relatedItem.title}</p>
+                    <p className="mt-0.5 flex items-baseline gap-2 text-sm text-mt-muted">
+                      {formatPrice(relatedPrice, relatedItem.currency || 'INR')}
+                      {showRelatedDiscount && (
+                        <span className="text-xs text-mt-subtle line-through">
+                          {formatPrice(relatedOriginalPrice, relatedItem.currency || 'INR')}
                         </span>
-                        {showRelatedDiscount && (
-                          <span className="text-[11px] text-gray-400 line-through">
-                            {formatPrice(relatedOriginalPrice, relatedItem.currency || 'INR')}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                      )}
+                    </p>
                   </Link>
                 );
               })}
@@ -2040,15 +1763,19 @@ export default function ProductDetailPage() {
           )}
         </section>
       )}
+
       {isReadymade && itemData?._id ? (
-        <ProductReviews
-          kind="READYMADE"
-          targetId={itemData._id}
-          initialRating={displayData?.rating}
-          initialReviewCount={displayData?.reviewCount}
-          initialBreakdown={displayData?.ratingBreakdown}
-        />
+        <div id="reviews" className="scroll-mt-40">
+          <ProductReviews
+            kind="READYMADE"
+            targetId={itemData._id}
+            initialRating={displayData?.rating}
+            initialReviewCount={displayData?.reviewCount}
+            initialBreakdown={displayData?.ratingBreakdown}
+          />
+        </div>
       ) : null}
+
       <ProductImageLightbox
         isOpen={isImageViewerOpen}
         items={galleryItems}

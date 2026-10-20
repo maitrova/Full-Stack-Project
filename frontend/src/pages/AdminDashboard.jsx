@@ -94,7 +94,9 @@ import ProductSearch from '../components/searchproductdetail.jsx';
 import AdminDesignsPage from './AdminDesignsPage.jsx';
 import DesignUploadsManager from '../components/admindesignuploads.jsx';
 import CouponManagement from '../components/admin/CouponManagement.jsx';
+import CartOfferRulesManager from '../components/admin/CartOfferRulesManager.jsx';
 import HeaderBannerSettings from '../components/admin/HeaderBannerSettings.jsx';
+import HomepageBannersManager from '../components/admin/HomepageBannersManager.jsx';
 import UserManagement from '../components/admin/UserManagement.jsx';
 import CompanyDocumentManager from '../components/admin/CompanyDocumentManager.jsx';
 import ReviewManagement from '../components/admin/ReviewManagement.jsx';
@@ -213,6 +215,7 @@ const AdminDashboard = () => {
         activeTab !== 'search' &&
         activeTab !== 'adminDesigns' &&
         activeTab !== 'coupons' &&
+        activeTab !== 'cartOffers' &&
         activeTab !== 'reviews' &&
         activeTab !== 'users' &&
         activeTab !== 'companyPolicies' &&
@@ -354,6 +357,8 @@ const AdminDashboard = () => {
     setViewMode('search');
   } else if (tab === 'coupons') {
     setViewMode('coupons');
+  } else if (tab === 'cartOffers') {
+    setViewMode('cartOffers');
   } else if (tab === 'reviews') {
     setViewMode('reviews');
   } else if (tab === 'users') {
@@ -783,6 +788,7 @@ const AdminDashboard = () => {
     { id: 'adminUploads', label: 'Admin Uploads', icon: <Upload className="w-5 h-5" /> },
     { id: 'companyPolicies', label: 'Company Policies', icon: <FileText className="w-5 h-5" /> },
     { id: 'coupons', label: 'Coupon Management', icon: <DollarSign className="w-5 h-5" /> },
+    { id: 'cartOffers', label: 'Cart Value Offers', icon: <Tag className="w-5 h-5" /> },
     { id: 'reviews', label: 'Review Management', icon: <MessageSquareText className="w-5 h-5" /> },
     { id: 'topOrder', label: 'Top Order Selection', icon: <Star className="w-5 h-5" /> },
     { id: 'newArrival', label: 'New Arrivals', icon: <TrendingUp className="w-5 h-5" /> },
@@ -1166,6 +1172,7 @@ const AdminDashboard = () => {
                 {activeSidebarItem === 'adminUploads' && 'Admin Uploads'}
                 {activeSidebarItem === 'companyPolicies' && 'Company Policies'}
                 {activeSidebarItem === 'coupons' && 'Coupon Management'}
+                {activeSidebarItem === 'cartOffers' && 'Cart Value Offers'}
                 {activeSidebarItem === 'reviews' && 'Review Management'}
               </h1>
               <p className="text-gray-600 mt-2">
@@ -1190,6 +1197,7 @@ const AdminDashboard = () => {
                 {activeSidebarItem === 'adminUploads' && 'Upload and manage admin files'}
                 {activeSidebarItem === 'companyPolicies' && 'Create and manage public-facing company policy pages'}
                 {activeSidebarItem === 'coupons' && 'Create, edit, pause, and delete coupon rules'}
+                {activeSidebarItem === 'cartOffers' && 'Spend more, save more offers shown in the cart'}
                 {activeSidebarItem === 'reviews' && 'Moderate and delete customer reviews'}
               </p>
             </div>
@@ -1259,7 +1267,10 @@ const AdminDashboard = () => {
 
           {/* Homepage Component */}
           {activeSidebarItem === 'homepage' && (
-            <HomepageAdmin />
+            <>
+              <HomepageBannersManager />
+              <HomepageAdmin />
+            </>
           )}
 
           {activeSidebarItem === 'blogs' && (
@@ -1287,6 +1298,10 @@ const AdminDashboard = () => {
 
           {activeSidebarItem === 'coupons' && (
             <CouponManagement />
+          )}
+
+          {activeSidebarItem === 'cartOffers' && (
+            <CartOfferRulesManager />
           )}
 
           {activeSidebarItem === 'reviews' && (
@@ -1886,6 +1901,7 @@ const AdminDashboard = () => {
      activeSidebarItem !== 'adminUploads' &&
      activeSidebarItem !== 'companyPolicies' &&
      activeSidebarItem !== 'coupons' &&
+     activeSidebarItem !== 'cartOffers' &&
      activeSidebarItem !== 'reviews' &&
      activeSidebarItem !== 'prices' &&
      activeSidebarItem !== 'users' &&

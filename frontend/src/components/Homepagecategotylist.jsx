@@ -1,4 +1,4 @@
-// CategoryTilesHorizontal.jsx - Name overlay on image (like screenshot)
+// CategoryTilesHorizontal.jsx - "Shop by category" photo tiles on the homepage
 import React, { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -7,15 +7,14 @@ import {
   selectCategoriesLoading,
 } from "../redux/slices/Homepagecategorylist.js";
 import { Link } from "react-router-dom";
-import { BiCategoryAlt } from "react-icons/bi"; // optional icon
 import { buildProductsListingPath } from "../utils/readymadeRoutes.js";
+import { CategoryTile, SectionHeader, Skeleton } from "./ui/index.js";
 
 const IMAGE_URL = import.meta.env.VITE_IMAGE_URL; 
 
 const CategoryTilesHorizontal = ({ limit = 12, onlyActive = true }) => {
   const dispatch = useDispatch();
   const categories = useSelector(selectAllCategories);
-  console.log("Homepage Categories:", categories);
   const loading = useSelector(selectCategoriesLoading);
 
   useEffect(() => {
@@ -46,96 +45,52 @@ const CategoryTilesHorizontal = ({ limit = 12, onlyActive = true }) => {
 
   if (loading && categories.length === 0) {
     return (
-      <div className="bg-white">
-        <div className="max-w-7xl mx-auto px-3 pt-6 pb-3">
-          <div className="mb-6 flex flex-col items-center justify-center">
-            <div className="h-7 w-48 bg-gray-200 rounded-lg animate-pulse mb-1"></div>
-            <div className="h-4 w-32 bg-gray-200 rounded-lg animate-pulse"></div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-            {[...Array(6)].map((_, index) => (
-              <div key={index} className="animate-pulse">
-                <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
-                  <div className="aspect-square w-full bg-gray-200" />
-                </div>
-              </div>
-            ))}
-          </div>
+      <section className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 sm:pt-12">
+        <Skeleton className="mb-4 h-7 w-44" />
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-4">
+          {[...Array(4)].map((_, index) => (
+            <Skeleton key={index} className="aspect-[16/11] w-full sm:aspect-[4/3] lg:aspect-[4/5]" />
+          ))}
         </div>
-      </div>
+      </section>
     );
   }
 
   if (categories.length === 0 && !loading) return null;
 
   return (
-    <div className="bg-white">
-      <div className="mx-auto px-3 pt-6 pb-3">
-        {/* Centered Header */}
-        <div className="mb-6 flex flex-col items-center justify-center">
-          <h1 className="text-xl font-medium text-gray-900 mb-1 flex items-center gap-2">
-            <BiCategoryAlt className="text-gray-700" />
-            Our Categories
-          </h1>
-          <p className="text-gray-500 text-sm">{categories.length} collections</p>
-        </div>
+    <section className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 sm:pt-10">
+      <SectionHeader title="Shop by category" actionTo="/products" className="mb-3 sm:mb-5" />
 
-        {/* Categories Grid */}
-        <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-          {categories.map((category) => {
-            const imageUrl = formatImageUrl(category.thumbnail);
-            console.log("Formatted image URL for category", categories);
-            const label = titleCase(category.category);
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+        {categories.map((category) => {
+          const imageUrl = formatImageUrl(category.thumbnail);
+          const label = titleCase(category.category);
 
-            return (
-              <Link
-                key={category.category}
-                to={buildProductsListingPath(category.category)}
-                className="group block"
-              >
-                <div className="bg-white border border-gray-100 rounded-xl overflow-hidden hover:border-gray-300 transition-all duration-200 hover:shadow-md">
-                  {/* Image + overlay name */}
-                  <div className="relative aspect-square w-full overflow-hidden">
-                                    {imageUrl ? (
-                  <>
-                    {console.log("Alt text:", category.image.altText)}
-                    <img
-                      src={imageUrl}
-                      alt={category.image.altText || "hebu"}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                      loading="lazy"
-                    />
-                  </>
-                ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                        <span className="text-gray-400 text-2xl font-semibold">
-                          {label?.charAt(0) || "C"}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* subtle bottom fade so label always readable */}
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/35 to-transparent" />
-
-                    {/* Name pill/button on image (like your screenshot) */}
-                    <div className="absolute inset-x-0 bottom-3 flex justify-center px-3">
-                      <div className="flex items-center gap-2 max-w-full px-4 py-1.5 rounded-md bg-white text-gray-900 text-sm font-medium shadow">
-
-
-                        <span className="text-[13px] font-medium text-gray-900 truncate">
-                          {label}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
+          return imageUrl ? (
+            <CategoryTile
+              aspect="aspect-[16/11] sm:aspect-[4/3] lg:aspect-[4/5]"
+              key={category.category}
+              to={buildProductsListingPath(category.category)}
+              image={imageUrl}
+              imageAlt={category.image?.altText || label}
+              label={label}
+            />
+          ) : (
+            <Link
+              key={category.category}
+              to={buildProductsListingPath(category.category)}
+              className="relative flex aspect-[16/11] sm:aspect-[4/3] lg:aspect-[4/5] items-center justify-center rounded-mt-btn bg-mt-surface-raised text-3xl font-light text-mt-subtle"
+            >
+              {label?.charAt(0) || "C"}
+              <span className="absolute bottom-2.5 left-3 text-[13px] text-mt-text sm:bottom-4 sm:left-4 sm:text-base">
+                {label}
+              </span>
+            </Link>
+          );
+        })}
       </div>
-    </div>
+    </section>
   );
 };
 

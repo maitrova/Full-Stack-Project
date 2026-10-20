@@ -143,12 +143,12 @@ export default function Breadcrumbs() {
   if (!items || items.length === 0) return null;
 
   return (
-    <div className="border-b border-gray-100 bg-white">
-      <div className="mx-auto hidden max-w-7xl px-4 py-3 sm:block sm:px-6 lg:px-8">
+    <div className="border-b border-mt-line bg-mt-header font-brand">
+      <div className="mx-auto hidden max-w-7xl px-4 py-2.5 sm:block sm:px-6 lg:px-8">
         <nav aria-label="Breadcrumb">
-          <ol className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+          <ol className="flex flex-wrap items-center gap-2 text-xs text-mt-subtle">
             <li>
-              <Link to="/" className="transition-colors hover:text-gray-900">
+              <Link to="/" className="transition-colors hover:text-mt-text">
                 Home
               </Link>
             </li>
@@ -158,13 +158,18 @@ export default function Breadcrumbs() {
 
               return (
                 <li key={`${item.label}-${index}`} className="flex items-center gap-2">
-                  <ChevronRight className="h-4 w-4 text-gray-400" />
+                  <ChevronRight className="h-3.5 w-3.5 text-mt-line-strong" aria-hidden="true" />
                   {item.to && !isLast ? (
-                    <Link to={item.to} className="transition-colors hover:text-gray-900">
+                    <Link to={item.to} className="transition-colors hover:text-mt-text">
                       {item.label}
                     </Link>
                   ) : (
-                    <span className={isLast ? "font-medium text-gray-900" : ""}>{item.label}</span>
+                    <span
+                      className={isLast ? "text-mt-muted" : ""}
+                      aria-current={isLast ? "page" : undefined}
+                    >
+                      {item.label}
+                    </span>
                   )}
                 </li>
               );

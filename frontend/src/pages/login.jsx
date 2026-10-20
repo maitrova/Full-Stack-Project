@@ -136,7 +136,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-gray-50">
+    <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)] flex flex-col md:flex-row">
       {/* Image Section */}
       <div className="w-full md:w-1/2 lg:w-2/5 flex items-center justify-center p-12">
         <div className="text-center">
@@ -145,7 +145,7 @@ const LoginPage = () => {
             alt="Login Illustration"
             className="w-full max-w-lg mx-auto object-contain rounded-lg shadow-xl mb-8"
           />
-          <h2 className="text-3xl font-bold mb-4">Welcome Back</h2>
+          <h2 className="text-3xl font-normal mb-4">Welcome Back</h2>
           <p className="text-xl opacity-90">We're glad to see you again</p>
         </div>
       </div>
@@ -154,12 +154,12 @@ const LoginPage = () => {
       <div className="w-full md:w-1/2 lg:w-3/5 flex items-center justify-center p-8 sm:p-12 lg:p-16">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">Login</h1>
-            <p className="text-gray-600">Sign in to access your account</p>
+            <h1 className="text-3xl font-normal text-mt-text mb-2">Login</h1>
+            <p className="text-mt-muted">Sign in to access your account</p>
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">
+            <div className="mb-4 p-3 bg-mt-danger/10 text-mt-danger rounded-lg">
               {error}
             </div>
           )}
@@ -167,15 +167,15 @@ const LoginPage = () => {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Phone */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-mt-muted mb-1">
                 Phone or Email
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
                   {String(formData.identifier || "").includes("@") ? (
-                    <FiMail className="text-gray-400" />
+                    <FiMail className="text-mt-subtle" />
                   ) : (
-                    <FiPhone className="text-gray-400" />
+                    <FiPhone className="text-mt-subtle" />
                   )}
                 </div>
                 <input
@@ -188,7 +188,7 @@ const LoginPage = () => {
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-3 border border-mt-line-strong rounded-lg focus:ring-2 focus:ring-mt-text focus:border-transparent"
                   placeholder="Enter phone or email"
                   required
                 />
@@ -197,14 +197,14 @@ const LoginPage = () => {
 
             {/* Password */}
            <div>
-  <label className="block text-sm font-medium text-gray-700 mb-1">
+  <label className="block text-sm font-medium text-mt-muted mb-1">
     Password
   </label>
 
   <div className="relative">
     {/* Lock Icon */}
     <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
-      <FiLock className="text-gray-400" />
+      <FiLock className="text-mt-subtle" />
     </div>
 
     {/* Password Input */}
@@ -213,7 +213,7 @@ const LoginPage = () => {
       name="password"
       value={formData.password}
       onChange={handleChange}
-      className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+      className="w-full pl-10 pr-12 py-3 border border-mt-line-strong rounded-lg focus:ring-2 focus:ring-mt-text focus:border-transparent"
       placeholder="Enter password"
       required
     />
@@ -222,7 +222,7 @@ const LoginPage = () => {
     <button
       type="button"
       onClick={() => setShowPassword(!showPassword)}
-      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-purple-600 transition"
+      className="absolute inset-y-0 right-0 pr-3 flex items-center text-mt-subtle hover:text-mt-text transition"
     >
       {showPassword ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
     </button>
@@ -234,7 +234,7 @@ const LoginPage = () => {
               <button
                 type="button"
                 onClick={handleForgotPassword}
-                className="text-sm text-purple-600 hover:text-purple-800 font-medium"
+                className="text-sm text-mt-text hover:text-mt-text font-medium"
               >
                 Forgot Password?
               </button>
@@ -243,7 +243,7 @@ const LoginPage = () => {
             {/* Login Button */}
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition duration-300 font-medium"
+              className="w-full text-mt-btn-text py-3 rounded-lg transition duration-300 font-medium bg-mt-btn"
               disabled={status === 'loading'}
             >
               {status === 'loading' ? 'Signing in...' : 'Login'}
@@ -252,9 +252,9 @@ const LoginPage = () => {
 
           {/* Divider */}
           <div className="my-6 flex items-center">
-            <div className="flex-grow h-px bg-gray-300"></div>
-            <span className="mx-4 text-gray-500 text-sm">OR</span>
-            <div className="flex-grow h-px bg-gray-300"></div>
+            <div className="flex-grow h-px bg-mt-line-strong"></div>
+            <span className="mx-4 text-mt-subtle text-sm">OR</span>
+            <div className="flex-grow h-px bg-mt-line-strong"></div>
           </div>
 
           {/* Google Login */}
@@ -270,9 +270,9 @@ const LoginPage = () => {
           </div>
 
           {/* Signup Link */}
-          <div className="text-center text-sm text-gray-600 mt-6">
+          <div className="text-center text-sm text-mt-muted mt-6">
             Don't have an account?{' '}
-            <Link to="/register" state={{ from: location.state?.from }} className="text-purple-600 font-medium hover:text-purple-800">
+            <Link to="/register" state={{ from: location.state?.from }} className="text-mt-text font-medium hover:text-mt-text">
               Sign up
             </Link>
           </div>
@@ -281,12 +281,12 @@ const LoginPage = () => {
 
       {/* Forgot Password Modal */}
       {showForgotModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 relative animate-fadeIn">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-mt-surface rounded-xl max-w-md w-full p-6 relative animate-fadeIn">
             {/* Close button */}
             <button
               onClick={closeModal}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+              className="absolute top-4 right-4 text-mt-subtle hover:text-mt-text"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -295,29 +295,29 @@ const LoginPage = () => {
 
             {forgotStep === 'email' && (
               <div>
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Forgot Password?</h2>
-                <p className="text-gray-600 mb-6">Enter your email to receive an OTP</p>
+                <h2 className="text-2xl font-normal text-mt-text mb-2">Forgot Password?</h2>
+                <p className="text-mt-muted mb-6">Enter your email to receive an OTP</p>
                 
                 {forgotError && (
-                  <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">
+                  <div className="mb-4 p-3 bg-mt-danger/10 text-mt-danger rounded-lg">
                     {forgotError}
                   </div>
                 )}
 
                 <form onSubmit={handleSendOtp}>
                   <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-mt-muted mb-1">
                       Email Address
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
-                        <FiMail className="text-gray-400" />
+                        <FiMail className="text-mt-subtle" />
                       </div>
                       <input
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        className="w-full pl-10 pr-4 py-3 border border-mt-line-strong rounded-lg focus:ring-2 focus:ring-mt-text focus:border-transparent"
                         placeholder="Enter your email"
                         required
                       />
@@ -327,7 +327,7 @@ const LoginPage = () => {
                   <button
                     type="submit"
                     disabled={forgotStatus === 'loading'}
-                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition duration-300 font-medium disabled:opacity-50"
+                    className="w-full text-mt-btn-text py-3 rounded-lg transition duration-300 font-medium disabled:opacity-50 bg-mt-btn"
                   >
                     {forgotStatus === 'loading' ? 'Sending OTP...' : 'Send OTP'}
                   </button>
@@ -337,25 +337,25 @@ const LoginPage = () => {
 
             {forgotStep === 'otp' && (
               <div>
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Reset Password</h2>
-                <p className="text-gray-600 mb-6">Enter the OTP sent to {email}</p>
+                <h2 className="text-2xl font-normal text-mt-text mb-2">Reset Password</h2>
+                <p className="text-mt-muted mb-6">Enter the OTP sent to {email}</p>
                 
                 {(resetError || passwordError) && (
-                  <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">
+                  <div className="mb-4 p-3 bg-mt-danger/10 text-mt-danger rounded-lg">
                     {resetError || passwordError}
                   </div>
                 )}
 
                 <form onSubmit={handleResetPassword}>
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-mt-muted mb-1">
                       OTP
                     </label>
                     <input
                       type="text"
                       value={otp}
                       onChange={(e) => setOtp(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-mt-line-strong rounded-lg focus:ring-2 focus:ring-mt-text focus:border-transparent"
                       placeholder="Enter OTP"
                       required
                       maxLength="6"
@@ -363,18 +363,18 @@ const LoginPage = () => {
                   </div>
 
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-mt-muted mb-1">
                       New Password
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
-                        <FiLock className="text-gray-400" />
+                        <FiLock className="text-mt-subtle" />
                       </div>
                       <input
                         type="password"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        className="w-full pl-10 pr-4 py-3 border border-mt-line-strong rounded-lg focus:ring-2 focus:ring-mt-text focus:border-transparent"
                         placeholder="Enter new password"
                         required
                         minLength="6"
@@ -383,18 +383,18 @@ const LoginPage = () => {
                   </div>
 
                   <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-mt-muted mb-1">
                       Confirm Password
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
-                        <FiLock className="text-gray-400" />
+                        <FiLock className="text-mt-subtle" />
                       </div>
                       <input
                         type="password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        className="w-full pl-10 pr-4 py-3 border border-mt-line-strong rounded-lg focus:ring-2 focus:ring-mt-text focus:border-transparent"
                         placeholder="Confirm new password"
                         required
                         minLength="6"
@@ -405,7 +405,7 @@ const LoginPage = () => {
                   <button
                     type="submit"
                     disabled={resetStatus === 'loading'}
-                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition duration-300 font-medium disabled:opacity-50"
+                    className="w-full text-mt-btn-text py-3 rounded-lg transition duration-300 font-medium disabled:opacity-50 bg-mt-btn"
                   >
                     {resetStatus === 'loading' ? 'Resetting...' : 'Reset Password'}
                   </button>
@@ -413,7 +413,7 @@ const LoginPage = () => {
 
                 <button
                   onClick={() => setForgotStep('email')}
-                  className="mt-4 text-sm text-purple-600 hover:text-purple-800 font-medium w-full text-center"
+                  className="mt-4 text-sm text-mt-text hover:text-mt-text font-medium w-full text-center"
                 >
                   ← Back to email
                 </button>
@@ -422,18 +422,18 @@ const LoginPage = () => {
 
             {forgotStep === 'success' && (
               <div className="text-center py-4">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-16 h-16 bg-mt-success/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-mt-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <h2 className="text-2xl font-bold text-gray-800 mb-2">Password Reset Successful!</h2>
-                <p className="text-gray-600 mb-4">
+                <h2 className="text-2xl font-normal text-mt-text mb-2">Password Reset Successful!</h2>
+                <p className="text-mt-muted mb-4">
                   Your password has been reset successfully. You can now login with your new password.
                 </p>
                 <button
                   onClick={closeModal}
-                  className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-2 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition duration-300 font-medium"
+                  className="text-mt-btn-text px-6 py-2 rounded-lg transition duration-300 font-medium bg-mt-btn"
                 >
                   Close
                 </button>

@@ -384,7 +384,7 @@ export default function Usersaveddesigns() {
     const cartQuantity = getDesignCartQuantity(design._id);
     
     return (
-      <div className="actions-menu absolute right-0 top-full mt-1 z-50 bg-white rounded-lg shadow-lg border border-slate-200 min-w-[200px] overflow-hidden">
+      <div className="actions-menu absolute right-0 top-full mt-1 z-50 bg-mt-surface rounded-lg shadow-lg border border-mt-line min-w-[200px] overflow-hidden">
         <div className="py-1">
           <button
             onClick={() => {
@@ -392,7 +392,7 @@ export default function Usersaveddesigns() {
               setShowActionsMenu(null);
             }}
             disabled={addingToCartId === design._id}
-            className="w-full text-left px-4 py-3 text-sm text-emerald-700 hover:bg-emerald-50 flex items-center gap-3 border-b border-slate-100 disabled:opacity-50"
+            className="w-full text-left px-4 py-3 text-sm text-mt-success hover:bg-mt-success/15 flex items-center gap-3 border-b border-mt-line disabled:opacity-50"
           >
             {addingToCartId === design._id ? (
               <>
@@ -417,7 +417,7 @@ export default function Usersaveddesigns() {
               handleEditDesign(design);
               setShowActionsMenu(null);
             }}
-            className="w-full text-left px-4 py-3 text-sm text-sky-700 hover:bg-sky-50 flex items-center gap-3 border-b border-slate-100"
+            className="w-full text-left px-4 py-3 text-sm text-mt-text hover:bg-mt-tint/10 flex items-center gap-3 border-b border-mt-line"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -427,7 +427,7 @@ export default function Usersaveddesigns() {
           
           <Link 
             to={buildCatalogueDesignPath(design) || `/catalogue/${design._id}`}
-            className="block w-full text-left px-4 py-3 text-sm text-sky-700 hover:bg-sky-50 flex items-center gap-3 border-b border-slate-100"
+            className="block w-full text-left px-4 py-3 text-sm text-mt-text hover:bg-mt-tint/10 flex items-center gap-3 border-b border-mt-line"
             onClick={() => setShowActionsMenu(null)}
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -443,7 +443,7 @@ export default function Usersaveddesigns() {
               setShowActionsMenu(null);
             }}
             disabled={deletingId === design._id}
-            className="w-full text-left px-4 py-3 text-sm text-rose-700 hover:bg-rose-50 flex items-center gap-3 disabled:opacity-50"
+            className="w-full text-left px-4 py-3 text-sm text-mt-danger hover:bg-mt-danger/15 flex items-center gap-3 disabled:opacity-50"
           >
             {deletingId === design._id ? (
               <>
@@ -475,12 +475,12 @@ export default function Usersaveddesigns() {
     const cartQuantity = getDesignCartQuantity(design._id);
     
     return (
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 py-3 z-40 shadow-lg">
+      <div className="fixed bottom-0 left-0 right-0 bg-mt-surface border-t border-mt-line px-4 py-3 z-40 shadow-lg">
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => handleAddToCart(design)}
             disabled={addingToCartId === design._id}
-            className="col-span-2 px-3 py-3 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            className="col-span-2 px-3 py-3 text-sm bg-mt-success text-white rounded-lg hover:bg-mt-success/85 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {addingToCartId === design._id ? (
               <>
@@ -501,7 +501,7 @@ export default function Usersaveddesigns() {
           </button>
           <Link
             to={buildCatalogueDesignPath(design) || `/catalogue/${design._id}`}
-            className="flex-1 px-3 py-3 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
+            className="flex-1 px-3 py-3 text-sm bg-mt-surface-raised text-mt-muted rounded-lg hover:bg-mt-tint/15 transition-colors flex items-center justify-center gap-2"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -511,7 +511,7 @@ export default function Usersaveddesigns() {
           </Link>
           <button
             onClick={() => handleEditDesign(design)}
-            className="flex-1 px-3 py-3 text-sm bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors flex items-center justify-center gap-2"
+            className="flex-1 px-3 py-3 text-sm bg-mt-btn text-mt-btn-text rounded-lg hover:bg-mt-btn-hover transition-colors flex items-center justify-center gap-2"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -521,7 +521,7 @@ export default function Usersaveddesigns() {
           <button
             onClick={() => handleDeleteDesign(design._id, design.productName || "Untitled")}
             disabled={deletingId === design._id}
-            className="flex-1 px-3 py-3 text-sm bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            className="flex-1 px-3 py-3 text-sm bg-mt-danger text-white rounded-lg hover:bg-mt-danger/85 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {deletingId === design._id ? (
               <>
@@ -546,24 +546,24 @@ export default function Usersaveddesigns() {
   };
 
   return (
-    <div className="flex h-screen flex-col bg-neutral-100 text-slate-900">
+    <div className="flex h-screen flex-col bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)]">
       {/* Notification Toast - Mobile Optimized */}
       {notification.show && (
         <div className={`fixed z-50 animate-fade-in-down ${
           isMobile ? 'top-2 left-2 right-2' : 'top-4 right-4'
         }`}>
           <div className={`rounded-lg shadow-lg p-4 ${
-            notification.type === 'success' ? 'bg-green-50 border border-green-200' :
-            notification.type === 'error' ? 'bg-red-50 border border-red-200' :
-            notification.type === 'warning' ? 'bg-yellow-50 border border-yellow-200' :
-            'bg-blue-50 border border-blue-200'
+            notification.type === 'success' ? 'bg-mt-success/10 border border-mt-success/30' :
+            notification.type === 'error' ? 'bg-mt-danger/10 border border-mt-danger/30' :
+            notification.type === 'warning' ? 'bg-amber-400/10 border border-amber-400/30' :
+            'bg-mt-tint/10 border border-mt-line-strong'
           }`}>
             <div className="flex items-center">
               <div className={`flex-shrink-0 ${
                 notification.type === 'success' ? 'text-green-400' :
                 notification.type === 'error' ? 'text-red-400' :
                 notification.type === 'warning' ? 'text-yellow-400' :
-                'text-blue-400'
+                'text-mt-subtle'
               }`}>
                 {notification.type === 'success' ? (
                   <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -581,17 +581,17 @@ export default function Usersaveddesigns() {
               </div>
               <div className="ml-3 flex-1">
                 <p className={`text-sm font-medium ${
-                  notification.type === 'success' ? 'text-green-800' :
-                  notification.type === 'error' ? 'text-red-800' :
-                  notification.type === 'warning' ? 'text-yellow-800' :
-                  'text-blue-800'
+                  notification.type === 'success' ? 'text-mt-success' :
+                  notification.type === 'error' ? 'text-mt-danger' :
+                  notification.type === 'warning' ? 'text-mt-warning' :
+                  'text-mt-text'
                 }`}>
                   {notification.message}
                 </p>
               </div>
               <button
                 onClick={() => setNotification({ show: false, message: '', type: '' })}
-                className="ml-4 p-1.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100"
+                className="ml-4 p-1.5 text-mt-subtle hover:text-mt-text rounded-full hover:bg-mt-tint/10"
               >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -606,10 +606,10 @@ export default function Usersaveddesigns() {
 
       {/* Mobile Header Toggle - Improved */}
       {isMobile && (
-        <div className="sticky top-14 z-30 bg-white border-b border-slate-200 px-4 py-2 flex justify-between items-center shadow-sm">
+        <div className="sticky top-14 z-30 bg-mt-surface border-b border-mt-line px-4 py-2 flex justify-between items-center shadow-sm">
           <button
             onClick={() => setShowSidebar(true)}
-            className="flex items-center gap-2 text-sm text-sky-700 bg-sky-50 px-3 py-2 rounded-lg hover:bg-sky-100 transition-colors"
+            className="flex items-center gap-2 text-sm text-mt-text bg-mt-tint/10 px-3 py-2 rounded-lg hover:bg-mt-tint/10 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -619,11 +619,11 @@ export default function Usersaveddesigns() {
           
           {selectedDesign && (
             <div className="flex items-center gap-2">
-              <div className="text-xs text-slate-600 truncate max-w-[150px]">
+              <div className="text-xs text-mt-muted truncate max-w-[150px]">
                 <span className="font-medium">{selectedDesign.productName || "Selected Design"}</span>
               </div>
               <div
-                className="h-6 w-6 rounded border border-slate-200 shrink-0"
+                className="h-6 w-6 rounded border border-mt-line shrink-0"
                 style={{ backgroundColor: selectedDesign.productColor || "#fff" }}
               />
             </div>
@@ -643,22 +643,22 @@ export default function Usersaveddesigns() {
             )}
             <aside className={`
               ${isMobile ? 'fixed inset-y-0 left-0 z-50 w-[90vw] max-w-sm animate-slide-right' : 'w-80 lg:w-96'} 
-              border-r border-slate-200 bg-white flex flex-col shadow-xl
+              border-r border-mt-line bg-mt-surface flex flex-col shadow-xl
             `}>
-              <div className="border-b border-slate-200 px-4 py-4">
+              <div className="border-b border-mt-line px-4 py-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-base font-semibold text-slate-800">
+                    <h2 className="text-base font-normal text-mt-text">
                       Saved Designs
                     </h2>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-mt-subtle">
                       {designs.length} {designs.length === 1 ? 'design' : 'designs'} available
                     </p>
                   </div>
                   {isMobile && (
                     <button
                       onClick={() => setShowSidebar(false)}
-                      className="p-2 text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100"
+                      className="p-2 text-mt-subtle hover:text-mt-text rounded-lg hover:bg-mt-tint/10"
                       aria-label="Close sidebar"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -672,26 +672,26 @@ export default function Usersaveddesigns() {
               {loadingList ? (
                 <div className="flex-1 flex items-center justify-center p-6">
                   <div className="text-center">
-                    <svg className="animate-spin h-10 w-10 text-sky-600 mx-auto mb-3" viewBox="0 0 24 24">
+                    <svg className="animate-spin h-10 w-10 text-mt-text mx-auto mb-3" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    <p className="text-sm text-slate-500">Loading designs...</p>
+                    <p className="text-sm text-mt-subtle">Loading designs...</p>
                   </div>
                 </div>
               ) : designs.length === 0 ? (
                 <div className="flex-1 flex items-center justify-center p-6">
                   <div className="text-center">
-                    <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="w-20 h-20 bg-mt-surface-raised rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-10 h-10 text-mt-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                     </div>
-                    <p className="text-base font-medium text-slate-700 mb-2">No designs saved yet</p>
-                    <p className="text-sm text-slate-500 mb-4">Create your first custom design</p>
+                    <p className="text-base font-medium text-mt-muted mb-2">No designs saved yet</p>
+                    <p className="text-sm text-mt-subtle mb-4">Create your first custom design</p>
                     <Link 
                       to="/" 
-                      className="inline-flex items-center px-4 py-2 bg-sky-600 text-white rounded-lg text-sm hover:bg-sky-700 transition-colors"
+                      className="inline-flex items-center px-4 py-2 bg-mt-btn text-mt-btn-text rounded-lg text-sm hover:bg-mt-btn-hover transition-colors"
                     >
                       Create New Design
                       <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -702,7 +702,7 @@ export default function Usersaveddesigns() {
                 </div>
               ) : (
                 <div className="flex-1 overflow-y-auto">
-                  <ul className="divide-y divide-slate-100">
+                  <ul className="divide-y divide-mt-line">
                     {designs.map((d) => {
                       const isActive = d._id === selectedDesignId;
                       
@@ -710,7 +710,7 @@ export default function Usersaveddesigns() {
                         <li
                           key={d._id}
                           className={`
-                            ${isActive ? "bg-sky-50 border-l-4 border-sky-500" : "hover:bg-slate-50 border-l-4 border-transparent"}
+                            ${isActive ? "bg-mt-tint/10 border-l-4 border-mt-text" : "hover:bg-mt-tint/5 border-l-4 border-transparent"}
                             transition-colors
                           `}
                         >
@@ -718,7 +718,7 @@ export default function Usersaveddesigns() {
                             <div className="flex items-start gap-3">
                               {/* Color indicator */}
                               <div
-                                className="h-12 w-12 rounded-lg border-2 border-slate-200 shrink-0"
+                                className="h-12 w-12 rounded-lg border-2 border-mt-line shrink-0"
                                 style={{ backgroundColor: d.productColor || "#fff" }}
                               />
                               
@@ -727,13 +727,13 @@ export default function Usersaveddesigns() {
                                   className="cursor-pointer"
                                   onClick={() => handleSelectDesign(d._id)}
                                 >
-                                  <h3 className="font-medium text-slate-800 truncate text-base mb-1">
+                                  <h3 className="font-medium text-mt-text truncate text-base mb-1">
                                     {d.productName || "Untitled Design"}
                                   </h3>
-                                  <p className="text-xs text-slate-500 truncate mb-1">
+                                  <p className="text-xs text-mt-subtle truncate mb-1">
                                     {d.productSlug || "No slug"}
                                   </p>
-                                  <p className="text-xs text-slate-400">
+                                  <p className="text-xs text-mt-subtle">
                                     {formatDateTime(d.createdAt)}
                                   </p>
                                 </div>
@@ -747,7 +747,7 @@ export default function Usersaveddesigns() {
                                       e.stopPropagation();
                                       setShowActionsMenu(showActionsMenu === d._id ? null : d._id);
                                     }}
-                                    className="p-2 text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100"
+                                    className="p-2 text-mt-subtle hover:text-mt-text rounded-lg hover:bg-mt-tint/10"
                                   >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
@@ -762,7 +762,7 @@ export default function Usersaveddesigns() {
                                 <div className="flex items-center gap-1">
                                   <button
                                     onClick={() => handleEditDesign(d)}
-                                    className="p-1.5 text-sky-700 hover:bg-sky-50 rounded transition-colors"
+                                    className="p-1.5 text-mt-text hover:bg-mt-tint/10 rounded transition-colors"
                                     title="Edit design"
                                   >
                                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -771,7 +771,7 @@ export default function Usersaveddesigns() {
                                   </button>
                                   <Link
                                     to={buildCatalogueDesignPath(d) || `/catalogue/${d._id}`}
-                                    className="p-1.5 text-sky-700 hover:bg-sky-50 rounded transition-colors"
+                                    className="p-1.5 text-mt-text hover:bg-mt-tint/10 rounded transition-colors"
                                     title="View details"
                                   >
                                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -782,7 +782,7 @@ export default function Usersaveddesigns() {
                                   <button
                                     onClick={() => handleAddToCart(d)}
                                     disabled={addingToCartId === d._id}
-                                    className="p-1.5 text-emerald-700 hover:bg-emerald-50 rounded transition-colors disabled:opacity-50"
+                                    className="p-1.5 text-mt-success hover:bg-mt-success/15 rounded transition-colors disabled:opacity-50"
                                     title={isDesignInCart(d._id) ? `In cart (${getDesignCartQuantity(d._id)})` : "Add to cart"}
                                   >
                                     {addingToCartId === d._id ? (
@@ -799,7 +799,7 @@ export default function Usersaveddesigns() {
                                   <button
                                     onClick={() => handleDeleteDesign(d._id, d.productName || "Untitled")}
                                     disabled={deletingId === d._id}
-                                    className="p-1.5 text-rose-700 hover:bg-rose-50 rounded transition-colors"
+                                    className="p-1.5 text-mt-danger hover:bg-mt-danger/15 rounded transition-colors"
                                     title="Delete design"
                                   >
                                     {deletingId === d._id ? (
@@ -825,9 +825,9 @@ export default function Usersaveddesigns() {
               )}
 
               {error && (
-                <div className="border-t border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                <div className="border-t border-mt-danger/30 bg-mt-danger/10 px-4 py-3 text-sm text-mt-danger">
                   <div className="flex items-center gap-2">
-                    <svg className="h-5 w-5 text-rose-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-5 w-5 text-mt-danger shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span>{error}</span>
@@ -843,19 +843,19 @@ export default function Usersaveddesigns() {
           {!selectedDesign ? (
             <div className="flex h-full items-center justify-center">
               <div className="text-center max-w-md mx-auto p-6">
-                <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <svg className="w-12 h-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-24 h-24 bg-mt-surface-raised rounded-full flex items-center justify-center mx-auto mb-6">
+                  <svg className="w-12 h-12 text-mt-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
-                <p className="text-xl font-semibold text-slate-700 mb-2">No Design Selected</p>
-                <p className="text-sm text-slate-500 mb-6">
+                <p className="text-xl font-semibold text-mt-muted mb-2">No Design Selected</p>
+                <p className="text-sm text-mt-subtle mb-6">
                   {isMobile ? 'Tap on "Browse Designs" to view your saved designs' : 'Select a design from the list to view details'}
                 </p>
                 {isMobile && !showSidebar && (
                   <button
                     onClick={() => setShowSidebar(true)}
-                    className="px-6 py-3 bg-sky-600 text-white rounded-lg hover:bg-sky-700 transition-colors text-base font-medium w-full sm:w-auto"
+                    className="px-6 py-3 bg-mt-btn text-mt-btn-text rounded-lg hover:bg-mt-btn-hover transition-colors text-base font-medium w-full sm:w-auto"
                   >
                     Browse Designs
                   </button>
@@ -865,16 +865,16 @@ export default function Usersaveddesigns() {
           ) : (
             <div className="space-y-4 max-w-6xl mx-auto">
               {/* Header Card - Mobile Optimized */}
-              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <section className="rounded-xl border border-mt-line bg-mt-surface p-4 shadow-sm">
                 <div className="flex flex-col gap-4">
                   {/* Title and Actions */}
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <h1 className="text-lg sm:text-xl font-bold text-slate-900 truncate mb-1">
+                      <h1 className="text-lg sm:text-xl font-normal text-mt-text truncate mb-1">
                         {selectedDesign.productName || "Untitled design"}
                       </h1>
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <span className="bg-slate-100 px-2 py-1 rounded">
+                      <div className="flex items-center gap-2 text-xs text-mt-subtle">
+                        <span className="bg-mt-surface-raised px-2 py-1 rounded">
                           {selectedDesign.productSlug || "no-slug"}
                         </span>
                         <span>•</span>
@@ -885,24 +885,24 @@ export default function Usersaveddesigns() {
                     {/* Color swatch - Mobile */}
                     <div className="flex flex-col items-end gap-2">
                       <div
-                        className="h-10 w-10 rounded-lg border-2 border-slate-200"
+                        className="h-10 w-10 rounded-lg border-2 border-mt-line"
                         style={{ backgroundColor: selectedDesign.productColor || "#fff" }}
                       />
-                      <span className="text-xs text-slate-500">Color</span>
+                      <span className="text-xs text-mt-subtle">Color</span>
                     </div>
                   </div>
 
                   {/* Preview Image */}
                   {selectedDesign.previewImage && (
                     <div className="mt-2">
-                      <div className="text-xs font-medium text-slate-700 mb-2 flex items-center gap-2">
+                      <div className="text-xs font-medium text-mt-muted mb-2 flex items-center gap-2">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                         Main Preview
                       </div>
                       <div 
-                        className="relative aspect-video w-full bg-slate-100 rounded-lg overflow-hidden cursor-pointer border border-slate-200 hover:border-sky-400 transition-colors"
+                        className="relative aspect-video w-full bg-mt-surface-raised rounded-lg overflow-hidden cursor-pointer border border-mt-line hover:border-mt-line-strong transition-colors"
                         onClick={() => openImageModal(
                           selectedDesign.previewImage,
                           "Main preview",
@@ -915,7 +915,7 @@ export default function Usersaveddesigns() {
                           className="w-full h-full object-contain"
                         />
                         <div className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <span className="bg-white text-slate-900 px-4 py-2 rounded-lg text-sm font-medium">
+                          <span className="bg-mt-surface text-mt-text px-4 py-2 rounded-lg text-sm font-medium">
                             View Full Size
                           </span>
                         </div>
@@ -926,19 +926,19 @@ export default function Usersaveddesigns() {
               </section>
 
               {/* View Previews Section - Collapsible on Mobile */}
-              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <section className="rounded-xl border border-mt-line bg-mt-surface p-4 shadow-sm">
                 <button
                   onClick={() => setExpandedSections(prev => ({ ...prev, previews: !prev.previews }))}
                   className="w-full flex items-center justify-between text-left"
                 >
-                  <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <h2 className="text-base font-normal text-mt-text flex items-center gap-2">
+                    <svg className="w-5 h-5 text-mt-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
                     </svg>
                     View Previews ({selectedDesign.views?.length || 0})
                   </h2>
                   <svg
-                    className={`w-5 h-5 text-slate-600 transition-transform duration-200 ${
+                    className={`w-5 h-5 text-mt-muted transition-transform duration-200 ${
                       expandedSections.previews ? 'rotate-180' : ''
                     }`}
                     fill="none"
@@ -952,7 +952,7 @@ export default function Usersaveddesigns() {
                 {expandedSections.previews && (
                   <>
                     {(!selectedDesign.views || selectedDesign.views.length === 0) ? (
-                      <div className="text-sm text-slate-500 text-center py-6 mt-2">
+                      <div className="text-sm text-mt-subtle text-center py-6 mt-2">
                         No view configuration stored for this design.
                       </div>
                     ) : (
@@ -960,9 +960,9 @@ export default function Usersaveddesigns() {
                         {selectedDesign.views.map((v) => (
                           <div
                             key={v.code}
-                            className="rounded-lg border border-slate-200 bg-slate-50 p-3 flex flex-col items-center gap-2"
+                            className="rounded-lg border border-mt-line bg-mt-bg p-3 flex flex-col items-center gap-2"
                           >
-                            <div className="text-sm font-medium text-slate-700 bg-white px-3 py-1 rounded-full border border-slate-200">
+                            <div className="text-sm font-medium text-mt-muted bg-mt-surface px-3 py-1 rounded-full border border-mt-line">
                               {v.code?.toUpperCase() || "VIEW"}
                             </div>
                             {v.previewImage ? (
@@ -974,7 +974,7 @@ export default function Usersaveddesigns() {
                                   `${selectedDesign.productName || "Design"} - ${v.code} view`
                                 )}
                               >
-                                <div className="relative aspect-square w-full rounded-lg border border-slate-200 bg-white overflow-hidden">
+                                <div className="relative aspect-square w-full rounded-lg border border-mt-line bg-mt-photo overflow-hidden">
                                   <img
                                     src={v.previewImage}
                                     alt={`${v.code} preview`}
@@ -983,15 +983,15 @@ export default function Usersaveddesigns() {
                                 </div>
                               </div>
                             ) : (
-                              <div className="flex aspect-square w-full items-center justify-center text-sm text-slate-400 border border-dashed border-slate-200 rounded-lg bg-white">
+                              <div className="flex aspect-square w-full items-center justify-center text-sm text-mt-subtle border border-dashed border-mt-line rounded-lg bg-mt-surface">
                                 No preview
                               </div>
                             )}
-                            <div className="text-xs text-slate-500 text-center mt-1">
-                              <span className="bg-slate-100 px-2 py-1 rounded">
+                            <div className="text-xs text-mt-subtle text-center mt-1">
+                              <span className="bg-mt-surface-raised px-2 py-1 rounded">
                                 Text: {v.textLayers?.length || 0}
                               </span>
-                              <span className="ml-2 bg-slate-100 px-2 py-1 rounded">
+                              <span className="ml-2 bg-mt-surface-raised px-2 py-1 rounded">
                                 Images: {v.designLayers?.length || 0}
                               </span>
                             </div>
@@ -1004,19 +1004,19 @@ export default function Usersaveddesigns() {
               </section>
 
               {/* Layers Detail Section - Collapsible on Mobile */}
-              <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm mb-4">
+              <section className="rounded-xl border border-mt-line bg-mt-surface p-4 shadow-sm mb-4">
                 <button
                   onClick={() => setExpandedSections(prev => ({ ...prev, layers: !prev.layers }))}
                   className="w-full flex items-center justify-between text-left"
                 >
-                  <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <h2 className="text-base font-normal text-mt-text flex items-center gap-2">
+                    <svg className="w-5 h-5 text-mt-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
                     Layers Detail
                   </h2>
                   <svg
-                    className={`w-5 h-5 text-slate-600 transition-transform duration-200 ${
+                    className={`w-5 h-5 text-mt-muted transition-transform duration-200 ${
                       expandedSections.layers ? 'rotate-180' : ''
                     }`}
                     fill="none"
@@ -1030,7 +1030,7 @@ export default function Usersaveddesigns() {
                 {expandedSections.layers && (
                   <>
                     {(!selectedDesign.views || selectedDesign.views.length === 0) ? (
-                      <div className="text-sm text-slate-500 text-center py-6 mt-2">
+                      <div className="text-sm text-mt-subtle text-center py-6 mt-2">
                         No view/layer data available.
                       </div>
                     ) : (
@@ -1038,7 +1038,7 @@ export default function Usersaveddesigns() {
                         {selectedDesign.views.map((v) => (
                           <div
                             key={v.code}
-                            className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                            className="rounded-lg border border-mt-line bg-mt-bg p-3"
                           >
                             {/* View Header - Toggle for mobile */}
                             <button
@@ -1046,20 +1046,20 @@ export default function Usersaveddesigns() {
                               className="w-full flex items-center justify-between text-left"
                             >
                               <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
-                                <div className="text-sm font-semibold text-slate-800">
+                                <div className="text-sm font-semibold text-mt-text">
                                   View: {v.code || "(no code)"}
                                 </div>
-                                <div className="text-xs text-slate-500 flex items-center gap-2">
-                                  <span className="bg-white px-2 py-1 rounded border border-slate-200">
+                                <div className="text-xs text-mt-subtle flex items-center gap-2">
+                                  <span className="bg-mt-surface px-2 py-1 rounded border border-mt-line">
                                     📝 {v.textLayers?.length || 0}
                                   </span>
-                                  <span className="bg-white px-2 py-1 rounded border border-slate-200">
+                                  <span className="bg-mt-surface px-2 py-1 rounded border border-mt-line">
                                     🖼️ {v.designLayers?.length || 0}
                                   </span>
                                 </div>
                               </div>
                               <svg
-                                className={`w-5 h-5 text-slate-600 sm:hidden transition-transform duration-200 ${
+                                className={`w-5 h-5 text-mt-muted sm:hidden transition-transform duration-200 ${
                                   expandedViews[v.code] ? 'rotate-180' : ''
                                 }`}
                                 fill="none"
@@ -1074,9 +1074,9 @@ export default function Usersaveddesigns() {
                             <div className={`${isMobile && !expandedViews[v.code] ? 'hidden' : 'block'} mt-3`}>
                               {/* Text layers */}
                               <div className="mb-4">
-                                <div className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                                <div className="text-sm font-medium text-mt-muted mb-2 flex items-center gap-2">
                                   <span>📝 Text Layers</span>
-                                  <span className="bg-slate-200 text-xs px-2 py-0.5 rounded-full">
+                                  <span className="bg-mt-line text-xs px-2 py-0.5 rounded-full">
                                     {v.textLayers?.length || 0}
                                   </span>
                                 </div>
@@ -1085,30 +1085,30 @@ export default function Usersaveddesigns() {
                                     {v.textLayers.map((t) => (
                                       <div
                                         key={t.id}
-                                        className="rounded-lg border border-slate-200 bg-white p-3 text-sm"
+                                        className="rounded-lg border border-mt-line bg-mt-surface p-3 text-sm"
                                       >
                                         <div className="flex flex-wrap items-start gap-2 mb-2">
-                                          <span className="font-mono text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">
+                                          <span className="font-mono text-xs text-mt-subtle bg-mt-surface-raised px-2 py-1 rounded">
                                             {t.id}
                                           </span>
-                                          <span className="font-medium text-slate-800 flex-1 break-words">
+                                          <span className="font-medium text-mt-text flex-1 break-words">
                                             "{t.text}"
                                           </span>
                                         </div>
-                                        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 text-xs text-slate-600">
-                                          <span className="bg-slate-50 px-2 py-1 rounded">
+                                        <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 text-xs text-mt-muted">
+                                          <span className="bg-mt-bg px-2 py-1 rounded">
                                             📍 {t.x?.toFixed?.(2) ?? t.x}, {t.y?.toFixed?.(2) ?? t.y}
                                           </span>
-                                          <span className="bg-slate-50 px-2 py-1 rounded">
+                                          <span className="bg-mt-bg px-2 py-1 rounded">
                                             📏 {t.fontSize}px
                                           </span>
-                                          <span className="bg-slate-50 px-2 py-1 rounded">
+                                          <span className="bg-mt-bg px-2 py-1 rounded">
                                             🔄 {t.rotation ?? 0}°
                                           </span>
-                                          <span className="bg-slate-50 px-2 py-1 rounded flex items-center gap-1">
+                                          <span className="bg-mt-bg px-2 py-1 rounded flex items-center gap-1">
                                             🎨{" "}
                                             <span
-                                              className="inline-block h-4 w-4 rounded border border-slate-300"
+                                              className="inline-block h-4 w-4 rounded border border-mt-line-strong"
                                               style={{ backgroundColor: t.color }}
                                             />
                                           </span>
@@ -1117,7 +1117,7 @@ export default function Usersaveddesigns() {
                                     ))}
                                   </div>
                                 ) : (
-                                  <div className="text-sm text-slate-400 text-center py-3 bg-white rounded-lg border border-dashed border-slate-200">
+                                  <div className="text-sm text-mt-subtle text-center py-3 bg-mt-surface rounded-lg border border-dashed border-mt-line">
                                     No text layers
                                   </div>
                                 )}
@@ -1125,9 +1125,9 @@ export default function Usersaveddesigns() {
 
                               {/* Design/image layers */}
                               <div>
-                                <div className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                                <div className="text-sm font-medium text-mt-muted mb-2 flex items-center gap-2">
                                   <span>🖼️ Design / Image Layers</span>
-                                  <span className="bg-slate-200 text-xs px-2 py-0.5 rounded-full">
+                                  <span className="bg-mt-line text-xs px-2 py-0.5 rounded-full">
                                     {v.designLayers?.length || 0}
                                   </span>
                                 </div>
@@ -1136,12 +1136,12 @@ export default function Usersaveddesigns() {
                                     {v.designLayers.map((d, idx) => (
                                       <div
                                         key={d.id || idx}
-                                        className="rounded-lg border border-slate-200 bg-white p-3"
+                                        className="rounded-lg border border-mt-line bg-mt-surface p-3"
                                       >
                                         <div className="flex flex-col sm:flex-row gap-3">
                                           {d.imageUrl ? (
                                             <div 
-                                              className="h-24 w-full sm:w-24 shrink-0 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center cursor-pointer hover:border-sky-400 transition-colors overflow-hidden"
+                                              className="h-24 w-full sm:w-24 shrink-0 rounded-lg border border-mt-line bg-mt-bg flex items-center justify-center cursor-pointer hover:border-mt-line-strong transition-colors overflow-hidden"
                                               onClick={() => openImageModal(
                                                 d.imageUrl,
                                                 `Design layer ${d.id || idx}`,
@@ -1155,30 +1155,30 @@ export default function Usersaveddesigns() {
                                               />
                                             </div>
                                           ) : (
-                                            <div className="h-24 w-full sm:w-24 shrink-0 rounded-lg border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-xs text-slate-400">
+                                            <div className="h-24 w-full sm:w-24 shrink-0 rounded-lg border border-dashed border-mt-line bg-mt-bg flex items-center justify-center text-xs text-mt-subtle">
                                               no image
                                             </div>
                                           )}
 
                                           <div className="flex-1 space-y-2">
                                             <div className="flex flex-wrap items-center gap-1.5">
-                                              <span className="font-mono text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">
+                                              <span className="font-mono text-xs text-mt-subtle bg-mt-surface-raised px-2 py-1 rounded">
                                                 {d.id || `layer-${idx}`}
                                               </span>
                                               {d.zone && (
-                                                <span className="rounded-full bg-sky-50 px-2 py-1 text-xs text-sky-700 border border-sky-100">
+                                                <span className="rounded-full bg-mt-tint/10 px-2 py-1 text-xs text-mt-text border border-mt-line">
                                                   zone: {d.zone}
                                                 </span>
                                               )}
-                                              <span className="rounded-full bg-slate-50 px-2 py-1 text-xs text-slate-600 border border-slate-200">
+                                              <span className="rounded-full bg-mt-bg px-2 py-1 text-xs text-mt-muted border border-mt-line">
                                                 scale: {d.scale}
                                               </span>
-                                              <span className="rounded-full bg-slate-50 px-2 py-1 text-xs text-slate-600 border border-slate-200">
+                                              <span className="rounded-full bg-mt-bg px-2 py-1 text-xs text-mt-muted border border-mt-line">
                                                 rot: {d.rotation ?? 0}°
                                               </span>
                                             </div>
-                                            <div className="text-xs text-slate-500 space-y-1">
-                                              <div className="bg-slate-50 p-2 rounded">
+                                            <div className="text-xs text-mt-subtle space-y-1">
+                                              <div className="bg-mt-bg p-2 rounded">
                                                 <span className="font-medium">Position:</span>{" "}
                                                 <span className="font-mono">
                                                   ({d.x?.toFixed?.(2) ?? d.x}, {d.y?.toFixed?.(2) ?? d.y})
@@ -1186,11 +1186,11 @@ export default function Usersaveddesigns() {
                                               </div>
                                               <div className="flex flex-wrap gap-2">
                                                 <span className="flex items-center gap-1">
-                                                  <span className={`inline-block w-2 h-2 rounded-full ${d.hasBgRemoved ? 'bg-green-500' : 'bg-amber-500'}`} />
+                                                  <span className={`inline-block w-2 h-2 rounded-full ${d.hasBgRemoved ? 'bg-mt-success' : 'bg-amber-500'}`} />
                                                   BG removed: {d.hasBgRemoved ? "Yes" : "No"}
                                                 </span>
                                                 <span className="flex items-center gap-1">
-                                                  <span className={`inline-block w-2 h-2 rounded-full ${d.insideSafeArea === false ? 'bg-rose-500' : 'bg-green-500'}`} />
+                                                  <span className={`inline-block w-2 h-2 rounded-full ${d.insideSafeArea === false ? 'bg-mt-danger' : 'bg-mt-success'}`} />
                                                   Safe area: {d.insideSafeArea === false ? "No" : "Yes"}
                                                 </span>
                                               </div>
@@ -1201,7 +1201,7 @@ export default function Usersaveddesigns() {
                                     ))}
                                   </div>
                                 ) : (
-                                  <div className="text-sm text-slate-400 text-center py-3 bg-white rounded-lg border border-dashed border-slate-200">
+                                  <div className="text-sm text-mt-subtle text-center py-3 bg-mt-surface rounded-lg border border-dashed border-mt-line">
                                     No design/image layers
                                   </div>
                                 )}
@@ -1228,22 +1228,22 @@ export default function Usersaveddesigns() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-2"
           onClick={handleModalBackdropClick}
         >
-          <div className="relative w-full max-w-6xl max-h-[95vh] bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col">
+          <div className="relative w-full max-w-6xl max-h-[95vh] bg-mt-surface rounded-xl shadow-2xl overflow-hidden flex flex-col">
             {/* Modal header - Mobile Optimized */}
-            <div className="flex items-center justify-between p-3 sm:p-4 border-b border-slate-200 bg-slate-50">
+            <div className="flex items-center justify-between p-3 sm:p-4 border-b border-mt-line bg-mt-bg">
               <div className="min-w-0 flex-1">
-                <h3 className="text-sm sm:text-base font-semibold text-slate-800 truncate pr-2">
+                <h3 className="text-sm sm:text-base font-semibold text-mt-text truncate pr-2">
                   {imageModal.title}
                 </h3>
                 {imageModal.altText && (
-                  <p className="text-xs text-slate-500 mt-1 truncate">
+                  <p className="text-xs text-mt-subtle mt-1 truncate">
                     {imageModal.altText}
                   </p>
                 )}
               </div>
               <button
                 onClick={closeImageModal}
-                className="text-slate-500 hover:text-slate-700 hover:bg-slate-200 w-10 h-10 rounded-full flex items-center justify-center transition-colors shrink-0"
+                className="text-mt-subtle hover:text-mt-text hover:bg-mt-tint/15 w-10 h-10 rounded-full flex items-center justify-center transition-colors shrink-0"
                 aria-label="Close modal"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1253,27 +1253,27 @@ export default function Usersaveddesigns() {
             </div>
 
             {/* Modal content - Image with pinch zoom support */}
-            <div className="flex-1 flex items-center justify-center p-2 sm:p-4 bg-slate-100 overflow-auto">
+            <div className="flex-1 flex items-center justify-center p-2 sm:p-4 bg-mt-surface-raised overflow-auto">
               <div className="relative max-w-full max-h-full">
                 <img
                   src={imageModal.imageUrl}
                   alt={imageModal.altText}
-                  className="max-w-full max-h-[60vh] sm:max-h-[70vh] object-contain rounded-lg border border-slate-200 bg-white shadow-lg"
+                  className="max-w-full max-h-[60vh] sm:max-h-[70vh] object-contain rounded-lg border border-mt-line bg-mt-surface shadow-lg"
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
             </div>
 
             {/* Modal footer - Mobile Optimized */}
-            <div className="p-3 sm:p-4 border-t border-slate-200 bg-slate-50">
+            <div className="p-3 sm:p-4 border-t border-mt-line bg-mt-bg">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <p className="text-xs text-slate-500 text-center sm:text-left">
+                <p className="text-xs text-mt-subtle text-center sm:text-left">
                   {isMobile ? 'Tap outside to close' : 'Click outside or press ESC to close'}
                 </p>
                 {isMobile && (
                   <button
                     onClick={closeImageModal}
-                    className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-300 transition-colors"
+                    className="px-4 py-2 bg-mt-line text-mt-muted rounded-lg text-sm font-medium hover:bg-mt-tint/20 transition-colors"
                   >
                     Close
                   </button>

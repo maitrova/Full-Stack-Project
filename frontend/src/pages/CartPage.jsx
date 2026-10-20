@@ -23,6 +23,8 @@ import { buildReadymadeProductPath } from "../utils/readymadeRoutes.js";
 import { buildDropProductPath } from "../utils/dropProductRoutes.js";
 import { buildCatalogueDesignPath } from "../utils/catalogueDesignRoutes.js";
 import { trackBeginCheckoutOnce } from "../utils/analytics.js";
+import { useCartOffers } from "../hooks/useCartOffers.js";
+import CartOffersPanel from "../components/CartOffersPanel.jsx";
 
 // Constants
 const ensureImageUrl = (imagePath) => buildImageUrl(imagePath) || null;
@@ -78,6 +80,14 @@ const CartPage = () => {
   const error = useSelector(selectCartError);
   const cartSummary = useSelector(selectCartSummary);
   const cartItemCount = useSelector(selectCartItemCount);
+  const cartOffers = useCartOffers(cartItems);
+  const offerDiscount = Math.min(Number(cartOffers.discount || 0), Number(cartSummary.total || 0));
+  const summaryWithOffers = {
+    ...cartSummary,
+    offerDiscount,
+    offerName: cartOffers.applied?.name || "",
+    total: Math.max(0, Number(cartSummary.total || 0) - offerDiscount),
+  };
   
   // User state
   const token = useSelector(selectCurrentToken);
@@ -283,7 +293,7 @@ const CartPage = () => {
     }
     trackBeginCheckoutOnce({
       items: cartItems,
-      value: cartSummary.total,
+      value: summaryWithOffers.total,
       currency: "INR",
     });
     setIsCheckoutLoading(true);
@@ -345,11 +355,11 @@ const CartPage = () => {
   // Loading state
   if (loading && cartItems.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 py-6 px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)] py-6 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading your cart...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-mt-text mx-auto mb-4"></div>
+            <p className="text-mt-muted">Loading your cart...</p>
           </div>
         </div>
       </div>
@@ -359,19 +369,19 @@ const CartPage = () => {
   // Error state
   if (error && cartItems.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 py-6 px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)] py-6 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-red-100 rounded-full mb-6">
-              <svg className="w-8 h-8 sm:w-10 sm:h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 bg-mt-danger/10 rounded-full mb-6">
+              <svg className="w-8 h-8 sm:w-10 sm:h-10 text-mt-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Failed to load cart</h2>
-            <p className="text-gray-600 mb-6 px-4">{error}</p>
+            <h2 className="text-xl sm:text-2xl font-normal text-mt-text mb-3">Failed to load cart</h2>
+            <p className="text-mt-muted mb-6 px-4">{error}</p>
             <button
               onClick={handleRetry}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition duration-200"
+              className="px-6 py-3 bg-mt-btn text-mt-btn-text rounded-lg font-medium hover:bg-mt-btn-hover transition duration-200"
             >
               Retry
             </button>
@@ -384,26 +394,26 @@ const CartPage = () => {
   // Empty cart state
   if (cartItems.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 py-6 px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)] py-6 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="text-center">
-            <div className="inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 bg-blue-50 rounded-full mb-6">
-              <svg className="w-10 h-10 sm:w-12 sm:h-12 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 bg-mt-tint/10 rounded-full mb-6">
+              <svg className="w-10 h-10 sm:w-12 sm:h-12 text-mt-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">Your cart is empty</h2>
-            <p className="text-gray-600 mb-6 px-4">Looks like you haven't added any items to your cart yet</p>
+            <h2 className="text-xl sm:text-2xl font-normal text-mt-text mb-3">Your cart is empty</h2>
+            <p className="text-mt-muted mb-6 px-4">Looks like you haven't added any items to your cart yet</p>
             <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4 px-4">
               <Link
                 to="/products"
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition duration-200 w-full sm:w-auto text-center"
+                className="px-6 py-3 bg-mt-btn text-mt-btn-text rounded-lg font-medium hover:bg-mt-btn-hover transition duration-200 w-full sm:w-auto text-center"
               >
                 Browse Products
               </Link>
               <Link
                 to="/customproducts"
-                className="px-6 py-3 border-2 border-blue-600 text-blue-600 rounded-lg font-medium hover:bg-blue-50 transition duration-200 w-full sm:w-auto text-center"
+                className="px-6 py-3 border-2 border-mt-text text-mt-text rounded-lg font-medium hover:bg-mt-tint/10 transition duration-200 w-full sm:w-auto text-center"
               >
                 Explore Designs
               </Link>
@@ -415,22 +425,22 @@ const CartPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-8">
+    <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)] pb-8">
       {/* Notification Toast - Mobile Optimized */}
       {notification.show && (
         <div className="fixed top-4 right-4 left-4 sm:left-auto sm:right-4 z-50 animate-fade-in-down">
           <div className={`rounded-lg shadow-lg p-4 ${
-            notification.type === 'success' ? 'bg-green-50 border border-green-200' :
-            notification.type === 'error' ? 'bg-red-50 border border-red-200' :
-            notification.type === 'warning' ? 'bg-yellow-50 border border-yellow-200' :
-            'bg-blue-50 border border-blue-200'
+            notification.type === 'success' ? 'bg-mt-success/10 border border-mt-success/30' :
+            notification.type === 'error' ? 'bg-mt-danger/10 border border-mt-danger/30' :
+            notification.type === 'warning' ? 'bg-amber-400/10 border border-amber-400/30' :
+            'bg-mt-tint/10 border border-mt-line-strong'
           }`}>
             <div className="flex items-center">
               <div className={`flex-shrink-0 ${
                 notification.type === 'success' ? 'text-green-400' :
                 notification.type === 'error' ? 'text-red-400' :
                 notification.type === 'warning' ? 'text-yellow-400' :
-                'text-blue-400'
+                'text-mt-subtle'
               }`}>
                 {notification.type === 'success' ? (
                   <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -448,10 +458,10 @@ const CartPage = () => {
               </div>
               <div className="ml-3 flex-1">
                 <p className={`text-sm font-medium ${
-                  notification.type === 'success' ? 'text-green-800' :
-                  notification.type === 'error' ? 'text-red-800' :
-                  notification.type === 'warning' ? 'text-yellow-800' :
-                  'text-blue-800'
+                  notification.type === 'success' ? 'text-mt-success' :
+                  notification.type === 'error' ? 'text-mt-danger' :
+                  notification.type === 'warning' ? 'text-mt-warning' :
+                  'text-mt-text'
                 }`}>
                   {notification.message}
                 </p>
@@ -464,7 +474,7 @@ const CartPage = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {!isLoggedIn && (
           <div className="pt-4">
-            <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            <div className="rounded-xl border border-mt-line-strong bg-mt-tint/10 px-4 py-3 text-sm text-mt-text">
               Your cart is saved for this browser. Login is only required when you proceed to checkout.
             </div>
           </div>
@@ -472,8 +482,8 @@ const CartPage = () => {
         {/* Mobile Header */}
         <div className="py-6 flex flex-col sm:flex-row justify-between items-start sm:items-center">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Shopping Cart</h1>
-            <p className="text-sm sm:text-base text-gray-600 mt-1">
+            <h1 className="text-2xl sm:text-3xl font-normal text-mt-text">Shopping Cart</h1>
+            <p className="text-sm sm:text-base text-mt-muted mt-1">
               {cartItemCount} item{cartItemCount !== 1 ? 's' : ''} in your cart
             </p>
           </div>
@@ -484,15 +494,15 @@ const CartPage = () => {
         <div className="lg:hidden mb-4">
           <button
             onClick={() => setExpandedMobileMenu(!expandedMobileMenu)}
-            className="w-full bg-white rounded-xl shadow-sm p-4 flex justify-between items-center"
+            className="w-full bg-mt-surface rounded-xl shadow-sm p-4 flex justify-between items-center"
           >
-            <span className="font-semibold text-gray-900">Order Summary</span>
+            <span className="font-semibold text-mt-text">Order Summary</span>
             <div className="flex items-center">
-              <span className="text-lg font-bold text-gray-900 mr-2">
-                {formatPrice(cartSummary.total, 'INR')}
+              <span className="text-lg font-bold text-mt-text mr-2">
+                {formatPrice(summaryWithOffers.total, 'INR')}
               </span>
               <svg
-                className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${expandedMobileMenu ? 'rotate-180' : ''}`}
+                className={`w-5 h-5 text-mt-subtle transition-transform duration-200 ${expandedMobileMenu ? 'rotate-180' : ''}`}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -503,9 +513,9 @@ const CartPage = () => {
           </button>
           
           {expandedMobileMenu && (
-            <div className="mt-2 bg-white rounded-xl shadow-sm p-4">
+            <div className="mt-2 bg-mt-surface rounded-xl shadow-sm p-4">
               <OrderSummaryContent
-                cartSummary={cartSummary}
+                cartSummary={summaryWithOffers}
                 formatPrice={formatPrice}
                 hideCheckoutButton={true} // Hide checkout button in dropdown
                 cartItems={cartItems}
@@ -519,7 +529,7 @@ const CartPage = () => {
           <button
             onClick={handleCheckout}
             disabled={isCheckoutLoading || cartItems.length === 0}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-4 rounded-xl shadow-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-base"
+            className="w-full bg-mt-btn hover:bg-mt-btn-hover text-mt-btn-text font-semibold py-4 px-4 rounded-xl shadow-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-base"
           >
             {isCheckoutLoading ? (
               <span className="flex items-center justify-center">
@@ -530,7 +540,7 @@ const CartPage = () => {
                 Processing...
               </span>
             ) : (
-              `Proceed to Checkout • ${formatPrice(cartSummary.total, 'INR')}`
+              `Proceed to Checkout • ${formatPrice(summaryWithOffers.total, 'INR')}`
             )}
           </button>
         </div>
@@ -538,12 +548,13 @@ const CartPage = () => {
         <div className="lg:grid lg:grid-cols-12 lg:gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-8">
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="p-4 sm:p-6 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Cart Items</h2>
+            <CartOffersPanel offers={cartOffers} />
+            <div className="bg-mt-surface rounded-xl shadow-sm overflow-hidden">
+              <div className="p-4 sm:p-6 border-b border-mt-line">
+                <h2 className="text-lg font-normal text-mt-text">Cart Items</h2>
               </div>
 
-              <div className="divide-y divide-gray-200">
+              <div className="divide-y divide-mt-line">
                 {cartItems.map((item) => {
                   const isUpdating = updatingItem === item._id;
                   const isRemoving = removingItem === item._id;
@@ -599,11 +610,11 @@ const CartPage = () => {
                               </div>
                             </div>
                           ) : (
-                            <div className="w-full h-48 sm:h-32 bg-gray-200 rounded-lg flex flex-col items-center justify-center">
-                              <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div className="w-full h-48 sm:h-32 bg-mt-line rounded-lg flex flex-col items-center justify-center">
+                              <svg className="w-10 h-10 text-mt-subtle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                               </svg>
-                              <span className="mt-2 text-sm text-gray-600">No Image</span>
+                              <span className="mt-2 text-sm text-mt-muted">No Image</span>
                             </div>
                           )}
                         </div>
@@ -613,23 +624,23 @@ const CartPage = () => {
                           <div className="flex flex-col sm:flex-row justify-between">
                             <div className="flex-1">
                               <h3 
-                                className="text-base sm:text-lg font-medium text-gray-900 cursor-pointer hover:text-blue-600 transition-colors duration-200 mb-1"
+                                className="text-base sm:text-lg font-medium text-mt-text cursor-pointer hover:text-mt-text transition-colors duration-200 mb-1"
                                 onClick={() => handleImageClick(item)}
                               >
                                 {itemName}
                               </h3>
-                              <p className="text-xs sm:text-sm text-gray-500 mb-2">
+                              <p className="text-xs sm:text-sm text-mt-subtle mb-2">
                                 {productType} • {item.currency}
                               </p>
                               
                               {/* Size + Stock badges - Mobile Optimized */}
                               {item.size && (
                                 <div className="flex flex-wrap gap-2 mb-2">
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-mt-surface-raised text-mt-text">
                                     Size: {String(item.size).toUpperCase()}
                                   </span>
                                   {item.kind === "READYMADE" && typeof maxStock === "number" && maxStock > 0 && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-400/10 text-mt-warning">
                                       Stock: {maxStock}
                                     </span>
                                   )}
@@ -637,16 +648,16 @@ const CartPage = () => {
                               )}
 
                               {item.kind === "COMBO" && Array.isArray(item.comboSelections) && item.comboSelections.length > 0 && (
-                                <div className="mb-2 space-y-1.5 rounded-lg bg-gray-50 p-3">
+                                <div className="mb-2 space-y-1.5 rounded-lg bg-mt-bg p-3">
                                   {item.comboSelections.map((selection, selectionIndex) => (
                                     <div
                                       key={`${selection.productId || selection.productName}-${selectionIndex}`}
-                                      className="flex items-center justify-between gap-3 text-xs text-gray-700"
+                                      className="flex items-center justify-between gap-3 text-xs text-mt-muted"
                                     >
                                       <span className="min-w-0 truncate font-medium">
                                         {selection.productName || `Item ${selectionIndex + 1}`}
                                       </span>
-                                      <span className="flex-shrink-0 text-gray-500">
+                                      <span className="flex-shrink-0 text-mt-subtle">
                                         {selection.size ? `Size: ${selection.size}` : ""}
                                         {selection.color?.label || selection.color?.value
                                           ? `${selection.size ? " | " : ""}Color: ${selection.color.label || selection.color.value}`
@@ -659,16 +670,16 @@ const CartPage = () => {
 
                               {/* Price - Mobile */}
                               <div className="flex justify-between items-center sm:hidden mt-2">
-                                <span className="text-sm text-gray-600">Price:</span>
+                                <span className="text-sm text-mt-muted">Price:</span>
                               <div className="text-right">
-                                <p className="text-base font-semibold text-gray-900">
+                                <p className="text-base font-semibold text-mt-text">
                                   {formatPrice(itemTotal, item.currency)}
                                 </p>
-                                <p className="text-xs text-gray-500">
+                                <p className="text-xs text-mt-subtle">
                                   {formatPrice(item.unitPrice, item.currency)} each
                                 </p>
                                 {Number(item.basePrice || 0) > Number(item.unitPrice || 0) && (
-                                  <p className="text-xs text-gray-400 line-through">
+                                  <p className="text-xs text-mt-subtle line-through">
                                     {formatPrice(item.basePrice, item.currency)} MRP
                                   </p>
                                 )}
@@ -677,7 +688,7 @@ const CartPage = () => {
                               
                               {/* Additional product info - Collapsible on mobile */}
                               {productInfo.description && (
-                                <p className="text-xs sm:text-sm text-gray-600 mt-1 line-clamp-2">
+                                <p className="text-xs sm:text-sm text-mt-muted mt-1 line-clamp-2">
                                   {productInfo.description}
                                 </p>
                               )}
@@ -686,27 +697,27 @@ const CartPage = () => {
                               {(productInfo.category || productInfo.brand || productInfo.subCategory || productInfo.style || productInfo.color) && (
                                 <div className="flex flex-wrap gap-1.5 mt-2">
                                   {productInfo.category && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-mt-tint/10 text-mt-text">
                                       {productInfo.category}
                                     </span>
                                   )}
                                   {productInfo.subCategory && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-mt-tint/10 text-mt-text">
                                       {productInfo.subCategory}
                                     </span>
                                   )}
                                   {productInfo.brand && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-mt-success/10 text-mt-success">
                                       {productInfo.brand}
                                     </span>
                                   )}
                                   {productInfo.style && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-mt-tint/10 text-mt-text">
                                       {productInfo.style}
                                     </span>
                                   )}
                                   {productInfo.color && (
-                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-400/10 text-mt-warning">
                                       {productInfo.color}
                                     </span>
                                   )}
@@ -716,14 +727,14 @@ const CartPage = () => {
                             
                             {/* Price - Desktop */}
                             <div className="hidden sm:block text-right">
-                              <p className="text-lg font-semibold text-gray-900">
+                              <p className="text-lg font-semibold text-mt-text">
                                 {formatPrice(itemTotal, item.currency)}
                               </p>
-                              <p className="text-sm text-gray-500">
+                              <p className="text-sm text-mt-subtle">
                                 {formatPrice(item.unitPrice, item.currency)} each
                               </p>
                               {Number(item.basePrice || 0) > Number(item.unitPrice || 0) && (
-                                <p className="text-xs text-gray-400 line-through">
+                                <p className="text-xs text-mt-subtle line-through">
                                   {formatPrice(item.basePrice, item.currency)} MRP
                                 </p>
                               )}
@@ -733,20 +744,20 @@ const CartPage = () => {
                           {/* Quantity Controls and Remove - Mobile Optimized */}
                           <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
                             <div className="flex items-center justify-between sm:justify-start">
-                              <span className="text-sm text-gray-600 sm:hidden mr-3">Qty:</span>
+                              <span className="text-sm text-mt-muted sm:hidden mr-3">Qty:</span>
                               <div className="flex items-center">
                                 <button
                                   onClick={() => handleQuantityChange(item._id, item.qty - 1)}
                                   disabled={item.qty <= 1 || isUpdating}
-                                  className="w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center border border-gray-300 rounded-l-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                                  className="w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center border border-mt-line-strong rounded-l-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-mt-tint/5"
                                 >
-                                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <svg className="w-4 h-4 text-mt-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
                                   </svg>
                                 </button>
-                                <div className="w-14 h-10 sm:w-12 sm:h-8 flex items-center justify-center border-t border-b border-gray-300">
+                                <div className="w-14 h-10 sm:w-12 sm:h-8 flex items-center justify-center border-t border-b border-mt-line-strong">
                                   {isUpdating ? (
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-mt-text"></div>
                                   ) : (
                                     <span className="text-sm font-medium">{item.qty}</span>
                                   )}
@@ -754,9 +765,9 @@ const CartPage = () => {
                                 <button
                                   onClick={() => handleQuantityChange(item._id, item.qty + 1)}
                                   disabled={isUpdating || (typeof maxStock === 'number' && item.qty >= maxStock)}
-                                  className="w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center border border-gray-300 rounded-r-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                                  className="w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center border border-mt-line-strong rounded-r-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-mt-tint/5"
                                 >
-                                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <svg className="w-4 h-4 text-mt-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                                   </svg>
                                 </button>
@@ -767,11 +778,11 @@ const CartPage = () => {
                             <button
                               onClick={() => handleRemoveItem(item._id)}
                               disabled={isRemoving}
-                              className="text-red-600 hover:text-red-800 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center justify-center sm:justify-start w-full sm:w-auto"
+                              className="text-mt-danger hover:text-mt-danger disabled:text-mt-subtle disabled:cursor-not-allowed flex items-center justify-center sm:justify-start w-full sm:w-auto"
                             >
                               {isRemoving ? (
                                 <>
-                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-red-600" fill="none" viewBox="0 0 24 24">
+                                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-mt-danger" fill="none" viewBox="0 0 24 24">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                   </svg>
@@ -799,7 +810,7 @@ const CartPage = () => {
             <div className="mt-6">
               <Link
                 to="/products"
-                className="inline-flex items-center justify-center sm:justify-start text-blue-600 hover:text-blue-800 w-full sm:w-auto"
+                className="inline-flex items-center justify-center sm:justify-start text-mt-text hover:text-mt-text w-full sm:w-auto"
               >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -811,10 +822,10 @@ const CartPage = () => {
 
           {/* Desktop Order Summary */}
           <div className="hidden lg:block lg:col-span-4">
-            <div className="bg-white rounded-xl shadow-sm p-6 sticky top-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-6">Order Summary</h2>
+            <div className="bg-mt-surface rounded-xl shadow-sm p-6 sticky top-6">
+              <h2 className="text-lg font-normal text-mt-text mb-6">Order Summary</h2>
               <OrderSummaryContent
-                cartSummary={cartSummary}
+                cartSummary={summaryWithOffers}
                 formatPrice={formatPrice}
                 handleCheckout={handleCheckout}
                 isCheckoutLoading={isCheckoutLoading}
@@ -842,14 +853,25 @@ const OrderSummaryContent = ({
   <>
     <div className="space-y-3 sm:space-y-4">
       <div className="flex justify-between">
-        <span className="text-sm sm:text-base text-gray-600">Subtotal</span>
+        <span className="text-sm sm:text-base text-mt-muted">Subtotal</span>
         <span className="text-sm sm:text-base font-medium">{formatPrice(cartSummary.subtotal, 'INR')}</span>
       </div>
-      
-      <div className="border-t border-gray-200 pt-3 sm:pt-4">
+
+      {cartSummary.offerDiscount > 0 && (
         <div className="flex justify-between">
-          <span className="text-base sm:text-lg font-semibold text-gray-900">Total</span>
-          <span className="text-lg sm:text-xl font-bold text-gray-900">
+          <span className="text-sm sm:text-base text-mt-muted">
+            Offer discount{cartSummary.offerName ? ` (${cartSummary.offerName})` : ''}
+          </span>
+          <span className="text-sm sm:text-base font-medium text-mt-success">
+            -{formatPrice(cartSummary.offerDiscount, 'INR')}
+          </span>
+        </div>
+      )}
+      
+      <div className="border-t border-mt-line pt-3 sm:pt-4">
+        <div className="flex justify-between">
+          <span className="text-base sm:text-lg font-semibold text-mt-text">Total</span>
+          <span className="text-lg sm:text-xl font-bold text-mt-text">
             {formatPrice(cartSummary.total, 'INR')}
           </span>
         </div>
@@ -861,7 +883,7 @@ const OrderSummaryContent = ({
       <button
         onClick={handleCheckout}
         disabled={isCheckoutLoading || cartItems.length === 0}
-        className="w-full mt-6 sm:mt-8 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+        className="w-full mt-6 sm:mt-8 bg-mt-btn hover:bg-mt-btn-hover text-mt-btn-text font-semibold py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
       >
         {isCheckoutLoading ? (
           <span className="flex items-center justify-center">
@@ -878,9 +900,9 @@ const OrderSummaryContent = ({
     )}
 
     {/* Additional Info - Mobile Optimized */}
-    <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200">
-      <div className="flex items-center text-xs sm:text-sm text-gray-500">
-        <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-mt-line">
+      <div className="flex items-center text-xs sm:text-sm text-mt-subtle">
+        <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-mt-success flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
         </svg>
         <span>Secure checkout</span>

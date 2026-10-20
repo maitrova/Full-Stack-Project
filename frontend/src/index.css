@@ -1,1 +1,115 @@
 @import "tailwindcss";
+
+/*
+ * MaiTrova design tokens.
+ * Default theme: "Sand" (approved reference: warm cream, charcoal buttons,
+ * brown accents, serif headings). The previous "Midnight Black" theme is kept
+ * below — put data-theme="midnight" on <html> to switch back.
+ *
+ * Tailwind utilities come from the @theme block, e.g. bg-mt-bg, text-mt-muted,
+ * border-mt-line, bg-mt-tint/10 (hover/selected tint), rounded-mt-btn,
+ * font-brand, font-display, tracking-wordmark.
+ */
+:root {
+  --mt-scheme: light;
+  --mt-bg: #f4efe8;
+  --mt-header: #f4efe8;
+  --mt-surface: #fbf8f3;
+  --mt-surface-raised: #ece3d6;
+  --mt-photo: #e9e1d5;
+  --mt-line: #e0d5c5;
+  --mt-line-strong: #c4b29b;
+  --mt-text: #1f1c19;
+  --mt-muted: #574e46;
+  --mt-subtle: #685e54;
+  --mt-tint: #1f1c19;
+  --mt-btn: #222120;
+  --mt-btn-hover: #3a3734;
+  --mt-btn-text: #ffffff;
+  --mt-accent: #8b5a36;
+  --mt-accent-strong: #6e4529;
+  --mt-new: #a0522d;
+  --mt-success: #2f7a4b;
+  --mt-danger: #b42318;
+  --mt-warning: #8a5300;
+  /* Home page promo banners: cappuccino gradient */
+  --mt-banner-from: #e2cbad;
+  --mt-banner-mid: #d3b795;
+  --mt-banner-to: #c4a27c;
+  --mt-banner-muted: #3f362e;
+  --mt-banner-accent: #5a3a22;
+}
+
+[data-theme="midnight"] {
+  --mt-scheme: dark;
+  --mt-bg: #0b0b0c;
+  --mt-header: #000000;
+  --mt-surface: #161617;
+  --mt-surface-raised: #1f1f21;
+  --mt-photo: #f4f4f5;
+  --mt-line: #2a2a2c;
+  --mt-line-strong: #48484a;
+  --mt-text: #ffffff;
+  --mt-muted: #b5b5ba;
+  --mt-subtle: #8e8e93;
+  --mt-tint: #ffffff;
+  --mt-btn: #ffffff;
+  --mt-btn-hover: #d9d9d9;
+  --mt-btn-text: #000000;
+  --mt-accent: #ffffff;
+  --mt-accent-strong: #ffffff;
+  --mt-new: #f56300;
+  --mt-success: #30d158;
+  --mt-danger: #ff453a;
+  --mt-warning: #fcd34d;
+  --mt-banner-from: #1f1f21;
+  --mt-banner-mid: #1a1a1c;
+  --mt-banner-to: #161617;
+  --mt-banner-muted: #b5b5ba;
+  --mt-banner-accent: #ffffff;
+}
+
+@theme inline {
+  --color-mt-bg: var(--mt-bg);
+  --color-mt-header: var(--mt-header);
+  --color-mt-surface: var(--mt-surface);
+  --color-mt-surface-raised: var(--mt-surface-raised);
+  --color-mt-photo: var(--mt-photo);
+  --color-mt-line: var(--mt-line);
+  --color-mt-line-strong: var(--mt-line-strong);
+  --color-mt-text: var(--mt-text);
+  --color-mt-muted: var(--mt-muted);
+  --color-mt-subtle: var(--mt-subtle);
+  --color-mt-tint: var(--mt-tint);
+  --color-mt-btn: var(--mt-btn);
+  --color-mt-btn-hover: var(--mt-btn-hover);
+  --color-mt-btn-text: var(--mt-btn-text);
+  --color-mt-accent: var(--mt-accent);
+  --color-mt-accent-strong: var(--mt-accent-strong);
+  --color-mt-new: var(--mt-new);
+  --color-mt-success: var(--mt-success);
+  --color-mt-danger: var(--mt-danger);
+  --color-mt-warning: var(--mt-warning);
+  --color-mt-banner-muted: var(--mt-banner-muted);
+  --color-mt-banner-accent: var(--mt-banner-accent);
+}
+
+@theme {
+  --font-brand: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Libre Caslon Text", "Iowan Old Style", Georgia, "Times New Roman", serif;
+
+  --radius-mt-btn: 3px;
+  --radius-mt-card: 4px;
+
+  --tracking-wordmark: 0.32em;
+  --tracking-eyebrow: 0.38em;
+}
+
+/* Storefront headings use the serif display face (scoped to font-brand areas so
+   the admin panel is unaffected). Weight/size utilities still apply. */
+@layer base {
+  .font-brand :where(h1, h2) {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+}

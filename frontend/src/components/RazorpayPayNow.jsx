@@ -111,13 +111,13 @@ export default function RazorpayPayNow({
       <button
         onClick={handlePay}
         disabled={loading || disabled}
-        className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+        className="w-full rounded-xl bg-mt-btn px-4 py-3 text-sm font-semibold text-mt-btn-text hover:bg-mt-btn-hover disabled:opacity-60"
       >
         {loading ? "Processing..." : "Pay Now"}
       </button>
 
       {err && (
-        <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-800">
+        <div className="mt-3 rounded-xl border border-mt-danger/30 bg-mt-danger/10 px-4 py-2 text-sm text-mt-danger">
           {err}
         </div>
       )}

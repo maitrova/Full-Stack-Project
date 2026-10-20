@@ -311,26 +311,26 @@ export default function CataloguePage() {
   const kindStats = getKindStats();
 
   if (loading) return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center">
+    <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)] flex items-center justify-center">
       <div className="text-center">
-        <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto mb-4" />
-        <p className="text-gray-600 font-medium">Loading catalogue...</p>
-        <p className="text-sm text-gray-400 mt-1">Fetching the latest designs</p>
+        <Loader2 className="w-12 h-12 animate-spin text-mt-text mx-auto mb-4" />
+        <p className="text-mt-muted font-medium">Loading catalogue...</p>
+        <p className="text-sm text-mt-subtle mt-1">Fetching the latest designs</p>
       </div>
     </div>
   );
 
   if (error) return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to white flex items-center justify-center">
-      <div className="text-center max-w-md p-8 bg-white rounded-2xl shadow-lg border border-gray-100">
-        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+    <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)] flex items-center justify-center">
+      <div className="text-center max-w-md p-8 bg-mt-surface rounded-2xl shadow-lg border border-mt-line">
+        <div className="w-16 h-16 bg-mt-danger/10 rounded-full flex items-center justify-center mx-auto mb-4">
           <span className="text-2xl">⚠️</span>
         </div>
-        <h3 className="text-lg font-bold text-gray-800 mb-2">Unable to Load Catalogue</h3>
-        <p className="text-gray-600 mb-4">{error}</p>
+        <h3 className="text-lg font-bold text-mt-text mb-2">Unable to Load Catalogue</h3>
+        <p className="text-mt-muted mb-4">{error}</p>
         <button 
           onClick={() => window.location.reload()}
-          className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+          className="px-6 py-2 bg-mt-btn text-mt-btn-text rounded-lg hover:bg-mt-btn-hover transition-colors font-medium"
         >
           Try Again
         </button>
@@ -339,33 +339,33 @@ export default function CataloguePage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+    <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)]">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-gray-100">
+      <div className="sticky top-0 z-10 bg-mt-surface/90 backdrop-blur-sm border-b border-mt-line">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <Grid3x3 className="w-6 h-6 text-indigo-600" />
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                <Grid3x3 className="w-6 h-6 text-mt-text" />
+                <h1 className="text-3xl font-medium text-mt-text">
                   Design Catalogue
                 </h1>
-                <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-medium">
+                <span className="px-3 py-1 bg-mt-tint/10 text-mt-text rounded-full text-sm font-medium">
                   {filteredDesigns.length} designs
                 </span>
               </div>
-              <p className="text-gray-500">Browse and explore our collection of premium designs</p>
+              <p className="text-mt-subtle">Browse and explore our collection of premium designs</p>
             </div>
             
             <div className="flex items-center gap-3">
               <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-mt-subtle" />
                 <input
                   type="text"
                   placeholder="Search designs..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                  className="w-full pl-10 pr-4 py-2.5 bg-mt-bg border border-mt-line rounded-xl focus:outline-none focus:ring-2 focus:ring-mt-text focus:border-transparent transition"
                 />
               </div>
             </div>
@@ -373,15 +373,15 @@ export default function CataloguePage() {
 
           {/* Kind Filter Tabs */}
           <div className="mt-6 flex flex-wrap gap-2">
-            <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-2">
-              <span className="text-sm font-medium text-gray-600">Filter by kind:</span>
+            <div className="flex items-center gap-3 bg-mt-bg rounded-xl p-2">
+              <span className="text-sm font-medium text-mt-muted">Filter by kind:</span>
               <div className="flex gap-1">
                 <button
                   onClick={() => handleKindFilterChange("All")}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     selectedKind === "All" 
-                      ? "bg-indigo-600 text-white shadow-md" 
-                      : "bg-white text-gray-600 hover:bg-gray-100"
+                      ? "bg-mt-btn text-mt-btn-text shadow-md" 
+                      : "bg-mt-surface text-mt-muted hover:bg-mt-tint/10"
                   }`}
                 >
                   All ({designs.length})
@@ -390,8 +390,8 @@ export default function CataloguePage() {
                   onClick={() => handleKindFilterChange("DESIGN")}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
                     selectedKind === "DESIGN" 
-                      ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-md" 
-                      : "bg-white text-gray-600 hover:bg-gray-100"
+                      ? "bg-mt-btn text-mt-btn-text" 
+                      : "bg-mt-surface text-mt-muted hover:bg-mt-tint/10"
                   }`}
                 >
                   <Palette className="w-4 h-4" />
@@ -401,8 +401,8 @@ export default function CataloguePage() {
                   onClick={() => handleKindFilterChange("READYMADE")}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
                     selectedKind === "READYMADE" 
-                      ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md" 
-                      : "bg-white text-gray-600 hover:bg-gray-100"
+                      ? "bg-mt-btn text-mt-btn-text" 
+                      : "bg-mt-surface text-mt-muted hover:bg-mt-tint/10"
                   }`}
                 >
                   <Package className="w-4 h-4" />
@@ -413,12 +413,12 @@ export default function CataloguePage() {
 
             {/* Active Filter Badge */}
             {selectedKind !== "All" && (
-              <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-2">
-                <span className="text-sm font-medium text-gray-600">Showing:</span>
+              <div className="flex items-center gap-2 bg-mt-surface border border-mt-line rounded-xl px-4 py-2">
+                <span className="text-sm font-medium text-mt-muted">Showing:</span>
                 <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
                   selectedKind === "DESIGN" 
-                    ? "bg-indigo-100 text-indigo-700" 
-                    : "bg-emerald-100 text-emerald-700"
+                    ? "bg-mt-tint/10 text-mt-text" 
+                    : "bg-mt-success/10 text-mt-success"
                 }`}>
                   {selectedKind === "DESIGN" ? (
                     <span className="flex items-center gap-1">
@@ -434,7 +434,7 @@ export default function CataloguePage() {
                 </span>
                 <button
                   onClick={() => handleKindFilterChange("All")}
-                  className="text-gray-400 hover:text-gray-600 ml-2"
+                  className="text-mt-subtle hover:text-mt-text ml-2"
                 >
                   ✕
                 </button>
@@ -448,22 +448,22 @@ export default function CataloguePage() {
       {(cartError || cartSuccess) && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
           {cartError && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex justify-between items-center">
+            <div className="bg-mt-danger/10 border border-mt-danger/30 text-mt-danger px-4 py-3 rounded-xl flex justify-between items-center">
               <span>{cartError}</span>
               <button 
                 onClick={clearCartNotifications}
-                className="text-red-500 hover:text-red-700"
+                className="text-mt-danger hover:text-mt-danger"
               >
                 ✕
               </button>
             </div>
           )}
           {cartSuccess && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl flex justify-between items-center">
+            <div className="bg-mt-success/10 border border-mt-success/30 text-mt-success px-4 py-3 rounded-xl flex justify-between items-center">
               <span>✓ Item added to cart successfully!</span>
               <button 
                 onClick={clearCartNotifications}
-                className="text-green-500 hover:text-green-700"
+                className="text-mt-success hover:text-mt-text"
               >
                 ✕
               </button>
@@ -476,13 +476,13 @@ export default function CataloguePage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {filteredDesigns.length === 0 ? (
           <div className="text-center py-16">
-            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Search className="w-12 h-12 text-gray-400" />
+            <div className="w-24 h-24 bg-mt-surface-raised rounded-full flex items-center justify-center mx-auto mb-6">
+              <Search className="w-12 h-12 text-mt-subtle" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">
+            <h3 className="text-xl font-semibold text-mt-muted mb-2">
               {selectedKind === "All" ? "No designs found" : `No ${selectedKind} designs found`}
             </h3>
-            <p className="text-gray-500 mb-6">
+            <p className="text-mt-subtle mb-6">
               {searchTerm 
                 ? "Try adjusting your search terms" 
                 : `Try switching to a different category or check back later for new ${selectedKind} designs`}
@@ -491,7 +491,7 @@ export default function CataloguePage() {
               {searchTerm && (
                 <button 
                   onClick={() => setSearchTerm("")}
-                  className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                  className="px-6 py-2.5 bg-mt-surface-raised text-mt-muted rounded-lg hover:bg-mt-tint/15 transition-colors font-medium"
                 >
                   Clear Search
                 </button>
@@ -499,7 +499,7 @@ export default function CataloguePage() {
               {selectedKind !== "All" && (
                 <button 
                   onClick={() => handleKindFilterChange("All")}
-                  className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+                  className="px-6 py-2.5 bg-mt-btn text-mt-btn-text rounded-lg hover:bg-mt-btn-hover transition-colors font-medium"
                 >
                   Show All Designs
                 </button>
@@ -510,11 +510,11 @@ export default function CataloguePage() {
           <>
             {/* Results Summary */}
             <div className="mb-6 px-2">
-              <p className="text-sm text-gray-500">
-                Showing <span className="font-semibold text-gray-700">{filteredDesigns.length}</span> {selectedKind.toLowerCase()} designs
+              <p className="text-sm text-mt-subtle">
+                Showing <span className="font-semibold text-mt-muted">{filteredDesigns.length}</span> {selectedKind.toLowerCase()} designs
                 {searchTerm && (
                   <>
-                    {" "}matching "<span className="font-semibold text-gray-700">{searchTerm}</span>"
+                    {" "}matching "<span className="font-semibold text-mt-text">{searchTerm}</span>"
                   </>
                 )}
               </p>
@@ -532,7 +532,7 @@ export default function CataloguePage() {
                 return (
                   <div 
                     key={d._id}
-                    className="group bg-white rounded-xl sm:rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl hover:border-indigo-100 transition-all duration-300 overflow-hidden hover:-translate-y-1"
+                    className="group bg-mt-surface rounded-xl sm:rounded-2xl shadow-sm border border-mt-line hover:shadow-xl hover:border-mt-line-strong transition-all duration-300 overflow-hidden hover:-translate-y-1"
                   >
                     <div className="relative">
                       {/* Kind Badge */}
@@ -540,8 +540,8 @@ export default function CataloguePage() {
                         <div className="absolute top-3 left-3 z-10">
                           <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
                             normalizedKind === "DESIGN" 
-                              ? "bg-indigo-100 text-indigo-700" 
-                              : "bg-emerald-100 text-emerald-700"
+                              ? "bg-mt-tint/10 text-mt-text" 
+                              : "bg-mt-success/10 text-mt-success"
                           }`}>
                             {normalizedKind === "DESIGN" ? (
                               <span className="flex items-center gap-1">
@@ -559,7 +559,7 @@ export default function CataloguePage() {
                       )}
                       
                       {/* Main Preview */}
-                      <div className="relative h-44 sm:h-64 bg-white sm:bg-gradient-to-br sm:from-gray-50 sm:to-white overflow-hidden">
+                      <div className="relative h-44 sm:h-64 bg-mt-photo overflow-hidden">
                         {d.previewImage ? (
                           <>
                             <img
@@ -571,8 +571,8 @@ export default function CataloguePage() {
                                 e.target.parentElement.innerHTML = `
                                   <div class="flex items-center justify-center h-full">
                                     <div class="text-center">
-                                      <Sparkles class="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                                      <p class="text-sm text-gray-400">Preview unavailable</p>
+                                      <Sparkles class="w-12 h-12 text-mt-line-strong mx-auto mb-2" />
+                                      <p class="text-sm text-mt-subtle">Preview unavailable</p>
                                     </div>
                                   </div>
                                 `;
@@ -583,8 +583,8 @@ export default function CataloguePage() {
                         ) : (
                           <div className="flex items-center justify-center h-full">
                             <div className="text-center">
-                              <Sparkles className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                              <p className="text-sm text-gray-400">No preview</p>
+                              <Sparkles className="w-12 h-12 text-mt-line-strong mx-auto mb-2" />
+                              <p className="text-sm text-mt-subtle">No preview</p>
                             </div>
                           </div>
                         )}
@@ -594,11 +594,11 @@ export default function CataloguePage() {
                           <div className="flex items-center gap-2">
                             {inCart ? (
                               <>
-                                <div className="flex items-center bg-white/90 backdrop-blur-sm rounded-full shadow-lg">
+                                <div className="flex items-center bg-mt-surface/90 backdrop-blur-sm rounded-full shadow-lg">
                                   <button
                                     onClick={() => handleDecrement(d)}
                                     disabled={isUpdating}
-                                    className="p-2 text-gray-600 hover:bg-gray-100 rounded-l-full disabled:opacity-50 transition-colors"
+                                    className="p-2 text-mt-muted hover:bg-mt-tint/10 rounded-l-full disabled:opacity-50 transition-colors"
                                   >
                                     <Minus className="w-4 h-4" />
                                   </button>
@@ -608,13 +608,13 @@ export default function CataloguePage() {
                                   <button
                                     onClick={() => handleIncrement(d)}
                                     disabled={isUpdating}
-                                    className="p-2 text-gray-600 hover:bg-gray-100 rounded-r-full disabled:opacity-50 transition-colors"
+                                    className="p-2 text-mt-muted hover:bg-mt-tint/10 rounded-r-full disabled:opacity-50 transition-colors"
                                   >
                                     <Plus className="w-4 h-4" />
                                   </button>
                                 </div>
                                 {isUpdating && (
-                                  <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                                  <Loader2 className="w-4 h-4 animate-spin text-mt-text" />
                                 )}
                               </>
                             ) : (
@@ -623,8 +623,8 @@ export default function CataloguePage() {
                                 disabled={isUpdating || !token}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-full shadow-lg transition-all ${
                                   token 
-                                    ? 'bg-indigo-600 hover:bg-indigo-700 text-white' 
-                                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                    ? 'bg-mt-btn hover:bg-mt-btn-hover text-mt-btn-text' 
+                                    : 'bg-mt-line text-mt-subtle cursor-not-allowed'
                                 } ${isUpdating ? 'opacity-50' : ''}`}
                               >
                                 {isUpdating ? (
@@ -643,7 +643,7 @@ export default function CataloguePage() {
                         {/* Popular Badge */}
                         {d.salePrice > 5000 && (
                           <div className="absolute top-3 right-3">
-                            <span className="px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-semibold rounded-full flex items-center gap-1">
+                            <span className="px-3 py-1 bg-mt-btn text-mt-btn-text text-xs font-semibold rounded-full flex items-center gap-1">
                               <TrendingUp className="w-3 h-3" />
                               Popular
                             </span>
@@ -653,12 +653,12 @@ export default function CataloguePage() {
 
                       {/* Side Previews */}
                       {d.views && d.views.some(v => v.previewImage) && (
-                        <div className="hidden sm:block px-4 py-3 bg-gray-50/50 border-t border-gray-100">
-                          <p className="text-xs text-gray-500 font-medium mb-2">Views</p>
+                        <div className="hidden sm:block px-4 py-3 bg-mt-surface-raised/50 border-t border-mt-line">
+                          <p className="text-xs text-mt-subtle font-medium mb-2">Views</p>
                           <div className="grid grid-cols-4 gap-2">
                             {d.views.slice(0, 4).map((v) =>
                               v.previewImage ? (
-                                <div key={v.code} className="relative aspect-square bg-white rounded-lg border border-gray-200 overflow-hidden group-hover:border-gray-300 transition-colors">
+                                <div key={v.code} className="relative aspect-square bg-mt-photo rounded-lg border border-mt-line overflow-hidden group-hover:border-mt-text transition-colors">
                                   <img
                                     src={v.previewImage}
                                     alt={v.code}
@@ -675,27 +675,27 @@ export default function CataloguePage() {
                       <div className="p-3 sm:p-5">
                         <Link to={detailPath} className="block">
                           <div className="mb-3">
-                            <h2 className="font-bold text-gray-900 line-clamp-1 mb-1 group-hover:text-indigo-600 transition-colors">
+                            <h2 className="font-normal text-mt-text line-clamp-1 mb-1 group-hover:text-mt-text transition-colors">
                               {d.title || d.productName}
                             </h2>
-                            <p className="text-sm text-gray-500 line-clamp-1">{d.productName}</p>
+                            <p className="text-sm text-mt-subtle line-clamp-1">{d.productName}</p>
                           </div>
                         </Link>
 
-                        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                        <div className="flex items-center justify-between pt-3 border-t border-mt-line">
                           <div>
-                            <span className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                            <span className="text-2xl font-medium text-mt-text">
                               ₹{d.salePrice || d.product?.basePrice || 0}
                             </span>
                             {d.product?.basePrice && d.salePrice < d.product.basePrice && (
-                              <span className="ml-2 text-sm text-gray-400 line-through">
+                              <span className="ml-2 text-sm text-mt-subtle line-through">
                                 ₹{d.product.basePrice}
                               </span>
                             )}
                           </div>
                           <Link 
                             to={detailPath}
-                            className="inline-flex items-center gap-1.5 text-indigo-600 font-medium text-sm group-hover:gap-2 transition-all"
+                            className="inline-flex items-center gap-1.5 text-mt-text font-medium text-sm group-hover:gap-2 transition-all"
                           >
                             View Details
                             <Eye className="w-4 h-4" />
@@ -711,22 +711,22 @@ export default function CataloguePage() {
         )}
 
         {/* Footer Stats */}
-        <div className="mt-12 pt-8 border-t border-gray-100">
+        <div className="mt-12 pt-8 border-t border-mt-line">
           <div className="text-center">
-            <p className="text-gray-500 text-sm">
+            <p className="text-mt-subtle text-sm">
               {selectedKind === "All" ? (
                 <>
-                  Showing <span className="font-semibold text-gray-700">{filteredDesigns.length}</span> of{" "}
-                  <span className="font-semibold text-gray-700">{designs.length}</span> designs
+                  Showing <span className="font-semibold text-mt-muted">{filteredDesigns.length}</span> of{" "}
+                  <span className="font-semibold text-mt-muted">{designs.length}</span> designs
                 </>
               ) : (
                 <>
-                  Showing <span className="font-semibold text-gray-700">{filteredDesigns.length}</span> {selectedKind} designs of{" "}
-                  <span className="font-semibold text-gray-700">{kindStats[selectedKind === "DESIGN" ? "designCount" : "readyMadeCount"]}</span> total
+                  Showing <span className="font-semibold text-mt-muted">{filteredDesigns.length}</span> {selectedKind} designs of{" "}
+                  <span className="font-semibold text-mt-muted">{kindStats[selectedKind === "DESIGN" ? "designCount" : "readyMadeCount"]}</span> total
                 </>
               )}
             </p>
-            <p className="text-gray-400 text-xs mt-2">
+            <p className="text-mt-subtle text-xs mt-2">
               All designs are curated and quality-checked
             </p>
           </div>

@@ -138,26 +138,26 @@ const ProfilePage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)]">
       {/* Enhanced Header */}
-      <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white shadow-xl">
+      <div className="text-mt-btn-text shadow-xl bg-mt-btn">
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Agent Profile</h1>
-              <p className="text-gray-300 mt-2 flex items-center gap-2">
+              <h1 className="text-3xl font-normal tracking-tight">Agent Profile</h1>
+              <p className="text-mt-line-strong mt-2 flex items-center gap-2">
                 <Shield className="w-4 h-4" />
                 Manage your professional identity and credentials
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <div className="px-4 py-2 bg-white/10 rounded-xl backdrop-blur-sm">
+              <div className="px-4 py-2 bg-mt-tint/10 rounded-xl backdrop-blur-sm">
                 <span className="text-sm font-medium">Status: </span>
                 <span className="text-green-400 font-semibold">Active</span>
               </div>
-              <div className="px-4 py-2 bg-blue-500/20 rounded-xl backdrop-blur-sm border border-blue-400/30">
+              <div className="px-4 py-2 bg-mt-tint/10 rounded-xl backdrop-blur-sm border border-mt-line-strong">
                 <span className="text-sm font-medium">Role: </span>
-                <span className="text-blue-300 font-semibold">{sourceUser?.role || "Agent"}</span>
+                <span className="text-mt-text font-semibold">{sourceUser?.role || "Agent"}</span>
               </div>
             </div>
           </div>
@@ -166,25 +166,25 @@ const ProfilePage = () => {
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {!isLoggedIn ? (
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg p-8 text-center">
+          <div className="bg-mt-surface/90 backdrop-blur-sm rounded-2xl border border-mt-line shadow-lg p-8 text-center">
             <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-800">Authentication Required</h3>
-            <p className="text-gray-600 mt-2">Please login to access your professional profile</p>
+            <h3 className="text-xl font-semibold text-mt-text">Authentication Required</h3>
+            <p className="text-mt-muted mt-2">Please login to access your professional profile</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             {/* Left Panel - Profile Card */}
             <div className="lg:col-span-1 space-y-6">
-              <div className="bg-white/90 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg p-6">
+              <div className="bg-mt-surface/90 backdrop-blur-sm rounded-2xl border border-mt-line shadow-lg p-6">
                 <div className="relative group">
-                  <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 mx-auto flex items-center justify-center text-white text-4xl font-bold shadow-lg">
+                  <div className="w-32 h-32 rounded-2xl mx-auto flex items-center justify-center text-mt-btn-text text-4xl font-bold shadow-lg bg-mt-btn">
                     {(sourceUser?.name || "U")
                       .split(" ")
                       .slice(0, 2)
                       .map((w) => w[0]?.toUpperCase())
                       .join("")}
                   </div>
-                  <label className="absolute bottom-2 right-1/4 bg-gray-900 text-white p-2 rounded-full cursor-pointer hover:bg-gray-800 transition-all shadow-lg">
+                  <label className="absolute bottom-2 right-1/4 bg-mt-btn text-mt-btn-text p-2 rounded-full cursor-pointer hover:bg-mt-btn-hover transition-all shadow-lg">
                     <Upload className="w-5 h-5" />
                     <input
                       type="file"
@@ -197,86 +197,86 @@ const ProfilePage = () => {
 
                 {uploadProgress > 0 && (
                   <div className="mt-4">
-                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div className="h-2 bg-mt-line rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-300"
+                        className="h-full transition-all duration-300 bg-mt-btn"
                         style={{ width: `${uploadProgress}%` }}
                       />
                     </div>
-                    <p className="text-xs text-gray-500 text-center mt-1">
+                    <p className="text-xs text-mt-subtle text-center mt-1">
                       Uploading... {uploadProgress}%
                     </p>
                   </div>
                 )}
 
                 <div className="text-center mt-6">
-                  <h2 className="text-xl font-bold text-gray-900">
+                  <h2 className="text-xl font-normal text-mt-text">
                     {sourceUser?.name || "Agent"}
                   </h2>
-                  <p className="text-gray-600 mt-1 flex items-center justify-center gap-2">
+                  <p className="text-mt-muted mt-1 flex items-center justify-center gap-2">
                     <Mail className="w-4 h-4" />
                     {sourceUser?.email || "agent@example.com"}
                   </p>
-                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl mt-3 border border-blue-100">
-                    <Briefcase className="w-4 h-4 text-blue-600" />
-                    <span className="text-blue-700 font-semibold text-sm">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl mt-3 border border-mt-line-strong bg-mt-surface-raised">
+                    <Briefcase className="w-4 h-4 text-mt-text" />
+                    <span className="text-mt-text font-semibold text-sm">
                       {sourceUser?.role || "Professional Agent"}
                     </span>
                   </div>
                 </div>
 
                 <div className="mt-8 space-y-4">
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center justify-between p-3 bg-mt-bg rounded-xl hover:bg-mt-tint/10 transition-colors">
                     <div className="flex items-center gap-3">
-                      <Phone className="w-5 h-5 text-gray-600" />
-                      <span className="text-gray-700">Phone</span>
+                      <Phone className="w-5 h-5 text-mt-muted" />
+                      <span className="text-mt-muted">Phone</span>
                     </div>
-                    <span className="font-semibold text-gray-900">
+                    <span className="font-semibold text-mt-text">
                       {sourceUser?.phone || "Not set"}
                     </span>
                   </div>
                   
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center justify-between p-3 bg-mt-bg rounded-xl hover:bg-mt-tint/10 transition-colors">
                     <div className="flex items-center gap-3">
-                      <Shield className="w-5 h-5 text-gray-600" />
-                      <span className="text-gray-700">User ID</span>
+                      <Shield className="w-5 h-5 text-mt-muted" />
+                      <span className="text-mt-muted">User ID</span>
                     </div>
-                    <span className="font-mono text-sm text-gray-900">
+                    <span className="font-mono text-sm text-mt-text">
                       {sourceUser?._id?.slice(-8) || "N/A"}
                     </span>
                   </div>
                 </div>
 
                 {successMsg && (
-                  <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl">
+                  <div className="mt-6 p-4 border border-mt-success/30 rounded-xl bg-mt-surface-raised">
                     <div className="flex items-center gap-2">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                      <span className="text-green-700 font-medium">{successMsg}</span>
+                      <CheckCircle className="w-5 h-5 text-mt-success" />
+                      <span className="text-mt-success font-medium">{successMsg}</span>
                     </div>
                   </div>
                 )}
 
                 {profileError && (
-                  <div className="mt-6 p-4 bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-xl">
+                  <div className="mt-6 p-4 border border-mt-danger/30 rounded-xl bg-mt-surface-raised">
                     <div className="flex items-center gap-2">
-                      <AlertCircle className="w-5 h-5 text-red-600" />
-                      <span className="text-red-700 font-medium">{profileError}</span>
+                      <AlertCircle className="w-5 h-5 text-mt-danger" />
+                      <span className="text-mt-danger font-medium">{profileError}</span>
                     </div>
                   </div>
                 )}
               </div>
 
               {/* Quick Stats Card */}
-              <div className="bg-gradient-to-br from-gray-900 to-gray-800 text-white rounded-2xl p-6 shadow-xl">
-                <h3 className="font-semibold text-gray-300 mb-4">Profile Strength</h3>
+              <div className="text-mt-btn-text rounded-2xl p-6 shadow-xl bg-mt-btn">
+                <h3 className="font-semibold text-mt-line-strong mb-4">Profile Strength</h3>
                 <div className="space-y-4">
                   <div>
                     <div className="flex justify-between text-sm mb-1">
                       <span>Completeness</span>
                       <span>85%</span>
                     </div>
-                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-blue-400 to-indigo-400 w-4/5" />
+                    <div className="h-2 bg-mt-line rounded-full overflow-hidden">
+                      <div className="h-full w-4/5 bg-mt-btn" />
                     </div>
                   </div>
                   <div>
@@ -284,8 +284,8 @@ const ProfilePage = () => {
                       <span>Verification</span>
                       <span>Verified ✅</span>
                     </div>
-                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-green-400 to-emerald-400 w-full" />
+                    <div className="h-2 bg-mt-line rounded-full overflow-hidden">
+                      <div className="h-full w-full bg-mt-success" />
                     </div>
                   </div>
                 </div>
@@ -294,26 +294,26 @@ const ProfilePage = () => {
 
             {/* Right Panel - Edit Form */}
             <div className="lg:col-span-3">
-              <div className="bg-white/90 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
-                <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+              <div className="bg-mt-surface/90 backdrop-blur-sm rounded-2xl border border-mt-line shadow-lg overflow-hidden">
+                <div className="px-8 py-6 border-b border-mt-line bg-mt-bg">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                      <h2 className="text-2xl font-bold text-gray-900">Profile Configuration</h2>
-                      <p className="text-gray-600 mt-1">Update your professional details and security settings</p>
+                      <h2 className="text-2xl font-normal text-mt-text">Profile Configuration</h2>
+                      <p className="text-mt-muted mt-1">Update your professional details and security settings</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() => setIsEditing(!isEditing)}
                         className={`px-5 py-2.5 rounded-xl font-medium transition-all ${
                           isEditing 
-                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg' 
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            ? 'text-mt-btn-text shadow-lg bg-mt-btn' 
+                            : 'bg-mt-surface-raised text-mt-muted hover:bg-mt-tint/15'
                         }`}
                       >
                         {isEditing ? 'Editing Mode' : 'Edit Profile'}
                       </button>
                       {isLoading && (
-                        <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-700 rounded-xl">
+                        <div className="flex items-center gap-2 px-4 py-2 bg-amber-400/10 text-mt-warning rounded-xl">
                           <RefreshCw className="w-4 h-4 animate-spin" />
                           <span className="text-sm font-medium">Processing...</span>
                         </div>
@@ -327,13 +327,13 @@ const ProfilePage = () => {
                     {/* Personal Information */}
                     <div className="space-y-6">
                       <div className="flex items-center gap-3">
-                        <User className="w-6 h-6 text-blue-600" />
-                        <h3 className="text-lg font-semibold text-gray-900">Personal Information</h3>
+                        <User className="w-6 h-6 text-mt-text" />
+                        <h3 className="text-lg font-semibold text-mt-text">Personal Information</h3>
                       </div>
                       
                       <div className="space-y-5">
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          <label className="block text-sm font-semibold text-mt-muted mb-2">
                             Full Name
                           </label>
                           <input
@@ -341,41 +341,41 @@ const ProfilePage = () => {
                             value={form.name}
                             onChange={onChange}
                             disabled={!isEditing}
-                            className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900 outline-none transition-all focus:ring-3 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                            className="w-full px-4 py-3 rounded-xl border border-mt-line-strong bg-mt-surface text-mt-text outline-none transition-all focus:ring-3 focus:ring-mt-tint/10 focus:border-mt-text disabled:bg-mt-bg disabled:text-mt-subtle"
                             placeholder="Enter your full name"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          <label className="block text-sm font-semibold text-mt-muted mb-2">
                             Email Address
                           </label>
                           <div className="relative">
-                            <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                            <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-mt-subtle" />
                             <input
                               name="email"
                               type="email"
                               value={form.email}
                               onChange={onChange}
                               disabled={!isEditing}
-                              className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900 outline-none transition-all focus:ring-3 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                              className="w-full pl-12 pr-4 py-3 rounded-xl border border-mt-line-strong bg-mt-surface text-mt-text outline-none transition-all focus:ring-3 focus:ring-mt-tint/10 focus:border-mt-text disabled:bg-mt-bg disabled:text-mt-subtle"
                               placeholder="professional@email.com"
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          <label className="block text-sm font-semibold text-mt-muted mb-2">
                             Phone Number
                           </label>
                           <div className="relative">
-                            <Phone className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                            <Phone className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-mt-subtle" />
                             <input
                               name="phone"
                               value={form.phone}
                               onChange={onChange}
                               disabled={!isEditing}
-                              className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900 outline-none transition-all focus:ring-3 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                              className="w-full pl-12 pr-4 py-3 rounded-xl border border-mt-line-strong bg-mt-surface text-mt-text outline-none transition-all focus:ring-3 focus:ring-mt-tint/10 focus:border-mt-text disabled:bg-mt-bg disabled:text-mt-subtle"
                               placeholder="+1 (555) 000-0000"
                             />
                           </div>
@@ -386,13 +386,13 @@ const ProfilePage = () => {
                     {/* Professional Details */}
                     <div className="space-y-6">
                       {/* <div className="flex items-center gap-3">
-                        <Briefcase className="w-6 h-6 text-indigo-600" />
-                        <h3 className="text-lg font-semibold text-gray-900">Professional Details</h3>
+                        <Briefcase className="w-6 h-6 text-mt-text" />
+                        <h3 className="text-lg font-semibold text-mt-text">Professional Details</h3>
                       </div> */}
                       
                       {/* <div className="space-y-5">
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          <label className="block text-sm font-semibold text-mt-muted mb-2">
                             Role / Position
                           </label>
                           <select
@@ -400,7 +400,7 @@ const ProfilePage = () => {
                             value={form.role}
                             onChange={onChange}
                             disabled={!isEditing}
-                            className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900 outline-none transition-all focus:ring-3 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                            className="w-full px-4 py-3 rounded-xl border border-mt-line-strong bg-mt-surface text-mt-text outline-none transition-all focus:ring-3 focus:ring-mt-tint/10 focus:border-mt-text disabled:bg-mt-bg disabled:text-mt-subtle"
                           >
                             <option value="">Select Role</option>
                             <option value="Senior Agent">Senior Agent</option>
@@ -409,17 +409,17 @@ const ProfilePage = () => {
                             <option value="Executive Agent">Executive Agent</option>
                             <option value="Principal Agent">Principal Agent</option>
                           </select>
-                          <p className="text-xs text-gray-500 mt-2">
+                          <p className="text-xs text-mt-subtle mt-2">
                             Select your current professional designation
                           </p>
                         </div>
 
-                        <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+                        <div className="p-4 rounded-xl border border-mt-line-strong bg-mt-surface-raised">
                           <div className="flex items-center gap-3">
-                            <Shield className="w-5 h-5 text-blue-600" />
+                            <Shield className="w-5 h-5 text-mt-text" />
                             <div>
-                              <h4 className="font-semibold text-blue-900">Verification Status</h4>
-                              <p className="text-sm text-blue-700 mt-1">Identity verified • Profile active</p>
+                              <h4 className="font-semibold text-mt-text">Verification Status</h4>
+                              <p className="text-sm text-mt-text mt-1">Identity verified • Profile active</p>
                             </div>
                           </div>
                         </div>
@@ -428,15 +428,15 @@ const ProfilePage = () => {
                   </div>
 
                   {/* Password Section */}
-                  <div className="mt-12 pt-8 border-t border-gray-200">
+                  <div className="mt-12 pt-8 border-t border-mt-line">
                     <div className="flex items-center gap-3 mb-6">
-                      <Key className="w-6 h-6 text-amber-600" />
-                      <h3 className="text-lg font-semibold text-gray-900">Security Settings</h3>
+                      <Key className="w-6 h-6 text-mt-warning" />
+                      <h3 className="text-lg font-semibold text-mt-text">Security Settings</h3>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        <label className="block text-sm font-semibold text-mt-muted mb-2">
                           New Password
                         </label>
                         <div className="relative">
@@ -446,13 +446,13 @@ const ProfilePage = () => {
                             value={form.password}
                             onChange={onChange}
                             disabled={!isEditing}
-                            className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900 outline-none transition-all focus:ring-3 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                            className="w-full px-4 py-3 rounded-xl border border-mt-line-strong bg-mt-surface text-mt-text outline-none transition-all focus:ring-3 focus:ring-mt-tint/10 focus:border-mt-text disabled:bg-mt-bg disabled:text-mt-subtle"
                             placeholder="Enter new password"
                           />
                           <button
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            className="absolute right-4 top-1/2 transform -translate-y-1/2 text-mt-subtle hover:text-mt-text"
                           >
                             {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                           </button>
@@ -460,7 +460,7 @@ const ProfilePage = () => {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        <label className="block text-sm font-semibold text-mt-muted mb-2">
                           Confirm Password
                         </label>
                         <div className="relative">
@@ -470,13 +470,13 @@ const ProfilePage = () => {
                             value={form.confirmPassword}
                             onChange={onChange}
                             disabled={!isEditing}
-                            className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900 outline-none transition-all focus:ring-3 focus:ring-blue-500/20 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                            className="w-full px-4 py-3 rounded-xl border border-mt-line-strong bg-mt-surface text-mt-text outline-none transition-all focus:ring-3 focus:ring-mt-tint/10 focus:border-mt-text disabled:bg-mt-bg disabled:text-mt-subtle"
                             placeholder="Confirm new password"
                           />
                           <button
                             type="button"
                             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                            className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            className="absolute right-4 top-1/2 transform -translate-y-1/2 text-mt-subtle hover:text-mt-text"
                           >
                             {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                           </button>
@@ -484,16 +484,16 @@ const ProfilePage = () => {
                       </div>
                     </div>
 
-                    <div className="mt-6 p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-100">
-                      <p className="text-sm text-amber-800">
+                    <div className="mt-6 p-4 rounded-xl border border-amber-400/30 bg-mt-surface-raised">
+                      <p className="text-sm text-mt-warning">
                         🔒 Password must contain at least 8 characters, including uppercase, lowercase, numbers, and special characters.
                       </p>
                     </div>
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="mt-12 pt-6 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="text-sm text-gray-500">
+                  <div className="mt-12 pt-6 border-t border-mt-line flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="text-sm text-mt-subtle">
                       Last updated: {new Date().toLocaleDateString('en-US', { 
                         month: 'long', 
                         day: 'numeric', 
@@ -519,7 +519,7 @@ const ProfilePage = () => {
                           setIsEditing(false);
                         }}
                         disabled={isLoading || !isEditing}
-                        className="px-6 py-3 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        className="px-6 py-3 rounded-xl border border-mt-line-strong text-mt-muted font-medium hover:bg-mt-tint/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
                         <RefreshCw className="w-4 h-4" />
                         Reset Changes
@@ -528,7 +528,7 @@ const ProfilePage = () => {
                       <button
                         type="submit"
                         disabled={isLoading || !isEditing}
-                        className="px-8 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        className="px-8 py-3 rounded-xl text-mt-btn-text font-semibold transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 bg-mt-btn"
                       >
                         <Save className="w-4 h-4" />
                         Save Changes

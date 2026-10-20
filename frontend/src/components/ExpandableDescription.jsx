@@ -29,7 +29,7 @@ export default function ExpandableDescription({
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="mt-2 inline-flex text-xs font-bold text-orange-600 transition hover:text-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
+          className="mt-2 inline-flex text-xs font-medium text-mt-text underline underline-offset-4 transition hover:text-mt-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mt-text"
         >
           {expanded ? "View less" : "View more"}
         </button>

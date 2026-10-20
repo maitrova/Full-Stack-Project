@@ -1080,7 +1080,7 @@ const startPanelDrag = (e) => {
       {/* Panel */}
 <div
   ref={panelRef}
-  className="absolute z-[2000] w-[min(92vw,360px)] bg-white rounded-lg shadow-lg border border-slate-200 pointer-events-auto"
+  className="absolute z-[2000] w-[min(92vw,360px)] bg-mt-surface rounded-lg shadow-lg border border-mt-line pointer-events-auto"
   style={{
     left: panelPos.x,
     top: panelPos.y,
@@ -1088,15 +1088,15 @@ const startPanelDrag = (e) => {
 >
         <div
   onPointerDown={startPanelDrag}
-  className="px-3 py-2 border-b border-slate-200 flex items-center justify-between cursor-move bg-slate-50"
+  className="px-3 py-2 border-b border-mt-line flex items-center justify-between cursor-move bg-mt-bg"
 >
 
-          <div className="text-sm font-semibold text-slate-900">
+          <div className="text-sm font-semibold text-mt-text">
             Calibration Mode • {view.toUpperCase()}
           </div>
           <button
             onClick={onClose}
-            className="text-xs px-2 py-1 rounded border border-slate-200 hover:bg-slate-50"
+            className="text-xs px-2 py-1 rounded border border-mt-line hover:bg-mt-tint/5"
             type="button"
           >
             Close
@@ -1104,21 +1104,21 @@ const startPanelDrag = (e) => {
         </div>
 
         <div className="p-3 space-y-3">
-          <div className="text-xs text-slate-600">
+          <div className="text-xs text-mt-muted">
             Manage zones for this view. Add/remove zones and adjust boundaries. Save once per mockup.
           </div>
 
           <div className="flex gap-2">
             <button
               onClick={addZone}
-              className="flex-1 text-xs px-3 py-2 rounded bg-slate-900 text-white hover:bg-slate-800"
+              className="flex-1 text-xs px-3 py-2 rounded bg-mt-btn text-mt-btn-text hover:bg-mt-btn-hover"
               type="button"
             >
               + Add Zone
             </button>
             <button
               onClick={exportJson}
-              className="text-xs px-3 py-2 rounded border border-slate-200 hover:bg-slate-50"
+              className="text-xs px-3 py-2 rounded border border-mt-line hover:bg-mt-tint/5"
               type="button"
             >
               Copy JSON
@@ -1128,7 +1128,7 @@ const startPanelDrag = (e) => {
           <div className="flex gap-2">
             <button
               onClick={resetAllZonesToDefaults}
-              className="flex-1 text-xs px-3 py-2 rounded border border-slate-200 text-slate-700 hover:bg-slate-50"
+              className="flex-1 text-xs px-3 py-2 rounded border border-mt-line text-mt-muted hover:bg-mt-tint/5"
               type="button"
             >
               Reset View
@@ -1136,14 +1136,14 @@ const startPanelDrag = (e) => {
             <button
               onClick={() => activeZone && resetZoneToDefault(activeZone)}
               disabled={!activeZone}
-              className="flex-1 text-xs px-3 py-2 rounded border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              className="flex-1 text-xs px-3 py-2 rounded border border-mt-line text-mt-muted hover:bg-mt-tint/5 disabled:opacity-50"
               type="button"
             >
               Reset Active
             </button>
           </div>
 
-          <div className="text-xs font-medium text-slate-800">Zones</div>
+          <div className="text-xs font-medium text-mt-text">Zones</div>
           <div className="max-h-[220px] overflow-auto space-y-2 pr-1">
             {zones.map((z) => {
               const isActive = z === activeZone;
@@ -1154,7 +1154,7 @@ const startPanelDrag = (e) => {
               return (
                 <div
                   key={z}
-                  className={`rounded border p-2 ${isActive ? "border-blue-500 bg-blue-50" : "border-slate-200"}`}
+                  className={`rounded border p-2 ${isActive ? "border-mt-text bg-mt-tint/10" : "border-mt-line"}`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <button
@@ -1162,14 +1162,14 @@ const startPanelDrag = (e) => {
                       onClick={() => setActiveZone(z)}
                       className="text-left flex-1"
                     >
-                      <div className="text-xs font-semibold text-slate-900">{label}</div>
-                      <div className="text-[11px] text-slate-600">{z}</div>
+                      <div className="text-xs font-semibold text-mt-text">{label}</div>
+                      <div className="text-[11px] text-mt-muted">{z}</div>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => deleteZone(z)}
-                      className="text-[11px] px-2 py-1 rounded border border-rose-200 text-rose-700 hover:bg-rose-50"
+                      className="text-[11px] px-2 py-1 rounded border border-mt-danger/30 text-mt-danger hover:bg-mt-danger/15"
                     >
                       Delete
                     </button>
@@ -1177,24 +1177,24 @@ const startPanelDrag = (e) => {
 
                   <div className="grid grid-cols-2 gap-2 mt-2">
                     <div>
-                      <div className="text-[11px] text-slate-600">Label</div>
+                      <div className="text-[11px] text-mt-muted">Label</div>
                       <input
-                        className="w-full text-xs border border-slate-200 rounded px-2 py-1"
+                        className="w-full text-xs border border-mt-line rounded px-2 py-1"
                         value={label}
                         onChange={(e) => updateMeta(z, { label: e.target.value })}
                       />
                     </div>
 
                     <div>
-                      <div className="text-[11px] text-slate-600">Size (in)</div>
+                      <div className="text-[11px] text-mt-muted">Size (in)</div>
                       <div className="flex gap-2">
                         <input
-                          className="w-1/2 text-xs border border-slate-200 rounded px-2 py-1"
+                          className="w-1/2 text-xs border border-mt-line rounded px-2 py-1"
                           value={spec.maxW}
                           onChange={(e) => updateMeta(z, { maxW: Number(e.target.value || 0) })}
                         />
                         <input
-                          className="w-1/2 text-xs border border-slate-200 rounded px-2 py-1"
+                          className="w-1/2 text-xs border border-mt-line rounded px-2 py-1"
                           value={spec.maxH}
                           onChange={(e) => updateMeta(z, { maxH: Number(e.target.value || 0) })}
                         />
@@ -1207,15 +1207,15 @@ const startPanelDrag = (e) => {
           </div>
 
           {activeZone && activeRect && (
-            <div className="rounded border border-slate-200 bg-slate-50 p-3">
+            <div className="rounded border border-mt-line bg-mt-bg p-3">
               <div className="mb-2 flex items-center justify-between">
-                <div className="text-xs font-semibold text-slate-800">
+                <div className="text-xs font-semibold text-mt-text">
                   Active Zone: {getZoneLabel(activeZone, { zoneMeta })}
                 </div>
-                <div className="text-[10px] text-slate-500">Values are % of preview</div>
+                <div className="text-[10px] text-mt-subtle">Values are % of preview</div>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <label className="text-[11px] text-slate-600">
+                <label className="text-[11px] text-mt-muted">
                   X
                   <input
                     type="number"
@@ -1224,10 +1224,10 @@ const startPanelDrag = (e) => {
                     step="1"
                     value={Math.round(activeRect.x * 100)}
                     onChange={(e) => setZoneRect(activeZone, { x: Number(e.target.value || 0) / 100 })}
-                    className="mt-1 w-full rounded border border-slate-200 px-2 py-1 text-xs"
+                    className="mt-1 w-full rounded border border-mt-line px-2 py-1 text-xs"
                   />
                 </label>
-                <label className="text-[11px] text-slate-600">
+                <label className="text-[11px] text-mt-muted">
                   Y
                   <input
                     type="number"
@@ -1236,10 +1236,10 @@ const startPanelDrag = (e) => {
                     step="1"
                     value={Math.round(activeRect.y * 100)}
                     onChange={(e) => setZoneRect(activeZone, { y: Number(e.target.value || 0) / 100 })}
-                    className="mt-1 w-full rounded border border-slate-200 px-2 py-1 text-xs"
+                    className="mt-1 w-full rounded border border-mt-line px-2 py-1 text-xs"
                   />
                 </label>
-                <label className="text-[11px] text-slate-600">
+                <label className="text-[11px] text-mt-muted">
                   Width
                   <input
                     type="number"
@@ -1248,10 +1248,10 @@ const startPanelDrag = (e) => {
                     step="1"
                     value={Math.round(activeRect.w * 100)}
                     onChange={(e) => setZoneRect(activeZone, { w: Number(e.target.value || 4) / 100 })}
-                    className="mt-1 w-full rounded border border-slate-200 px-2 py-1 text-xs"
+                    className="mt-1 w-full rounded border border-mt-line px-2 py-1 text-xs"
                   />
                 </label>
-                <label className="text-[11px] text-slate-600">
+                <label className="text-[11px] text-mt-muted">
                   Height
                   <input
                     type="number"
@@ -1260,7 +1260,7 @@ const startPanelDrag = (e) => {
                     step="1"
                     value={Math.round(activeRect.h * 100)}
                     onChange={(e) => setZoneRect(activeZone, { h: Number(e.target.value || 4) / 100 })}
-                    className="mt-1 w-full rounded border border-slate-200 px-2 py-1 text-xs"
+                    className="mt-1 w-full rounded border border-mt-line px-2 py-1 text-xs"
                   />
                 </label>
               </div>
@@ -1269,7 +1269,7 @@ const startPanelDrag = (e) => {
 
           <button
             onClick={saveNow}
-            className="w-full text-xs px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+            className="w-full text-xs px-3 py-2 rounded bg-mt-btn text-mt-btn-text hover:bg-mt-btn-hover"
             type="button"
           >
             Save Calibration
@@ -1322,7 +1322,7 @@ const startPanelDrag = (e) => {
                     <div
                       key={h}
                       onPointerDown={(e) => startDrag(e, zoneKey, "resize", h)}
-                      className="absolute h-2.5 w-2.5 rounded border border-blue-300 bg-white"
+                      className="absolute h-2.5 w-2.5 rounded border border-mt-line-strong bg-mt-surface"
                       style={{
                         cursor: h === "nw" || h === "se" ? "nwse-resize" : "nesw-resize",
                         left: h.includes("w") ? "-6px" : "auto",
@@ -2113,13 +2113,13 @@ return () => {
       style={{ touchAction: isCompactUI ? "pan-y" : "none" }}
       onPointerDown={handleBackgroundPointerDown}
     >
-      <div className="flex flex-wrap items-center justify-end gap-2 rounded-2xl bg-white/90 px-2 py-2 shadow-sm">
+      <div className="flex flex-wrap items-center justify-end gap-1.5 pb-2 font-brand text-mt-text [color-scheme:var(--mt-scheme)]">
         <button
           onClick={() => setShowMeasurements((s) => !s)}
-          className="rounded border border-slate-300 bg-white px-3 py-1.5 text-xs shadow-sm hover:bg-slate-50"
+          className="h-8 rounded-mt-btn border border-mt-line-strong bg-mt-surface/90 px-3 text-xs text-mt-text hover:bg-mt-surface"
           type="button"
         >
-          {showMeasurements ? "Hide Measurements" : "Show Measurements"}
+          {showMeasurements ? "Hide measurements" : "Show measurements"}
         </button>
         {activeDesignId && zoneOptions.length > 1 && onMoveActiveDesignToZone && (
           <>
@@ -2131,10 +2131,10 @@ return () => {
                   type="button"
                   onClick={() => onMoveActiveDesignToZone(zoneKey)}
                   disabled={isCurrentZone}
-                  className={`rounded border px-3 py-1.5 text-xs shadow-sm transition ${
+                  className={`h-8 rounded-mt-btn border px-3 text-xs transition-colors ${
                     isCurrentZone
-                      ? "cursor-default border-sky-200 bg-sky-50 text-sky-700"
-                      : "border-slate-300 bg-white hover:bg-slate-50"
+                      ? "cursor-default border-mt-text bg-mt-btn text-mt-btn-text"
+                      : "border-mt-line-strong bg-mt-surface/90 text-mt-text hover:bg-mt-surface"
                   }`}
                 >
                   {isCurrentZone
@@ -2155,10 +2155,10 @@ return () => {
                   type="button"
                   onClick={() => onMoveActiveTextToZone(zoneKey)}
                   disabled={isCurrentZone}
-                  className={`rounded border px-3 py-1.5 text-xs shadow-sm transition ${
+                  className={`h-8 rounded-mt-btn border px-3 text-xs transition-colors ${
                     isCurrentZone
-                      ? "cursor-default border-sky-200 bg-sky-50 text-sky-700"
-                      : "border-slate-300 bg-white hover:bg-slate-50"
+                      ? "cursor-default border-mt-text bg-mt-btn text-mt-btn-text"
+                      : "border-mt-line-strong bg-mt-surface/90 text-mt-text hover:bg-mt-surface"
                   }`}
                 >
                   {isCurrentZone
@@ -2172,7 +2172,7 @@ return () => {
         {isAdmin && (
           <button
             onClick={() => setCalibrationMode(true)}
-            className="rounded bg-blue-600 px-3 py-1.5 text-xs text-white shadow-sm hover:bg-blue-700"
+            className="h-8 rounded-mt-btn bg-mt-btn px-3 text-xs text-mt-btn-text hover:bg-mt-btn-hover"
             type="button"
           >
             Calibrate Zones
@@ -2269,9 +2269,9 @@ return () => {
 
       {bgRemovalLoading && (
         <div className="pointer-events-none absolute inset-0 bg-white/40 flex items-center justify-center">
-          <div className="bg-white px-4 py-2 rounded shadow-md">
-            <div className="text-sm text-slate-700">Removing background...</div>
-            <div className="text-xs text-slate-500 mt-1">Please wait</div>
+          <div className="bg-mt-surface px-4 py-2 rounded shadow-md">
+            <div className="text-sm text-mt-muted">Removing background...</div>
+            <div className="text-xs text-mt-subtle mt-1">Please wait</div>
           </div>
         </div>
       )}

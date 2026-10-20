@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { fetchProductBySlug, fetchProducts } from "../redux/slices/productsSlice.js";
 import RecolorEditor from "./RecolorEditor.jsx";
+import { Button, SectionHeader, Skeleton, Swatch } from "./ui/index.js";
 
 const API_URL = (import.meta.env.VITE_API_URL || "https://maitrova.in/backend").replace(/\/$/, "");
 const IMAGE_URL = (import.meta.env.VITE_IMAGE_URL || API_URL).replace(/\/$/, "");
@@ -266,19 +267,25 @@ const Hero = () => {
   };
 
   return (
-    <section className="relative overflow-hidden bg-[linear-gradient(135deg,#f7f1e8_0%,#f4f5eb_48%,#ecf3d2_100%)] px-2 py-4 text-slate-950 sm:px-5 sm:py-5 lg:px-8 lg:py-7">
-      <div className="pointer-events-none absolute -left-24 top-20 h-72 w-72 rounded-full bg-orange-300/35 blur-3xl" />
-      <div className="pointer-events-none absolute right-0 top-0 h-80 w-80 rounded-full bg-lime-300/30 blur-3xl" />
-      <div className="pointer-events-none absolute left-[42%] top-12 h-28 w-28 rounded-full border border-white/70 bg-white/30 shadow-xl backdrop-blur" />
+    <section className="mx-auto max-w-7xl px-4 pt-10 sm:px-6 sm:pt-14">
+      <SectionHeader
+        title="Design it live"
+        actionLabel="Open customizer"
+        onAction={() => openCustomizer()}
+        className="mb-3 sm:mb-5"
+      />
 
-      <div className="relative mx-auto grid max-w-[1240px] items-stretch gap-4 lg:grid-cols-[minmax(0,1.18fr)_minmax(0,0.82fr)] lg:gap-5">
-        <div className="floating-panel min-w-0 rounded-[1.35rem] border border-white/80 bg-[#fffdf8]/95 p-2.5 shadow-[0_25px_70px_rgba(15,23,42,0.14)] backdrop-blur sm:rounded-[2rem] sm:p-4">
-          <h1 className="mb-2 truncate text-xl font-black tracking-[-0.035em] sm:text-2xl">
-            Customize <span className="text-orange-600">{product?.name || "your product"}</span>
-          </h1>
+      <div className="grid items-stretch gap-3 lg:grid-cols-[minmax(0,1.18fr)_minmax(0,0.82fr)] lg:gap-4">
+        <div className="min-w-0 rounded-mt-card border border-mt-line bg-mt-surface p-3 sm:p-5">
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <p className="text-sm font-light text-mt-muted sm:text-base">Create apparel that’s uniquely yours.</p>
+            <p className="truncate text-sm text-mt-text">
+              Customizing <span className="font-medium">{product?.name || "your product"}</span>
+            </p>
+          </div>
 
           {productOptions.length > 0 && (
-            <div className="mb-2">
+            <div className="mb-3">
               <div
                 ref={productRailRef}
                 onMouseEnter={() => { productRailPausedRef.current = true; }}
@@ -287,26 +294,29 @@ const Hero = () => {
                 onTouchEnd={() => { productRailPausedRef.current = false; }}
                 onFocus={() => { productRailPausedRef.current = true; }}
                 onBlur={() => { productRailPausedRef.current = false; }}
-                className="product-selector-rail flex gap-1 overflow-x-auto overscroll-contain rounded-xl border border-white/80 bg-white/55 p-1 shadow-inner backdrop-blur sm:rounded-2xl sm:p-1.5"
+                className="product-selector-rail flex gap-2 overflow-x-auto overscroll-contain"
                 aria-label="Scrollable customization products"
               >
                 {[...productOptions, ...productOptions].map((option, index) => {
                   const front = option.views?.find((view) => view.code === "front") || option.views?.[0];
                   const thumbnail = front?.mockupUrl || option.image?.url || option.image || `/mockups/${option.slug}/front.png`;
+                  // The bundled files in /public/mockups are stored upside down; show them upright here.
+                  const isBundledMockup = String(thumbnail).startsWith("/mockups/");
                   const active = option.slug === product?.slug;
                   return (
                     <button
                       key={`${option.slug}-${index}`}
                       type="button"
                       onClick={() => selectProduct(option)}
-                      className={`group flex w-[126px] shrink-0 items-center gap-1.5 rounded-xl border px-1.5 py-1 text-left transition hover:-translate-y-1 hover:shadow-lg sm:w-[138px] ${active ? "border-orange-500 bg-white shadow-md" : "border-white/80 bg-white/70 shadow-sm"}`}
+                      aria-pressed={active}
+                      className={`group flex w-[132px] shrink-0 items-center gap-2 rounded-mt-btn border p-1.5 text-left transition-colors sm:w-[146px] ${active ? "border-mt-text bg-mt-surface-raised" : "border-mt-line hover:border-mt-line-strong"}`}
                     >
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
-                        <img src={thumbnail} alt="" className="h-full w-full object-contain transition group-hover:scale-110" loading="lazy" />
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-mt-btn bg-mt-photo">
+                        <img src={thumbnail} alt="" className={`h-full w-full object-contain transition-transform group-hover:scale-110 ${isBundledMockup ? "rotate-180" : ""}`} loading="lazy" />
                       </span>
                       <span className="min-w-0">
-                        <span className="block truncate text-[11px] font-black text-slate-900">{option.name}</span>
-                        <span className={`block text-[9px] font-bold ${active ? "text-orange-600" : "text-slate-400"}`}>{active ? "Selected" : "Customize"}</span>
+                        <span className="block truncate text-xs text-mt-text">{option.name}</span>
+                        <span className={`block text-[10px] ${active ? "text-mt-text" : "text-mt-subtle"}`}>{active ? "Selected" : "Customize"}</span>
                       </span>
                     </button>
                   );
@@ -315,7 +325,7 @@ const Hero = () => {
             </div>
           )}
 
-          <div className="grid h-[345px] min-w-0 grid-cols-[52px_minmax(0,1fr)] gap-2 sm:h-[410px] sm:grid-cols-[72px_minmax(0,1fr)] sm:gap-3">
+          <div className="grid h-[345px] min-w-0 grid-cols-[56px_minmax(0,1fr)] gap-2 sm:h-[420px] sm:grid-cols-[76px_minmax(0,1fr)] sm:gap-3">
             <div
               ref={designRailRef}
               onMouseEnter={() => { designRailPausedRef.current = true; }}
@@ -324,11 +334,10 @@ const Hero = () => {
               onTouchEnd={() => { designRailPausedRef.current = false; }}
               onFocus={() => { designRailPausedRef.current = true; }}
               onBlur={() => { designRailPausedRef.current = false; }}
-              className="hero-design-rail relative overflow-x-hidden overflow-y-auto rounded-2xl border border-black/10 bg-slate-950 py-2 overscroll-contain"
+              className="hero-design-rail relative overflow-x-hidden overflow-y-auto rounded-mt-btn border border-mt-line bg-mt-header py-2 overscroll-contain"
               aria-label="Scrollable design previews"
             >
-              <div className="absolute inset-x-0 top-0 z-10 h-10 bg-gradient-to-b from-slate-950 to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 z-10 h-10 bg-gradient-to-t from-slate-950 to-transparent" />
+              <div className="pointer-events-none sticky top-0 z-10 -mb-10 h-10 bg-gradient-to-b from-mt-header to-transparent" />
               {designs.length ? (
                 <div className="flex flex-col items-center gap-2 px-1.5">
                   {[...designs, ...designs].map((design, index) => (
@@ -336,7 +345,7 @@ const Hero = () => {
                       type="button"
                       key={`${design.folder}-${design.filename}-${index}`}
                       onClick={() => previewDesign(design)}
-                      className={`aspect-square w-full shrink-0 overflow-hidden rounded-xl border bg-white p-1.5 transition hover:scale-105 ${selectedDesign?.filename === design.filename ? "border-orange-400 ring-2 ring-orange-400/40" : "border-white/15"}`}
+                      className={`aspect-square w-full shrink-0 overflow-hidden rounded-mt-btn border bg-mt-photo p-1.5 transition-transform hover:scale-105 ${selectedDesign?.filename === design.filename ? "border-mt-text ring-2 ring-mt-text/60" : "border-transparent"}`}
                       aria-label={`Preview ${design.filename}`}
                     >
                       <img src={assetUrl(design.url)} alt="" className="h-full w-full object-contain" loading="lazy" />
@@ -344,8 +353,8 @@ const Hero = () => {
                   ))}
                 </div>
               ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-3 px-2 text-center text-[10px] font-bold uppercase tracking-wider text-white/60">
-                  <Palette size={24} /> {libraryLoading ? "Loading designs" : "Your design here"}
+                <div className="flex h-full flex-col items-center justify-center gap-3 px-2 text-center text-[10px] uppercase tracking-wider text-mt-subtle">
+                  <Palette size={22} aria-hidden="true" /> {libraryLoading ? "Loading designs" : "Your design here"}
                 </div>
               )}
             </div>
@@ -354,18 +363,28 @@ const Hero = () => {
               ref={productPreviewRef}
               onPointerMove={tiltProductPreview}
               onPointerLeave={resetProductTilt}
-              className="product-preview-stage relative flex min-w-0 flex-col overflow-hidden rounded-[1.4rem] bg-slate-50 shadow-[0_14px_35px_rgba(15,23,42,.12)]"
+              className="product-preview-stage relative flex min-w-0 flex-col overflow-hidden rounded-mt-btn border border-mt-line"
             >
-              <div className="flex items-center justify-between gap-1 bg-white px-2 py-2 sm:gap-2 sm:px-3">
-                <div className="flex items-center gap-2 text-sm font-black"><Shirt size={16} /> {product?.name || "Hoodie"}</div>
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2 bg-mt-surface-raised px-2.5 py-2 sm:px-3">
+                <div className="flex min-w-0 items-center gap-2 text-sm text-mt-text">
+                  <Shirt size={16} aria-hidden="true" /> <span className="truncate">{product?.name || "Hoodie"}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
                   {(availableViews.length ? availableViews : [{ code: "front", label: "Front" }, { code: "back", label: "Back" }]).map((view) => (
-                    <button key={view.code} type="button" onClick={() => setViewCode(view.code)} className={`rounded-full px-2 py-1 text-[9px] font-bold transition sm:px-3 sm:text-[10px] ${viewCode === view.code ? "bg-orange-500 text-white" : "border border-slate-200 bg-white text-slate-600"}`}>{view.label || view.code}</button>
+                    <button
+                      key={view.code}
+                      type="button"
+                      onClick={() => setViewCode(view.code)}
+                      aria-pressed={viewCode === view.code}
+                      className={`h-8 rounded-mt-btn px-3 text-[11px] transition-colors ${viewCode === view.code ? "bg-mt-btn text-mt-btn-text" : "border border-mt-line-strong text-mt-muted hover:text-mt-text"}`}
+                    >
+                      {view.label || view.code}
+                    </button>
                   ))}
                 </div>
               </div>
 
-              <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_50%_35%,#fff_0%,#eef2f7_75%)] p-2 sm:p-4">
+              <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_50%_35%,#f4f4f5_0%,#d4d4d8_85%)] p-2 sm:p-4">
                 <div className="min-w-0 w-full max-w-[620px] overflow-hidden [&_canvas]:max-w-full">
                   <RecolorEditor
                     mockupUrl={mockupUrl}
@@ -394,70 +413,89 @@ const Hero = () => {
                   />
                 </div>
                 {!selectedDesign && (
-                  <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-slate-950/80 px-4 py-2 text-center text-xs font-bold text-white backdrop-blur">Choose a design from either side</div>
+                  <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-mt-btn bg-black/80 px-4 py-2 text-center text-xs text-white backdrop-blur">
+                    Choose a design from the side
+                  </div>
                 )}
               </div>
-
             </div>
           </div>
 
-          <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="flex flex-wrap gap-2.5">
-                {colors.map((color) => {
-                  const active = color.value.toLowerCase() === selectedColor.toLowerCase();
-                  return (
-                    <button key={color.value} type="button" onClick={() => setSelectedColor(color.value)} title={color.label} aria-label={`Use ${color.label}`} className={`h-8 w-8 rounded-full border-2 transition hover:scale-110 ${active ? "border-orange-500 ring-2 ring-orange-200" : "border-white shadow-[0_0_0_1px_rgba(15,23,42,.18)]"}`} style={{ backgroundColor: color.value }} />
-                  );
-                })}
-              </div>
-            </div>
-            <button type="button" onClick={openCustomizer} className="group inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-xs font-bold text-white transition hover:bg-orange-600 sm:w-auto">
-              Customize this look <ArrowRight size={17} className="transition group-hover:translate-x-1" />
-            </button>
+          <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <Swatch
+              colors={colors}
+              value={colors.find((color) => color.value.toLowerCase() === selectedColor.toLowerCase())?.value}
+              onChange={setSelectedColor}
+              size="md"
+              label="Garment colour"
+            />
+            <Button onClick={() => openCustomizer()} arrow className="w-full sm:w-auto">
+              Customize now
+            </Button>
           </div>
         </div>
 
-        <aside className="floating-panel floating-panel-delay relative hidden min-w-0 flex-col overflow-hidden rounded-[1.35rem] border border-white/70 bg-[#dbe8a6]/95 p-3 shadow-[0_28px_75px_rgba(62,78,20,0.2)] backdrop-blur sm:rounded-[2rem] sm:p-4 lg:flex">
-          <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full border-[42px] border-white/25" />
-          <div className="pointer-events-none absolute -bottom-20 -left-20 h-56 w-56 rounded-full bg-orange-400/20 blur-3xl" />
+        <aside className="relative hidden min-w-0 flex-col rounded-mt-card border border-mt-line bg-mt-surface p-4 sm:p-5 lg:flex">
+          <h3 className="text-lg font-medium text-mt-text">Featured designs</h3>
+          <p className="mt-1 text-sm text-mt-muted">Tap a design to preview it on the product.</p>
 
-          <h2 className="relative text-2xl font-black tracking-[-0.04em]">Featured designs</h2>
-
-          <div className="relative mt-3 grid h-[270px] grid-cols-[1.15fr_.85fr] grid-rows-2 gap-2 sm:h-[318px] sm:gap-2.5">
+          <div className="mt-4 grid h-[300px] grid-cols-[1.15fr_.85fr] grid-rows-2 gap-2.5 sm:h-[330px]">
             {designs[0] ? (
-              <button type="button" onClick={() => previewDesign(designs[0])} className={`floating-art-card group relative row-span-2 overflow-hidden rounded-[1.4rem] border p-4 text-left transition duration-300 hover:shadow-2xl ${selectedDesign?.filename === designs[0].filename ? "border-slate-950 bg-[#fff1dc] shadow-xl" : "border-white/80 bg-white/80 shadow-lg"}`}>
-                <span className="absolute left-4 top-4 z-10 rounded-full bg-slate-950 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-white">Featured</span>
-                <span className="absolute right-4 top-4 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-orange-500 text-xs font-black text-white">01</span>
-                <img src={assetUrl(designs[0].url)} alt={designs[0].filename} className="h-full w-full object-contain pb-9 pt-5 transition duration-500 group-hover:scale-110 group-hover:-rotate-2" loading="lazy" />
-                <span className="absolute inset-x-3 bottom-3 flex items-center justify-between rounded-xl bg-white/90 px-3 py-2 shadow-sm backdrop-blur">
-                  <span><span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">{designs[0].folder || "Trending"}</span><span className="block text-xs font-black text-slate-900">Try this artwork</span></span>
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-950 text-white transition group-hover:bg-orange-500"><ArrowRight size={14} /></span>
+              <button
+                type="button"
+                onClick={() => previewDesign(designs[0])}
+                className={`group relative row-span-2 overflow-hidden rounded-mt-btn border bg-mt-photo p-4 text-left transition-colors ${selectedDesign?.filename === designs[0].filename ? "border-mt-text ring-2 ring-mt-text/60" : "border-transparent"}`}
+              >
+                <span className="absolute left-3 top-3 z-10 rounded-mt-btn bg-black px-2 py-0.5 text-[10px] uppercase tracking-wider text-white">Featured</span>
+                <img src={assetUrl(designs[0].url)} alt={designs[0].filename} className="h-full w-full object-contain pb-10 pt-6 transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+                <span className="absolute inset-x-2.5 bottom-2.5 flex items-center justify-between rounded-mt-btn bg-black/85 px-3 py-2 text-white backdrop-blur">
+                  <span>
+                    <span className="block text-[10px] uppercase tracking-wider text-white/60">{designs[0].folder || "Trending"}</span>
+                    <span className="block text-xs">Try this artwork</span>
+                  </span>
+                  <ArrowRight size={15} aria-hidden="true" />
                 </span>
               </button>
-            ) : <div className="row-span-2 animate-pulse rounded-[1.4rem] bg-white/45" />}
+            ) : (
+              <Skeleton className="row-span-2 h-full" />
+            )}
 
-            {designs.slice(1, 3).map((design, index) => (
-              <button key={`${design.folder}-${design.filename}`} type="button" onClick={() => previewDesign(design)} className={`floating-art-card group relative overflow-hidden rounded-[1.2rem] border p-3 transition duration-300 hover:shadow-xl ${selectedDesign?.filename === design.filename ? "border-slate-950 bg-orange-100 shadow-lg" : "border-white/80 bg-white/75 shadow-md"}`} style={{ animationDelay: `${(index + 1) * 0.7}s` }}>
-                <span className="absolute left-3 top-3 z-10 text-[9px] font-black text-slate-400">0{index + 2}</span>
-                <img src={assetUrl(design.url)} alt={design.filename} className="h-full w-full object-contain transition duration-300 group-hover:scale-110" loading="lazy" />
-                <span className="absolute inset-x-2 bottom-2 translate-y-10 rounded-lg bg-slate-950/90 px-2 py-1.5 text-center text-[9px] font-bold text-white transition group-hover:translate-y-0">Preview on product</span>
+            {designs.slice(1, 3).map((design) => (
+              <button
+                key={`${design.folder}-${design.filename}`}
+                type="button"
+                onClick={() => previewDesign(design)}
+                className={`group relative overflow-hidden rounded-mt-btn border bg-mt-photo p-3 transition-colors ${selectedDesign?.filename === design.filename ? "border-mt-text ring-2 ring-mt-text/60" : "border-transparent"}`}
+              >
+                <img src={assetUrl(design.url)} alt={design.filename} className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-110" loading="lazy" />
+                <span className="absolute inset-x-2 bottom-2 translate-y-10 rounded-mt-btn bg-black/85 px-2 py-1.5 text-center text-[10px] text-white transition-transform group-hover:translate-y-0 group-focus-visible:translate-y-0">
+                  Preview on product
+                </span>
               </button>
             ))}
           </div>
 
-          <button type="button" onClick={() => openCustomizer({ openLibrary: true })} className="group relative mt-3 overflow-hidden rounded-2xl border border-slate-950 bg-slate-950 p-1 text-left text-white shadow-[0_14px_30px_rgba(15,23,42,.2)] transition hover:-translate-y-1 hover:shadow-[0_20px_42px_rgba(15,23,42,.3)]">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_0%,rgba(249,115,22,.8),transparent_38%)] opacity-80 transition group-hover:scale-110" />
-            <div className="relative flex items-center gap-2.5 rounded-[0.8rem] border border-white/15 px-3 py-2.5">
-              <div className="flex -space-x-3">
-                {designs.slice(6, 9).map((design) => <span key={`${design.folder}-${design.filename}`} className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border-2 border-slate-950 bg-white p-1"><img src={assetUrl(design.url)} alt="" className="h-full w-full object-contain" /></span>)}
-                <span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-slate-950 bg-orange-500"><LockKeyhole size={14} /></span>
-              </div>
-              <span className="min-w-0 flex-1"><span className="block text-sm font-black">See the full design library</span><span className="block text-xs text-white/65">Browse {libraryFolders.length || "all"} categories</span></span>
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-slate-950"><ArrowRight size={16} /></span>
-            </div>
+          <button
+            type="button"
+            onClick={() => openCustomizer({ openLibrary: true })}
+            className="group mt-4 flex items-center gap-3 rounded-mt-btn border border-mt-line bg-mt-surface-raised px-3 py-3 text-left transition-colors hover:border-mt-line-strong"
+          >
+            <span className="flex -space-x-3">
+              {designs.slice(6, 9).map((design) => (
+                <span key={`${design.folder}-${design.filename}`} className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border-2 border-mt-surface-raised bg-mt-photo p-1">
+                  <img src={assetUrl(design.url)} alt="" className="h-full w-full object-contain" />
+                </span>
+              ))}
+              <span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-mt-surface-raised bg-mt-btn text-mt-btn-text">
+                <LockKeyhole size={14} aria-hidden="true" />
+              </span>
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm text-mt-text">See the full design library</span>
+              <span className="block text-xs text-mt-subtle">Browse {libraryFolders.length || "all"} categories</span>
+            </span>
+            <ArrowRight size={16} className="text-mt-muted transition-transform group-hover:translate-x-1" aria-hidden="true" />
           </button>
-
         </aside>
       </div>
       <style>{`
@@ -465,15 +503,8 @@ const Hero = () => {
         .hero-design-rail::-webkit-scrollbar { display: none; width: 0; height: 0; }
         .product-selector-rail { scrollbar-width: none; -ms-overflow-style: none; }
         .product-selector-rail::-webkit-scrollbar { display: none; width: 0; height: 0; }
-        .floating-panel { animation: panelFloat 6s ease-in-out infinite; }
-        .floating-panel-delay { animation-delay: -2.4s; }
-        .floating-art-card { animation: artworkFloat 5s ease-in-out infinite; }
-        .floating-art-card:hover, .floating-art-card:focus-visible { animation-play-state: paused; transform: translateY(-7px) scale(1.01); }
-        .product-preview-stage { transform-style: preserve-3d; transform-origin: center; transition: transform .18s ease-out, box-shadow .3s ease; will-change: transform; }
-        .product-preview-stage:hover, .product-preview-stage:focus-within { box-shadow: 0 20px 45px rgba(15,23,42,.16); }
-        @keyframes panelFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-        @keyframes artworkFloat { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-4px) rotate(.35deg); } }
-        @media (prefers-reduced-motion: reduce) { .product-preview-stage, .floating-panel, .floating-art-card { transform: none !important; transition: none; animation: none; } }
+        .product-preview-stage { transform-style: preserve-3d; transform-origin: center; transition: transform .18s ease-out; will-change: transform; }
+        @media (prefers-reduced-motion: reduce) { .product-preview-stage { transform: none !important; transition: none; } }
       `}</style>
     </section>
   );

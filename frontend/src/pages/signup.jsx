@@ -75,7 +75,7 @@ const SignupPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-gray-50">
+    <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)] flex flex-col md:flex-row">
 
       {/* Image Section */}
       <div className="w-full md:w-1/2 lg:w-2/5 flex items-center justify-center p-12">
@@ -85,7 +85,7 @@ const SignupPage = () => {
             alt="Signup"
             className="w-full max-w-lg mx-auto object-contain rounded-lg shadow-xl mb-8"
           />
-          <h2 className="text-3xl font-bold mb-4">Create Your Account</h2>
+          <h2 className="text-3xl font-normal mb-4">Create Your Account</h2>
           <p className="text-xl opacity-90">
             Unlock exclusive deals and personalized shopping
           </p>
@@ -97,28 +97,28 @@ const SignupPage = () => {
         <div className="w-full max-w-md">
 
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">
+            <h1 className="text-3xl font-normal text-mt-text mb-2">
               Create Account
             </h1>
-            <p className="text-gray-600">
+            <p className="text-mt-muted">
               Fill in your details to get started
             </p>
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">
+            <div className="mb-4 p-3 bg-mt-danger/10 text-mt-danger rounded-lg">
               {error}
             </div>
           )}
 
           {termsError && (
-            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">
+            <div className="mb-4 p-3 bg-mt-danger/10 text-mt-danger rounded-lg">
               {termsError}
             </div>
           )}
 
           {passwordError && (
-            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">
+            <div className="mb-4 p-3 bg-mt-danger/10 text-mt-danger rounded-lg">
               {passwordError}
             </div>
           )}
@@ -128,18 +128,18 @@ const SignupPage = () => {
 
             {/* Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-mt-muted mb-1">
                 Full Name
               </label>
               <div className="relative">
-                <FiUser className="absolute left-3 top-3.5 text-gray-400" />
+                <FiUser className="absolute left-3 top-3.5 text-mt-subtle" />
                 <input
                   type="text"
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
                   required
-                  className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-violet-600"
+                  className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-mt-text"
                   placeholder="Enter your name"
                 />
               </div>
@@ -147,18 +147,18 @@ const SignupPage = () => {
 
             {/* Phone */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-mt-muted mb-1">
                 Phone
               </label>
               <div className="relative">
-                <FiPhone className="absolute left-3 top-3.5 text-gray-400" />
+                <FiPhone className="absolute left-3 top-3.5 text-mt-subtle" />
                 <input
                   type="tel"
                   name="phone"
                   value={formData.phone}
                   onChange={handleChange}
                   required
-                  className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-violet-600"
+                  className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-mt-text"
                   placeholder="Enter phone number"
                 />
               </div>
@@ -166,18 +166,18 @@ const SignupPage = () => {
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-mt-muted mb-1">
                 Email
               </label>
               <div className="relative">
-                <FiMail className="absolute left-3 top-3.5 text-gray-400" />
+                <FiMail className="absolute left-3 top-3.5 text-mt-subtle" />
                 <input
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
                   required
-                  className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-violet-600"
+                  className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-mt-text"
                   placeholder="Enter email"
                 />
               </div>
@@ -185,11 +185,11 @@ const SignupPage = () => {
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-mt-muted mb-1">
                 Password
               </label>
               <div className="relative">
-                <FiLock className="absolute left-3 top-3.5 text-gray-400" />
+                <FiLock className="absolute left-3 top-3.5 text-mt-subtle" />
                 <input
                   type={showPassword ? "text" : "password"}
                   name="password"
@@ -197,13 +197,13 @@ const SignupPage = () => {
                   onChange={handleChange}
                   required
                   minLength={6}
-                  className="w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-violet-600"
+                  className="w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-mt-text"
                   placeholder="Create password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((value) => !value)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-violet-600 transition"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-mt-subtle hover:text-mt-text transition"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <FiEyeOff className="h-5 w-5" /> : <FiEye className="h-5 w-5" />}
@@ -213,11 +213,11 @@ const SignupPage = () => {
 
             {/* Confirm Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-mt-muted mb-1">
                 Confirm Password
               </label>
               <div className="relative">
-                <FiLock className="absolute left-3 top-3.5 text-gray-400" />
+                <FiLock className="absolute left-3 top-3.5 text-mt-subtle" />
                 <input
                   type={showConfirmPassword ? "text" : "password"}
                   name="confirmPassword"
@@ -225,13 +225,13 @@ const SignupPage = () => {
                   onChange={handleChange}
                   required
                   minLength={6}
-                  className="w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-violet-600"
+                  className="w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-mt-text"
                   placeholder="Confirm password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword((value) => !value)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-violet-600 transition"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-mt-subtle hover:text-mt-text transition"
                   aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
                 >
                   {showConfirmPassword ? <FiEyeOff className="h-5 w-5" /> : <FiEye className="h-5 w-5" />}
@@ -247,13 +247,13 @@ const SignupPage = () => {
                 checked={termsAccepted}
                 onChange={handleTermsChange}
                 required
-                className="mt-1 h-4 w-4 text-violet-600 focus:ring-violet-500 border-gray-300 rounded"
+                className="mt-1 h-4 w-4 text-mt-text focus:ring-mt-text border-mt-line-strong rounded"
               />
-              <label htmlFor="terms" className="text-sm text-gray-600">
+              <label htmlFor="terms" className="text-sm text-mt-muted">
                 I accept the{" "}
                 <Link 
                   to="/terms-and-conditions" 
-                  className="text-violet-600 hover:text-violet-800 font-medium"
+                  className="text-mt-text hover:text-mt-text font-medium"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -265,7 +265,7 @@ const SignupPage = () => {
             <button
               type="submit"
               disabled={status === "loading"}
-              className="w-full bg-gradient-to-r from-violet-700 to-violet-500 text-white py-3 rounded-lg hover:from-violet-800 hover:to-violet-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full text-mt-btn-text py-3 rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed bg-mt-btn"
             >
               {status === "loading" ? "Creating..." : "Create Account"}
             </button>
@@ -273,9 +273,9 @@ const SignupPage = () => {
 
           {/* Divider */}
           <div className="my-6 flex items-center">
-            <div className="flex-grow h-px bg-gray-300" />
-            <span className="mx-4 text-gray-500 text-sm">OR</span>
-            <div className="flex-grow h-px bg-gray-300" />
+            <div className="flex-grow h-px bg-mt-line-strong" />
+            <span className="mx-4 text-mt-subtle text-sm">OR</span>
+            <div className="flex-grow h-px bg-mt-line-strong" />
           </div>
 
           {/* Google Signup */}
@@ -290,9 +290,9 @@ const SignupPage = () => {
             />
           </div>
 
-          <div className="text-center text-sm text-gray-600 mt-6">
+          <div className="text-center text-sm text-mt-muted mt-6">
             Already have an account?{" "}
-            <Link to="/login" className="text-violet-600 font-medium hover:text-violet-800">
+            <Link to="/login" className="text-mt-text font-medium hover:text-mt-text">
               Log in
             </Link>
           </div>

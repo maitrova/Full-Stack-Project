@@ -695,18 +695,18 @@ export default function AllProductsHub() {
   // Loading state
   if (commonLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)]">
         <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+            <div className="h-8 bg-mt-line rounded w-1/4 mb-6"></div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {Array.from({ length: 8 }).map((_, index) => (
-                <div key={index} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                  <div className="h-48 bg-gray-200"></div>
+                <div key={index} className="bg-mt-surface rounded-lg border border-mt-line overflow-hidden">
+                  <div className="h-48 bg-mt-line"></div>
                   <div className="p-3 space-y-2">
-                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                    <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                    <div className="h-6 bg-gray-200 rounded w-1/4"></div>
+                    <div className="h-4 bg-mt-line rounded w-3/4"></div>
+                    <div className="h-4 bg-mt-line rounded w-1/2"></div>
+                    <div className="h-6 bg-mt-line rounded w-1/4"></div>
                   </div>
                 </div>
               ))}
@@ -719,18 +719,18 @@ export default function AllProductsHub() {
   
   if (commonError) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-lg border border-gray-200 p-6 text-center">
-          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
+      <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-mt-surface rounded-lg border border-mt-line p-6 text-center">
+          <div className="w-16 h-16 bg-mt-danger/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-8 h-8 bg-mt-danger rounded-full flex items-center justify-center">
               <span className="text-lg text-white font-bold">!</span>
             </div>
           </div>
-          <h3 className="text-lg font-medium text-gray-800 mb-2">Error Loading Products</h3>
-          <p className="text-gray-600 mb-4">{commonError}</p>
+          <h3 className="text-lg font-medium text-mt-text mb-2">Error Loading Products</h3>
+          <p className="text-mt-muted mb-4">{commonError}</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-5 py-2 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors font-medium"
+            className="px-5 py-2 bg-mt-btn text-mt-btn-text rounded-lg hover:bg-mt-btn-hover transition-colors font-medium"
           >
             Try Again
           </button>
@@ -740,17 +740,17 @@ export default function AllProductsHub() {
   }
   
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)]">
       {/* Cart Success Notification */}
       {showCartSuccess && (
         <div className="fixed top-4 right-4 z-50 animate-fade-in">
-          <div className="bg-white border border-gray-200 text-gray-800 px-4 py-3 rounded-lg shadow-lg max-w-sm flex items-center gap-3">
-            <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <CheckCircle className="w-4 h-4 text-emerald-600" />
+          <div className="bg-mt-surface border border-mt-line text-mt-text px-4 py-3 rounded-lg shadow-lg max-w-sm flex items-center gap-3">
+            <div className="w-8 h-8 bg-mt-success/10 rounded-full flex items-center justify-center flex-shrink-0">
+              <CheckCircle className="w-4 h-4 text-mt-success" />
             </div>
             <div className="flex-1">
               <p className="font-medium text-sm">Added to Cart</p>
-              <p className="text-xs text-gray-600 mt-0.5">"{addedProductName}"</p>
+              <p className="text-xs text-mt-muted mt-0.5">"{addedProductName}"</p>
             </div>
           </div>
         </div>
@@ -764,14 +764,14 @@ export default function AllProductsHub() {
             onClick={() => setShowMobileFilters(false)}
           />
 
-          <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-xl">
+          <div className="absolute right-0 top-0 h-full w-80 bg-mt-surface shadow-xl">
             <div className="h-full flex flex-col">
               
               {/* Header */}
               <div className="flex items-center justify-between p-4 border-b">
-                <h3 className="font-medium text-gray-900">Filters</h3>
+                <h3 className="font-medium text-mt-text">Filters</h3>
                 <button onClick={() => setShowMobileFilters(false)} className="p-1">
-                  <X className="w-5 h-5 text-gray-500" />
+                  <X className="w-5 h-5 text-mt-subtle" />
                 </button>
               </div>
 
@@ -780,7 +780,7 @@ export default function AllProductsHub() {
 
                 {/* Category Filter */}
                 <div className="mb-6">
-                  <h3 className="text-sm font-medium text-gray-700 mb-3">
+                  <h3 className="text-sm font-medium text-mt-muted mb-3">
                     Categories
                   </h3>
 
@@ -789,8 +789,8 @@ export default function AllProductsHub() {
                       onClick={() => selectCategory('all', true)}
                       className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm ${
                         selectedCommonCategory === 'all'
-                          ? 'bg-gray-900 text-white'
-                          : 'text-gray-600 hover:bg-gray-50'
+                          ? 'bg-mt-btn text-mt-btn-text'
+                          : 'text-mt-muted hover:bg-mt-tint/5'
                       }`}
                     >
                       <span>All Categories</span>
@@ -802,8 +802,8 @@ export default function AllProductsHub() {
                         onClick={() => selectCategory(category.name, true)}
                         className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm ${
                           selectedCommonCategory === category.name
-                            ? 'bg-gray-900 text-white'
-                            : 'text-gray-600 hover:bg-gray-50'
+                            ? 'bg-mt-btn text-mt-btn-text'
+                            : 'text-mt-muted hover:bg-mt-tint/5'
                         }`}
                       >
                         <span>{category.name}</span>
@@ -814,7 +814,7 @@ export default function AllProductsHub() {
                   {selectedCommonCategory !== 'all' &&
                     getCommonSubcategories.length > 0 && (
                       <div className="mt-3">
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                        <p className="text-xs font-medium text-mt-subtle uppercase tracking-wide mb-2">
                           Subcategories
                         </p>
 
@@ -823,8 +823,8 @@ export default function AllProductsHub() {
                             onClick={() => selectSubCategory('all', true)}
                             className={`w-full text-left px-3 py-2 rounded text-sm ${
                               selectedCommonSubCategory === 'all'
-                                ? 'bg-gray-900 text-white'
-                                : 'text-gray-600 hover:bg-gray-50'
+                                ? 'bg-mt-btn text-mt-btn-text'
+                                : 'text-mt-muted hover:bg-mt-tint/5'
                             }`}
                           >
                             All Subcategories
@@ -836,8 +836,8 @@ export default function AllProductsHub() {
                               onClick={() => selectSubCategory(sub.name, true)}
                               className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm ${
                                 selectedCommonSubCategory === sub.name
-                                  ? 'bg-gray-900 text-white'
-                                  : 'text-gray-600 hover:bg-gray-50'
+                                  ? 'bg-mt-btn text-mt-btn-text'
+                                  : 'text-mt-muted hover:bg-mt-tint/5'
                               }`}
                             >
                               <span>{sub.name}</span>
@@ -850,7 +850,7 @@ export default function AllProductsHub() {
 
                 {/* Price Range */}
                 <div className="mb-6">
-                  <h3 className="text-sm font-medium text-gray-700 mb-3">
+                  <h3 className="text-sm font-medium text-mt-muted mb-3">
                     Price Range
                   </h3>
 
@@ -864,8 +864,8 @@ export default function AllProductsHub() {
                         }}
                         className={`w-full text-left px-3 py-2 rounded text-sm ${
                           quickPriceRange === range.label
-                            ? 'bg-gray-900 text-white'
-                            : 'text-gray-600 hover:bg-gray-50'
+                            ? 'bg-mt-btn text-mt-btn-text'
+                            : 'text-mt-muted hover:bg-mt-tint/5'
                         }`}
                       >
                         {range.label}
@@ -880,7 +880,7 @@ export default function AllProductsHub() {
                     handleClearFilters();
                     setShowMobileFilters(false);
                   }}
-                  className="w-full py-2.5 border border-gray-300 text-gray-700 rounded font-medium text-sm hover:bg-gray-50"
+                  className="w-full py-2.5 border border-mt-line-strong text-mt-muted rounded font-medium text-sm hover:bg-mt-tint/5"
                 >
                   Clear All Filters
                 </button>
@@ -891,22 +891,22 @@ export default function AllProductsHub() {
       )}
       
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-white border-b border-gray-200">
+      <div className="sticky top-0 z-40 bg-mt-surface border-b border-mt-line">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="relative">
-            <div className="relative bg-gray-100 border border-gray-200 rounded-lg overflow-hidden">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
+            <div className="relative bg-mt-surface-raised border border-mt-line rounded-lg overflow-hidden">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-mt-subtle w-4 h-4" />
               <input
                 type="text"
                 placeholder="Search all products..."
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
-                className="w-full pl-9 pr-8 py-2.5 bg-transparent text-sm text-gray-800 placeholder-gray-500 focus:outline-none"
+                className="w-full pl-9 pr-8 py-2.5 bg-transparent text-sm text-mt-text placeholder-mt-subtle focus:outline-none"
               />
               {searchQuery && (
                 <button
                   onClick={() => handleSearchChange('')}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-mt-subtle hover:text-mt-text p-1"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -921,18 +921,18 @@ export default function AllProductsHub() {
         <div className="flex gap-6">
           {/* Sidebar Filters - Desktop */}
           <div className="hidden lg:block w-64 shrink-0">
-            <div className="bg-white rounded-lg border border-gray-200 p-4 sticky top-20">
+            <div className="bg-mt-surface rounded-lg border border-mt-line p-4 sticky top-20">
               
               {/* Category Filter */}
               <div className="mb-6">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">Categories</h3>
+                <h3 className="text-sm font-medium text-mt-muted mb-3">Categories</h3>
                 <div className="space-y-2">
                   <button
                     onClick={() => selectCategory('all')}
                     className={`w-full flex items-center justify-between p-2.5 rounded text-sm ${
                       selectedCommonCategory === 'all'
-                        ? 'bg-gray-900 text-white'
-                        : 'text-gray-600 hover:bg-gray-50'
+                        ? 'bg-mt-btn text-mt-btn-text'
+                        : 'text-mt-muted hover:bg-mt-tint/5'
                     }`}
                   >
                     <span>All Categories</span>
@@ -943,8 +943,8 @@ export default function AllProductsHub() {
                       onClick={() => selectCategory(category.name)}
                       className={`w-full flex items-center justify-between p-2.5 rounded text-sm ${
                         selectedCommonCategory === category.name
-                          ? 'bg-gray-900 text-white'
-                          : 'text-gray-600 hover:bg-gray-50'
+                          ? 'bg-mt-btn text-mt-btn-text'
+                          : 'text-mt-muted hover:bg-mt-tint/5'
                       }`}
                     >
                       <span>{category.name}</span>
@@ -954,14 +954,14 @@ export default function AllProductsHub() {
 
                 {selectedCommonCategory !== 'all' && getCommonSubcategories.length > 0 && (
                   <div className="mt-3">
-                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Subcategories</p>
+                    <p className="text-xs font-medium text-mt-subtle uppercase tracking-wide mb-2">Subcategories</p>
                     <div className="space-y-1">
                       <button
                         onClick={() => selectSubCategory('all')}
                         className={`w-full text-left px-3 py-2 rounded text-sm ${
                           selectedCommonSubCategory === 'all'
-                            ? 'bg-gray-900 text-white'
-                            : 'text-gray-600 hover:bg-gray-50'
+                            ? 'bg-mt-btn text-mt-btn-text'
+                            : 'text-mt-muted hover:bg-mt-tint/5'
                         }`}
                       >
                         All Subcategories
@@ -972,8 +972,8 @@ export default function AllProductsHub() {
                           onClick={() => selectSubCategory(sub.name)}
                           className={`w-full flex items-center justify-between px-3 py-2 rounded text-sm ${
                             selectedCommonSubCategory === sub.name
-                              ? 'bg-gray-900 text-white'
-                              : 'text-gray-600 hover:bg-gray-50'
+                              ? 'bg-mt-btn text-mt-btn-text'
+                              : 'text-mt-muted hover:bg-mt-tint/5'
                           }`}
                         >
                           <span>{sub.name}</span>
@@ -986,7 +986,7 @@ export default function AllProductsHub() {
 
               {/* Price Range */}
               <div className="mb-6">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">Price Range</h3>
+                <h3 className="text-sm font-medium text-mt-muted mb-3">Price Range</h3>
                 <div className="space-y-2">
                   {ALL_PRODUCTS_PRICE_RANGES.map((range) => (
                     <button
@@ -994,8 +994,8 @@ export default function AllProductsHub() {
                       onClick={() => applyQuickPriceRange(range)}
                       className={`w-full text-left p-2.5 rounded text-sm ${
                         quickPriceRange === range.label
-                          ? 'bg-gray-900 text-white'
-                          : 'text-gray-600 hover:bg-gray-50'
+                          ? 'bg-mt-btn text-mt-btn-text'
+                          : 'text-mt-muted hover:bg-mt-tint/5'
                       }`}
                     >
                       {range.label}
@@ -1006,7 +1006,7 @@ export default function AllProductsHub() {
               
               {/* Sort Options */}
               <div className="mb-6">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">Sort By</h3>
+                <h3 className="text-sm font-medium text-mt-muted mb-3">Sort By</h3>
                 <div className="space-y-2">
                   {ALL_PRODUCTS_SORT_OPTIONS.map((option) => {
                     const Icon = option.icon;
@@ -1016,8 +1016,8 @@ export default function AllProductsHub() {
                         onClick={() => handleSortChange(option.id)}
                         className={`w-full flex items-center gap-2 p-2.5 rounded text-sm ${
                           sortOption === option.id
-                            ? 'bg-gray-900 text-white'
-                            : 'text-gray-600 hover:bg-gray-50'
+                            ? 'bg-mt-btn text-mt-btn-text'
+                            : 'text-mt-muted hover:bg-mt-tint/5'
                         }`}
                       >
                         <Icon className="w-3.5 h-3.5" />
@@ -1031,7 +1031,7 @@ export default function AllProductsHub() {
               {/* Clear Filters Button */}
               <button
                 onClick={handleClearFilters}
-                className="w-full py-2.5 border border-gray-300 text-gray-700 rounded font-medium text-sm hover:bg-gray-50 transition-colors"
+                className="w-full py-2.5 border border-mt-line-strong text-mt-muted rounded font-medium text-sm hover:bg-mt-tint/5 transition-colors"
               >
                 Clear All Filters
               </button>
@@ -1046,7 +1046,7 @@ export default function AllProductsHub() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setShowMobileFilters(true)}
-                    className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    className="flex items-center gap-1.5 px-3 py-2 border border-mt-line-strong rounded-lg text-sm font-medium text-mt-muted hover:bg-mt-tint/5"
                   >
                     <Filter className="w-4 h-4" />
                     Filters
@@ -1055,7 +1055,7 @@ export default function AllProductsHub() {
                     <select
                       value={sortOption}
                       onChange={(e) => handleSortChange(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-gray-900"
+                      className="px-3 py-2 border border-mt-line-strong rounded-lg text-sm font-medium text-mt-muted bg-mt-surface focus:outline-none focus:ring-1 focus:ring-mt-text"
                     >
                       {ALL_PRODUCTS_SORT_OPTIONS.map((option) => (
                         <option key={option.id} value={option.id}>
@@ -1065,7 +1065,7 @@ export default function AllProductsHub() {
                     </select>
                   </div>
                 </div>
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-mt-muted">
                   {filteredProducts.length} products
                 </div>
               </div>
@@ -1074,8 +1074,8 @@ export default function AllProductsHub() {
             {/* Desktop Header */}
             <div className="hidden lg:flex items-center justify-between mb-6">
               <div>
-                <h1 className="text-2xl font-medium text-gray-900">All Products</h1>
-                <p className="text-sm text-gray-600 mt-1">
+                <h1 className="text-2xl font-medium text-mt-text">All Products</h1>
+                <p className="text-sm text-mt-muted mt-1">
                   {filteredProducts.length} products
                   {productTypeFilter !== 'all' && (
                     <span className="ml-2">• {productTypeFilter === 'design' ? 'Designs Only' : 'Readymade Only'}</span>
@@ -1091,7 +1091,7 @@ export default function AllProductsHub() {
               <div className="mb-4">
                 <div className="flex flex-wrap gap-2">
                   {urlFilter && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-mt-surface-raised text-mt-muted rounded-full text-xs font-medium">
                       {urlFilter === 'newArrivals' ? 'New Arrivals' : 
                        urlFilter === 'bestSellers' ? 'Best Sellers' : 
                        urlFilter === 'trending' ? 'Trending' : urlFilter}
@@ -1102,7 +1102,7 @@ export default function AllProductsHub() {
                   )}
                   
                   {productTypeFilter !== 'all' && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-mt-surface-raised text-mt-muted rounded-full text-xs font-medium">
                       {productTypeFilter === 'design' ? 'Designs Only' : 'Readymade Only'}
                       <button onClick={() => handleProductTypeChange('all')} className="ml-1">
                         <X className="w-3 h-3" />
@@ -1111,7 +1111,7 @@ export default function AllProductsHub() {
                   )}
                   
                   {quickPriceRange && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-mt-surface-raised text-mt-muted rounded-full text-xs font-medium">
                       Price: {quickPriceRange}
                       <button onClick={() => {
                         setQuickPriceRange(null);
@@ -1130,20 +1130,20 @@ export default function AllProductsHub() {
               // Category tiles view (similar to subcategory tiles design)
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900">
+                  <h2 className="text-lg font-normal text-mt-text">
                     Browse Categories
                   </h2>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-mt-muted">
                     {getCategoriesWithThumbnails.length} categories
                   </p>
                 </div>
 
                 {getCategoriesWithThumbnails.length === 0 ? (
-                  <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-                    <h3 className="text-lg font-medium text-gray-800 mb-2">
+                  <div className="bg-mt-surface rounded-lg border border-mt-line p-8 text-center">
+                    <h3 className="text-lg font-medium text-mt-text mb-2">
                       No categories found
                     </h3>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-mt-muted">
                       Categories will appear here once products are added.
                     </p>
                   </div>
@@ -1153,9 +1153,9 @@ export default function AllProductsHub() {
                       <button
                         key={category.name}
                         onClick={() => selectCategory(category.name)}
-                        className="group bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden text-left"
+                        className="group bg-mt-surface border border-mt-line rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden text-left"
                       >
-                        <div className="relative aspect-square bg-white flex items-center justify-center overflow-hidden">
+                        <div className="relative aspect-square bg-mt-surface flex items-center justify-center overflow-hidden">
                           {(() => {
                             const imageProps = getCardImageProps(
                               category.thumbnail,
@@ -1186,30 +1186,30 @@ export default function AllProductsHub() {
                                   e.target.style.display = 'none';
                                   const parent = e.target.parentElement;
                                   const fallback = document.createElement('div');
-                                  fallback.className = 'w-full h-full flex items-center justify-center bg-gray-100';
-                                  fallback.innerHTML = `<span class="text-4xl text-gray-400 font-medium">${category.name.charAt(0).toUpperCase()}</span>`;
+                                  fallback.className = 'w-full h-full flex items-center justify-center bg-mt-surface-raised';
+                                  fallback.innerHTML = `<span class="text-4xl text-mt-subtle font-medium">${category.name.charAt(0).toUpperCase()}</span>`;
                                   parent.appendChild(fallback);
                                 }}
                               />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                                <span className="text-4xl text-gray-400 font-medium">
+                              <div className="w-full h-full flex items-center justify-center bg-mt-surface-raised">
+                                <span className="text-4xl text-mt-subtle font-medium">
                                   {category.name.charAt(0).toUpperCase()}
                                 </span>
                               </div>
                             );
                           })()}
-                          <div className="absolute inset-0 ring-1 ring-gray-200" />
+                          <div className="absolute inset-0 ring-1 ring-mt-line" />
                         </div>
                         <div className="p-3">
-                          <h3 className="text-sm font-medium text-gray-900 line-clamp-1">
+                          <h3 className="text-sm font-medium text-mt-text line-clamp-1">
                             {category.name}
                           </h3>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-mt-subtle mt-1">
                             {category.count} products
                           </p>
 
-                          <div className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-gray-700 group-hover:text-gray-900">
+                          <div className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-mt-muted group-hover:text-mt-text">
                             Browse category
                             <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
                           </div>
@@ -1223,20 +1223,20 @@ export default function AllProductsHub() {
               // Subcategory tiles view
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900">
+                  <h2 className="text-lg font-normal text-mt-text">
                     {selectedCommonCategory} Subcategories
                   </h2>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-mt-muted">
                     {getCommonSubcategories.length} subcategories
                   </p>
                 </div>
 
                 {getCommonSubcategories.length === 0 ? (
-                  <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-                    <h3 className="text-lg font-medium text-gray-800 mb-2">
+                  <div className="bg-mt-surface rounded-lg border border-mt-line p-8 text-center">
+                    <h3 className="text-lg font-medium text-mt-text mb-2">
                       No subcategories found
                     </h3>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-mt-muted">
                       This category does not have subcategories yet.
                     </p>
                   </div>
@@ -1246,9 +1246,9 @@ export default function AllProductsHub() {
                       <button
                         key={sub.name}
                         onClick={() => selectSubCategory(sub.name)}
-                        className="group bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden text-left"
+                        className="group bg-mt-surface border border-mt-line rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden text-left"
                       >
-                        <div className="relative aspect-square bg-white flex items-center justify-center overflow-hidden">
+                        <div className="relative aspect-square bg-mt-surface flex items-center justify-center overflow-hidden">
                           {(() => {
                             const imageProps = getCardImageProps(
                               sub.thumb,
@@ -1279,30 +1279,30 @@ export default function AllProductsHub() {
                                   e.target.style.display = 'none';
                                   const parent = e.target.parentElement;
                                   const fallback = document.createElement('div');
-                                  fallback.className = 'w-full h-full flex items-center justify-center bg-gray-100';
-                                  fallback.innerHTML = `<span class="text-4xl text-gray-400 font-medium">${sub.name.charAt(0).toUpperCase()}</span>`;
+                                  fallback.className = 'w-full h-full flex items-center justify-center bg-mt-surface-raised';
+                                  fallback.innerHTML = `<span class="text-4xl text-mt-subtle font-medium">${sub.name.charAt(0).toUpperCase()}</span>`;
                                   parent.appendChild(fallback);
                                 }}
                               />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                                <span className="text-4xl text-gray-400 font-medium">
+                              <div className="w-full h-full flex items-center justify-center bg-mt-surface-raised">
+                                <span className="text-4xl text-mt-subtle font-medium">
                                   {sub.name.charAt(0).toUpperCase()}
                                 </span>
                               </div>
                             );
                           })()}
-                          <div className="absolute inset-0 ring-1 ring-gray-200" />
+                          <div className="absolute inset-0 ring-1 ring-mt-line" />
                         </div>
                         <div className="p-3">
-                          <h3 className="text-sm font-medium text-gray-900 line-clamp-1">
+                          <h3 className="text-sm font-medium text-mt-text line-clamp-1">
                             {sub.name}
                           </h3>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-mt-subtle mt-1">
                             {sub.count} products
                           </p>
 
-                          <div className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-gray-700 group-hover:text-gray-900">
+                          <div className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-mt-muted group-hover:text-mt-text">
                             View products
                             <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
                           </div>
@@ -1315,17 +1315,17 @@ export default function AllProductsHub() {
             ) : (
               // Products view (your existing product list)
               filteredProducts.length === 0 ? (
-                <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Search className="w-6 h-6 text-gray-400" />
+                <div className="bg-mt-surface rounded-lg border border-mt-line p-8 text-center">
+                  <div className="w-12 h-12 bg-mt-surface-raised rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Search className="w-6 h-6 text-mt-subtle" />
                   </div>
-                  <h3 className="text-lg font-medium text-gray-800 mb-2">No products found</h3>
-                  <p className="text-gray-600 mb-6 text-sm">
+                  <h3 className="text-lg font-medium text-mt-text mb-2">No products found</h3>
+                  <p className="text-mt-muted mb-6 text-sm">
                     Try adjusting your search or filter criteria
                   </p>
                   <button
                     onClick={handleClearFilters}
-                    className="px-5 py-2 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors font-medium text-sm"
+                    className="px-5 py-2 bg-mt-btn text-mt-btn-text rounded-lg hover:bg-mt-btn-hover transition-colors font-medium text-sm"
                   >
                     Reset All Filters
                   </button>
@@ -1358,7 +1358,7 @@ export default function AllProductsHub() {
                     return (
                       <div
                         key={product._id}
-                        className="group bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden"
+                        className="group bg-mt-surface border border-mt-line rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden"
                       >
                         <Link
                           to={
@@ -1366,9 +1366,9 @@ export default function AllProductsHub() {
                               ? (buildReadymadeProductPath(product) || `/readymade/${product._id}`)
                               : (buildCatalogueDesignPath(product) || `/catalogue/${product._id}`)
                           }
-                          className="block text-gray-700 transition-colors hover:text-gray-900"
+                          className="block text-mt-muted transition-colors hover:text-mt-text"
                         >
-                          <div className="relative aspect-[4/3] bg-white flex items-center justify-center overflow-hidden rounded-t-lg">
+                          <div className="relative aspect-[4/3] bg-mt-photo flex items-center justify-center overflow-hidden rounded-t-lg">
                             <img
                               src={imageProps.src || getImageUrl(previewImage)}
                               srcSet={imageProps.srcSet}
@@ -1393,42 +1393,42 @@ export default function AllProductsHub() {
                               }
                             />
 
-                            <div className="absolute inset-0 ring-1 ring-gray-200" />
+                            <div className="absolute inset-0 ring-1 ring-mt-line" />
 
                             <div className="absolute top-2 left-2 flex flex-col gap-2 z-10">
                               {product.topOrder && (
-                                <span className="px-2 py-1 text-[11px] font-semibold bg-blue-600 text-white rounded-md">
+                                <span className="px-2 py-1 text-[11px] font-semibold bg-mt-btn text-mt-btn-text rounded-md">
                                   {product.topOrderTag || "Top Order"}
                                 </span>
                               )}
 
                               {product.bestSeller && (
-                                <span className="px-2 py-1 text-[11px] font-semibold bg-orange-500 text-white rounded-md">
+                                <span className="px-2 py-1 text-[11px] font-semibold bg-mt-btn text-mt-btn-text rounded-md">
                                   Best Seller
                                 </span>
                               )}
 
                               {product.customerFave && (
-                                <span className="px-2 py-1 text-[11px] font-semibold bg-pink-500 text-white rounded-md">
+                                <span className="px-2 py-1 text-[11px] font-semibold border border-mt-line-strong text-mt-text rounded-md">
                                   Customer Fave
                                 </span>
                               )}
 
                               {product.staffPick && (
-                                <span className="px-2 py-1 text-[11px] font-semibold bg-indigo-500 text-white rounded-md">
+                                <span className="px-2 py-1 text-[11px] font-semibold bg-mt-btn text-mt-btn-text rounded-md">
                                   Staff Pick
                                 </span>
                               )}
                             </div>
 
                             {discountPercent > 0 && (
-                              <span className="absolute top-2 right-2 z-10 rounded-md bg-red-600 px-2 py-1 text-[11px] font-semibold text-white shadow-sm">
+                              <span className="absolute top-2 right-2 z-10 rounded-md bg-mt-danger px-2 py-1 text-[11px] font-semibold text-white shadow-sm">
                                 {discountPercent}% OFF
                               </span>
                             )}
 
                             {product.ecoFriendly && (
-                              <span className="absolute bottom-2 right-2 px-2 py-1 text-[11px] font-medium bg-green-100 text-green-700 rounded-md">
+                              <span className="absolute bottom-2 right-2 px-2 py-1 text-[11px] font-medium bg-mt-success/10 text-mt-success rounded-md">
                                 🌿 Eco-friendly
                               </span>
                             )}
@@ -1436,10 +1436,10 @@ export default function AllProductsHub() {
                         </Link>
                         <div className="p-3">
                           <div className="mb-2">
-                            <p className="text-xs text-gray-500 mb-1">
+                            <p className="text-xs text-mt-subtle mb-1">
                               {product.category || "Uncategorized"}
                             </p>
-                            <h3 className="text-sm font-medium text-gray-900 line-clamp-1">
+                            <h3 className="text-sm font-medium text-mt-text line-clamp-1">
                               {product.title || "Unnamed Product"}
                             </h3>
                           </div>
@@ -1447,22 +1447,22 @@ export default function AllProductsHub() {
                           <div className="flex items-center justify-between">
                             <div>
                               <div className="flex items-baseline gap-1">
-                                <span className="text-sm font-semibold text-gray-900">
+                                <span className="text-sm font-semibold text-mt-text">
                                   ₹{displayPrice.toLocaleString()}
                                 </span>
 
                                 {discountPercent > 0 && (
-                                  <span className="text-xs text-gray-400 line-through">
+                                  <span className="text-xs text-mt-subtle line-through">
                                     ₹{displayOriginalPrice.toLocaleString()}
                                   </span>
                                 )}
                               </div>
                               {discountPercent > 0 && (
-                                <p className="text-[10px] font-medium text-emerald-700 mt-0.5">
+                                <p className="text-[10px] font-medium text-mt-success mt-0.5">
                                   {discountPercent}% OFF
                                 </p>
                               )}
-                              {/* <p className="text-[10px] text-gray-500 mt-0.5">
+                              {/* <p className="text-[10px] text-mt-subtle mt-0.5">
                                 incl. taxes
                               </p> */}
                             </div>
@@ -1475,7 +1475,7 @@ export default function AllProductsHub() {
                                   ? (buildReadymadeProductPath(product) || `/readymade/${product._id}`)
                                   : (buildCatalogueDesignPath(product) || `/catalogue/${product._id}`)
                               }
-                              className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                              className="inline-flex items-center gap-1 text-xs font-medium text-mt-muted hover:text-mt-text transition-colors"
                             >
                               View Details
                               <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
@@ -1491,12 +1491,12 @@ export default function AllProductsHub() {
                       <button
                         type="button"
                         onClick={handleLoadMore}
-                        className="inline-flex h-11 items-center gap-2 rounded-lg border border-gray-900 bg-gray-900 px-5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-black"
+                        className="inline-flex h-11 items-center gap-2 rounded-lg border border-mt-text bg-mt-btn px-5 text-sm font-semibold text-mt-btn-text shadow-sm transition-colors hover:bg-mt-btn-hover"
                       >
                         Load More
                         <ChevronDown className="h-4 w-4" />
                       </button>
-                      <p className="text-xs font-medium text-gray-500">
+                      <p className="text-xs font-medium text-mt-subtle">
                         Showing {visibleProducts.length} of {filteredProducts.length} products
                       </p>
                     </div>

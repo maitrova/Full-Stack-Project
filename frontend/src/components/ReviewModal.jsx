@@ -33,7 +33,7 @@ const renderStarButton = (value, active, onClick) => (
     className="rounded-full p-1 transition-transform hover:scale-110"
   >
     <Star
-      className={`h-7 w-7 ${value <= active ? "fill-amber-400 text-amber-400" : "text-slate-300"}`}
+      className={`h-7 w-7 ${value <= active ? "fill-amber-400 text-amber-400" : "text-mt-line-strong"}`}
     />
   </button>
 );
@@ -117,22 +117,22 @@ export default function ReviewModal({ isOpen, onClose, item, orderId, token, pro
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/55 px-4 py-6">
-      <div className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 px-4 py-6 font-brand text-mt-text [color-scheme:var(--mt-scheme)] backdrop-blur-sm">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-hidden rounded-[28px] border border-mt-line bg-mt-surface shadow-2xl">
+        <div className="flex items-start justify-between border-b border-mt-line px-6 py-5">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-mt-subtle">
               Verified Review
             </div>
-            <h3 className="mt-2 text-2xl font-semibold text-slate-900">
+            <h3 className="mt-2 text-2xl font-semibold text-mt-text">
               {item?.reviewMeta?.existingReview ? "Edit your review" : "Write a review"}
             </h3>
-            <p className="mt-2 text-sm text-slate-600">{productName}</p>
+            <p className="mt-2 text-sm text-mt-muted">{productName}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+            className="rounded-full border border-mt-line p-2 text-mt-subtle transition hover:bg-mt-tint/5 hover:text-mt-text"
           >
             <X className="h-5 w-5" />
           </button>
@@ -140,51 +140,51 @@ export default function ReviewModal({ isOpen, onClose, item, orderId, token, pro
 
         <form onSubmit={handleSubmit} className="max-h-[calc(92vh-132px)] space-y-5 overflow-y-auto px-6 py-6">
           <div>
-            <label className="block text-sm font-medium text-slate-700">Your rating</label>
+            <label className="block text-sm font-medium text-mt-muted">Your rating</label>
             <div className="mt-2 flex items-center gap-1">
               {[1, 2, 3, 4, 5].map((value) => renderStarButton(value, rating, setRating))}
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">Users</label>
+            <label className="block text-sm font-medium text-mt-muted">Users</label>
             <input
               type="number"
               min="1"
               value={users}
               onChange={(event) => setUsers(event.target.value)}
               placeholder="1"
-              className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+              className="mt-2 w-full rounded-2xl border border-mt-line px-4 py-3 text-sm text-mt-text outline-none transition focus:border-mt-text"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">Review title</label>
+            <label className="block text-sm font-medium text-mt-muted">Review title</label>
             <input
               type="text"
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               maxLength={120}
               placeholder="Summarize your experience"
-              className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400"
+              className="mt-2 w-full rounded-2xl border border-mt-line px-4 py-3 text-sm text-mt-text outline-none transition focus:border-mt-text"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">Detailed review</label>
+            <label className="block text-sm font-medium text-mt-muted">Detailed review</label>
             <textarea
               value={comment}
               onChange={(event) => setComment(event.target.value)}
               rows={6}
               maxLength={1500}
               placeholder="Share what you liked, sizing experience, material quality, delivery condition, and anything that helps other shoppers."
-              className="mt-2 w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-slate-400"
+              className="mt-2 w-full resize-none rounded-2xl border border-mt-line px-4 py-3 text-sm leading-6 text-mt-text outline-none transition focus:border-mt-text"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700">Review photos</label>
-            <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
+            <label className="block text-sm font-medium text-mt-muted">Review photos</label>
+            <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-mt-line-strong bg-mt-bg px-4 py-4 text-sm font-semibold text-mt-muted transition hover:bg-mt-tint/10">
               <Image className="h-4 w-4" />
               Upload photos
               <input
@@ -196,9 +196,9 @@ export default function ReviewModal({ isOpen, onClose, item, orderId, token, pro
               />
             </label>
             {photos.length ? (
-              <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-mt-subtle">
                 {photos.map((file, index) => (
-                  <span key={`${file.name}-${index}`} className="rounded-full bg-slate-100 px-3 py-1">
+                  <span key={`${file.name}-${index}`} className="rounded-full bg-mt-surface-raised px-3 py-1">
                     {file.name}
                   </span>
                 ))}
@@ -212,7 +212,7 @@ export default function ReviewModal({ isOpen, onClose, item, orderId, token, pro
                     href={resolveReviewPhotoUrl(photo)}
                     target="_blank"
                     rel="noreferrer"
-                    className="block h-20 w-20 overflow-hidden rounded-xl border border-slate-200 bg-slate-100"
+                    className="block h-20 w-20 overflow-hidden rounded-xl border border-mt-line bg-mt-surface-raised"
                   >
                     <img
                       src={resolveReviewPhotoUrl(photo)}
@@ -226,23 +226,23 @@ export default function ReviewModal({ isOpen, onClose, item, orderId, token, pro
           </div>
 
           {error ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <div className="rounded-2xl border border-mt-danger/30 bg-mt-danger/10 px-4 py-3 text-sm text-mt-danger">
               {error}
             </div>
           ) : null}
 
-          <div className="flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-end">
+          <div className="flex flex-col gap-3 border-t border-mt-line pt-5 sm:flex-row sm:items-center sm:justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+              className="rounded-2xl border border-mt-line bg-mt-surface px-5 py-3 text-sm font-semibold text-mt-text transition hover:bg-mt-tint/5"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-mt-btn px-5 py-3 text-sm font-semibold text-mt-btn-text transition hover:bg-mt-btn-hover disabled:opacity-60"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {item?.reviewMeta?.existingReview ? "Update Review" : "Submit Review"}

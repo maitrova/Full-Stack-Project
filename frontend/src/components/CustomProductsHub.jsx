@@ -286,18 +286,18 @@ export default function CustomProductsHub() {
   // Loading state
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)]">
         <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
+            <div className="h-8 bg-mt-line rounded w-1/4 mb-6"></div>
             <div className="grid grid-cols-2 gap-4">
               {Array.from({ length: 4 }).map((_, index) => (
-                <div key={index} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                  <div className="h-48 bg-gray-200"></div>
+                <div key={index} className="bg-mt-surface rounded-lg border border-mt-line overflow-hidden">
+                  <div className="h-48 bg-mt-line"></div>
                   <div className="p-3 space-y-2">
-                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                    <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                    <div className="h-6 bg-gray-200 rounded w-1/4"></div>
+                    <div className="h-4 bg-mt-line rounded w-3/4"></div>
+                    <div className="h-4 bg-mt-line rounded w-1/2"></div>
+                    <div className="h-6 bg-mt-line rounded w-1/4"></div>
                   </div>
                 </div>
               ))}
@@ -311,18 +311,18 @@ export default function CustomProductsHub() {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-lg border border-gray-200 p-6 text-center">
-          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
+      <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-mt-surface rounded-lg border border-mt-line p-6 text-center">
+          <div className="w-16 h-16 bg-mt-danger/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-8 h-8 bg-mt-danger rounded-full flex items-center justify-center">
               <span className="text-white font-bold">!</span>
             </div>
           </div>
-          <h3 className="text-lg font-medium text-gray-800 mb-2">Error Loading Products</h3>
-          <p className="text-gray-600 mb-4">{error}</p>
+          <h3 className="text-lg font-medium text-mt-text mb-2">Error Loading Products</h3>
+          <p className="text-mt-muted mb-4">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="px-5 py-2 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors font-medium"
+            className="px-5 py-2 bg-mt-btn text-mt-btn-text rounded-lg hover:bg-mt-btn-hover transition-colors font-medium"
           >
             Try Again
           </button>
@@ -332,23 +332,23 @@ export default function CustomProductsHub() {
   }
   
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)]">
       {/* Mobile Filter Drawer */}
       {showMobileFilters && (
         <div className="lg:hidden fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowMobileFilters(false)} />
-          <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-xl">
+          <div className="absolute right-0 top-0 h-full w-80 bg-mt-surface shadow-xl">
             <div className="h-full flex flex-col">
               <div className="flex items-center justify-between p-4 border-b">
-                <h3 className="font-medium text-gray-900">Filters</h3>
+                <h3 className="font-medium text-mt-text">Filters</h3>
                 <button onClick={() => setShowMobileFilters(false)} className="p-1">
-                  <X className="w-5 h-5 text-gray-500" />
+                  <X className="w-5 h-5 text-mt-subtle" />
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto p-4">
                 {/* Categories */}
                 <div className="mb-6">
-                  <h3 className="text-sm font-medium text-gray-700 mb-3">Categories</h3>
+                  <h3 className="text-sm font-medium text-mt-muted mb-3">Categories</h3>
                   <div className="space-y-2">
                     <button
                       onClick={() => {
@@ -357,8 +357,8 @@ export default function CustomProductsHub() {
                       }}
                       className={`w-full text-left px-3 py-2 rounded text-sm ${
                         selectedCategory === 'all'
-                          ? 'bg-gray-900 text-white'
-                          : 'text-gray-600 hover:bg-gray-50'
+                          ? 'bg-mt-btn text-mt-btn-text'
+                          : 'text-mt-muted hover:bg-mt-tint/5'
                       }`}
                     >
                       All Products
@@ -373,8 +373,8 @@ export default function CustomProductsHub() {
                         }}
                         className={`w-full text-left px-3 py-2 rounded text-sm ${
                           selectedCategory === category.name
-                            ? 'bg-gray-900 text-white'
-                            : 'text-gray-600 hover:bg-gray-50'
+                            ? 'bg-mt-btn text-mt-btn-text'
+                            : 'text-mt-muted hover:bg-mt-tint/5'
                         }`}
                       >
                         {category.name}
@@ -385,7 +385,7 @@ export default function CustomProductsHub() {
                 
                 {/* Price Range */}
                 <div className="mb-6">
-                  <h3 className="text-sm font-medium text-gray-700 mb-3">Price Range</h3>
+                  <h3 className="text-sm font-medium text-mt-muted mb-3">Price Range</h3>
                   <div className="space-y-2">
                     {PRICE_RANGES.map((range) => (
                       <button
@@ -396,8 +396,8 @@ export default function CustomProductsHub() {
                         }}
                         className={`w-full text-left px-3 py-2 rounded text-sm ${
                           activePriceFilter === range.label
-                            ? 'bg-gray-900 text-white'
-                            : 'text-gray-600 hover:bg-gray-50'
+                            ? 'bg-mt-btn text-mt-btn-text'
+                            : 'text-mt-muted hover:bg-mt-tint/5'
                         }`}
                       >
                         {range.label}
@@ -408,7 +408,7 @@ export default function CustomProductsHub() {
                 
                 {/* Sort Options */}
                 <div className="mb-6">
-                  <h3 className="text-sm font-medium text-gray-700 mb-3">Sort By</h3>
+                  <h3 className="text-sm font-medium text-mt-muted mb-3">Sort By</h3>
                   <div className="space-y-2">
                     {SORT_OPTIONS.map((option) => (
                       <button
@@ -419,8 +419,8 @@ export default function CustomProductsHub() {
                         }}
                         className={`w-full text-left px-3 py-2 rounded text-sm ${
                           sortOption === option.id
-                            ? 'bg-gray-900 text-white'
-                            : 'text-gray-600 hover:bg-gray-50'
+                            ? 'bg-mt-btn text-mt-btn-text'
+                            : 'text-mt-muted hover:bg-mt-tint/5'
                         }`}
                       >
                         {option.name}
@@ -435,7 +435,7 @@ export default function CustomProductsHub() {
                     clearFilters();
                     setShowMobileFilters(false);
                   }}
-                  className="w-full py-2.5 border border-gray-300 text-gray-700 rounded font-medium text-sm hover:bg-gray-50"
+                  className="w-full py-2.5 border border-mt-line-strong text-mt-muted rounded font-medium text-sm hover:bg-mt-tint/5"
                 >
                   Clear All Filters
                 </button>
@@ -446,22 +446,22 @@ export default function CustomProductsHub() {
       )}
       
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-white border-b border-gray-200">
+      <div className="sticky top-0 z-40 bg-mt-surface border-b border-mt-line">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="relative">
-            <div className="relative bg-gray-100 border border-gray-200 rounded-lg overflow-hidden">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-4 h-4" />
+            <div className="relative bg-mt-surface-raised border border-mt-line rounded-lg overflow-hidden">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-mt-subtle w-4 h-4" />
               <input
                 type="text"
                 placeholder="Search custom products..."
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
-                className="w-full pl-9 pr-8 py-2.5 bg-transparent text-sm text-gray-800 placeholder-gray-500 focus:outline-none"
+                className="w-full pl-9 pr-8 py-2.5 bg-transparent text-sm text-mt-text placeholder-mt-subtle focus:outline-none"
               />
               {searchQuery && (
                 <button
                   onClick={() => handleSearchChange('')}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-mt-subtle hover:text-mt-text p-1"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -476,20 +476,20 @@ export default function CustomProductsHub() {
         <div className="flex gap-6">
           {/* Sidebar Filters - Desktop */}
           <div className="hidden lg:block w-64 shrink-0">
-            <div className="bg-white rounded-lg border border-gray-200 p-4 sticky top-20">
+            <div className="bg-mt-surface rounded-lg border border-mt-line p-4 sticky top-20">
               <div className="mb-6">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">Categories</h3>
+                <h3 className="text-sm font-medium text-mt-muted mb-3">Categories</h3>
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                   <button
                     onClick={() => handleCategorySelect('all')}
                     className={`w-full flex items-center justify-between p-2.5 rounded text-sm ${
                       selectedCategory === 'all'
-                        ? 'bg-gray-900 text-white'
-                        : 'text-gray-600 hover:bg-gray-50'
+                        ? 'bg-mt-btn text-mt-btn-text'
+                        : 'text-mt-muted hover:bg-mt-tint/5'
                     }`}
                   >
                     <span>All Products</span>
-                    <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-gray-800 text-gray-100">
+                    <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-mt-btn text-mt-btn-text">
                       {products?.length || 0}
                     </span>
                   </button>
@@ -508,8 +508,8 @@ export default function CustomProductsHub() {
                           }}
                           className={`w-full flex items-center justify-between p-2.5 rounded text-sm ${
                             isSelected
-                              ? 'bg-gray-900 text-white'
-                              : 'text-gray-600 hover:bg-gray-50'
+                              ? 'bg-mt-btn text-mt-btn-text'
+                              : 'text-mt-muted hover:bg-mt-tint/5'
                           }`}
                         >
                           <div className="flex items-center gap-2">
@@ -520,7 +520,7 @@ export default function CustomProductsHub() {
                             {hasSubcategories && (
                               isExpanded ? 
                                 <ChevronUp className="w-3 h-3" /> : 
-                                <ChevronDown className="w-3 h-3 text-gray-400" />
+                                <ChevronDown className="w-3 h-3 text-mt-subtle" />
                             )}
                           </div>
                         </button>
@@ -531,8 +531,8 @@ export default function CustomProductsHub() {
                               onClick={() => handleSubCategorySelect('all')}
                               className={`w-full flex items-center justify-between p-1.5 rounded transition-all text-xs ${
                                 selectedSubCategory === 'all'
-                                  ? 'bg-gray-100 text-gray-900 font-medium'
-                                  : 'hover:bg-gray-50 text-gray-500'
+                                  ? 'bg-mt-surface-raised text-mt-text font-medium'
+                                  : 'hover:bg-mt-tint/5 text-mt-subtle'
                               }`}
                             >
                               <span>All Subcategories</span>
@@ -544,8 +544,8 @@ export default function CustomProductsHub() {
                                 onClick={() => handleSubCategorySelect(subCat)}
                                 className={`w-full flex items-center justify-between p-1.5 rounded transition-all text-xs ${
                                   selectedSubCategory === subCat
-                                    ? 'bg-gray-100 text-gray-900 font-medium'
-                                    : 'hover:bg-gray-50 text-gray-500'
+                                    ? 'bg-mt-surface-raised text-mt-text font-medium'
+                                    : 'hover:bg-mt-tint/5 text-mt-subtle'
                                 }`}
                               >
                                 <span>{subCat}</span>
@@ -561,7 +561,7 @@ export default function CustomProductsHub() {
               
               {/* Price Range */}
               <div className="mb-6">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">Price Range</h3>
+                <h3 className="text-sm font-medium text-mt-muted mb-3">Price Range</h3>
                 <div className="space-y-2">
                   {PRICE_RANGES.map((range) => (
                     <button
@@ -569,8 +569,8 @@ export default function CustomProductsHub() {
                       onClick={() => handlePriceFilter(range)}
                       className={`w-full text-left p-2.5 rounded text-sm ${
                         activePriceFilter === range.label
-                          ? 'bg-gray-900 text-white'
-                          : 'text-gray-600 hover:bg-gray-50'
+                          ? 'bg-mt-btn text-mt-btn-text'
+                          : 'text-mt-muted hover:bg-mt-tint/5'
                       }`}
                     >
                       {range.label}
@@ -581,7 +581,7 @@ export default function CustomProductsHub() {
               
               {/* Sort Options */}
               <div className="mb-6">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">Sort By</h3>
+                <h3 className="text-sm font-medium text-mt-muted mb-3">Sort By</h3>
                 <div className="space-y-2">
                   {SORT_OPTIONS.map((option) => (
                     <button
@@ -589,8 +589,8 @@ export default function CustomProductsHub() {
                       onClick={() => handleSortChange(option.id)}
                       className={`w-full flex items-center gap-2 p-2.5 rounded text-sm ${
                         sortOption === option.id
-                          ? 'bg-gray-900 text-white'
-                          : 'text-gray-600 hover:bg-gray-50'
+                          ? 'bg-mt-btn text-mt-btn-text'
+                          : 'text-mt-muted hover:bg-mt-tint/5'
                       }`}
                     >
                       <span>{option.name}</span>
@@ -602,7 +602,7 @@ export default function CustomProductsHub() {
               {/* Clear Filters Button */}
               <button
                 onClick={clearFilters}
-                className="w-full py-2.5 border border-gray-300 text-gray-700 rounded font-medium text-sm hover:bg-gray-50 transition-colors"
+                className="w-full py-2.5 border border-mt-line-strong text-mt-muted rounded font-medium text-sm hover:bg-mt-tint/5 transition-colors"
               >
                 Clear All Filters
               </button>
@@ -617,19 +617,19 @@ export default function CustomProductsHub() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setShowMobileFilters(true)}
-                    className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    className="flex items-center gap-1.5 px-3 py-2 border border-mt-line-strong rounded-lg text-sm font-medium text-mt-muted hover:bg-mt-tint/5"
                   >
                     <Filter className="w-4 h-4" />
                     Filters
                     {(selectedCategory !== 'all' || activePriceFilter) && (
-                      <span className="w-2 h-2 bg-gray-900 rounded-full ml-1"></span>
+                      <span className="w-2 h-2 bg-mt-btn rounded-full ml-1"></span>
                     )}
                   </button>
                   <div className="relative">
                     <select
                       value={sortOption}
                       onChange={(e) => handleSortChange(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-gray-900"
+                      className="px-3 py-2 border border-mt-line-strong rounded-lg text-sm font-medium text-mt-muted bg-mt-surface focus:outline-none focus:ring-1 focus:ring-mt-text"
                     >
                       {SORT_OPTIONS.map((option) => (
                         <option key={option.id} value={option.id}>
@@ -639,7 +639,7 @@ export default function CustomProductsHub() {
                     </select>
                   </div>
                 </div>
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-mt-muted">
                   {filteredProducts.length} products
                 </div>
               </div>
@@ -648,8 +648,8 @@ export default function CustomProductsHub() {
             {/* Desktop Header */}
             <div className="hidden lg:flex items-center justify-between mb-6">
               <div>
-                <h1 className="text-2xl font-medium text-gray-900">Custom Products</h1>
-                <p className="text-sm text-gray-600 mt-1">
+                <h1 className="text-2xl font-medium text-mt-text">Custom Products</h1>
+                <p className="text-sm text-mt-muted mt-1">
                   {filteredProducts.length} products
                   {selectedCategory !== 'all' && (
                     <span className="ml-2">• {selectedCategory}</span>
@@ -658,16 +658,16 @@ export default function CustomProductsHub() {
               </div>
               
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600 mr-2">View:</span>
+                <span className="text-sm text-mt-muted mr-2">View:</span>
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`p-2 ${viewMode === 'grid' ? 'text-gray-900' : 'text-gray-400'}`}
+                  className={`p-2 ${viewMode === 'grid' ? 'text-mt-text' : 'text-mt-subtle'}`}
                 >
                   <Grid className="w-5 h-5" />
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`p-2 ${viewMode === 'list' ? 'text-gray-900' : 'text-gray-400'}`}
+                  className={`p-2 ${viewMode === 'list' ? 'text-mt-text' : 'text-mt-subtle'}`}
                 >
                   <List className="w-5 h-5" />
                 </button>
@@ -680,7 +680,7 @@ export default function CustomProductsHub() {
               <div className="mb-4">
                 <div className="flex flex-wrap gap-2">
                   {selectedCategory !== 'all' && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-mt-surface-raised text-mt-muted rounded-full text-xs font-medium">
                       {selectedCategory}
                       <button onClick={() => handleCategorySelect('all')} className="ml-1">
                         <X className="w-3 h-3" />
@@ -689,7 +689,7 @@ export default function CustomProductsHub() {
                   )}
                   
                   {selectedSubCategory !== 'all' && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-mt-surface-raised text-mt-muted rounded-full text-xs font-medium">
                       {selectedSubCategory}
                       <button onClick={() => handleSubCategorySelect('all')} className="ml-1">
                         <X className="w-3 h-3" />
@@ -698,7 +698,7 @@ export default function CustomProductsHub() {
                   )}
                   
                   {activePriceFilter && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-mt-surface-raised text-mt-muted rounded-full text-xs font-medium">
                       Price: {activePriceFilter}
                       <button onClick={() => {
                         setPriceRange([0, 100000]);
@@ -710,7 +710,7 @@ export default function CustomProductsHub() {
                   )}
                   
                   {searchQuery && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-mt-surface-raised text-mt-muted rounded-full text-xs font-medium">
                       Search: "{searchQuery}"
                       <button onClick={() => handleSearchChange('')} className="ml-1">
                         <X className="w-3 h-3" />
@@ -723,17 +723,17 @@ export default function CustomProductsHub() {
             
             {/* Products Grid/List */}
             {filteredProducts.length === 0 ? (
-              <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Search className="w-6 h-6 text-gray-400" />
+              <div className="bg-mt-surface rounded-lg border border-mt-line p-8 text-center">
+                <div className="w-12 h-12 bg-mt-surface-raised rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Search className="w-6 h-6 text-mt-subtle" />
                 </div>
-                <h3 className="text-lg font-medium text-gray-800 mb-2">No products found</h3>
-                <p className="text-gray-600 mb-6 text-sm">
+                <h3 className="text-lg font-medium text-mt-text mb-2">No products found</h3>
+                <p className="text-mt-muted mb-6 text-sm">
                   Try adjusting your search or filter criteria
                 </p>
                 <button
                   onClick={clearFilters}
-                  className="px-5 py-2 bg-gray-900 text-white rounded-lg hover:bg-black transition-colors font-medium text-sm"
+                  className="px-5 py-2 bg-mt-btn text-mt-btn-text rounded-lg hover:bg-mt-btn-hover transition-colors font-medium text-sm"
                 >
                   Reset All Filters
                 </button>
@@ -750,10 +750,10 @@ export default function CustomProductsHub() {
                     <Link
                       key={product._id}
                       to={productLink}
-                      className="group block bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden"
+                      className="group block bg-mt-surface border border-mt-line rounded-lg hover:shadow-sm transition-all duration-200 overflow-hidden"
                     >
                       {/* Image Container - Compact for mobile */}
-                      <div className="relative aspect-[3/4] bg-gray-100 overflow-hidden">
+                      <div className="relative aspect-[3/4] bg-mt-photo overflow-hidden">
                         <img
                           src={product.imageUrl || product.image || "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&h=600&fit=crop&q=80"}
                           alt={product.name}
@@ -763,12 +763,12 @@ export default function CustomProductsHub() {
                         {/* Badges */}
                         <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
                           {product.newArrival && (
-                            <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-gray-900 text-white">
+                            <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-mt-btn text-mt-btn-text">
                               NEW
                             </span>
                           )}
                           {product.featured && (
-                            <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-blue-600 text-white">
+                            <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-mt-btn text-mt-btn-text">
                               FEATURED
                             </span>
                           )}
@@ -778,10 +778,10 @@ export default function CustomProductsHub() {
                       {/* Product Info */}
                       <div className="p-3">
                         <div className="mb-2">
-                          <p className="text-xs text-gray-500 mb-1">
+                          <p className="text-xs text-mt-subtle mb-1">
                             {product.category || 'Custom Product'}
                           </p>
-                          <h3 className="text-sm font-medium text-gray-900 line-clamp-1">
+                          <h3 className="text-sm font-medium text-mt-text line-clamp-1">
                             {product.name || product.title || 'Unnamed Product'}
                           </h3>
                         </div>
@@ -790,14 +790,14 @@ export default function CustomProductsHub() {
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="flex items-baseline gap-1">
-                              <span className="text-sm font-semibold text-gray-900">
+                              <span className="text-sm font-semibold text-mt-text">
                                 ₹{(product.basePrice || product.price || 0).toLocaleString()}
                               </span>
                             </div>
-                            <p className="text-[10px] text-gray-500 mt-0.5">starting price</p>
+                            <p className="text-[10px] text-mt-subtle mt-0.5">starting price</p>
                           </div>
                           
-                          <span className="px-3 py-1.5 bg-gray-900 text-white text-xs font-medium rounded">
+                          <span className="px-3 py-1.5 bg-mt-btn text-mt-btn-text text-xs font-medium rounded">
                             Customize
                           </span>
                         </div>
@@ -806,7 +806,7 @@ export default function CustomProductsHub() {
                         {/* <div className="mt-3">
                           <Link
                             to={`/products/${product._id}`}
-                            className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                            className="inline-flex items-center gap-1 text-xs font-medium text-mt-muted hover:text-mt-text transition-colors"
                           >
                             View Details
                             <ChevronRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
@@ -829,10 +829,10 @@ export default function CustomProductsHub() {
                     <Link
                       key={product._id}
                       to={productLink}
-                      className="block bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-sm transition-shadow"
+                      className="block bg-mt-surface border border-mt-line rounded-lg overflow-hidden hover:shadow-sm transition-shadow"
                     >
                       <div className="flex flex-col md:flex-row">
-                        <div className="md:w-48 h-48 bg-gray-100 overflow-hidden">
+                        <div className="md:w-48 h-48 bg-mt-photo overflow-hidden">
                           <img
                             src={product.imageUrl || product.image}
                             alt={product.name}
@@ -843,27 +843,27 @@ export default function CustomProductsHub() {
                         <div className="flex-1 p-4">
                           <div className="flex flex-col h-full">
                             <div className="mb-4">
-                              <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                              <p className="text-xs text-mt-subtle uppercase tracking-wider mb-1">
                                 {product.category || 'Custom Product'}
                               </p>
-                              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                              <h3 className="text-lg font-semibold text-mt-text mb-2">
                                 {product.name || product.title || 'Unnamed Product'}
                               </h3>
-                              <p className="text-gray-600 line-clamp-2">
+                              <p className="text-mt-muted line-clamp-2">
                                 {product.description || ''}
                               </p>
                             </div>
                             
                             <div className="flex items-center justify-between mt-auto">
                               <div>
-                                <span className="text-xl font-bold text-gray-900">
+                                <span className="text-xl font-bold text-mt-text">
                                   ₹{(product.basePrice || product.price || 0).toLocaleString()}
                                 </span>
-                                <p className="text-xs text-gray-500">Starting price</p>
+                                <p className="text-xs text-mt-subtle">Starting price</p>
                               </div>
                               
                               <div className="flex items-center gap-3">
-                                <span className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded">
+                                <span className="px-4 py-2 bg-mt-btn text-mt-btn-text text-sm font-medium rounded">
                                   Customize Now
                                 </span>
                               </div>
@@ -883,9 +883,9 @@ export default function CustomProductsHub() {
       {/* Loading State for Filter Changes */}
       {isLoading && (
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 shadow-xl">
-            <div className="w-8 h-8 border-2 border-gray-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-sm text-gray-600">Applying filters...</p>
+          <div className="bg-mt-surface rounded-lg p-6 shadow-xl">
+            <div className="w-8 h-8 border-2 border-mt-line border-t-blue-600 rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-sm text-mt-muted">Applying filters...</p>
           </div>
         </div>
       )}

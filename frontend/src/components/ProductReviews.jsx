@@ -41,7 +41,7 @@ const renderStars = (rating, className = "h-4 w-4") =>
     return (
       <Star
         key={`${className}-${index}`}
-        className={`${className} ${filled ? "fill-amber-400 text-amber-400" : "text-slate-300"}`}
+        className={`${className} ${filled ? "fill-amber-400 text-amber-400" : "text-mt-line-strong"}`}
       />
     );
   });
@@ -144,26 +144,26 @@ export default function ProductReviews({
 
   return (
     <section className="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6 lg:px-8">
-      <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 bg-[linear-gradient(135deg,_#ffffff,_#f8fafc)] px-6 py-6">
+      <div className="overflow-hidden rounded-[28px] border border-mt-line bg-mt-surface shadow-sm">
+        <div className="border-b border-mt-line bg-mt-surface px-6 py-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-mt-subtle">
                 Customer Reviews
               </div>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+              <h2 className="mt-2 text-2xl font-normal tracking-tight text-mt-text">
                 Verified buyer feedback
               </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-mt-muted">
                 Reviews are accepted after delivery, so the rating reflects actual purchase history.
               </p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <div className="rounded-2xl border border-mt-line bg-mt-surface px-4 py-3 shadow-sm">
               <div className="flex items-center gap-2">{renderStars(summary.rating, "h-5 w-5")}</div>
-              <div className="mt-1 text-3xl font-semibold text-slate-900">
+              <div className="mt-1 text-3xl font-semibold text-mt-text">
                 {Number(summary.rating || 0).toFixed(1)}
               </div>
-              <div className="text-sm text-slate-500">
+              <div className="text-sm text-mt-subtle">
                 {summary.reviewCount} review{summary.reviewCount === 1 ? "" : "s"}
               </div>
             </div>
@@ -174,27 +174,27 @@ export default function ProductReviews({
           <div className="space-y-4">
             {breakdownEntries.map((entry) => (
               <div key={entry.star} className="flex items-center gap-3">
-                <div className="flex w-12 items-center gap-1 text-sm font-medium text-slate-700">
+                <div className="flex w-12 items-center gap-1 text-sm font-medium text-mt-muted">
                   <span>{entry.star}</span>
                   <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
                 </div>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-mt-surface-raised">
                   <div
                     className="h-full rounded-full bg-[linear-gradient(90deg,_#f59e0b,_#fbbf24)]"
                     style={{ width: `${entry.percent}%` }}
                   />
                 </div>
-                <div className="w-10 text-right text-xs font-medium text-slate-500">
+                <div className="w-10 text-right text-xs font-medium text-mt-subtle">
                   {entry.count}
                 </div>
               </div>
             ))}
 
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            <div className="rounded-2xl border border-dashed border-mt-line bg-mt-bg p-4 text-sm text-mt-muted">
               {token ? (
                 <span>
                   Bought this item already? Leave or edit your review from{" "}
-                  <Link to="/orders" className="font-semibold text-slate-900 underline">
+                  <Link to="/orders" className="font-semibold text-mt-text underline">
                     My Orders
                   </Link>
                   .
@@ -208,15 +208,15 @@ export default function ProductReviews({
           </div>
 
           <div className="space-y-4">
-            <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-center">
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <div className="flex flex-col gap-3 rounded-2xl border border-mt-line bg-mt-bg p-4 md:flex-row md:items-center">
+              <div className="flex items-center gap-2 text-sm font-semibold text-mt-muted">
                 <SlidersHorizontal className="h-4 w-4" />
                 Filter Reviews
               </div>
               <select
                 value={sortOption}
                 onChange={(event) => setSortOption(event.target.value)}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-400"
+                className="rounded-xl border border-mt-line bg-mt-surface px-3 py-2 text-sm text-mt-muted outline-none focus:border-mt-text"
               >
                 <option value="recent">Most recent</option>
                 <option value="highest">Highest rating</option>
@@ -226,7 +226,7 @@ export default function ProductReviews({
               <select
                 value={ratingFilter}
                 onChange={(event) => setRatingFilter(Number(event.target.value))}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-400"
+                className="rounded-xl border border-mt-line bg-mt-surface px-3 py-2 text-sm text-mt-muted outline-none focus:border-mt-text"
               >
                 <option value={0}>All ratings</option>
                 <option value={5}>5 stars</option>
@@ -235,19 +235,19 @@ export default function ProductReviews({
                 <option value={2}>2 stars</option>
                 <option value={1}>1 star</option>
               </select>
-              <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+              <label className="inline-flex items-center gap-2 text-sm text-mt-muted">
                 <input
                   type="checkbox"
                   checked={withComment}
                   onChange={(event) => setWithComment(event.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300"
+                  className="h-4 w-4 rounded border-mt-line-strong"
                 />
                 Text reviews only
               </label>
             </div>
 
             {error ? (
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              <div className="rounded-2xl border border-mt-danger/30 bg-mt-danger/10 px-4 py-3 text-sm text-mt-danger">
                 {error}
               </div>
             ) : null}
@@ -255,10 +255,10 @@ export default function ProductReviews({
             {loading ? (
               <div className="space-y-3">
                 {[0, 1, 2].map((item) => (
-                  <div key={item} className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <div className="h-4 w-32 animate-pulse rounded bg-slate-100" />
-                    <div className="mt-3 h-3 w-full animate-pulse rounded bg-slate-100" />
-                    <div className="mt-2 h-3 w-5/6 animate-pulse rounded bg-slate-100" />
+                  <div key={item} className="rounded-2xl border border-mt-line bg-mt-surface p-4">
+                    <div className="h-4 w-32 animate-pulse rounded bg-mt-surface-raised" />
+                    <div className="mt-3 h-3 w-full animate-pulse rounded bg-mt-surface-raised" />
+                    <div className="mt-2 h-3 w-5/6 animate-pulse rounded bg-mt-surface-raised" />
                   </div>
                 ))}
               </div>
@@ -267,26 +267,26 @@ export default function ProductReviews({
                 {reviews.map((review) => (
                   <article
                     key={review._id}
-                    className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                    className="rounded-2xl border border-mt-line bg-mt-surface p-5 shadow-sm"
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <div className="flex items-center gap-2">{renderStars(review.rating)}</div>
-                        <h3 className="mt-2 text-base font-semibold text-slate-900">
+                        <h3 className="mt-2 text-base font-semibold text-mt-text">
                           {review.title || "Verified purchase review"}
                         </h3>
-                        <div className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">
+                        <div className="mt-1 text-xs uppercase tracking-[0.18em] text-mt-subtle">
                           {review.userName} • {new Date(review.reviewDate || review.createdAt).toLocaleDateString("en-IN")}
                         </div>
                       </div>
                       {review.verifiedPurchase ? (
-                        <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                        <div className="inline-flex items-center gap-2 rounded-full bg-mt-success/10 px-3 py-1 text-xs font-semibold text-mt-success">
                           <MessageSquareText className="h-3.5 w-3.5" />
                           Verified Purchase
                         </div>
                       ) : null}
                     </div>
-                    <p className="mt-3 text-sm leading-6 text-slate-700">
+                    <p className="mt-3 text-sm leading-6 text-mt-muted">
                       {review.comment || "No written comment provided."}
                     </p>
                     {review.photos?.length ? (
@@ -297,7 +297,7 @@ export default function ProductReviews({
                             href={resolveReviewPhotoUrl(photo)}
                             target="_blank"
                             rel="noreferrer"
-                            className="block h-24 w-24 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100"
+                            className="block h-24 w-24 overflow-hidden rounded-2xl border border-mt-line bg-mt-surface-raised"
                           >
                             <img
                               src={resolveReviewPhotoUrl(photo)}
@@ -312,7 +312,7 @@ export default function ProductReviews({
                 ))}
               </div>
             ) : (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+              <div className="rounded-2xl border border-dashed border-mt-line bg-mt-bg px-4 py-8 text-center text-sm text-mt-subtle">
                 No reviews match the current filters yet.
               </div>
             )}

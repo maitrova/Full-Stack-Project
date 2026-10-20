@@ -56,34 +56,34 @@ export default function SubCategoryTilesPage() {
   }, [subCategories, category]);
 
   return (
-    <div className="w-full bg-white">
+    <div className="w-full min-h-screen bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)]">
       <div className="mx-auto max-w-[1400px] px-6 py-6">
         {/* Breadcrumb */}
         <nav className="mb-3 text-sm">
-          <ol className="flex flex-wrap items-center gap-2 text-gray-600">
+          <ol className="flex flex-wrap items-center gap-2 text-mt-muted">
             <li className="flex items-center gap-2">
-              <Link to="/products" className="text-blue-600 hover:underline">
+              <Link to="/products" className="text-mt-text hover:underline">
                 All Products
               </Link>
-              <span className="text-gray-400">{">"}</span>
+              <span className="text-mt-subtle">{">"}</span>
             </li>
-            <li className="text-gray-700">{category}</li>
+            <li className="text-mt-muted">{category}</li>
           </ol>
         </nav>
 
         {/* Title */}
-        <h1 className="text-5xl font-extrabold tracking-tight text-gray-900">
+        <h1 className="text-5xl font-normal tracking-tight text-mt-text">
           Custom {category}
         </h1>
-        <p className="mt-2 text-lg text-gray-700">
+        <p className="mt-2 text-lg text-mt-muted">
           Make your own custom {category.toLowerCase()}! Custom printing with no minimums.
         </p>
 
         {/* Loading/Error */}
-        {loading && <div className="mt-8 text-gray-600">Loading sub categories...</div>}
+        {loading && <div className="mt-8 text-mt-muted">Loading sub categories...</div>}
 
         {error && !loading && (
-          <div className="mt-8 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+          <div className="mt-8 rounded-lg border border-mt-danger/30 bg-mt-danger/10 p-4 text-mt-danger">
             {error}
           </div>
         )}
@@ -102,7 +102,7 @@ export default function SubCategoryTilesPage() {
             ))}
 
             {tiles.length === 0 && (
-              <div className="col-span-full text-gray-600">No sub categories found.</div>
+              <div className="col-span-full text-mt-muted">No sub categories found.</div>
             )}
           </div>
         )}
@@ -122,7 +122,7 @@ function TileCard({ title, image, href, featured = false }) {
     <Link
       to={href}
       className={[
-        "group relative overflow-hidden rounded-xl border border-gray-200 bg-white",
+        "group relative overflow-hidden rounded-xl border border-mt-line bg-mt-surface",
         "transition hover:shadow-md",
         featured ? "xl:col-span-2" : "",
         featured ? "min-h-[320px]" : "min-h-[220px]",
@@ -131,7 +131,7 @@ function TileCard({ title, image, href, featured = false }) {
       <div className="p-6">
         <h3
           className={[
-            "whitespace-pre-line leading-tight text-gray-900",
+            "whitespace-pre-line leading-tight text-mt-text",
             featured ? "text-3xl font-medium" : "text-2xl font-medium text-center",
           ].join(" ")}
         >
@@ -167,7 +167,7 @@ function TileCard({ title, image, href, featured = false }) {
           />
         </div>
       ) : (
-        <div className="absolute bottom-6 right-6 rounded-md bg-gray-100 px-3 py-2 text-xs text-gray-600">
+        <div className="absolute bottom-6 right-6 rounded-md bg-mt-surface-raised px-3 py-2 text-xs text-mt-muted">
           No image
         </div>
       )}

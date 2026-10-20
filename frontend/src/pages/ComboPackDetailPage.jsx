@@ -2,22 +2,28 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import DOMPurify from "dompurify";
-import { 
-  Check, 
-  CheckCircle2, 
-  ChevronLeft, 
-  ChevronRight, 
-  Eye, 
-  ShoppingCart, 
-  Package,
-  ArrowRight,
-  Zap,
-  Undo2,
-} from "lucide-react";
+import { AlertCircle, Check, ChevronLeft, ChevronRight, CreditCard, Eye, Package, Undo2 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { addToCart, getCart, selectCartLoading } from "../redux/slices/Cartslice.js";
 import { buildImageUrl } from "../utils/responsiveImage.js";
 import { buildReadymadeProductPath } from "../utils/readymadeRoutes.js";
+import {
+  DetailSection,
+  InfoSection,
+  InfoSections,
+  MobilePurchaseBar,
+  PriceBlock,
+  PrimaryPurchaseButton,
+  ProductHeading,
+  ProductNotFound,
+  ProductPage,
+  ProductPageSkeleton,
+  ProductToast,
+  ProductTopBar,
+  QuantityStepper,
+  SecondaryPurchaseButton,
+  TrustRow,
+} from "../components/product/ProductPageParts.jsx";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
@@ -313,31 +319,18 @@ const ComboPackDetailPage = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 border-t-violet-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 text-lg font-medium">Loading amazing combo...</p>
-        </div>
-      </div>
-    );
+    return <ProductPageSkeleton label="Loading combo pack…" />;
   }
 
   if (error && !combo) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-8">
-        <div className="text-center max-w-md">
-          <div className="text-6xl mb-4">😔</div>
-          <p className="text-red-600 text-lg font-medium mb-4">{error}</p>
-          <Link 
-            to="/combo-packs" 
-            className="inline-flex items-center gap-2 px-6 py-3 bg-violet-600 text-white rounded-full hover:bg-violet-700 transition-all font-medium"
-          >
-            <ChevronLeft size={18} />
-            Back to combo packs
-          </Link>
-        </div>
-      </div>
+      <ProductNotFound
+        title="Combo pack not found"
+        message={error}
+        onBack={() => navigate(-1)}
+        browseLabel="Browse combo packs"
+        onBrowse={() => navigate("/combo-packs")}
+      />
     );
   }
 
@@ -355,761 +348,494 @@ const ComboPackDetailPage = () => {
       }, 0)
     : combo.items?.length || 0;
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-violet-50">
-      {/* Success Animation Overlay */}
-      {showSuccessAnimation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl p-8 shadow-2xl transform animate-bounce">
-            <div className="text-center">
-              <CheckCircle2 size={64} className="text-green-500 mx-auto mb-4" />
-              <p className="text-xl font-bold text-gray-900">Added to Cart!</p>
-              <p className="text-gray-500 mt-2">Your combo pack is ready</p>
-            </div>
-          </div>
-        </div>
-      )}
+  const totalSlots = selectionGroups.length || combo.items?.length || 0;
+  const busy = adding || cartLoading;
+  const canBuy = validation.complete && !busy;
+  const currency = combo.currency;
+  const buyNow = async () => {
+    const added = await addComboToCart();
+    if (added) navigate("/cart");
+  };
+  const includedLines = selectionGroups.length
+    ? selectionGroups.map((group, index) => {
+        const chosen = selectedComboProducts[index];
+        const slotName = group.label || group.category?.name || `Slot ${index + 1}`;
+        return { key: group._id || index, label: `1 × ${slotName}`, value: chosen?.title || "Not chosen yet" };
+      })
+    : (combo.items || []).map((item, index) => ({
+        key: `${item.product?._id}-${index}`,
+        label: `Item ${index + 1}`,
+        value: item.product?.title || "Product",
+      }));
 
-      <div className="mx-auto max-w-7xl px-4 pb-28 pt-8 sm:px-6 lg:px-8 lg:pb-8">
-        {/* Back Navigation */}
-        <button
-          type="button"
-          onClick={() => navigate("/combo-packs")}
-          className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-violet-600 transition-colors group"
-        >
-          <ChevronLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-          <span>Explore More Combo Packs</span>
-        </button>
+  // Size + colour chips for one product inside the builder.
+  const renderOptionPickers = (product, index, { compact = false } = {}) => {
+    const productVariants = Array.isArray(product?.variants) ? product.variants : [];
+    const productColors = Array.isArray(product?.colors) ? product.colors : [];
+    const selectedSize = selections[index]?.size || "";
+    const selectedStock = getVariantStock(product, selectedSize);
+    if (!productVariants.length && !productColors.length) return null;
 
-        {/* Notifications */}
-        {(notice || error) && (
-          <div
-            className={`mb-6 rounded-2xl border-2 p-4 text-sm font-medium animate-slideDown ${
-              error 
-                ? "border-red-200 bg-red-50 text-red-700" 
-                : "border-green-200 bg-green-50 text-green-700"
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              {error ? "⚠️" : "✅"} {error || notice}
+    return (
+      <div className={compact ? "mt-3 space-y-3 border-t border-mt-line pt-3" : "mt-4 space-y-4"} onClick={(event) => event.stopPropagation()}>
+        {productColors.length > 0 && (
+          <div>
+            <p className="mb-2 text-xs text-mt-muted">
+              Colour{selections[index]?.color ? <span className="text-mt-text">: {selections[index].color}</span> : null}
+            </p>
+            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={`Colour for ${product.title}`}>
+              {productColors.map((color) => {
+                const colorValue = color.value || color.label || color;
+                const colorLabel = color.label || colorValue;
+                const colorActive = selections[index]?.color === colorValue;
+                return (
+                  <button
+                    key={colorValue}
+                    type="button"
+                    role="radio"
+                    aria-checked={colorActive}
+                    aria-label={colorLabel}
+                    title={colorLabel}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      updateSelection(index, "color", colorValue);
+                    }}
+                    className={`h-8 w-8 rounded-full border border-mt-tint/25 transition-shadow ${
+                      colorActive ? "ring-2 ring-mt-text ring-offset-2 ring-offset-mt-surface" : "hover:ring-1 hover:ring-mt-line-strong hover:ring-offset-2 hover:ring-offset-mt-surface"
+                    }`}
+                    style={{ backgroundColor: colorValue }}
+                  />
+                );
+              })}
             </div>
           </div>
         )}
 
-        <div className="mx-auto max-w-7xl space-y-4">
-          {/* Main Content */}
-          <div className="grid gap-4 lg:grid-cols-3">
-            {/* Products Selection Area */}
-            <div className="space-y-4 lg:col-span-2">
-              {/* Progress Card */}
-             
+        {productVariants.length > 0 && (
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-xs text-mt-muted">
+                Size{selectedSize ? <span className="text-mt-text">: {selectedSize}</span> : null}
+              </p>
+              {selectedSize && (
+                <span className={`text-[11px] ${selectedStock <= 0 ? "text-mt-danger" : selectedStock < 5 ? "text-mt-warning" : "text-mt-subtle"}`}>
+                  {selectedStock <= 0 ? "Out of stock" : selectedStock < 5 ? `Only ${selectedStock} left` : "In stock"}
+                </span>
+              )}
+            </div>
+            <div className={`grid gap-1.5 ${compact ? "grid-cols-4" : "grid-cols-5 sm:grid-cols-6"}`}>
+              {productVariants.map((variant) => {
+                const sizeActive = selectedSize === variant.size;
+                const sizeDisabled = Number(variant.stock || 0) <= 0;
+                return (
+                  <button
+                    key={variant.size}
+                    type="button"
+                    disabled={sizeDisabled}
+                    aria-pressed={sizeActive}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      updateSelection(index, "size", variant.size);
+                    }}
+                    className={`h-9 rounded-mt-btn border text-xs transition-colors ${
+                      sizeActive
+                        ? "border-mt-text bg-mt-btn font-medium text-mt-btn-text"
+                        : sizeDisabled
+                          ? "cursor-not-allowed border-mt-line text-mt-subtle line-through"
+                          : "border-mt-line-strong text-mt-text hover:border-mt-text"
+                    }`}
+                  >
+                    {variant.size}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
-              {/* Product Selection Grid */}
-              <div className="space-y-4">
-                {selectionGroups.length ? (
-                  <>
-                    <div className="grid grid-cols-2 gap-2">
-                      {selectionGroups.map((group, index) => {
-                        const selectedProductId = selections[index]?.productId || "";
-                        const selectedProduct = (group.eligibleProducts || []).find((product) => product._id === selectedProductId);
-                        const selectedSizeReady = hasSelectedRequiredSize(selectedProduct, selections[index]);
-                        const slotName = group.label || group.category?.name || `Slot ${index + 1}`;
-                        const active = activeSelectionGroupIndex === index;
+  const purchasePanel = (
+    <div className="space-y-3">
+      <div className="flex gap-3">
+        <QuantityStepper
+          value={quantity}
+          onDecrease={() => setQuantity((value) => Math.max(1, value - 1))}
+          onIncrease={() => setQuantity((value) => Math.min(maxQuantity, value + 1))}
+          decreaseDisabled={quantity <= 1}
+          increaseDisabled={quantity >= maxQuantity}
+        />
+        <PrimaryPurchaseButton onClick={addComboToCart} disabled={!canBuy} busy={busy} className="flex-1">
+          {busy ? "Adding…" : "Add to cart"}
+        </PrimaryPurchaseButton>
+      </div>
+      <SecondaryPurchaseButton onClick={buyNow} disabled={!canBuy} icon={CreditCard}>
+        Buy now
+      </SecondaryPurchaseButton>
+      {!validation.complete && (
+        <p className="flex items-start gap-2 text-xs text-mt-warning" role="status">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          {validation.message}
+        </p>
+      )}
+      {quantity > 1 && (
+        <p className="text-xs text-mt-muted">
+          {quantity} combos · {formatPrice(displayComboPrice * quantity, currency)}
+          {savings > 0 ? ` · you save ${formatPrice(savings * quantity, currency)}` : ""}
+        </p>
+      )}
+    </div>
+  );
 
-                        return (
-                          <button
-                            key={group._id || index}
-                            type="button"
-                            onClick={() => setActiveSelectionGroupIndex(index)}
-                            className={`flex min-w-0 items-center justify-between gap-2 rounded-xl border-2 px-2.5 py-3 text-left transition-all sm:gap-3 sm:px-4 ${
-                              active
-                                ? "border-violet-600 bg-violet-50 shadow-sm"
-                                : selectedSizeReady
-                                  ? "border-green-200 bg-white hover:border-green-300"
-                                  : selectedProduct
-                                    ? "border-amber-200 bg-white hover:border-amber-300"
-                                  : "border-gray-200 bg-white hover:border-violet-300"
-                            }`}
-                          >
-                            <span className="flex min-w-0 items-center gap-2 sm:gap-3">
-                              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm font-bold sm:h-9 sm:w-9 ${
-                                selectedSizeReady ? "bg-green-600 text-white" : "bg-violet-600 text-white"
-                              }`}>
-                                {selectedSizeReady ? <Check size={18} /> : index + 1}
-                              </span>
-                              <span className="min-w-0">
-                                <span className="block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                  Slot {index + 1}
-                                </span>
-                                <span className="block truncate text-xs font-bold text-gray-900 sm:text-sm">
-                                  {slotName}
-                                </span>
-                                {selectedProduct && (
-                                  <span className="block truncate text-xs text-gray-500">
-                                    {selectedProduct.title}
-                                  </span>
-                                )}
-                              </span>
-                            </span>
-                            <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold sm:px-2.5 sm:text-xs ${
-                              selectedSizeReady ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-800"
-                            }`}>
-                              {selectedSizeReady ? "Selected" : selectedProduct ? "Choose size" : "Pick 1"}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
+  return (
+    <ProductPage>
+      <ProductToast
+        show={Boolean(showSuccessAnimation || notice) && !error}
+        type="success"
+        message={notice || "Combo pack added to cart"}
+        showCartLink
+        onClose={() => {
+          setShowSuccessAnimation(false);
+          setNotice("");
+        }}
+      />
+      <ProductToast show={Boolean(error)} type="error" message={error} onClose={() => setError("")} />
 
-                    {(() => {
-                  const index = activeSelectionGroupIndex;
-                  const group = selectionGroups[index];
-                  if (!group) return null;
+      <ProductTopBar onBack={() => navigate("/combo-packs")} backLabel="combo packs" />
+
+      <div className="mx-auto grid max-w-7xl gap-8 px-4 pb-12 pt-3 sm:px-6 lg:grid-cols-12 lg:gap-12 lg:px-8 lg:pb-20">
+        {/* Summary (first on phones, right column on desktop) */}
+        <section aria-label="Combo summary" className="lg:order-2 lg:col-span-5">
+          <div className="lg:sticky lg:top-40">
+            <ProductHeading eyebrow="Combo pack" title={combo.name} />
+            <PriceBlock
+              price={formatPrice(displayComboPrice, currency)}
+              compareAt={savings > 0 ? formatPrice(originalPrice, currency) : null}
+              saving={savings > 0 ? `Save ${formatPrice(savings, currency)} (${discount}%)` : null}
+            />
+
+            <div className="mt-5">
+              <div className="mb-2 flex items-center justify-between text-xs text-mt-muted">
+                <span>Your selection</span>
+                <span className="tabular-nums text-mt-text">
+                  {completedSelectionCount} of {totalSlots}
+                </span>
+              </div>
+              <div className="h-1 overflow-hidden rounded-full bg-mt-line" aria-hidden="true">
+                <div
+                  className="h-full rounded-full bg-mt-btn transition-all duration-300"
+                  style={{ width: `${totalSlots ? Math.min(100, (completedSelectionCount / totalSlots) * 100) : 0}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="hidden lg:block">
+              <DetailSection>{purchasePanel}</DetailSection>
+            </div>
+
+            <TrustRow />
+
+            <InfoSections>
+              {(combo.fullDescription || combo.shortDescription) && (
+                <InfoSection title="About this combo" defaultOpen>
+                  <div
+                    className="text-sm leading-relaxed text-mt-muted [&_p]:mb-3 [&_strong]:font-medium [&_strong]:text-mt-text [&_ul]:list-disc [&_ul]:pl-5 [&_li]:mb-1"
+                    dangerouslySetInnerHTML={{
+                      __html: DOMPurify.sanitize(combo.fullDescription || combo.shortDescription || ""),
+                    }}
+                  />
+                </InfoSection>
+              )}
+              <InfoSection title="What's included">
+                <ul className="space-y-2 text-sm">
+                  {includedLines.map((line) => (
+                    <li key={line.key} className="flex justify-between gap-4">
+                      <span className="text-mt-subtle">{line.label}</span>
+                      <span className="truncate text-right text-mt-text">{line.value}</span>
+                    </li>
+                  ))}
+                </ul>
+              </InfoSection>
+            </InfoSections>
+          </div>
+        </section>
+
+        {/* Builder */}
+        <section aria-label="Build your combo" className="lg:order-1 lg:col-span-7">
+          {selectionGroups.length ? (
+            <>
+              <h2 className="text-lg font-medium text-mt-text">Build your combo</h2>
+              <p className="mt-1 text-sm text-mt-muted">Pick one item for each slot, then choose its size.</p>
+
+              <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3" role="tablist" aria-label="Combo slots">
+                {selectionGroups.map((group, index) => {
                   const selectedProductId = selections[index]?.productId || "";
                   const selectedProduct = (group.eligibleProducts || []).find((product) => product._id === selectedProductId);
                   const selectedSizeReady = hasSelectedRequiredSize(selectedProduct, selections[index]);
                   const selectedOptionsReady = hasSelectedRequiredOptions(selectedProduct, selections[index]);
                   const slotName = group.label || group.category?.name || `Slot ${index + 1}`;
-                  const products = group.eligibleProducts || [];
-                  const selectedProductIds = Object.entries(selections)
-                    .filter(([slotIndex]) => Number(slotIndex) !== index)
-                    .map(([, selection]) => selection.productId)
-                    .filter(Boolean);
+                  const active = activeSelectionGroupIndex === index;
 
                   return (
-                    <section
+                    <button
                       key={group._id || index}
-                      className={`overflow-hidden rounded-xl border bg-white shadow-sm transition-all ${
-                        selectedSizeReady ? "border-green-200" : selectedProduct ? "border-amber-200" : "border-violet-200"
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setActiveSelectionGroupIndex(index)}
+                      className={`flex min-w-0 items-center gap-3 rounded-mt-card border px-3 py-3 text-left transition-colors ${
+                        active ? "border-mt-text bg-mt-surface" : "border-mt-line hover:border-mt-line-strong"
                       }`}
                     >
-                      <div className="border-b border-gray-100 bg-white px-4 py-3">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="flex items-start gap-3">
-                            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${
-                              selectedSizeReady ? "bg-green-600 text-white" : "bg-violet-600 text-white"
-                            }`}>
-                              {selectedSizeReady ? <Check size={20} /> : index + 1}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                Slot {index + 1} of {selectionGroups.length}
-                              </p>
-                              <h3 className="text-base font-bold text-gray-900">
-                                Pick 1 {slotName}
-                              </h3>
-                              <p className="text-xs text-gray-500">
-                                {products.length} option{products.length === 1 ? "" : "s"} available. Select exactly one for this slot.
-                              </p>
-                            </div>
-                          </div>
-                          {selectedProduct ? (
-                            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-                              <span
-                                className={`inline-flex items-center gap-2 rounded-full px-3 py-1 ${
-                                  selectedSizeReady ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-800"
-                                }`}
-                              >
-                                {selectedSizeReady ? <CheckCircle2 size={16} /> : <Package size={16} />}
-                                <span className="text-xs font-semibold">
-                                  {selectedOptionsReady ? "Slot complete" : selectedSizeReady ? "Choose color" : "Choose size"}
-                                </span>
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => undoGroupSelection(index)}
-                                className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold text-gray-700 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"
-                              >
-                                <Undo2 size={14} />
-                                Undo
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="inline-flex self-start rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 sm:self-auto">
-                              Needs 1 product
-                            </span>
-                          )}
-                        </div>
+                      <span
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs ${
+                          selectedSizeReady ? "bg-mt-success text-white" : active ? "bg-mt-btn text-mt-btn-text" : "border border-mt-line-strong text-mt-muted"
+                        }`}
+                      >
+                        {selectedSizeReady ? <Check size={14} aria-hidden="true" /> : index + 1}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm text-mt-text">{slotName}</span>
+                        <span className={`block truncate text-[11px] ${selectedOptionsReady ? "text-mt-success" : "text-mt-subtle"}`}>
+                          {selectedOptionsReady ? selectedProduct?.title : selectedSizeReady ? "Choose colour" : selectedProduct ? "Choose size" : "Pick 1"}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {(() => {
+                const index = activeSelectionGroupIndex;
+                const group = selectionGroups[index];
+                if (!group) return null;
+                const selectedProductId = selections[index]?.productId || "";
+                const selectedProduct = (group.eligibleProducts || []).find((product) => product._id === selectedProductId);
+                const selectedSizeReady = hasSelectedRequiredSize(selectedProduct, selections[index]);
+                const slotName = group.label || group.category?.name || `Slot ${index + 1}`;
+                const products = group.eligibleProducts || [];
+                const selectedProductIds = Object.entries(selections)
+                  .filter(([slotIndex]) => Number(slotIndex) !== index)
+                  .map(([, selection]) => selection.productId)
+                  .filter(Boolean);
+
+                return (
+                  <div key={group._id || index} className="mt-8" role="tabpanel">
+                    <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.24em] text-mt-subtle">
+                          Slot {index + 1} of {selectionGroups.length}
+                        </p>
+                        <h3 className="mt-1 text-base text-mt-text">Pick 1 {slotName}</h3>
+                        <p className="text-xs text-mt-subtle">
+                          {products.length} option{products.length === 1 ? "" : "s"}
+                        </p>
                       </div>
+                      {selectedProduct && (
+                        <button
+                          type="button"
+                          onClick={() => undoGroupSelection(index)}
+                          className="inline-flex h-9 items-center gap-1.5 rounded-full border border-mt-line px-3 text-xs text-mt-muted transition-colors hover:border-mt-line-strong hover:text-mt-text"
+                        >
+                          <Undo2 size={14} aria-hidden="true" />
+                          Change
+                        </button>
+                      )}
+                    </div>
 
-                      <div className="p-3 sm:p-4">
-                        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-                          {products.map((product) => {
-                            const active = selectedProductId === product._id;
-                            const productImages = getProductImages(product);
-                            const imageIndex = productImageIndexes[product._id] || 0;
-                            const activeProductImage = productImages[imageIndex] || getProductImage(product);
-                            const categoryName = product?.category?.name || (typeof product?.category === "string" ? product.category : "Product");
-                            const subCategoryName = product?.subCategory?.name || (typeof product?.subCategory === "string" ? product.subCategory : "");
-                            const productVariants = Array.isArray(product?.variants) ? product.variants : [];
-                            const productColors = Array.isArray(product?.colors) ? product.colors : [];
-                            const selectedSize = selections[index]?.size || "";
-                            const selectedStock = active ? getVariantStock(product, selectedSize) : 0;
-                            const activeSizeReady = active && hasSelectedRequiredSize(product, selections[index]);
-                            const slotLocked = Boolean(selectedProduct && selectedSizeReady);
-                            const duplicateDisabled = !combo.allowDuplicateProducts && selectedProductIds.includes(product._id);
-                            const slotProductDisabled = slotLocked && !active;
-                            const disabled = duplicateDisabled || slotProductDisabled;
-                            
-                            return (
-                              <div
-                                key={product._id}
-                                role="button"
-                                tabIndex={disabled ? -1 : 0}
-                                aria-disabled={disabled}
-                                onClick={() => {
-                                  if (disabled) return;
-                                  selectGroupProduct(index, product._id);
-                                }}
-                                onKeyDown={(event) => {
-                                  if (disabled || !["Enter", " "].includes(event.key)) return;
-                                  event.preventDefault();
-                                  selectGroupProduct(index, product._id);
-                                }}
-                                className={`group relative overflow-hidden rounded-xl border-2 bg-white transition-all duration-200 ${
-                                  active
-                                    ? activeSizeReady
-                                      ? "border-green-500 shadow-lg"
-                                      : "border-violet-600 shadow-lg"
-                                    : disabled
-                                      ? "cursor-not-allowed border-gray-200 opacity-60"
-                                      : "cursor-pointer border-gray-200 hover:border-violet-300 hover:shadow-lg"
-                                }`}
-                              >
-                                <div className="relative aspect-square overflow-hidden bg-gray-50">
-                                  {activeProductImage ? (
-                                    <img
-                                      src={buildImageUrl(activeProductImage)}
-                                      alt={product.title}
-                                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                                    />
-                                  ) : (
-                                    <div className="flex h-full w-full items-center justify-center text-gray-400">
-                                      <Package size={34} />
-                                    </div>
-                                  )}
-                                  
-                                  {productImages.length > 1 && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={(event) => shiftProductImage(event, product, -1)}
-                                        className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white/90 opacity-0 shadow-lg transition-all hover:bg-white group-hover:opacity-100"
-                                      >
-                                        <ChevronLeft size={16} />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={(event) => shiftProductImage(event, product, 1)}
-                                        className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white/90 opacity-0 shadow-lg transition-all hover:bg-white group-hover:opacity-100"
-                                      >
-                                        <ChevronRight size={16} />
-                                      </button>
-                                      <span className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-white/90 px-2 py-0.5 text-xs font-medium">
-                                        {imageIndex + 1}/{productImages.length}
-                                      </span>
-                                    </>
-                                  )}
-                                  
-                                  <div className={`absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border-2 transition-all ${
-                                    activeSizeReady
-                                      ? "bg-green-600 border-green-600"
-                                      : active
-                                        ? "bg-violet-600 border-violet-600"
-                                      : "bg-white border-gray-300"
-                                  }`}>
-                                    {(activeSizeReady || active) && <Check size={16} className="text-white" />}
-                                  </div>
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+                      {products.map((product) => {
+                        const active = selectedProductId === product._id;
+                        const productImages = getProductImages(product);
+                        const imageIndex = productImageIndexes[product._id] || 0;
+                        const activeProductImage = productImages[imageIndex] || getProductImage(product);
+                        const activeSizeReady = active && hasSelectedRequiredSize(product, selections[index]);
+                        const slotLocked = Boolean(selectedProduct && selectedSizeReady);
+                        const duplicateDisabled = !combo.allowDuplicateProducts && selectedProductIds.includes(product._id);
+                        const slotProductDisabled = slotLocked && !active;
+                        const disabled = duplicateDisabled || slotProductDisabled;
+
+                        return (
+                          <div
+                            key={product._id}
+                            role="button"
+                            tabIndex={disabled ? -1 : 0}
+                            aria-disabled={disabled}
+                            aria-pressed={active}
+                            onClick={() => {
+                              if (disabled) return;
+                              selectGroupProduct(index, product._id);
+                            }}
+                            onKeyDown={(event) => {
+                              if (disabled || !["Enter", " "].includes(event.key)) return;
+                              event.preventDefault();
+                              selectGroupProduct(index, product._id);
+                            }}
+                            className={`group flex flex-col rounded-mt-card border p-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-mt-text ${
+                              active
+                                ? "border-mt-text bg-mt-surface"
+                                : disabled
+                                  ? "cursor-not-allowed border-mt-line opacity-50"
+                                  : "cursor-pointer border-mt-line hover:border-mt-line-strong"
+                            }`}
+                          >
+                            <div className="relative aspect-[4/5] overflow-hidden rounded-mt-btn bg-mt-photo">
+                              {activeProductImage ? (
+                                <img
+                                  src={buildImageUrl(activeProductImage)}
+                                  alt={product.title}
+                                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center text-mt-subtle">
+                                  <Package size={30} aria-hidden="true" />
                                 </div>
+                              )}
 
-                                <div className="p-3">
-                                  <div className="min-w-0">
-                                    <p className="truncate text-xs text-gray-500">
-                                      {categoryName}
-                                      {subCategoryName ? <span className="text-gray-300"> / </span> : null}
-                                      {subCategoryName}
-                                    </p>
-                                    <h4 className="mt-1 line-clamp-1 text-sm font-semibold text-gray-900">{product.title}</h4>
-                                  </div>
-                                  <p className="mt-1 line-clamp-1 text-xs text-gray-500">
-                                    {stripHtml(product.description) || "Premium catalog product"}
-                                  </p>
-                                  <div className="mt-3 flex items-center justify-between gap-2">
-                                    <span className="text-base font-bold text-gray-900">
-                                      {formatPrice(getProductPrice(product), combo.currency)}
-                                    </span>
-                                    <Link
-                                      to={getProductDetailsPath(product)}
-                                      state={{
-                                        returnTo: `${location.pathname}${location.search || ""}`,
-                                        returnLabel: "combo offer",
-                                      }}
-                                      onClick={(event) => event.stopPropagation()}
-                                      className="inline-flex items-center gap-1 rounded-md bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700 transition hover:bg-sky-100 hover:text-sky-800"
-                                    >
-                                      <Eye size={14} />
-                                      Details
-                                    </Link>
-                                  </div>
-
-                                  {active && (productColors.length > 0 || productVariants.length > 0) && (
-                                    <div className="mt-3 space-y-2 rounded-lg bg-gray-50 p-2">
-                                      {productColors.length > 0 && (
-                                        <div>
-                                          <p className="mb-1 text-[11px] font-semibold text-gray-600">Color</p>
-                                          <div className="flex flex-wrap gap-1.5">
-                                            {productColors.map((color) => {
-                                              const colorValue = color.value || color.label || color;
-                                              const colorLabel = color.label || colorValue;
-                                              const colorActive = selections[index]?.color === colorValue;
-                                              return (
-                                                <button
-                                                  key={colorValue}
-                                                  type="button"
-                                                  onClick={(event) => {
-                                                    event.stopPropagation();
-                                                    updateSelection(index, "color", colorValue);
-                                                  }}
-                                                  className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-semibold transition ${
-                                                    colorActive
-                                                      ? "border-violet-600 bg-violet-600 text-white"
-                                                      : "border-gray-200 bg-white text-gray-700 hover:border-violet-300"
-                                                  }`}
-                                                >
-                                                  <span
-                                                    className="h-3.5 w-3.5 rounded-full border border-white shadow-inner"
-                                                    style={{ backgroundColor: colorValue }}
-                                                  />
-                                                  <span className="max-w-16 truncate">{colorLabel}</span>
-                                                </button>
-                                              );
-                                            })}
-                                          </div>
-                                        </div>
-                                      )}
-
-                                      {productVariants.length > 0 && (
-                                        <div>
-                                          <div className="mb-1 flex items-center justify-between gap-2">
-                                            <p className="text-[11px] font-semibold text-gray-600">Size</p>
-                                            {selectedSize && (
-                                              <span className={`text-[11px] font-semibold ${
-                                                selectedStock <= 0 ? "text-red-600" : "text-green-600"
-                                              }`}>
-                                                {selectedStock <= 0 ? "Out of stock" : `${selectedStock} left`}
-                                              </span>
-                                            )}
-                                          </div>
-                                          <div className="flex flex-wrap gap-1.5">
-                                            {productVariants.map((variant) => {
-                                              const sizeActive = selectedSize === variant.size;
-                                              const sizeDisabled = Number(variant.stock || 0) <= 0;
-                                              return (
-                                                <button
-                                                  key={variant.size}
-                                                  type="button"
-                                                  disabled={sizeDisabled}
-                                                  onClick={(event) => {
-                                                    event.stopPropagation();
-                                                    updateSelection(index, "size", variant.size);
-                                                  }}
-                                                  className={`min-w-8 rounded-md border px-2 py-1 text-[11px] font-semibold transition ${
-                                                    sizeActive
-                                                      ? "border-violet-600 bg-violet-600 text-white"
-                                                      : sizeDisabled
-                                                        ? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400 line-through"
-                                                        : "border-gray-200 bg-white text-gray-700 hover:border-violet-300"
-                                                  }`}
-                                                >
-                                                  {variant.size}
-                                                </button>
-                                              );
-                                            })}
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-
+                              {productImages.length > 1 && (
+                                <>
                                   <button
                                     type="button"
-                                    disabled={disabled}
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      if (disabled) return;
-                                      selectGroupProduct(index, product._id);
-                                    }}
-                                     className={`mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-lg text-sm font-semibold transition ${
-                                      activeSizeReady
-                                        ? "bg-green-600 text-white"
-                                        : active
-                                          ? "bg-violet-600 text-white"
-                                        : disabled
-                                          ? "bg-gray-100 text-gray-400"
-                                          : "bg-gray-900 text-white hover:bg-black"
-                                    }`}
+                                    onClick={(event) => shiftProductImage(event, product, -1)}
+                                    aria-label="Previous photo"
+                                    className="absolute left-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
                                   >
-                                    {(activeSizeReady || active) && <Check size={16} />}
-                                    {activeSizeReady ? "Selected" : active ? "Choose Size" : "Select"}
+                                    <ChevronLeft size={16} aria-hidden="true" />
                                   </button>
+                                  <button
+                                    type="button"
+                                    onClick={(event) => shiftProductImage(event, product, 1)}
+                                    aria-label="Next photo"
+                                    className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                                  >
+                                    <ChevronRight size={16} aria-hidden="true" />
+                                  </button>
+                                  <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white">
+                                    {imageIndex + 1}/{productImages.length}
+                                  </span>
+                                </>
+                              )}
 
-                                  {disabled && (
-                                    <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-500">
-                                      {slotProductDisabled ? "Product already selected for this slot" : "Already selected in another group"}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </section>
-                  );
-                    })()}
-                  </>
-                ) : combo.items.map((item, index) => {
-                  const product = item.product;
-                  const variants = Array.isArray(product?.variants) ? product.variants : [];
-                  const colors = Array.isArray(product?.colors) ? product.colors : [];
-                  const selectedSize = selections[index]?.size || "";
-                  const selectedStock = getVariantStock(product, selectedSize);
-                  const outOfStock = variants.length ? selectedSize && selectedStock <= 0 : selectedStock <= 0;
-
-                  return (
-                    <div key={`${product._id}-${index}`} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all">
-                      <div className="flex gap-4">
-                        <div className="relative">
-                          <Link
-                            to={getProductDetailsPath(product)}
-                            state={{
-                              returnTo: `${location.pathname}${location.search || ""}`,
-                              returnLabel: "combo offer",
-                            }}
-                            title={`View ${product.title || "product"} details`}
-                          >
-                            <img
-                              src={buildImageUrl(getProductImage(product))}
-                              alt={product.title}
-                              className="w-24 h-24 rounded-xl object-cover shadow-md"
-                            />
-                          </Link>
-                          <div className="absolute -top-2 -left-2 w-8 h-8 bg-violet-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
-                            {index + 1}
-                          </div>
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="text-xs font-medium text-violet-600">Item {index + 1}</p>
-                              <h3 className="font-bold text-gray-900">{product.title}</h3>
+                              <span
+                                className={`absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border transition-colors ${
+                                  activeSizeReady
+                                    ? "border-mt-success bg-mt-success text-white"
+                                    : active
+                                      ? "border-white bg-white text-black"
+                                      : "border-white/70 bg-black/30"
+                                }`}
+                                aria-hidden="true"
+                              >
+                                {(activeSizeReady || active) && <Check size={14} />}
+                              </span>
                             </div>
-                            <span className="text-lg font-bold text-violet-600">
-                              {formatPrice(getProductPrice(product), combo.currency)}
-                            </span>
+
+                            <div className="flex flex-1 flex-col px-1 pb-1 pt-2.5">
+                              <p className="line-clamp-1 text-sm text-mt-text">{product.title}</p>
+                              <div className="mt-0.5 flex items-center justify-between gap-2">
+                                <span className="text-sm text-mt-muted">{formatPrice(getProductPrice(product), currency)}</span>
+                                <Link
+                                  to={getProductDetailsPath(product)}
+                                  state={{
+                                    returnTo: `${location.pathname}${location.search || ""}`,
+                                    returnLabel: "combo offer",
+                                  }}
+                                  onClick={(event) => event.stopPropagation()}
+                                  className="inline-flex items-center gap-1 text-xs text-mt-subtle underline-offset-4 hover:text-mt-text hover:underline"
+                                >
+                                  <Eye size={13} aria-hidden="true" />
+                                  Details
+                                </Link>
+                              </div>
+
+                              {active && renderOptionPickers(product, index, { compact: true })}
+
+                              {disabled && (
+                                <p className="mt-2 text-[11px] text-mt-subtle">
+                                  {slotProductDisabled ? "Another item is chosen for this slot" : "Already chosen in another slot"}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                          <p className="text-sm text-gray-500 mt-1">
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+            </>
+          ) : (
+            <>
+              <h2 className="text-lg font-medium text-mt-text">What's in the box</h2>
+              <p className="mt-1 text-sm text-mt-muted">Choose a size{combo.items?.some((item) => item.product?.colors?.length) ? " and colour" : ""} for each item.</p>
+              <div className="mt-5 space-y-3">
+                {combo.items.map((item, index) => {
+                  const product = item.product;
+                  return (
+                    <div key={`${product._id}-${index}`} className="rounded-mt-card border border-mt-line p-3 sm:p-4">
+                      <div className="flex gap-4">
+                        <Link
+                          to={getProductDetailsPath(product)}
+                          state={{
+                            returnTo: `${location.pathname}${location.search || ""}`,
+                            returnLabel: "combo offer",
+                          }}
+                          title={`View ${product.title || "product"} details`}
+                          className="h-28 w-24 shrink-0 overflow-hidden rounded-mt-btn bg-mt-photo"
+                        >
+                          <img
+                            src={buildImageUrl(getProductImage(product))}
+                            alt={product.title}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                          />
+                        </Link>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] uppercase tracking-[0.24em] text-mt-subtle">Item {index + 1}</p>
+                          <h3 className="mt-1 text-sm text-mt-text sm:text-base">{product.title}</h3>
+                          <p className="mt-0.5 text-sm text-mt-muted">{formatPrice(getProductPrice(product), currency)}</p>
+                          <p className="mt-1 line-clamp-2 text-xs text-mt-subtle">
                             {stripHtml(product.description) || "Premium product"}
                           </p>
-                          {selectedSize && (
-                            <p className={`text-xs font-medium mt-1 ${outOfStock ? "text-red-600" : "text-green-600"}`}>
-                              {outOfStock ? "Out of Stock" : `${selectedStock} available`}
-                            </p>
-                          )}
                         </div>
                       </div>
-
-                      {/* Color Selection */}
-                      {colors.length > 0 && (
-                        <div className="mt-4">
-                          <p className="text-sm font-semibold text-gray-700 mb-2">Color</p>
-                          <div className="flex flex-wrap gap-2">
-                            {colors.map((color) => {
-                              const colorValue = color.value || color.label || color;
-                              const active = selections[index]?.color === colorValue;
-                              return (
-                                <button
-                                  key={colorValue}
-                                  type="button"
-                                  onClick={() => updateSelection(index, "color", colorValue)}
-                                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                                    active 
-                                      ? "bg-violet-600 text-white" 
-                                      : "bg-gray-50 text-gray-700 border border-gray-200 hover:border-violet-300"
-                                  }`}
-                                >
-                                  <span 
-                                    className="w-4 h-4 rounded-full border border-gray-300" 
-                                    style={{ backgroundColor: colorValue }} 
-                                  />
-                                  {color.label || colorValue}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Size Selection */}
-                      {variants.length > 0 && (
-                        <div className="mt-4">
-                          <p className="text-sm font-semibold text-gray-700 mb-2">Size</p>
-                          <div className="flex flex-wrap gap-2">
-                            {variants.map((variant) => {
-                              const active = selectedSize === variant.size;
-                              const disabled = Number(variant.stock || 0) <= 0;
-                              return (
-                                <button
-                                  key={variant.size}
-                                  type="button"
-                                  disabled={disabled}
-                                  onClick={() => updateSelection(index, "size", variant.size)}
-                                  className={`min-w-[3rem] px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                                    active
-                                      ? "bg-violet-600 text-white shadow-md"
-                                      : disabled
-                                        ? "bg-gray-100 text-gray-400 cursor-not-allowed line-through"
-                                        : "bg-white text-gray-700 border border-gray-200 hover:border-violet-300"
-                                  }`}
-                                >
-                                  {variant.size}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
+                      {renderOptionPickers(product, index)}
                     </div>
                   );
                 })}
               </div>
-            </div>
-
-            {/* Sidebar - Price Summary & Actions */}
-            <div className="lg:col-span-1">
-              <div className="sticky top-6 space-y-4">
-                {/* Price Card */}
-                <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
-                  <div className="mb-4 border-b border-gray-100 pb-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-violet-600">
-                      Combo Details
-                    </p>
-                    <h1 className="mt-1 text-xl font-bold leading-tight text-gray-900">{combo.name}</h1>
-                    {(combo.fullDescription || combo.shortDescription) && (
-                      <div
-                        className="prose prose-sm mt-2 max-w-none text-sm text-gray-600"
-                        dangerouslySetInnerHTML={{
-                          __html: DOMPurify.sanitize(combo.fullDescription || combo.shortDescription || ""),
-                        }}
-                      />
-                    )}
-                  </div>
-                  <h3 className="mb-3 text-sm font-bold text-gray-900">Price Summary</h3>
-                  
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Original Price</span>
-                      <span className="text-gray-400 line-through text-lg">
-                        {formatPrice(originalPrice, combo.currency)}
-                      </span>
-                    </div>
-                    
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Combo Discount</span>
-                      <span className="text-green-600 font-semibold">
-                        -{discount}%
-                      </span>
-                    </div>
-                    
-                    <div className="border-t border-gray-100 pt-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-900 font-semibold">Combo Price</span>
-                        <span className="text-2xl font-bold text-violet-600">
-                          {formatPrice(displayComboPrice, combo.currency)}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="rounded-lg border border-green-100 bg-green-50 px-3 py-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-green-700 font-semibold">You Save</span>
-                        <span className="font-bold text-green-600">
-                          {formatPrice(savings, combo.currency)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Quantity Selector Card */}
-                <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-                  <h3 className="mb-3 text-sm font-bold text-gray-900">Quantity</h3>
-                  
-                  <div className="flex items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setQuantity((value) => Math.max(1, value - 1))}
-                      className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-lg font-bold text-gray-700 transition-all hover:bg-violet-50 hover:text-violet-600"
-                    >
-                      -
-                    </button>
-                    
-                    <div className="flex h-9 w-12 items-center justify-center rounded-lg border border-violet-200 bg-violet-50 text-sm font-bold text-violet-600">
-                      {quantity}
-                    </div>
-                    
-                    <button
-                      type="button"
-                      onClick={() => setQuantity((value) => Math.min(maxQuantity, value + 1))}
-                      disabled={quantity >= maxQuantity}
-                      className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-lg font-bold text-gray-700 transition-all hover:bg-violet-50 hover:text-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      +
-                    </button>
-                  </div>
-                  
-                  <div className="mt-3 border-t border-gray-100 pt-3">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-gray-600">Total</span>
-                      <span className="text-xl font-bold text-gray-900">
-                        {formatPrice(displayComboPrice * quantity, combo.currency)}
-                      </span>
-                    </div>
-                    {savings > 0 && (
-                      <p className="text-sm text-green-600 font-medium text-center">
-                        Total savings: {formatPrice(savings * quantity, combo.currency)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Validation Message */}
-                {!validation.complete && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                    <div className="flex items-start gap-2">
-                      <span className="text-amber-500">⚠️</span>
-                      <p className="text-sm font-medium text-amber-800">{validation.message}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className="hidden grid-cols-2 gap-2 lg:grid">
-                  <button
-                    type="button"
-                    onClick={addComboToCart}
-                    disabled={!validation.complete || adding || cartLoading}
-                    className="flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-violet-600 bg-white px-3 text-sm font-semibold text-violet-600 transition-all hover:bg-violet-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:bg-gray-50 disabled:text-gray-400"
-                  >
-                    {adding || cartLoading ? (
-                      <>
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-violet-600 border-t-transparent"></div>
-                        Adding...
-                      </>
-                    ) : (
-                      <>
-                        <ShoppingCart size={16} />
-                        Add to Cart
-                      </>
-                    )}
-                  </button>
-                  
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const added = await addComboToCart();
-                      if (added) navigate("/cart");
-                    }}
-                    disabled={!validation.complete || adding || cartLoading}
-                    className="flex h-10 w-full items-center justify-center gap-1.5 rounded-lg bg-violet-600 px-3 text-sm font-semibold text-white transition-all hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500"
-                  >
-                    <Zap size={16} />
-                    Buy Now
-                    <ArrowRight size={16} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white shadow-lg lg:hidden">
-        <div className="space-y-2 p-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="truncate text-xs font-medium text-gray-500">{combo.name}</p>
-              <p className="text-lg font-bold text-gray-900">
-                {formatPrice(displayComboPrice * quantity, combo.currency)}
-              </p>
-            </div>
-
-            <div className="flex items-center">
-              <button
-                type="button"
-                onClick={() => setQuantity((value) => Math.max(1, value - 1))}
-                className="flex h-8 w-8 items-center justify-center rounded-l-lg border border-gray-300 text-lg font-bold text-gray-700 hover:bg-gray-50"
-              >
-                -
-              </button>
-              <div className="flex h-8 w-10 items-center justify-center border-y border-gray-300 text-sm font-semibold text-gray-900">
-                {quantity}
-              </div>
-              <button
-                type="button"
-                onClick={() => setQuantity((value) => Math.min(maxQuantity, value + 1))}
-                disabled={quantity >= maxQuantity}
-                className="flex h-8 w-8 items-center justify-center rounded-r-lg border border-gray-300 text-lg font-bold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                +
-              </button>
-            </div>
-          </div>
-
-          {!validation.complete && (
-            <p className="truncate rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
-              {validation.message}
-            </p>
+            </>
           )}
+        </section>
 
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={addComboToCart}
-              disabled={!validation.complete || adding || cartLoading}
-              className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg bg-violet-600 text-sm font-semibold text-white transition-all hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500"
-            >
-              {adding || cartLoading ? (
-                <>
-                  <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                  <span>Adding...</span>
-                </>
-              ) : (
-                <>
-                  <ShoppingCart size={15} />
-                  Add to Cart
-                </>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={async () => {
-                const added = await addComboToCart();
-                if (added) navigate("/cart");
-              }}
-              disabled={!validation.complete || adding || cartLoading}
-              className="flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg bg-gray-900 text-sm font-semibold text-white transition-all hover:bg-black disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500"
-            >
-              <Zap size={15} />
-              Buy Now
-            </button>
-          </div>
+        {/* Full purchase controls on phones (the bottom bar keeps a quick Add) */}
+        <div className="lg:hidden">
+          <DetailSection>{purchasePanel}</DetailSection>
         </div>
       </div>
-    </div>
+
+      <MobilePurchaseBar
+        price={formatPrice(displayComboPrice * quantity, currency)}
+        compareAt={savings > 0 ? formatPrice(originalPrice * quantity, currency) : null}
+        caption={validation.complete ? `${quantity} combo${quantity > 1 ? "s" : ""} · ${completedSelectionCount} of ${totalSlots} ready` : validation.message}
+      >
+        <div className="flex items-center gap-2">
+          <QuantityStepper
+            value={quantity}
+            onDecrease={() => setQuantity((value) => Math.max(1, value - 1))}
+            onIncrease={() => setQuantity((value) => Math.min(maxQuantity, value + 1))}
+            decreaseDisabled={quantity <= 1}
+            increaseDisabled={quantity >= maxQuantity}
+          />
+          <PrimaryPurchaseButton onClick={addComboToCart} disabled={!canBuy} busy={busy} className="px-4">
+            {busy ? "Adding…" : "Add"}
+          </PrimaryPurchaseButton>
+        </div>
+      </MobilePurchaseBar>
+    </ProductPage>
   );
 };
 
 export default ComboPackDetailPage;
-   

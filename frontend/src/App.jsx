@@ -1,6 +1,7 @@
 // src/App.jsx
 import React, { useEffect, useRef } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { Wordmark } from "./components/ui/index.js";
 import Header from "./components/Header.jsx";
 import Breadcrumbs from "./components/Breadcrumbs.jsx";
 import Footer from "./components/Footer.jsx";
@@ -69,7 +70,12 @@ const MainLayout = ({ children }) => {
 // Layout without header for auth pages
 const AuthLayout = ({ children }) => {
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="flex min-h-screen flex-col bg-mt-bg font-brand text-mt-text [color-scheme:var(--mt-scheme)]">
+      <header className="border-b border-mt-line bg-mt-header">
+        <div className="mx-auto flex h-14 max-w-7xl items-center px-4 sm:h-16 sm:px-6">
+          <Wordmark />
+        </div>
+      </header>
       <main className="flex-1">{children}</main>
       <Footer />
     </div>
@@ -478,7 +484,7 @@ function App() {
           <MainLayout>
             <div className="flex h-screen items-center justify-center bg-neutral-100">
               <div className="rounded-md bg-white px-8 py-6 shadow-lg text-center">
-                <h1 className="text-2xl font-bold text-gray-800 mb-2">404</h1>
+                <h1 className="text-2xl font-normal text-gray-800 mb-2">404</h1>
                 <p className="text-gray-600 mb-4">Page not found</p>
                 <a 
                   href="/" 
