@@ -14,6 +14,7 @@ import {
   validateCouponForCart,
 } from "../services/couponService.js";
 import { getReadymadePricing } from "../utils/readymadePricing.js";
+import { evaluateCartOffers, toOfferLine } from "../services/cartOfferService.js";
 import HeaderBannerSettings from "../models/HeaderBannerSettings.js";
 import { sendWhatsAppOrderUpdateSafely } from "../services/whatsappOrderService.js";
 
@@ -326,7 +327,7 @@ const getCartTotals = async ({ cart, userId, couponCode }) => {
     0
   );
   const shipping = 0;
-  let discount = 0;
+  let couponDiscount = 0;
   let couponSnapshot = null;
 
   if (couponCode) {
@@ -337,13 +338,44 @@ const getCartTotals = async ({ cart, userId, couponCode }) => {
       throw error;
     }
 
-    discount = couponResult.discount;
+    couponDiscount = couponResult.discount;
     couponSnapshot = couponResult.couponSnapshot;
   }
 
+  const offerResult = await evaluateCartOffers({
+    lines: cart.items.map((item) => toOfferLine(item)),
+    couponApplied: Boolean(couponSnapshot),
+  });
+  const offerDiscount = Math.min(offerResult.discount, Math.max(0, subtotal - couponDiscount));
+  const cartOfferSnapshot =
+    offerResult.applied && offerDiscount > 0
+      ? { ...offerResult.applied, discountApplied: offerDiscount }
+      : null;
+
+  const discount = couponDiscount + offerDiscount;
   const total = Math.max(0, subtotal + shipping - discount);
-  return { subtotal, shipping, discount, total, couponSnapshot };
+  return {
+    subtotal,
+    shipping,
+    discount,
+    couponDiscount,
+    offerDiscount,
+    total,
+    couponSnapshot,
+    cartOfferSnapshot,
+  };
 };
+
+const buildPricingResponse = (totals) => ({
+  subtotal: totals.subtotal,
+  shipping: totals.shipping,
+  discount: totals.discount,
+  couponDiscount: totals.couponDiscount,
+  offerDiscount: totals.offerDiscount,
+  total: totals.total,
+  coupon: totals.couponSnapshot,
+  cartOffer: totals.cartOfferSnapshot,
+});
 
 const createOrderDocFromCart = async ({
   userId,
@@ -380,9 +412,11 @@ const createOrderDocFromCart = async ({
     subtotal: totals.subtotal,
     shipping: totals.shipping,
     discount: totals.discount,
+    offerDiscount: totals.offerDiscount,
     total: totals.total,
     currency: "INR",
     coupon: totals.couponSnapshot,
+    cartOffer: totals.cartOfferSnapshot,
     status: paymentStatus,
     orderStatus,
     payment: {
@@ -551,13 +585,7 @@ export const createRazorpayOrderFromCart = async (req, res) => {
       amount: rpOrder.amount,
       currency: rpOrder.currency,
       razorpayKeyId: process.env.RAZORPAY_KEY_ID,
-      pricing: {
-        subtotal: totals.subtotal,
-        shipping: totals.shipping,
-        discount: totals.discount,
-        total: totals.total,
-        coupon: totals.couponSnapshot,
-      },
+      pricing: buildPricingResponse(totals),
     });
   } catch (err) {
     console.error("createRazorpayOrderFromCart error:", err);
@@ -608,13 +636,7 @@ export const createCashOnDeliveryOrderFromCart = async (req, res) => {
       message: "Cash on delivery order created",
       order: orderDoc,
       cart: newActiveCart,
-      pricing: {
-        subtotal: totals.subtotal,
-        shipping: totals.shipping,
-        discount: totals.discount,
-        total: totals.total,
-        coupon: totals.couponSnapshot,
-      },
+      pricing: buildPricingResponse(totals),
     });
   } catch (err) {
     console.error("createCashOnDeliveryOrderFromCart error:", err);

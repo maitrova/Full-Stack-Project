@@ -3,6 +3,7 @@ import {
   addToCart,
   clearCart,
   getCart,
+  getCartOffers,
   updateCartItemQty,
   removeCartItem,
 } from "../controllers/cartController.js";
@@ -12,6 +13,7 @@ const cartrouter = express.Router();
 
 // Cart
 cartrouter.get("/", optionalProtect, getCart);
+cartrouter.get("/offers", optionalProtect, getCartOffers);
 cartrouter.post("/add", optionalProtect, addToCart);
 cartrouter.delete("/clear", optionalProtect, clearCart);
 

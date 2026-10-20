@@ -1,5 +1,20 @@
 import mongoose from "mongoose";
 
+// Snapshot of the cart value offer applied at checkout.
+const cartOfferSnapshotSchema = new mongoose.Schema(
+  {
+    ruleId: { type: mongoose.Schema.Types.ObjectId, ref: "CartOfferRule", default: null },
+    name: { type: String, default: "" },
+    minCartAmount: { type: Number, default: 0 },
+    discountType: { type: String, enum: ["PERCENTAGE", "FIXED_AMOUNT", null], default: null },
+    discountValue: { type: Number, default: 0 },
+    maximumDiscountAmount: { type: Number, default: null },
+    eligibleAmount: { type: Number, default: 0 },
+    discountApplied: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
 const orderItemSchema = new mongoose.Schema(
   {
     kind: { 
@@ -50,7 +65,9 @@ const orderSchema = new mongoose.Schema(
 
     subtotal: Number,
     shipping: { type: Number, default: 0 },
+    // Total of coupon + cart value offer discounts.
     discount: { type: Number, default: 0 },
+    offerDiscount: { type: Number, default: 0 },
     total: Number,
     currency: { type: String, default: "INR" },
     coupon: {
@@ -67,6 +84,8 @@ const orderSchema = new mongoose.Schema(
       discountApplied: { type: Number, default: 0 },
       campaignTag: { type: String, default: "" },
     },
+
+    cartOffer: { type: cartOfferSnapshotSchema, default: null },
 
     status: {
       type: String,

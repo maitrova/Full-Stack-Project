@@ -9,6 +9,11 @@ import { Cart } from "../models/Cart.js";
 import Dropproduct from "../models/dropproduct.model.js"; // ✅ NEW
 import { attachReadymadePricing, getReadymadePricing } from "../utils/readymadePricing.js";
 import ComboPack from "../models/ComboPack.js";
+import {
+  evaluateCartOffers,
+  getGapRecommendations,
+  toOfferLine,
+} from "../services/cartOfferService.js";
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 const normalizeId = (value) => String(value?._id || value || "").trim();
 const GUEST_CART_COOKIE = "guest_cart_id_v2";
@@ -1104,6 +1109,42 @@ export const getCart = async (req, res) => {
 
 
 
+
+// Cart value offers: what is unlocked, what is next, and products that close the gap.
+export const getCartOffers = async (req, res) => {
+  try {
+    const { userId, guestId } = resolveCartOwner(req, res);
+    const cart = await findActiveCartWithDetails({ userId, guestId });
+    const rawItems = cart?.items || [];
+    const pricedItems = enrichCartItems(rawItems);
+    // Raw items keep category ids; enriched items carry the current prices.
+    const lines = rawItems.map((item, index) =>
+      toOfferLine({
+        ...item,
+        unitPrice: pricedItems[index]?.unitPrice,
+        priceDetails: pricedItems[index]?.priceDetails,
+      })
+    );
+
+    const result = await evaluateCartOffers({
+      lines,
+      couponApplied: String(req.query.couponApplied || "") === "true",
+    });
+
+    const recommendations = result.nextUnlock
+      ? await getGapRecommendations({
+          gapAmount: result.nextUnlock.gapAmount,
+          ruleId: result.nextUnlock.ruleId,
+          excludeProductIds: lines.map((line) => line.productId).filter(Boolean),
+        })
+      : [];
+
+    return res.status(200).json({ ...result, recommendations });
+  } catch (err) {
+    console.error("getCartOffers error:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
 
 export const updateCartItemQty = async (req, res) => {
   try {
