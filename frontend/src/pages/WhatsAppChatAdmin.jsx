@@ -39,6 +39,8 @@ const formatDate = (value) => {
   }).format(date);
 };
 
+const formatSeconds = (ms) => (ms == null ? "—" : `${(Number(ms) / 1000).toFixed(1)} s`);
+
 const phoneLabel = (value) => {
   const digits = String(value || "").replace(/\D/g, "");
   return digits ? `+${digits}` : "Unknown number";
@@ -274,7 +276,11 @@ export default function WhatsAppChatAdmin() {
           <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[
               ["24h requests", overview.requests, Activity],
-              ["Avg latency", `${overview.average_latency_ms} ms`, Clock3],
+              ["Avg reply time", formatSeconds(overview.average_latency_ms), Clock3],
+              ["Slowest 10% over", formatSeconds(overview.p90_latency_ms), Clock3],
+              ["Timed out", overview.timed_out ?? 0, AlertTriangle],
+              ["Avg AI model time", formatSeconds(overview.average_model_ms), Clock3],
+              ["Avg lookup time", formatSeconds(overview.average_tool_ms), Clock3],
               ["Open handoffs", overview.active_handoffs, Users],
               ["Image failures", overview.image_failures, AlertTriangle],
               ["Delivery errors", overview.delivery_errors, AlertTriangle],

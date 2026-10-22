@@ -10,7 +10,10 @@ def start_usage_tracking() -> None:
     _usage.set([])
 
 
-def record_usage(provider: str, model: str, operation: str, usage: dict | None) -> None:
+def record_usage(
+    provider: str, model: str, operation: str, usage: dict | None,
+    latency_ms: int | None = None, attempts: int | None = None,
+) -> None:
     entries = _usage.get()
     if entries is None:
         return
@@ -21,7 +24,7 @@ def record_usage(provider: str, model: str, operation: str, usage: dict | None) 
     input_rate = getattr(settings, f"{provider}_input_cost_per_million", 0.0)
     output_rate = getattr(settings, f"{provider}_output_cost_per_million", 0.0)
     estimated_cost_usd = (input_tokens * input_rate + output_tokens * output_rate) / 1_000_000
-    entries.append({
+    entry = {
         "provider": provider,
         "model": model,
         "operation": operation,
@@ -29,7 +32,14 @@ def record_usage(provider: str, model: str, operation: str, usage: dict | None) 
         "output_tokens": output_tokens,
         "total_tokens": total_tokens,
         "estimated_cost_usd": round(estimated_cost_usd, 8),
-    })
+    }
+    # Wall time includes rate-limit waits and model switches, so slow replies
+    # can be traced to the provider rather than the catalogue lookups.
+    if latency_ms is not None:
+        entry["latency_ms"] = latency_ms
+    if attempts is not None:
+        entry["attempts"] = attempts
+    entries.append(entry)
 
 
 def consume_usage() -> list[dict[str, Any]]:

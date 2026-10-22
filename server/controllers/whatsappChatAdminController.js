@@ -25,7 +25,7 @@ export const getWhatsAppOverview = async (req, res) => {
   try {
     const database = mongoose.connection.db;
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [metricRows, openChats, handoffs, deliveryErrors, oldestHandoff, metaFailures, updatesNotSent] = await Promise.all([
+    const [metricRows, openChats, handoffs, deliveryErrors, oldestHandoff, metaFailures, updatesNotSent, latencyRows] = await Promise.all([
       database.collection("ai_agent_metrics").aggregate([
         { $match: { created_at: { $gte: since } } },
         { $group: {
@@ -33,6 +33,11 @@ export const getWhatsAppOverview = async (req, res) => {
           requests: { $sum: 1 },
           average_latency_ms: { $avg: "$latency_ms" },
           max_latency_ms: { $max: "$latency_ms" },
+          timed_out: { $sum: { $cond: ["$timed_out", 1, 0] } },
+          // Timing breakdown; rows written before it existed are skipped by $avg.
+          average_model_ms: { $avg: "$model_ms" },
+          average_tool_ms: { $avg: "$tool_ms" },
+          average_model_calls: { $avg: "$model_calls" },
           empty_results: { $sum: { $cond: ["$empty_result", 1, 0] } },
           image_failures: { $sum: { $cond: ["$image_analysis_failed", 1, 0] } },
           checkout_failures: { $sum: { $cond: ["$checkout_failure", 1, 0] } },
@@ -58,8 +63,18 @@ export const getWhatsAppOverview = async (req, res) => {
         created_at: { $gte: since },
         status: { $in: ["failed", "skipped"] },
       }),
+      // Answered replies only, for the slowest-10% figure ($percentile needs MongoDB 7).
+      database.collection("ai_agent_metrics").find(
+        { created_at: { $gte: since }, latency_ms: { $type: "number" }, timed_out: { $ne: true }, rate_limited: { $ne: true } },
+        { projection: { _id: 0, latency_ms: 1 }, limit: 20000 }
+      ).toArray(),
     ]);
     const metrics = metricRows[0] || {};
+    const latencies = latencyRows.map((row) => row.latency_ms).sort((a, b) => a - b);
+    const p90LatencyMs = latencies.length
+      ? latencies[Math.min(latencies.length - 1, Math.round(0.9 * (latencies.length - 1)))]
+      : 0;
+    const roundOrNull = (value) => (value == null ? null : Math.round(Number(value)));
     const errorCount = Number(metrics.image_failures || 0) + Number(metrics.checkout_failures || 0) + deliveryErrors + metaFailures;
     res.json({
       window_hours: 24,
@@ -74,6 +89,11 @@ export const getWhatsAppOverview = async (req, res) => {
       requests: Number(metrics.requests || 0),
       average_latency_ms: Math.round(Number(metrics.average_latency_ms || 0)),
       max_latency_ms: Math.round(Number(metrics.max_latency_ms || 0)),
+      p90_latency_ms: Math.round(p90LatencyMs),
+      timed_out: Number(metrics.timed_out || 0),
+      average_model_ms: roundOrNull(metrics.average_model_ms),
+      average_tool_ms: roundOrNull(metrics.average_tool_ms),
+      average_model_calls: metrics.average_model_calls == null ? null : Number(Number(metrics.average_model_calls).toFixed(1)),
       empty_results: Number(metrics.empty_results || 0),
       image_failures: Number(metrics.image_failures || 0),
       checkout_failures: Number(metrics.checkout_failures || 0),

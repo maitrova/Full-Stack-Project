@@ -198,7 +198,7 @@ latency, and cost per conversation. Its alerts are merged into `alerts`:
 | Alert | Fires at | Usual cause |
 |---|---|---|
 | `ai_provider_rate_limited` (critical) | 5% of replies busy | Gemini quota or billing |
-| `ai_provider_slow` | 5% of messages timed out | provider latency; the shopper was asked to resend (limit: `WEB_AGENT_TOTAL_TIMEOUT_SECONDS`, default 40) |
+| `ai_provider_slow` | 5% of messages timed out | provider latency; the shopper was asked to resend (limit: `WEB_AGENT_TOTAL_TIMEOUT_SECONDS`, default 60) |
 | `high_fallback_rate` | 15% of replies | provider errors/timeouts, or grounding failures (see `fallback_reasons`) |
 | `high_grounding_retry_rate` | 20% of replies | the model inventing prices/links; check prompt or catalogue data |
 | `cart_claims_corrected` | 5% of replies | the model claiming cart changes without tools |

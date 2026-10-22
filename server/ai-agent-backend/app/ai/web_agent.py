@@ -1649,6 +1649,8 @@ Style: plain text only, no markdown headings, tables, or bold. Use short paragra
                 logger.warning("AI action audit write skipped: %s", exc.__class__.__name__)
 
         latency_ms = round((time.monotonic() - started_at) * 1000)
+        provider_usage = consume_usage()
+        model_calls = [item for item in provider_usage if item.get("operation") == "tool_calling"]
         await self.sales_agent._record_metric(
             business_id=business_id,
             request_id=request_id,
@@ -1661,9 +1663,18 @@ Style: plain text only, no markdown headings, tables, or bold. Use short paragra
             checkout_failure=False,
             response_goal="tools agent reply",
             latency_ms=latency_ms,
-            provider_usage=consume_usage(),
+            provider_usage=provider_usage,
             extra={
                 "agent_mode": "tools",
+                # Where the reply time went (counters only, no message text).
+                "model_calls": len(model_calls),
+                "model_ms": sum(int(item.get("latency_ms") or 0) for item in model_calls),
+                "slowest_model_call_ms": max((int(item.get("latency_ms") or 0) for item in model_calls), default=0),
+                "model_retries": sum(max(0, int(item.get("attempts") or 1) - 1) for item in model_calls),
+                "backup_model_used": any(
+                    item.get("provider") != "gemini" or item.get("model") != settings.gemini_model for item in model_calls
+                ),
+                "tool_ms": sum(int(call.get("latency_ms") or 0) for call in session.tool_calls),
                 "tool_names": [call["name"] for call in session.tool_calls],
                 "tool_failures": sum(call["status"] == "failed" for call in session.tool_calls),
                 "grounding_retry": bool(grounding_failures),
@@ -1677,8 +1688,9 @@ Style: plain text only, no markdown headings, tables, or bold. Use short paragra
             },
         )
         logger.info(
-            "Web agent handled request=%s conversation=%s tools=%s products=%s latency_ms=%s",
+            "Web agent handled request=%s conversation=%s tools=%s products=%s latency_ms=%s model_calls=%s model_ms=%s",
             request_id, conversation_id, [call["name"] for call in session.tool_calls], len(shown), latency_ms,
+            len(model_calls), sum(int(item.get("latency_ms") or 0) for item in model_calls),
         )
 
         refreshed = await repo.find_by_id(conversation_id, business_id)

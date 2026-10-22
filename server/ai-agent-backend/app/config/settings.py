@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     web_agent_model_timeout_seconds: float = 15.0
     # Falling back after a timeout gives a slower and worse answer, so allow
     # slow provider rounds to finish; past this the shopper is asked to resend.
-    web_agent_total_timeout_seconds: float = 40.0
+    web_agent_total_timeout_seconds: float = 60.0
 
     whatsapp_verify_token: str | None = None
     whatsapp_access_token: str | None = None

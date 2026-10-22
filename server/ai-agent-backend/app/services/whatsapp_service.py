@@ -73,6 +73,18 @@ class WhatsAppClient:
                 raise
             return response.json()
 
+    async def send_typing_indicator(self, message_id: str) -> None:
+        """Mark the customer's message read and show "typing…" until the reply
+        arrives (Meta clears it after 25 seconds or on our next message)."""
+        if not self.is_configured:
+            return
+        await self._send_message_payload({
+            "messaging_product": "whatsapp",
+            "status": "read",
+            "message_id": message_id,
+            "typing_indicator": {"type": "text"},
+        })
+
     async def send_template(self, to: str, name: str, language: str, parameters: list[str]) -> dict[str, Any] | None:
         """A Meta-approved template: the only message allowed outside the 24-hour window."""
         if not self.is_configured:
@@ -460,6 +472,7 @@ class WhatsAppService:
                             processed += 1
                             continue
 
+                        await self._show_typing(whatsapp_message_id)
                         if message.get("type") == "image":
                             await self._acknowledge_image(from_phone, whatsapp_message_id)
                         try:
@@ -526,6 +539,15 @@ class WhatsAppService:
                         continue
 
         return {"status": "ok", "processed": processed}
+
+    async def _show_typing(self, message_id: str | None) -> None:
+        # Purely cosmetic: a failure here must never delay or block the reply.
+        if not message_id:
+            return
+        try:
+            await asyncio.wait_for(self.client.send_typing_indicator(message_id), timeout=3)
+        except Exception as exc:
+            logger.info("WhatsApp typing indicator skipped (%s)", type(exc).__name__)
 
     async def _acknowledge_image(self, to: str, message_id: str) -> None:
         delivery = await self.deliveries.find_one({"_id": message_id}) or {}

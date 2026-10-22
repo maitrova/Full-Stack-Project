@@ -23,11 +23,15 @@ THRESHOLDS = [
 SLOW_P90_MS = 12000
 
 
-def _p90(values: list[int]) -> int | None:
+def _percentile(values: list[int], fraction: float) -> int | None:
     if not values:
         return None
     ordered = sorted(values)
-    return ordered[min(len(ordered) - 1, int(round(0.9 * (len(ordered) - 1))))]
+    return ordered[min(len(ordered) - 1, int(round(fraction * (len(ordered) - 1))))]
+
+
+def _p90(values: list[int]) -> int | None:
+    return _percentile(values, 0.9)
 
 
 async def web_agent_summary(database, business_id, since: datetime, channel: str = "web") -> dict:
@@ -37,7 +41,8 @@ async def web_agent_summary(database, business_id, since: datetime, channel: str
         {"business_id": business_id, "created_at": {"$gte": since}, "agent_mode": {"$in": ["tools", "tools_fallback"]}, **channel_filter},
         {"_id": 0, "agent_mode": 1, "reason": 1, "rate_limited": 1, "timed_out": 1, "grounding_retry": 1, "claim_corrected": 1,
          "cart_actions": 1, "tool_failures": 1, "handoff_requested": 1, "latency_ms": 1, "estimated_cost_usd": 1,
-         "conversation_id": 1, "tool_names": 1, "account_links_sent": 1},
+         "conversation_id": 1, "tool_names": 1, "account_links_sent": 1,
+         "model_calls": 1, "model_ms": 1, "tool_ms": 1, "model_retries": 1, "backup_model_used": 1},
     ).to_list(length=20000)
 
     replies = [row for row in rows if row.get("agent_mode") == "tools"]
@@ -56,11 +61,19 @@ async def web_agent_summary(database, business_id, since: datetime, channel: str
         for name in row.get("tool_names") or []:
             tools[name] = tools.get(name, 0) + 1
     latencies = [int(row["latency_ms"]) for row in answered if row.get("latency_ms") is not None]
+    # Rows written before the timing breakdown existed have no model_calls.
+    timed = [row for row in answered if row.get("model_calls") is not None]
     conversations = {row.get("conversation_id") for row in replies if row.get("conversation_id")}
     cost = sum(float(row.get("estimated_cost_usd") or 0) for row in replies)
 
     def rate(count: int, base: int) -> float:
         return round(count / base, 4) if base else 0.0
+
+    def average(field: str, items: list[dict], digits: int = 0) -> float | int | None:
+        if not items:
+            return None
+        value = round(sum(float(row.get(field) or 0) for row in items) / len(items), digits)
+        return value if digits else int(value)
 
     summary = {
         "replies": len(answered),
@@ -76,7 +89,14 @@ async def web_agent_summary(database, business_id, since: datetime, channel: str
         "account_links_sent": sum(int(row.get("account_links_sent") or 0) for row in answered),
         "tool_usage": dict(sorted(tools.items(), key=lambda item: -item[1])),
         "average_latency_ms": round(sum(latencies) / len(latencies)) if latencies else None,
+        "p50_latency_ms": _percentile(latencies, 0.5),
         "p90_latency_ms": _p90(latencies),
+        "max_latency_ms": max(latencies) if latencies else None,
+        "average_model_calls": average("model_calls", timed, digits=2),
+        "average_model_ms": average("model_ms", timed),
+        "average_tool_ms": average("tool_ms", timed),
+        "model_retries": sum(int(row.get("model_retries") or 0) for row in timed),
+        "backup_model_replies": sum(1 for row in timed if row.get("backup_model_used")),
         "conversations": len(conversations),
         "estimated_cost_usd": round(cost, 6),
         "cost_per_conversation_usd": round(cost / len(conversations), 6) if conversations else 0.0,

@@ -89,12 +89,17 @@ class ToolCallingClient:
                 {"name": tool.name, "description": tool.description, "parameters": tool.parameters}
                 for tool in tools
             ]}],
-            "generationConfig": {"temperature": 0.3, "maxOutputTokens": 800},
+            # Thinking tokens count toward this limit; too low a cap leaves no
+            # room for the reply and costs an extra "nudge" round.
+            "generationConfig": {"temperature": 0.3, "maxOutputTokens": 2048},
         }
         nudged = False
+        # The caller cancels at the total timeout; knowing it lets rate-limit
+        # backoff skip to the next model instead of sleeping past it.
+        deadline = time.monotonic() + settings.web_agent_total_timeout_seconds
         async with httpx.AsyncClient(timeout=settings.web_agent_model_timeout_seconds) as client:
             for _ in range(max_rounds + 2):
-                data = await self._post_gemini(client, {**body_base, "contents": contents})
+                data = await self._post_gemini(client, {**body_base, "contents": contents}, deadline)
                 candidate = (data.get("candidates") or [{}])[0]
                 content = candidate.get("content") or {}
                 parts = content.get("parts") or []
@@ -128,7 +133,7 @@ class ToolCallingClient:
                 ]})
         raise ToolCallingError("Tool budget exhausted")
 
-    async def _post_gemini(self, client: httpx.AsyncClient, body: dict) -> dict:
+    async def _post_gemini(self, client: httpx.AsyncClient, body: dict, deadline: float | None = None) -> dict:
         # Free-tier quotas are per model, so a backup model keeps replies going
         # when the main model's daily quota runs out.
         backups = [name.strip() for name in settings.gemini_fallback_models.split(",") if name.strip()]
@@ -137,10 +142,12 @@ class ToolCallingClient:
         available = [name for name in models if _exhausted_until.get(name, 0) <= now]
         models = available or models  # if every model is marked, try them anyway
         response = None
+        requests_sent = 0
         for model in models:
             # Rate limits (429) are common on smaller quotas; back off twice
             # before trying the next model. Other server errors retry once.
             for attempt in range(3):
+                requests_sent += 1
                 try:
                     response = await client.post(
                         GEMINI_URL.format(model=model),
@@ -160,7 +167,12 @@ class ToolCallingClient:
                     break
                 retries = 2 if response.status_code == 429 else 1
                 if response.status_code in RETRYABLE_STATUS and attempt < retries:
-                    await asyncio.sleep((1.5, 3.0)[attempt] if response.status_code == 429 else 0.5)
+                    delay = (1.5, 3.0)[attempt] if response.status_code == 429 else 0.5
+                    # Leave time for a request after the wait; otherwise try
+                    # the next model straight away.
+                    if deadline is not None and time.monotonic() + delay + 5 > deadline:
+                        break
+                    await asyncio.sleep(delay)
                     continue
                 break
             if response.status_code not in RETRYABLE_STATUS | {404}:
@@ -177,7 +189,7 @@ class ToolCallingClient:
             "input_tokens": usage.get("promptTokenCount"),
             "output_tokens": usage.get("candidatesTokenCount"),
             "total_tokens": usage.get("totalTokenCount"),
-        })
+        }, latency_ms=round((time.monotonic() - now) * 1000), attempts=requests_sent)
         return data
 
     async def _run_openai(self, system_prompt, history, user_message, tools, execute, max_rounds) -> str:
@@ -193,6 +205,7 @@ class ToolCallingClient:
         ]
         async with httpx.AsyncClient(timeout=settings.web_agent_model_timeout_seconds) as client:
             for _ in range(max_rounds + 1):
+                started = time.monotonic()
                 response = await client.post(
                     OPENAI_URL,
                     headers={"Authorization": f"Bearer {self.openai_api_key}", "Content-Type": "application/json"},
@@ -211,7 +224,8 @@ class ToolCallingClient:
                     raise ProviderRateLimited("Secondary provider rate limit")
                 response.raise_for_status()
                 data = response.json()
-                record_usage("openai", settings.openai_model, "tool_calling", data.get("usage"))
+                record_usage("openai", settings.openai_model, "tool_calling", data.get("usage"),
+                             latency_ms=round((time.monotonic() - started) * 1000), attempts=1)
                 output = data.get("output") or []
                 calls = [item for item in output if item.get("type") == "function_call"]
                 if not calls:

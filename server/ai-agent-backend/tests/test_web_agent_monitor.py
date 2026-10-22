@@ -59,6 +59,23 @@ class WebAgentMonitorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((summary["replies"], summary["timeouts"], summary["fallbacks"]), (9, 1, 0))
         self.assertIn("ai_provider_slow", {alert["code"] for alert in summary["alerts"]})
 
+    async def test_summary_breaks_down_where_reply_time_went(self):
+        rows = [
+            reply(latency_ms=4000, model_calls=2, model_ms=3000, tool_ms=500, model_retries=0),
+            reply(latency_ms=20000, model_calls=4, model_ms=18000, tool_ms=1500, model_retries=2, backup_model_used=True),
+            reply(latency_ms=6000),  # written before the breakdown existed
+            reply(timed_out=True, latency_ms=60000, model_calls=6, model_ms=59000),
+        ]
+        summary = await web_agent_summary(SimpleNamespace(ai_agent_metrics=FakeMetrics(rows)), "biz", datetime.now(timezone.utc))
+        self.assertEqual((summary["p50_latency_ms"], summary["max_latency_ms"]), (6000, 20000))
+        self.assertEqual((summary["average_model_calls"], summary["average_model_ms"], summary["average_tool_ms"]), (3.0, 10500, 1000))
+        self.assertEqual((summary["model_retries"], summary["backup_model_replies"]), (2, 1))
+
+    async def test_breakdown_is_empty_without_timed_rows(self):
+        summary = await web_agent_summary(SimpleNamespace(ai_agent_metrics=FakeMetrics([reply()])), "biz", datetime.now(timezone.utc))
+        self.assertIsNone(summary["average_model_ms"])
+        self.assertEqual(summary["backup_model_replies"], 0)
+
     def test_slow_replies_alert(self):
         alerts = web_agent_alerts({"replies": 5, "rates": {}, "p90_latency_ms": 15000})
         self.assertEqual([alert["code"] for alert in alerts], ["slow_replies"])

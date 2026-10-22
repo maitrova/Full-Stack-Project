@@ -1,9 +1,11 @@
+import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 
 from app.ai.tool_calling import ProviderRateLimited, ToolCallingClient
+from app.ai.usage import consume_usage, start_usage_tracking
 
 OK_BODY = {"candidates": [{"content": {"parts": [{"text": "hello"}]}}], "usageMetadata": {}}
 DAILY_429 = {"error": {"status": "RESOURCE_EXHAUSTED", "details": [{"violations": [
@@ -56,6 +58,46 @@ class GeminiFailoverTests(unittest.IsolatedAsyncioTestCase):
             await ToolCallingClient(gemini_api_key="k", openai_api_key="")._post_gemini(http, {})
         self.assertEqual(http.calls, ["main-model", "main-model"])
         sleep.assert_awaited_once()
+
+    async def test_per_minute_limit_near_deadline_tries_backup_without_waiting(self):
+        http = FakeHttp({"main-model": [(429, MINUTE_429)], "backup-model": [(200, OK_BODY)]})
+        with self.settings(), patch("app.ai.tool_calling.asyncio.sleep") as sleep:
+            data = await ToolCallingClient(gemini_api_key="k", openai_api_key="")._post_gemini(
+                http, {}, deadline=time.monotonic() + 3,
+            )
+        self.assertEqual(data, OK_BODY)
+        self.assertEqual(http.calls, ["main-model", "backup-model"])
+        sleep.assert_not_called()
+
+    async def test_per_minute_limit_with_time_left_still_backs_off(self):
+        http = FakeHttp({"main-model": [(429, MINUTE_429), (200, OK_BODY)], "backup-model": []})
+        with self.settings(), patch("app.ai.tool_calling.asyncio.sleep") as sleep:
+            await ToolCallingClient(gemini_api_key="k", openai_api_key="")._post_gemini(
+                http, {}, deadline=time.monotonic() + 60,
+            )
+        self.assertEqual(http.calls, ["main-model", "main-model"])
+        sleep.assert_awaited_once()
+
+    async def test_usage_records_call_time_and_request_count(self):
+        http = FakeHttp({"main-model": [(429, MINUTE_429), (200, OK_BODY)], "backup-model": []})
+        start_usage_tracking()
+        with self.settings(), patch("app.ai.tool_calling.asyncio.sleep"):
+            await ToolCallingClient(gemini_api_key="k", openai_api_key="")._post_gemini(http, {})
+        [entry] = consume_usage()
+        self.assertEqual((entry["model"], entry["attempts"]), ("main-model", 2))
+        self.assertIsInstance(entry["latency_ms"], int)
+
+    async def test_run_allows_room_for_thinking_and_passes_the_total_deadline(self):
+        post = AsyncMock(return_value=OK_BODY)
+        client = ToolCallingClient(gemini_api_key="k", openai_api_key="")
+        with patch.object(client, "_post_gemini", post), \
+                patch("app.ai.tool_calling.settings.web_agent_total_timeout_seconds", 60.0):
+            started = time.monotonic()
+            reply = await client.run("system", [], "hi", [], AsyncMock())
+        self.assertEqual(reply, "hello")
+        body, deadline = post.await_args.args[1], post.await_args.args[2]
+        self.assertEqual(body["generationConfig"]["maxOutputTokens"], 2048)
+        self.assertAlmostEqual(deadline - started, 60.0, delta=1)
 
     async def test_every_model_exhausted_reports_rate_limited(self):
         http = FakeHttp({"main-model": [(429, DAILY_429)], "backup-model": [(429, DAILY_429)]})
