@@ -7,6 +7,7 @@ const VARIANTS = {
   new: "text-mt-new px-0",
   success: "bg-mt-success/15 text-mt-success",
   danger: "bg-mt-danger/15 text-mt-danger",
+  warning: "bg-mt-warning/15 text-mt-warning",
 };
 
 /** Small label: "New", "Best seller", order status, etc. */

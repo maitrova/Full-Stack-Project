@@ -166,6 +166,7 @@ export const listWhatsAppChats = async (req, res) => {
           handoff_status: 1,
           handoff_assigned_to: 1,
           handoff_assigned_name: 1,
+          closed_at: 1,
           created_at: 1,
           updated_at: 1,
           last_message_at: 1,
@@ -194,13 +195,14 @@ export const getWhatsAppChat = async (req, res) => {
     });
     if (!conversation) return res.status(404).json({ message: "WhatsApp chat not found" });
 
+    // Keep the newest messages when a chat is over the limit, shown oldest first.
     const messages = await database.collection("messages")
       .find({ conversation_id: conversationId })
-      .sort({ created_at: 1 })
+      .sort({ created_at: -1, _id: -1 })
       .limit(1000)
       .toArray();
 
-    res.json({ conversation: serialize(conversation), messages: serialize(messages) });
+    res.json({ conversation: serialize(conversation), messages: serialize(messages.reverse()) });
   } catch (error) {
     console.error("Get WhatsApp chat failed:", error.message);
     res.status(500).json({ message: "Could not load this WhatsApp chat" });
@@ -240,7 +242,7 @@ export const updateWhatsAppChat = async (req, res) => {
   const conversationId = parseConversationId(req.params.id);
   if (!conversationId) return res.status(400).json({ message: "Invalid conversation id" });
 
-  const { leadStatus, conversationStatus, leadNote, assignToMe, handoffStatus } = req.body || {};
+  const { leadStatus, conversationStatus, leadNote, assignToMe, handoffStatus, confirmTakeover } = req.body || {};
   if (leadStatus !== undefined && !LEAD_STATUSES.has(leadStatus)) {
     return res.status(400).json({ message: "Invalid lead status" });
   }
@@ -256,6 +258,9 @@ export const updateWhatsAppChat = async (req, res) => {
   if (assignToMe !== undefined && typeof assignToMe !== "boolean") {
     return res.status(400).json({ message: "assignToMe must be true or false" });
   }
+  if (confirmTakeover !== undefined && typeof confirmTakeover !== "boolean") {
+    return res.status(400).json({ message: "confirmTakeover must be true or false" });
+  }
 
   try {
     const now = new Date();
@@ -265,6 +270,11 @@ export const updateWhatsAppChat = async (req, res) => {
       set.lead_updated_at = now;
     }
     if (conversationStatus !== undefined) set.status = conversationStatus;
+    if (conversationStatus === "closed") {
+      set.closed_at = now;
+      set.handoff_status = "resolved";
+      set.handoff_resolved_at = now;
+    }
     if (leadNote !== undefined) set.lead_note = leadNote.trim().slice(0, 2000);
     if (handoffStatus !== undefined) set.handoff_status = handoffStatus;
     const takeOver = assignToMe || conversationStatus === "handoff";
@@ -277,13 +287,35 @@ export const updateWhatsAppChat = async (req, res) => {
     }
 
     const database = mongoose.connection.db;
+    const filter = { _id: conversationId, channel: "whatsapp" };
+    // Checked in the update itself, so two admins claiming at once can't both win.
+    if (takeOver && !confirmTakeover) {
+      filter.$nor = [{
+        status: "handoff",
+        handoff_status: "assigned",
+        handoff_assigned_to: { $nin: [req.user._id, String(req.user._id), null] },
+      }];
+    }
     const result = await database.collection("conversations").findOneAndUpdate(
-      { _id: conversationId, channel: "whatsapp" },
+      filter,
       { $set: set },
       { returnDocument: "after" }
     );
-    const conversation = result?.value || result;
-    if (!conversation) return res.status(404).json({ message: "WhatsApp chat not found" });
+    // Older MongoDB drivers wrap the document as { value }.
+    const conversation = result && "value" in result ? result.value : result;
+    if (!conversation) {
+      const existing = await database.collection("conversations").findOne(
+        { _id: conversationId, channel: "whatsapp" },
+        { projection: { handoff_assigned_name: 1 } }
+      );
+      if (!existing) return res.status(404).json({ message: "WhatsApp chat not found" });
+      const ownerName = existing.handoff_assigned_name || "Another team member";
+      return res.status(409).json({
+        code: "owned_by_other",
+        owner_name: ownerName,
+        message: `${ownerName} already owns this chat.`,
+      });
+    }
 
     if (takeOver || handoffStatus !== undefined) {
       const alertUpdate = await database.collection("whatsapp_handoff_alerts").updateMany(
@@ -333,6 +365,13 @@ export const updateWhatsAppChat = async (req, res) => {
       await database.collection("whatsapp_handoff_alerts").updateMany(
         { conversation_id: conversationId, status: { $in: ["open", "assigned"] } },
         { $set: { status: "resumed", resolved_at: now, updated_at: now } }
+      );
+    }
+
+    if (conversationStatus === "closed") {
+      await database.collection("whatsapp_handoff_alerts").updateMany(
+        { conversation_id: conversationId, status: { $in: ["open", "assigned"] } },
+        { $set: { status: "resolved", resolved_at: now, updated_at: now } }
       );
     }
 

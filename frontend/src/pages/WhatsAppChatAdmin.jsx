@@ -1,42 +1,79 @@
-import { createElement, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import {
-  ArrowLeft,
   Activity,
-  AlertTriangle,
+  ArrowDown,
+  ArrowLeft,
   Bot,
   Bug,
-  CheckCircle2,
   ChevronLeft,
-  Clock3,
   ExternalLink,
+  Info,
   Loader2,
   MessageCircle,
-  Paintbrush,
   RefreshCw,
   Search,
   Send,
   UserRound,
-  UserCheck,
   Users,
 } from "lucide-react";
 import { useSelector } from "react-redux";
-import { Link } from "react-router-dom";
-import { selectCurrentToken } from "../redux/slices/Userslice.js";
+import { Badge, Button, EmptyState, Modal, Select, Skeleton, Textarea, cx } from "../components/ui/index.js";
+import { selectCurrentToken, selectCurrentUser } from "../redux/slices/Userslice.js";
+import {
+  QUEUES,
+  aiStatus,
+  formatDuration,
+  inQueue,
+  isClaimed,
+  isClosed,
+  isMine,
+  isOwnedByOther,
+  isUnclaimed,
+  needsReply,
+  replyWindow,
+  sortForQueue,
+  waitTone,
+  waitingSince,
+} from "../utils/whatsappInbox.js";
 
 const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace(/\/$/, "");
-const LEAD_STATUSES = ["new", "contacted", "qualified", "converted", "closed"];
+const LEAD_STATUS_OPTIONS = ["new", "contacted", "qualified", "converted", "closed"].map((value) => ({
+  value,
+  label: value[0].toUpperCase() + value.slice(1),
+}));
+const CHAT_REFRESH_MS = 10000;
+const LIST_REFRESH_MS = 15000;
 
-const formatDate = (value) => {
-  if (!value) return "No messages yet";
+const QUICK_REPLIES = [
+  { label: "Greeting", text: (name) => `Hi${name ? ` ${name}` : ""}, this is the Maitrova team. How can we help you today?` },
+  { label: "Checking", text: () => "Thanks for your patience. We're checking this now and will update you shortly." },
+  { label: "Order number", text: () => "Could you please share your order number so we can look into this?" },
+  { label: "Anything else", text: () => "Is there anything else we can help you with?" },
+];
+
+const withoutKey = (object, key) => Object.fromEntries(Object.entries(object).filter(([name]) => name !== key));
+
+const dayKey = (value) => new Date(value).toDateString();
+
+const formatTime = (value) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
+  return new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit" }).format(date);
+};
+
+const formatDay = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" }).format(date);
+};
+
+const formatListDate = (value, now) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  if (dayKey(value) === dayKey(now)) return formatTime(value);
+  return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short" }).format(date);
 };
 
 const formatSeconds = (ms) => (ms == null ? "—" : `${(Number(ms) / 1000).toFixed(1)} s`);
@@ -54,15 +91,9 @@ const whatsappLink = (conversation) => {
   return `https://wa.me/${digits}?text=${text}`;
 };
 
-const badgeClass = (value) => {
-  if (value === "handoff") return "bg-amber-100 text-amber-800";
-  if (value === "closed") return "bg-slate-200 text-slate-700";
-  if (value === "converted") return "bg-emerald-100 text-emerald-800";
-  if (value === "customization") return "bg-violet-100 text-violet-800";
-  return "bg-sky-100 text-sky-800";
-};
+const previewPrefix = { human: "Team: ", ai: "AI: ", assistant: "AI: " };
 
-const ChatImage = ({ conversationId, messageId, headers }) => {
+const ChatImage = ({ conversationId, messageId, headers, onLoad }) => {
   const [src, setSrc] = useState("");
 
   useEffect(() => {
@@ -72,9 +103,9 @@ const ChatImage = ({ conversationId, messageId, headers }) => {
       `${API_URL}/admin/whatsapp-chats/${conversationId}/media/${messageId}`,
       { headers, responseType: "blob" }
     ).then(({ data }) => {
-      if (!active) return;
       objectUrl = URL.createObjectURL(data);
-      setSrc(objectUrl);
+      if (active) setSrc(objectUrl);
+      else URL.revokeObjectURL(objectUrl);
     }).catch(() => {
       if (active) setSrc("");
     });
@@ -84,28 +115,432 @@ const ChatImage = ({ conversationId, messageId, headers }) => {
     };
   }, [conversationId, headers, messageId]);
 
-  if (!src) return <p className="mb-1 text-xs font-medium text-slate-500">Image preview unavailable</p>;
-  return <img src={src} alt="Customer attachment" className="mb-2 max-h-72 w-auto max-w-full rounded-xl object-contain" />;
+  if (!src) return <p className="mb-1 text-xs text-mt-muted">Image preview unavailable</p>;
+  return <img src={src} alt="Customer attachment" onLoad={onLoad} className="mb-2 max-h-72 w-auto max-w-full rounded-mt-card object-contain" />;
+};
+
+const ChatRow = ({ chat, selected, now, userId, onSelect }) => {
+  const waiting = needsReply(chat, now) ? now - new Date(waitingSince(chat)).getTime() : null;
+  const name = chat.customer_name || phoneLabel(chat.external_customer_ref);
+  const prefix = previewPrefix[chat.last_message?.sender] || "";
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(chat._id)}
+      aria-current={selected ? "true" : undefined}
+      className={cx(
+        "block w-full border-b border-mt-line px-4 py-3 text-left transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-mt-text",
+        selected ? "bg-mt-tint/10" : "hover:bg-mt-tint/5"
+      )}
+    >
+      <span className="flex items-baseline justify-between gap-2">
+        <span className="truncate text-sm font-medium text-mt-text">{name}</span>
+        <span className="shrink-0 text-xs text-mt-subtle">{formatListDate(chat.last_message_at, now)}</span>
+      </span>
+      <span className="mt-1 line-clamp-2 block break-words text-xs leading-relaxed text-mt-muted">
+        {chat.last_message?.content ? `${prefix}${chat.last_message.content}` : "Conversation started"}
+      </span>
+      <span className="mt-2 flex flex-wrap items-center gap-1.5">
+        {waiting != null && <Badge variant={waitTone(waiting)}>Waiting {formatDuration(waiting)}</Badge>}
+        {isUnclaimed(chat) && <Badge variant="danger">Unclaimed</Badge>}
+        {isClaimed(chat) && (
+          <Badge variant="outline">{isMine(chat, userId) ? "You" : chat.handoff_assigned_name || "Team"}</Badge>
+        )}
+        {isClosed(chat) && <Badge>Closed</Badge>}
+        {chat.lead_type === "customization" && <Badge>Customization</Badge>}
+      </span>
+    </button>
+  );
+};
+
+const senderLabel = (message) => {
+  if (message.sender === "customer") return "Customer";
+  if (message.sender === "human") return message.metadata?.sent_by || "Team";
+  return "AI assistant";
+};
+
+const MessageBubble = ({ message, conversationId, headers, showDebug, onImageLoad }) => {
+  const customer = message.sender === "customer";
+  const human = message.sender === "human";
+  const SenderIcon = customer ? UserRound : human ? Users : Bot;
+  return (
+    <div className={cx("flex", customer ? "justify-start" : "justify-end")}>
+      <div
+        className={cx(
+          "max-w-[88%] rounded-mt-card px-3 py-2 sm:max-w-[72%]",
+          customer && "border border-mt-line bg-mt-surface text-mt-text",
+          human && "bg-mt-btn text-mt-btn-text",
+          !customer && !human && "bg-mt-surface-raised text-mt-text"
+        )}
+      >
+        <p className={cx("mb-1 flex items-center gap-1.5 text-xs font-medium", human ? "opacity-75" : "text-mt-muted")}>
+          <SenderIcon className="h-3 w-3" aria-hidden="true" />
+          {senderLabel(message)}
+        </p>
+        {message.message_type === "image" && (
+          <ChatImage conversationId={conversationId} messageId={message._id} headers={headers} onLoad={onImageLoad} />
+        )}
+        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.content}</p>
+        {showDebug && !customer && (
+          <div className="mt-2 rounded-mt-card bg-black/80 p-2 font-mono text-[10px] text-white">
+            <p>phase: {message.metadata?.flow_phase || "unknown"}</p>
+            <p>intent: {message.metadata?.intent?.intent || "unknown"}</p>
+            <p>action: {message.metadata?.intent?.action || "none"}</p>
+            <p>tools: {(message.metadata?.tool_calls || []).map((item) => item.name).join(", ") || "none"}</p>
+          </div>
+        )}
+        <p className={cx("mt-1 text-right text-[11px]", human ? "opacity-75" : "text-mt-subtle")}>{formatTime(message.created_at)}</p>
+      </div>
+    </div>
+  );
+};
+
+// Follows new messages unless the admin has scrolled up to read older ones.
+// Mounted once per chat (keyed by id), so it always opens at the newest message.
+const Thread = ({ conversationId, messages, headers, showDebug }) => {
+  const scrollRef = useRef(null);
+  const [pinned, setPinned] = useState(true);
+  const lastId = messages.at(-1)?._id;
+  const [seenId, setSeenId] = useState(lastId);
+
+  const scrollToEnd = useCallback(() => {
+    const element = scrollRef.current;
+    if (element) element.scrollTop = element.scrollHeight;
+  }, []);
+
+  useLayoutEffect(() => {
+    if (pinned) scrollToEnd();
+  }, [lastId, pinned, scrollToEnd]);
+
+  const handleScroll = (event) => {
+    const element = event.currentTarget;
+    const atEnd = element.scrollHeight - element.scrollTop - element.clientHeight < 48;
+    setPinned(atEnd);
+    if (atEnd) setSeenId(lastId);
+  };
+
+  const handleImageLoad = () => {
+    if (pinned) scrollToEnd();
+  };
+
+  return (
+    <div className="relative min-h-0 flex-1">
+      <div ref={scrollRef} onScroll={handleScroll} className="h-full space-y-2 overflow-y-auto bg-mt-bg p-3 sm:p-5" aria-live="polite">
+        {messages.length === 0 && <p className="py-10 text-center text-sm text-mt-muted">No messages in this chat yet.</p>}
+        {messages.map((message, index) => {
+          const newDay = index === 0 || dayKey(messages[index - 1].created_at) !== dayKey(message.created_at);
+          return (
+            <div key={message._id}>
+              {newDay && (
+                <p className="py-3 text-center text-xs text-mt-subtle">{formatDay(message.created_at)}</p>
+              )}
+              <MessageBubble
+                message={message}
+                conversationId={conversationId}
+                headers={headers}
+                showDebug={showDebug}
+                onImageLoad={handleImageLoad}
+              />
+            </div>
+          );
+        })}
+      </div>
+      {!pinned && lastId !== seenId && (
+        <Button size="sm" leadingIcon={ArrowDown} onClick={scrollToEnd} className="absolute bottom-3 left-1/2 -translate-x-1/2 shadow-lg">
+          New messages
+        </Button>
+      )}
+    </div>
+  );
+};
+
+const Composer = ({ conversation, messages, now, userId, value, onChange, onSubmit, sending, saving, onReopen }) => {
+  const window24h = replyWindow(messages, now);
+  const closed = isClosed(conversation);
+  const canReply = window24h.open && !closed;
+
+  let hint = "Replying pauses the AI until you resume it, or after 12 hours without a team reply.";
+  if (isOwnedByOther(conversation, userId)) {
+    hint = `${conversation.handoff_assigned_name || "A teammate"} owns this chat. Your reply goes out under your name and they stay the owner.`;
+  } else if (isMine(conversation, userId)) {
+    hint = "The AI stays paused until you resume it, or after 12 hours without a team reply.";
+  }
+
+  if (closed) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-mt-line bg-mt-surface p-3">
+        <p className="text-sm text-mt-muted">This chat is closed. Reopen it to reply.</p>
+        <Button size="sm" variant="outline" onClick={onReopen} disabled={saving}>Reopen chat</Button>
+      </div>
+    );
+  }
+
+  const handleKeyDown = (event) => {
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) onSubmit(event);
+  };
+
+  const insertQuickReply = (text) => onChange(value.trim() ? `${value.trimEnd()}\n${text}` : text);
+
+  return (
+    <form onSubmit={onSubmit} className="border-t border-mt-line bg-mt-surface p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
+        <p className={canReply ? "text-mt-muted" : "text-mt-warning"}>
+          {canReply
+            ? hint
+            : "WhatsApp only allows replies within 24 hours of the customer's last message. Wait for them to write again."}
+        </p>
+        {canReply && (
+          <span className={cx("shrink-0 font-medium", window24h.remainingMs < 2 * 60 * 60 * 1000 ? "text-mt-warning" : "text-mt-muted")}>
+            Reply window: {formatDuration(window24h.remainingMs)} left
+          </span>
+        )}
+      </div>
+      {canReply && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {QUICK_REPLIES.map((reply) => (
+            <button
+              key={reply.label}
+              type="button"
+              onClick={() => insertQuickReply(reply.text(conversation.customer_name))}
+              className="rounded-mt-btn border border-mt-line px-2 py-1 text-xs text-mt-muted transition-colors hover:border-mt-line-strong hover:text-mt-text focus-visible:outline-2 focus-visible:outline-mt-text"
+            >
+              {reply.label}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="flex items-end gap-2">
+        <Textarea
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={handleKeyDown}
+          rows={2}
+          maxLength={4096}
+          disabled={!canReply}
+          readOnly={sending}
+          aria-label="Reply to customer"
+          placeholder={canReply ? "Reply as the store team (Shift+Enter for a new line)" : "Reply window closed"}
+          className="min-w-0 flex-1"
+          textareaClassName="resize-none"
+        />
+        <Button type="submit" leadingIcon={Send} loading={sending} disabled={!canReply || !value.trim()}>
+          Send
+        </Button>
+      </div>
+    </form>
+  );
+};
+
+const DetailsPanel = ({
+  conversation,
+  leadType,
+  userId,
+  now,
+  saving,
+  note,
+  onNoteChange,
+  onSaveNote,
+  noteChanged,
+  onUpdate,
+  onOpenWhatsApp,
+  showDebug,
+}) => {
+  const closed = isClosed(conversation);
+  const status = aiStatus(conversation);
+  const statusColor = { success: "text-mt-success", warning: "text-mt-warning", danger: "text-mt-danger", neutral: "text-mt-muted" }[status.tone];
+
+  return (
+    <div className="space-y-6 p-4">
+      <section aria-labelledby="chat-status-heading" className="space-y-3">
+        <h2 id="chat-status-heading" className="text-sm font-medium text-mt-text">Chat status</h2>
+        <p className={cx("text-sm", statusColor)}>{status.label}</p>
+
+        {isUnclaimed(conversation) && (
+          <p className="text-xs leading-relaxed text-mt-muted">The AI keeps replying until a team member claims this chat.</p>
+        )}
+
+        {isOwnedByOther(conversation, userId) && (
+          <Button variant="outline" size="sm" fullWidth disabled={saving} onClick={() => onUpdate({ assignToMe: true })}>
+            Take over chat
+          </Button>
+        )}
+        {isClaimed(conversation) && (
+          <Button variant="outline" size="sm" fullWidth disabled={saving} onClick={() => onUpdate({ conversationStatus: "open" })}>
+            Resume AI
+          </Button>
+        )}
+        {!closed && !isClaimed(conversation) && (
+          <Button size="sm" fullWidth disabled={saving} onClick={() => onUpdate({ assignToMe: true })}>
+            Claim chat and pause AI
+          </Button>
+        )}
+        {!closed && (
+          <Button variant="ghost" size="sm" fullWidth disabled={saving} onClick={() => onUpdate({ conversationStatus: "closed" })}>
+            Close chat
+          </Button>
+        )}
+      </section>
+
+      {conversation.status === "handoff" && (conversation.handoff_reason || conversation.handoff_summary) && (
+        <section className="rounded-mt-card border border-mt-line bg-mt-surface-raised p-3 text-xs leading-relaxed text-mt-text">
+          <h2 className="font-medium capitalize">{String(conversation.handoff_reason || "Team help").replaceAll("_", " ")}</h2>
+          <p className="mt-1 whitespace-pre-wrap text-mt-muted">{conversation.handoff_summary || "No summary available."}</p>
+        </section>
+      )}
+
+      <section aria-labelledby="chat-customer-heading" className="space-y-2">
+        <h2 id="chat-customer-heading" className="text-sm font-medium text-mt-text">Customer</h2>
+        <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
+          <dt className="text-mt-subtle">Number</dt>
+          <dd className="break-words text-mt-text">{phoneLabel(conversation.external_customer_ref)}</dd>
+          <dt className="text-mt-subtle">First chat</dt>
+          <dd className="text-mt-text">{conversation.created_at ? formatDay(conversation.created_at) : "—"}</dd>
+          <dt className="text-mt-subtle">Last activity</dt>
+          <dd className="text-mt-text">
+            {conversation.last_message_at ? `${formatListDate(conversation.last_message_at, now)}, ${formatDuration(now - new Date(conversation.last_message_at).getTime())} ago` : "—"}
+          </dd>
+          {leadType && (
+            <>
+              <dt className="text-mt-subtle">Lead type</dt>
+              <dd className="capitalize text-mt-text">{leadType}</dd>
+            </>
+          )}
+        </dl>
+        <Button
+          variant="outline"
+          size="sm"
+          fullWidth
+          leadingIcon={ExternalLink}
+          disabled={!whatsappLink(conversation)}
+          onClick={onOpenWhatsApp}
+        >
+          Open in WhatsApp
+        </Button>
+        <p className="text-xs leading-relaxed text-mt-subtle">
+          {isClaimed(conversation)
+            ? "Opens the chat in your own WhatsApp."
+            : "Opens the chat in your own WhatsApp, claims it and pauses the AI."}
+        </p>
+      </section>
+
+      <Select
+        label="Lead status"
+        value={conversation.lead_status || "new"}
+        options={LEAD_STATUS_OPTIONS}
+        disabled={saving}
+        onChange={(event) => onUpdate({ leadStatus: event.target.value })}
+      />
+
+      <div className="space-y-2">
+        <Textarea
+          label="Team note"
+          value={note}
+          onChange={(event) => onNoteChange(event.target.value)}
+          rows={4}
+          maxLength={2000}
+          placeholder="Sizing, design, budget or follow-up notes"
+          textareaClassName="resize-none"
+        />
+        <Button variant="outline" size="sm" fullWidth disabled={saving || !noteChanged} onClick={onSaveNote}>
+          Save note
+        </Button>
+      </div>
+
+      {showDebug && (
+        <section className="rounded-mt-card bg-black/80 p-3 font-mono text-[11px] text-white">
+          <h2 className="mb-2 font-medium">Conversation flow</h2>
+          <p>current: {conversation.conversation_state?.flow_phase || "unknown"}</p>
+          <p>previous: {conversation.conversation_state?.flow_previous_phase || "none"}</p>
+          <p>intent: {conversation.current_intent || "none"}</p>
+          <p>selected: {conversation.selected_product_id || conversation.conversation_state?.selected_product_id || "none"}</p>
+          <p>purchase: {conversation.conversation_state?.purchase ? "pending" : "none"}</p>
+        </section>
+      )}
+    </div>
+  );
+};
+
+const HealthDialog = ({ open, onClose, overview, now }) => {
+  const groups = overview ? [
+    { title: "Team", items: [
+      ["Open chats", overview.open_chats ?? 0],
+      ["Open handoffs", overview.active_handoffs ?? 0],
+      ["Oldest open handoff", overview.oldest_handoff_at ? formatDuration(now - new Date(overview.oldest_handoff_at).getTime()) : "—"],
+    ] },
+    { title: "AI speed", items: [
+      ["Requests", overview.requests ?? 0],
+      ["Avg reply time", formatSeconds(overview.average_latency_ms)],
+      ["Slowest 10% over", formatSeconds(overview.p90_latency_ms)],
+      ["Timed out", overview.timed_out ?? 0],
+      ["Avg AI model time", formatSeconds(overview.average_model_ms)],
+      ["Avg lookup time", formatSeconds(overview.average_tool_ms)],
+    ] },
+    { title: "Problems", items: [
+      ["Image failures", overview.image_failures ?? 0],
+      ["Delivery errors", overview.delivery_errors ?? 0],
+      ["Not delivered by Meta", overview.meta_delivery_failures ?? 0],
+      ["Order updates not sent", overview.order_updates_not_sent ?? 0],
+    ] },
+    { title: "Cost", items: [
+      ["AI cost", `$${Number(overview.estimated_cost_usd || 0).toFixed(4)}`],
+    ] },
+  ] : [];
+
+  return (
+    <Modal open={open} onClose={onClose} title="AI and delivery health" size="lg">
+      {!overview ? (
+        <p className="text-sm text-mt-muted">Health data isn't available right now.</p>
+      ) : (
+        <div className="space-y-5">
+          <p className="flex items-center gap-2 text-sm text-mt-muted">
+            <Badge variant={overview.status === "degraded" ? "danger" : "success"} className="capitalize">{overview.status}</Badge>
+            Last {overview.window_hours ?? 24} hours
+          </p>
+          {groups.map((group) => (
+            <section key={group.title}>
+              <h3 className="mb-2 text-sm font-medium text-mt-text">{group.title}</h3>
+              <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {group.items.map(([label, value]) => (
+                  <div key={label} className="rounded-mt-card border border-mt-line p-3">
+                    <dt className="text-xs text-mt-muted">{label}</dt>
+                    <dd className="mt-1 text-lg font-medium tabular-nums text-mt-text">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          ))}
+        </div>
+      )}
+    </Modal>
+  );
 };
 
 export default function WhatsAppChatAdmin() {
   const token = useSelector(selectCurrentToken);
+  const currentUser = useSelector(selectCurrentUser);
+  const userId = currentUser?._id;
+
   const [conversations, setConversations] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [detail, setDetail] = useState(null);
-  const [activeView, setActiveView] = useState("all");
+  const [activeQueue, setActiveQueue] = useState("needs_reply");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  const [detailLoading, setDetailLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [leadNote, setLeadNote] = useState("");
+  const [sending, setSending] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [mobilePane, setMobilePane] = useState("list");
   const [overview, setOverview] = useState(null);
+  const [healthOpen, setHealthOpen] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
-  const [replyText, setReplyText] = useState("");
-  const [sending, setSending] = useState(false);
-  const [loadedAt, setLoadedAt] = useState(0);
+  const [takeover, setTakeover] = useState(null);
+  const [now, setNow] = useState(() => Date.now());
+  // Unsent text is kept per chat, so refreshes can't wipe it and a draft can't
+  // follow the admin to a different customer.
+  const [replyDrafts, setReplyDrafts] = useState({});
+  const [noteDrafts, setNoteDrafts] = useState({});
+  const latestDetailId = useRef("");
 
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
@@ -114,12 +549,11 @@ export default function WhatsAppChatAdmin() {
     if (!quiet) setLoading(true);
     try {
       const { data } = await axios.get(`${API_URL}/admin/whatsapp-chats`, { headers });
-      const rows = Array.isArray(data?.conversations) ? data.conversations : [];
-      setConversations(rows);
-      setSelectedId((current) => current || rows[0]?._id || "");
-      setError("");
+      setConversations(Array.isArray(data?.conversations) ? data.conversations : []);
+      setNow(Date.now());
+      setLoadError("");
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Could not load WhatsApp chats.");
+      setLoadError(requestError.response?.data?.message || "Could not load WhatsApp chats.");
     } finally {
       if (!quiet) setLoading(false);
     }
@@ -135,19 +569,19 @@ export default function WhatsAppChatAdmin() {
     }
   }, [headers, token]);
 
-  const loadDetail = useCallback(async (id, { quiet = false } = {}) => {
+  const loadDetail = useCallback(async (id) => {
     if (!id || !token) return;
-    if (!quiet) setDetailLoading(true);
+    latestDetailId.current = id;
     try {
       const { data } = await axios.get(`${API_URL}/admin/whatsapp-chats/${id}`, { headers });
+      // A slow response must not replace the chat the admin has since switched to.
+      if (latestDetailId.current !== id) return;
       setDetail(data);
-      setLoadedAt(Date.now());
-      setLeadNote(data?.conversation?.lead_note || "");
-      setError("");
+      setNow(Date.now());
+      setLoadError("");
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Could not load this conversation.");
-    } finally {
-      if (!quiet) setDetailLoading(false);
+      if (latestDetailId.current !== id) return;
+      setLoadError(requestError.response?.data?.message || "Could not load this conversation.");
     }
   }, [headers, token]);
 
@@ -159,7 +593,7 @@ export default function WhatsAppChatAdmin() {
     const timer = window.setInterval(() => {
       loadChats({ quiet: true });
       loadOverview();
-    }, 15000);
+    }, LIST_REFRESH_MS);
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(timer);
@@ -169,326 +603,290 @@ export default function WhatsAppChatAdmin() {
   useEffect(() => {
     if (!selectedId) return undefined;
     const initial = window.setTimeout(() => loadDetail(selectedId), 0);
-    const timer = window.setInterval(() => loadDetail(selectedId, { quiet: true }), 10000);
+    const timer = window.setInterval(() => loadDetail(selectedId), CHAT_REFRESH_MS);
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(timer);
     };
   }, [loadDetail, selectedId]);
 
-  const stats = useMemo(() => ({
-    all: conversations.length,
-    customization: conversations.filter((item) => item.lead_type === "customization").length,
-    handoff: conversations.filter((item) => item.status === "handoff").length,
-  }), [conversations]);
+  const context = useMemo(() => ({ now, userId }), [now, userId]);
+
+  const counts = useMemo(() => Object.fromEntries(
+    QUEUES.map((queue) => [queue.id, conversations.filter((chat) => inQueue(queue.id, chat, context)).length])
+  ), [context, conversations]);
+
+  const oldestWaitMs = useMemo(() => {
+    const waits = conversations
+      .filter((chat) => needsReply(chat, now))
+      .map((chat) => now - new Date(waitingSince(chat)).getTime());
+    return waits.length ? Math.max(...waits) : null;
+  }, [conversations, now]);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return conversations.filter((item) => {
-      if (activeView === "customization" && item.lead_type !== "customization") return false;
-      if (activeView === "handoff" && item.status !== "handoff") return false;
-      if (!query) return true;
-      return [item.customer_name, item.external_customer_ref, item.last_message?.content]
-        .some((value) => String(value || "").toLowerCase().includes(query));
+    const queryDigits = query.replace(/\D/g, "");
+    const rows = conversations.filter((chat) => {
+      if (!query) return inQueue(activeQueue, chat, context);
+      // Searching covers every chat, so nobody is hidden by the current queue.
+      return [chat.customer_name, chat.last_message?.content]
+        .some((value) => String(value || "").toLowerCase().includes(query))
+        || (queryDigits && String(chat.external_customer_ref || "").includes(queryDigits));
     });
-  }, [activeView, conversations, search]);
+    return sortForQueue(query ? "all" : activeQueue, rows);
+  }, [activeQueue, context, conversations, search]);
+
+  const activeDetail = detail?.conversation?._id === selectedId ? detail : null;
+  const selectedConversation = activeDetail?.conversation;
+  const messages = activeDetail?.messages || [];
+  const selectedRow = conversations.find((chat) => chat._id === selectedId);
+  const replyText = replyDrafts[selectedId] ?? "";
+  const savedNote = selectedConversation?.lead_note || "";
+  const noteText = noteDrafts[selectedId] ?? savedNote;
+
+  const refreshAfterChange = (id) => Promise.all([loadChats({ quiet: true }), loadDetail(id)]);
 
   const updateConversation = async (changes) => {
-    if (!selectedId) return;
+    if (!selectedId) return false;
     setSaving(true);
     try {
       await axios.patch(`${API_URL}/admin/whatsapp-chats/${selectedId}`, changes, { headers });
-      await Promise.all([loadChats({ quiet: true }), loadDetail(selectedId, { quiet: true })]);
-      setError("");
+      await refreshAfterChange(selectedId);
+      setActionError("");
+      return true;
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Could not update the conversation.");
+      const response = requestError.response;
+      if (response?.status === 409 && response.data?.code === "owned_by_other") {
+        setTakeover({ changes, ownerName: response.data.owner_name });
+      } else {
+        setActionError(response?.data?.message || "Could not update the conversation.");
+      }
+      return false;
     } finally {
       setSaving(false);
     }
   };
 
-  const openTeamWhatsApp = async () => {
-    const url = whatsappLink(detail?.conversation);
-    if (!url) return;
-    window.open(url, "_blank", "noopener,noreferrer");
-    await updateConversation({
-      leadStatus: detail?.conversation?.lead_status === "new" || !detail?.conversation?.lead_status
-        ? "contacted"
-        : detail.conversation.lead_status,
-      conversationStatus: "handoff",
-    });
+  const confirmTakeover = async () => {
+    const { changes } = takeover;
+    setTakeover(null);
+    await updateConversation({ ...changes, confirmTakeover: true });
   };
 
-  const selectedConversation = detail?.conversation;
-  const messages = detail?.messages || [];
-  // WhatsApp allows free-form replies only within 24 hours of the customer's last message.
-  const lastCustomerAt = [...messages].reverse().find((message) => message.sender === "customer")?.created_at;
-  const windowOpen = Boolean(lastCustomerAt) && loadedAt - new Date(lastCustomerAt).getTime() < 24 * 60 * 60 * 1000;
+  const saveNote = async () => {
+    const id = selectedId;
+    const saved = await updateConversation({ leadNote: noteText });
+    if (saved) setNoteDrafts((drafts) => withoutKey(drafts, id));
+  };
+
+  const openTeamWhatsApp = async () => {
+    const url = whatsappLink(selectedConversation);
+    if (!url) return;
+    window.open(url, "_blank", "noopener,noreferrer");
+    const leadStatus = !selectedConversation.lead_status || selectedConversation.lead_status === "new"
+      ? "contacted"
+      : selectedConversation.lead_status;
+    // Messaging a customer shouldn't take the chat from the teammate who owns it.
+    await updateConversation(isClaimed(selectedConversation)
+      ? { leadStatus }
+      : { leadStatus, conversationStatus: "handoff" });
+  };
 
   const sendReply = async (event) => {
     event.preventDefault();
+    const id = selectedId;
     const text = replyText.trim();
-    if (!selectedId || !text) return;
+    if (!id || !text || sending) return;
     setSending(true);
     try {
-      await axios.post(`${API_URL}/admin/whatsapp-chats/${selectedId}/reply`, { text }, { headers });
-      setReplyText("");
-      await Promise.all([loadChats({ quiet: true }), loadDetail(selectedId, { quiet: true })]);
-      setError("");
+      await axios.post(`${API_URL}/admin/whatsapp-chats/${id}/reply`, { text }, { headers });
+      setReplyDrafts((drafts) => withoutKey(drafts, id));
+      await refreshAfterChange(id);
+      setActionError("");
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Could not send the reply.");
+      setActionError(requestError.response?.data?.message || "Could not send the reply.");
     } finally {
       setSending(false);
     }
   };
 
+  const selectChat = (id) => {
+    setSelectedId(id);
+    setMobilePane("chat");
+  };
+
+  const summary = `${counts.needs_reply ?? 0} need a reply · ${counts.unclaimed ?? 0} unclaimed`;
+
+  const error = actionError || loadError;
+  const emptyMessage = search.trim()
+    ? "No chats match your search."
+    : QUEUES.find((queue) => queue.id === activeQueue)?.empty;
+
   return (
-    <main className="min-h-screen bg-[#f0f2f5] text-slate-900">
-      <header className="border-b border-emerald-900/10 bg-[#075e54] px-4 py-3 text-white shadow-sm sm:px-6">
-        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Link to="/adminpage" className="rounded-full bg-white/10 p-2 text-white hover:bg-white/20" aria-label="Back to admin">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#075e54] shadow-sm">
-              <MessageCircle className="h-5 w-5" />
+    <main className="flex h-dvh flex-col bg-mt-bg font-brand text-mt-text">
+      <header className="flex shrink-0 items-center justify-between gap-2 border-b border-mt-line bg-mt-surface px-3 py-2 sm:px-4">
+        <div className="flex min-w-0 items-center gap-2">
+          <Button to="/adminpage" variant="ghost" size="sm" leadingIcon={ArrowLeft} aria-label="Back to admin" />
+          <div className="min-w-0">
+            <h1 className="text-base font-medium leading-tight sm:text-lg">Support inbox</h1>
+            <p className="truncate text-xs text-mt-muted" aria-live="polite">
+              {loading ? "Loading chats" : summary}
+              {!loading && oldestWaitMs != null && <span className="hidden sm:inline"> · longest wait {formatDuration(oldestWaitMs)}</span>}
+            </p>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center sm:gap-1">
+          <Button variant="ghost" size="sm" leadingIcon={Activity} onClick={() => setHealthOpen(true)}>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="sr-only sm:not-sr-only">Health</span>
+              {overview?.status === "degraded" && <span className="h-2 w-2 rounded-full bg-mt-danger" role="img" aria-label="Degraded" />}
             </span>
-            <div>
-              <h1 className="text-xl font-bold sm:text-2xl">WhatsApp chats</h1>
-              <p className="text-sm text-emerald-50/80">AI conversations and customer leads</p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={() => setShowDebug((value) => !value)} className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20">
-              <Bug className="h-4 w-4" /> {showDebug ? "Hide flow" : "Debug flow"}
-            </button>
-            <button onClick={() => { loadChats(); loadOverview(); }} className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/20">
-              <RefreshCw className="h-4 w-4" /> Refresh
-            </button>
-          </div>
+          </Button>
+          <Button variant="ghost" size="sm" leadingIcon={Bug} aria-pressed={showDebug} onClick={() => setShowDebug((value) => !value)}>
+            <span className="sr-only sm:not-sr-only">{showDebug ? "Hide flow" : "Debug flow"}</span>
+          </Button>
+          <Button variant="ghost" size="sm" leadingIcon={RefreshCw} onClick={() => { loadChats(); loadOverview(); if (selectedId) loadDetail(selectedId); }}>
+            <span className="sr-only sm:not-sr-only">Refresh</span>
+          </Button>
         </div>
       </header>
 
-      <section className="mx-auto max-w-[1600px] p-3 sm:p-6">
-        {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {error && (
+        <div role="alert" className="flex shrink-0 items-center justify-between gap-3 border-b border-mt-danger/30 bg-mt-danger/10 px-4 py-2 text-sm text-mt-danger">
+          <span>{error}</span>
+          {actionError && <Button variant="ghost" size="sm" onClick={() => setActionError("")}>Dismiss</Button>}
+        </div>
+      )}
 
-        {overview && (
-          <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {[
-              ["24h requests", overview.requests, Activity],
-              ["Avg reply time", formatSeconds(overview.average_latency_ms), Clock3],
-              ["Slowest 10% over", formatSeconds(overview.p90_latency_ms), Clock3],
-              ["Timed out", overview.timed_out ?? 0, AlertTriangle],
-              ["Avg AI model time", formatSeconds(overview.average_model_ms), Clock3],
-              ["Avg lookup time", formatSeconds(overview.average_tool_ms), Clock3],
-              ["Open handoffs", overview.active_handoffs, Users],
-              ["Image failures", overview.image_failures, AlertTriangle],
-              ["Delivery errors", overview.delivery_errors, AlertTriangle],
-              ["Not delivered by Meta", overview.meta_delivery_failures ?? 0, AlertTriangle],
-              ["Order updates not sent", overview.order_updates_not_sent ?? 0, AlertTriangle],
-              ["AI cost", `$${Number(overview.estimated_cost_usd || 0).toFixed(4)}`, Activity],
-            ].map(([label, value, Icon]) => (
-              <div key={label} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{createElement(Icon, { className: "h-3.5 w-3.5" })} {label}</p>
-                <p className="mt-1 text-lg font-bold text-slate-900">{value}</p>
+      <div className="grid min-h-0 flex-1 lg:grid-cols-[320px_minmax(0,1fr)_300px]">
+        <aside className={cx(mobilePane === "list" ? "flex" : "hidden", "min-h-0 flex-col border-mt-line bg-mt-surface lg:flex lg:border-r")} aria-label="Conversations">
+          <div className="space-y-3 border-b border-mt-line p-3">
+            <label className="flex h-9 items-center gap-2 rounded-mt-btn border border-mt-line px-2.5 focus-within:border-mt-text">
+              <Search className="h-4 w-4 shrink-0 text-mt-subtle" aria-hidden="true" />
+              <span className="sr-only">Search chats</span>
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="w-full bg-transparent text-sm text-mt-text outline-none placeholder:text-mt-subtle"
+                placeholder="Search all chats"
+              />
+            </label>
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Queues">
+              {QUEUES.map((queue) => {
+                const active = activeQueue === queue.id && !search.trim();
+                return (
+                  <button
+                    key={queue.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => { setActiveQueue(queue.id); setSearch(""); }}
+                    className={cx(
+                      "inline-flex items-center gap-1.5 rounded-mt-btn border px-2 py-1 text-xs transition-colors focus-visible:outline-2 focus-visible:outline-mt-text",
+                      active ? "border-mt-btn bg-mt-btn text-mt-btn-text" : "border-mt-line text-mt-muted hover:border-mt-line-strong hover:text-mt-text"
+                    )}
+                  >
+                    {queue.label}
+                    <span className="font-medium tabular-nums">{counts[queue.id] ?? 0}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {loading ? (
+              <div className="space-y-3 p-4" aria-hidden="true">
+                {[0, 1, 2, 3].map((item) => <Skeleton key={item} className="h-16 w-full" />)}
               </div>
+            ) : filtered.length === 0 ? (
+              <EmptyState icon={MessageCircle} description={emptyMessage} />
+            ) : filtered.map((chat) => (
+              <ChatRow key={chat._id} chat={chat} selected={selectedId === chat._id} now={now} userId={userId} onSelect={selectChat} />
             ))}
           </div>
-        )}
+        </aside>
 
-        <div className="mb-4 grid grid-cols-3 gap-2 sm:gap-3">
-          {[
-            ["all", "All chats", stats.all, MessageCircle],
-            ["customization", "Customization leads", stats.customization, Paintbrush],
-            ["handoff", "Team requested", stats.handoff, Users],
-          ].map(([id, label, count, Icon]) => (
-            <button key={id} onClick={() => { setActiveView(id); setMobilePane("list"); }} className={`flex min-w-0 items-center justify-between rounded-xl border p-2.5 text-left transition sm:rounded-2xl sm:p-4 ${activeView === id ? "border-[#25d366] bg-emerald-50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}>
-              <span className="flex min-w-0 items-center gap-2 sm:gap-3">{createElement(Icon, { className: "h-4 w-4 shrink-0 sm:h-5 sm:w-5" })}<span className="truncate text-xs font-semibold sm:text-base">{label}</span></span>
-              <span className="rounded-full bg-white px-2.5 py-1 text-sm font-bold shadow-sm">{count}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="grid min-h-[720px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.08)] lg:h-[calc(100vh-190px)] lg:min-h-[620px] lg:grid-cols-[340px_minmax(0,1fr)_290px]">
-          <aside className={`${mobilePane === "chat" ? "hidden" : "block"} border-b border-slate-200 bg-white lg:block lg:border-b-0 lg:border-r`}>
-            <div className="border-b border-slate-100 bg-[#f0f2f5] p-3">
-              <label className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 shadow-sm">
-                <Search className="h-4 w-4 text-slate-400" />
-                <input value={search} onChange={(event) => setSearch(event.target.value)} className="w-full bg-transparent text-sm outline-none" placeholder="Search name, number, or message" />
-              </label>
+        <section className={cx(mobilePane === "chat" ? "flex" : "hidden", "min-h-0 min-w-0 flex-col lg:flex")} aria-label="Conversation">
+          {!selectedId ? (
+            <EmptyState className="m-auto" icon={MessageCircle} title="Select a chat" description="Pick a customer from the list to read the conversation and reply." />
+          ) : !selectedConversation ? (
+            <div className="m-auto flex items-center gap-2 text-sm text-mt-muted">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading conversation
             </div>
-            <div className="max-h-[660px] overflow-y-auto lg:h-[calc(100%-57px)] lg:max-h-none">
-              {loading ? (
-                <div className="flex items-center justify-center gap-2 p-8 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading chats</div>
-              ) : filtered.length === 0 ? (
-                <p className="p-8 text-center text-sm text-slate-500">No chats in this view.</p>
-              ) : filtered.map((item) => (
-                <button key={item._id} onClick={() => { setSelectedId(item._id); setMobilePane("chat"); }} className={`w-full border-b border-slate-100 p-4 text-left transition hover:bg-slate-50 ${selectedId === item._id ? "bg-[#f0f2f5]" : ""}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold">{item.customer_name || phoneLabel(item.external_customer_ref)}</p>
-                      <p className="text-xs text-slate-500">{phoneLabel(item.external_customer_ref)}</p>
-                    </div>
-                    <span className="shrink-0 text-[11px] text-slate-400">{formatDate(item.last_message_at)}</span>
-                  </div>
-                  <p className="mt-2 line-clamp-2 text-sm text-slate-600">{item.last_message?.content || "Conversation started"}</p>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {item.lead_type === "customization" && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${badgeClass("customization")}`}>Customization</span>}
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${badgeClass(item.status)}`}>{item.status || "open"}</span>
-                    {item.lead_status && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold capitalize text-slate-600">{item.lead_status}</span>}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </aside>
-
-          <section
-            className={`${mobilePane === "list" ? "hidden" : "flex"} min-h-[620px] flex-col lg:flex`}
-            style={{
-              backgroundColor: "#efeae2",
-              backgroundImage: "radial-gradient(circle at 12px 12px, rgba(17,94,89,.055) 1.5px, transparent 1.5px)",
-              backgroundSize: "24px 24px",
-            }}
-          >
-            {!selectedId ? (
-              <div className="m-auto text-center text-slate-500"><MessageCircle className="mx-auto mb-3 h-10 w-10" /><p>Select a conversation.</p></div>
-            ) : detailLoading && !detail ? (
-              <div className="m-auto flex items-center gap-2 text-slate-500"><Loader2 className="h-5 w-5 animate-spin" /> Loading conversation</div>
-            ) : (
-              <>
-                <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-slate-200 bg-[#f0f2f5] px-3 py-2.5 sm:px-4">
-                  <button onClick={() => setMobilePane("list")} className="rounded-full p-1.5 text-slate-600 hover:bg-slate-200 lg:hidden" aria-label="Back to conversations">
-                    <ChevronLeft className="h-5 w-5" />
-                  </button>
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#d9fdd3] font-bold text-[#075e54]">
-                    {(selectedConversation?.customer_name || "C").slice(0, 1).toUpperCase()}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold">{selectedConversation?.customer_name || phoneLabel(selectedConversation?.external_customer_ref)}</p>
-                    <p className="truncate text-xs text-slate-500">{phoneLabel(selectedConversation?.external_customer_ref)} · AI {selectedConversation?.status === "handoff" ? "paused for team" : selectedConversation?.status || "open"}</p>
-                  </div>
+          ) : (
+            <>
+              <div className="flex shrink-0 items-center gap-2 border-b border-mt-line bg-mt-surface px-3 py-2">
+                <Button variant="ghost" size="sm" leadingIcon={ChevronLeft} aria-label="Back to conversations" className="lg:hidden" onClick={() => setMobilePane("list")} />
+                <div className="min-w-0 flex-1">
+                  <h2 className="truncate text-sm font-medium">{selectedConversation.customer_name || phoneLabel(selectedConversation.external_customer_ref)}</h2>
+                  <p className="truncate text-xs text-mt-muted">{phoneLabel(selectedConversation.external_customer_ref)} · {aiStatus(selectedConversation).label}</p>
                 </div>
-                <div className="flex-1 space-y-2 overflow-y-auto p-3 sm:p-5">
-                  {messages.map((message) => {
-                    const customer = message.sender === "customer";
-                    const human = message.sender === "human";
-                    return (
-                      <div key={message._id} className={`flex ${customer ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[88%] rounded-lg px-3 py-2 shadow-[0_1px_2px_rgba(15,23,42,.12)] sm:max-w-[78%] ${customer ? "rounded-tr-none bg-[#d9fdd3]" : human ? "rounded-tl-none border border-amber-200 bg-amber-50" : "rounded-tl-none bg-white"}`}>
-                          <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
-                            {customer ? <UserRound className="h-3 w-3" /> : human ? <Users className="h-3 w-3" /> : <Bot className="h-3 w-3" />}
-                            {customer ? "Customer" : human ? (message.metadata?.sent_by || "Team") : "AI"}
-                          </div>
-                          {message.message_type === "image" && (
-                            <ChatImage conversationId={selectedConversation._id} messageId={message._id} headers={headers} />
-                          )}
-                          <p className="whitespace-pre-wrap break-words text-sm">{message.content}</p>
-                          {showDebug && !customer && (
-                            <div className="mt-2 rounded-md bg-slate-900/90 p-2 font-mono text-[10px] text-emerald-200">
-                              <p>phase: {message.metadata?.flow_phase || "unknown"}</p>
-                              <p>intent: {message.metadata?.intent?.intent || "unknown"}</p>
-                              <p>action: {message.metadata?.intent?.action || "none"}</p>
-                              <p>tools: {(message.metadata?.tool_calls || []).map((item) => item.name).join(", ") || "none"}</p>
-                            </div>
-                          )}
-                          <p className="mt-1 text-right text-[10px] text-slate-400">{formatDate(message.created_at)}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <form onSubmit={sendReply} className="border-t border-slate-200 bg-[#f0f2f5] p-2 sm:p-3">
-                  {windowOpen ? (
-                    <p className="mb-1.5 px-1 text-[11px] text-slate-500">Replying pauses the AI for this chat until you press Resume AI (or after 12 hours without a team reply).</p>
-                  ) : (
-                    <p className="mb-1.5 px-1 text-[11px] font-medium text-amber-700">WhatsApp only allows replies within 24 hours of the customer's last message. Wait for them to write again.</p>
-                  )}
-                  <div className="flex items-end gap-2">
-                    <textarea
-                      value={replyText}
-                      onChange={(event) => setReplyText(event.target.value)}
-                      onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) sendReply(event); }}
-                      rows={2}
-                      maxLength={4096}
-                      disabled={!windowOpen || sending}
-                      className="min-w-0 flex-1 resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 disabled:bg-slate-100"
-                      placeholder={windowOpen ? "Reply as the store team" : "Reply window closed"}
-                    />
-                    <button type="submit" disabled={!windowOpen || sending || !replyText.trim()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50" aria-label="Send reply">
-                      {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </form>
-              </>
-            )}
-          </section>
-
-          <aside className={`${mobilePane === "list" ? "hidden" : "block"} border-t border-slate-200 bg-white p-4 lg:block lg:overflow-y-auto lg:border-l lg:border-t-0`}>
-            {selectedConversation ? (
-              <div className="space-y-5">
-                <div>
-                  <h2 className="font-bold">Lead actions</h2>
-                  <p className="mt-1 text-xs text-slate-500">Contact the customer from a team member's WhatsApp account.</p>
-                </div>
-                <button disabled={!whatsappLink(selectedConversation)} onClick={openTeamWhatsApp} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
-                  <MessageCircle className="h-4 w-4" /> Open in WhatsApp <ExternalLink className="h-3.5 w-3.5" />
-                </button>
-
-                {selectedConversation.status === "handoff" && (
-                  <button onClick={() => updateConversation({ assignToMe: true })} disabled={saving} className="flex w-full items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-900 disabled:opacity-50">
-                    <UserCheck className="h-4 w-4" /> Assign this handoff to me
-                  </button>
-                )}
-
-                {(selectedConversation.handoff_reason || selectedConversation.handoff_summary) && (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950">
-                    <p className="font-bold capitalize">{String(selectedConversation.handoff_reason || "team help").replaceAll("_", " ")}</p>
-                    <p className="mt-1 whitespace-pre-wrap">{selectedConversation.handoff_summary || "No summary available."}</p>
-                    {selectedConversation.handoff_assigned_name && <p className="mt-2 font-semibold">Owner: {selectedConversation.handoff_assigned_name}</p>}
-                  </div>
-                )}
-
-                <label className="block text-sm font-semibold">Lead status
-                  <select value={selectedConversation.lead_status || "new"} onChange={(event) => updateConversation({ leadStatus: event.target.value })} disabled={saving} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-normal capitalize outline-none focus:border-emerald-500">
-                    {LEAD_STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
-                  </select>
-                </label>
-
-                <div>
-                  <p className="text-sm font-semibold">AI conversation</p>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    <button onClick={() => updateConversation({ conversationStatus: "open" })} disabled={saving || selectedConversation.status === "open"} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50">Resume AI</button>
-                    <button onClick={() => updateConversation({ conversationStatus: "handoff" })} disabled={saving || selectedConversation.status === "handoff"} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-50">Pause AI</button>
-                  </div>
-                </div>
-
-                <label className="block text-sm font-semibold">Team note
-                  <textarea value={leadNote} onChange={(event) => setLeadNote(event.target.value)} rows={5} maxLength={2000} className="mt-2 w-full resize-none rounded-xl border border-slate-200 p-3 text-sm font-normal outline-none focus:border-emerald-500" placeholder="Add sizing, design, budget, or follow-up notes" />
-                </label>
-                <button onClick={() => updateConversation({ leadNote })} disabled={saving} className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50">
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Save note
-                </button>
-
-                <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
-                  <p className="flex items-center gap-1.5 font-semibold"><Clock3 className="h-3.5 w-3.5" /> Last activity</p>
-                  <p className="mt-1">{formatDate(selectedConversation.last_message_at)}</p>
-                </div>
-
-                {showDebug && (
-                  <div className="rounded-xl bg-slate-950 p-3 font-mono text-[11px] text-slate-200">
-                    <p className="mb-2 font-bold text-emerald-300">Conversation flow</p>
-                    <p>current: {selectedConversation.conversation_state?.flow_phase || "unknown"}</p>
-                    <p>previous: {selectedConversation.conversation_state?.flow_previous_phase || "none"}</p>
-                    <p>intent: {selectedConversation.current_intent || "none"}</p>
-                    <p>selected: {selectedConversation.selected_product_id || selectedConversation.conversation_state?.selected_product_id || "none"}</p>
-                    <p>purchase: {selectedConversation.conversation_state?.purchase ? "pending" : "none"}</p>
-                  </div>
-                )}
+                <Button variant="ghost" size="sm" leadingIcon={Info} className="lg:hidden" onClick={() => setMobilePane("details")}>
+                  Details
+                </Button>
               </div>
-            ) : <p className="text-sm text-slate-500">Select a chat to manage the lead.</p>}
-          </aside>
-        </div>
-      </section>
+              <Thread key={selectedId} conversationId={selectedId} messages={messages} headers={headers} showDebug={showDebug} />
+              <Composer
+                conversation={selectedConversation}
+                messages={messages}
+                now={now}
+                userId={userId}
+                value={replyText}
+                onChange={(text) => setReplyDrafts((drafts) => ({ ...drafts, [selectedId]: text }))}
+                onSubmit={sendReply}
+                sending={sending}
+                saving={saving}
+                onReopen={() => updateConversation({ conversationStatus: "open" })}
+              />
+            </>
+          )}
+        </section>
+
+        <aside className={cx(mobilePane === "details" ? "block" : "hidden", "min-h-0 overflow-y-auto border-mt-line bg-mt-surface lg:block lg:border-l")} aria-label="Chat details">
+          {mobilePane === "details" && (
+            <div className="border-b border-mt-line p-2 lg:hidden">
+              <Button variant="ghost" size="sm" leadingIcon={ChevronLeft} onClick={() => setMobilePane("chat")}>Back to chat</Button>
+            </div>
+          )}
+          {selectedConversation ? (
+            <DetailsPanel
+              conversation={selectedConversation}
+              leadType={selectedRow?.lead_type || selectedConversation.lead_type}
+              userId={userId}
+              now={now}
+              saving={saving}
+              note={noteText}
+              noteChanged={noteText.trim() !== savedNote.trim()}
+              onNoteChange={(text) => setNoteDrafts((drafts) => ({ ...drafts, [selectedId]: text }))}
+              onSaveNote={saveNote}
+              onUpdate={updateConversation}
+              onOpenWhatsApp={openTeamWhatsApp}
+              showDebug={showDebug}
+            />
+          ) : (
+            <p className="p-4 text-sm text-mt-muted">Select a chat to manage it.</p>
+          )}
+        </aside>
+      </div>
+
+      <HealthDialog open={healthOpen} onClose={() => setHealthOpen(false)} overview={overview} now={now} />
+
+      <Modal
+        open={Boolean(takeover)}
+        onClose={() => setTakeover(null)}
+        title="Take over this chat?"
+        size="sm"
+        footer={(
+          <>
+            <Button variant="ghost" onClick={() => setTakeover(null)}>Cancel</Button>
+            <Button onClick={confirmTakeover}>Take over</Button>
+          </>
+        )}
+      >
+        <p className="text-sm leading-relaxed text-mt-muted">
+          {takeover?.ownerName} owns this chat. If you take over, you become the owner instead and they won't be notified.
+        </p>
+      </Modal>
     </main>
   );
 }
