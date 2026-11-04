@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   AI_REPLY_GRACE_MS,
+  activityLabel,
   aiStatus,
   inQueue,
   isClosed,
@@ -69,4 +70,17 @@ test("the reply window lasts 24 hours from the customer's last message", () => {
   assert.equal(replyWindow(messages(60), NOW).remainingMs, 23 * 60 * 60 * 1000);
   assert.equal(replyWindow(messages(24 * 60), NOW).open, false);
   assert.equal(replyWindow([{ sender: "ai", created_at: ago(1) }], NOW).open, false);
+});
+
+test("history lines name the person, or say You for your own actions", () => {
+  const event = { type: "reassigned", actor_id: "a1", actor_name: "Priya", from_name: "Ravi", to_name: "Sana" };
+  assert.equal(activityLabel(event, "me"), "Priya moved this chat from Ravi to Sana");
+  assert.equal(activityLabel(event, "a1"), "You moved this chat from Ravi to Sana");
+  assert.equal(activityLabel({ type: "claimed", actor_name: "Priya", via: "reply" }, "me"), "Priya claimed this chat by replying");
+});
+
+test("system events have no person, and unknown events still read properly", () => {
+  assert.equal(activityLabel({ type: "ai_auto_resumed" }, "me"), "AI resumed because the team went quiet");
+  assert.equal(activityLabel({ type: "team_requested" }, undefined), "Customer asked for the team");
+  assert.equal(activityLabel({ type: "something_new" }, "me"), "A team member updated this chat");
 });

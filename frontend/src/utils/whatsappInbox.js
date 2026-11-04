@@ -105,3 +105,24 @@ export const replyWindow = (messages, now) => {
   const remainingMs = lastAt + REPLY_WINDOW_MS - now;
   return { open: remainingMs > 0, remainingMs: Math.max(0, remainingMs) };
 };
+
+// One line of the chat's history. System events have no actor.
+export const activityLabel = (event, userId) => {
+  const mine = Boolean(userId) && String(event.actor_id) === String(userId);
+  const actor = mine ? "You" : event.actor_name || "A team member";
+  switch (event.type) {
+    case "team_requested": return "Customer asked for the team";
+    case "customization_lead": return "Customer asked about customization";
+    case "ai_auto_resumed": return "AI resumed because the team went quiet";
+    case "claimed": return event.via === "reply" ? `${actor} claimed this chat by replying` : `${actor} claimed this chat`;
+    case "assigned": return `${actor} assigned this chat to ${event.to_name}`;
+    case "reassigned": return `${actor} moved this chat from ${event.from_name} to ${event.to_name}`;
+    case "taken_over": return `${actor} took over this chat from ${event.from_name}`;
+    case "ai_resumed": return `${actor} resumed the AI`;
+    case "closed": return `${actor} closed this chat`;
+    case "reopened": return `${actor} reopened this chat`;
+    case "lead_status": return `${actor} changed the lead status to ${event.to_status}`;
+    case "note_added": return `${actor} added a note`;
+    default: return `${actor} updated this chat`;
+  }
+};

@@ -20,6 +20,76 @@ const parseConversationId = (value) => {
 
 const serialize = (value) => JSON.parse(JSON.stringify(value));
 
+const NOTE_MAX_LENGTH = 2000;
+const HISTORY_LIMIT = 200;
+// Alerts the team created itself; every other alert came from the customer's chat.
+const TEAM_ALERT_REASONS = new Set(["team_paused_ai", "team_started"]);
+
+const displayName = (user) => user?.name || user?.email || "Admin";
+
+const isOwned = (conversation) => conversation?.status === "handoff"
+  && conversation?.handoff_status === "assigned"
+  && Boolean(conversation?.handoff_assigned_to);
+
+let historyIndexes = null;
+const ensureHistoryIndexes = (database) => {
+  if (!historyIndexes) {
+    historyIndexes = Promise.all(["whatsapp_chat_activity", "whatsapp_chat_notes"].map((name) => (
+      database.collection(name).createIndex({ conversation_id: 1, created_at: -1 })
+    ))).catch((error) => {
+      historyIndexes = null;
+      console.error("WhatsApp chat history indexes failed:", error.message);
+    });
+  }
+  return historyIndexes;
+};
+
+// The change has already happened by now, so a logging failure must not report it as failed.
+const logActivity = async (database, conversationId, user, type, details = {}, createdAt = new Date()) => {
+  try {
+    await ensureHistoryIndexes(database);
+    await database.collection("whatsapp_chat_activity").insertOne({
+      conversation_id: conversationId,
+      type,
+      actor_id: user._id,
+      actor_name: displayName(user),
+      ...details,
+      created_at: createdAt,
+    });
+  } catch (error) {
+    console.error("WhatsApp chat activity log failed:", error.message);
+  }
+};
+
+// Things the AI service did on its own are recorded on the handoff alerts.
+const alertEvents = (alerts) => alerts.flatMap((alert) => {
+  const events = [];
+  if (!TEAM_ALERT_REASONS.has(alert.reason) && alert.created_at) {
+    events.push({
+      _id: `${alert._id}-requested`,
+      type: alert.lead_type === "customization" ? "customization_lead" : "team_requested",
+      created_at: alert.created_at,
+    });
+  }
+  if (alert.auto_resumed && alert.resolved_at) {
+    events.push({ _id: `${alert._id}-resumed`, type: "ai_auto_resumed", created_at: alert.resolved_at });
+  }
+  return events;
+});
+
+const ownershipEvent = (before, owner, actor) => {
+  const previousOwner = isOwned(before) ? before.handoff_assigned_to : null;
+  if (previousOwner && String(previousOwner) === String(owner._id)) return null;
+  const toSelf = String(owner._id) === String(actor._id);
+  if (!previousOwner) {
+    return toSelf ? { type: "claimed" } : { type: "assigned", to_name: displayName(owner) };
+  }
+  const fromName = before.handoff_assigned_name || "Team";
+  return toSelf
+    ? { type: "taken_over", from_name: fromName }
+    : { type: "reassigned", from_name: fromName, to_name: displayName(owner) };
+};
+
 export const getWhatsAppOverview = async (req, res) => {
   if (!requireAdmin(req, res)) return;
   try {
@@ -104,6 +174,21 @@ export const getWhatsAppOverview = async (req, res) => {
   } catch (error) {
     console.error("WhatsApp overview failed:", error.message);
     res.status(500).json({ message: "Could not load AI production monitoring" });
+  }
+};
+
+export const listWhatsAppAdmins = async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  try {
+    const rows = await mongoose.connection.db.collection("users")
+      .find({ role: "admin" }, { projection: { name: 1, email: 1 } })
+      .sort({ name: 1 })
+      .limit(200)
+      .toArray();
+    res.json({ admins: rows.map((row) => ({ _id: String(row._id), name: displayName(row) })) });
+  } catch (error) {
+    console.error("List WhatsApp admins failed:", error.message);
+    res.status(500).json({ message: "Could not load the team list" });
   }
 };
 
@@ -196,13 +281,22 @@ export const getWhatsAppChat = async (req, res) => {
     if (!conversation) return res.status(404).json({ message: "WhatsApp chat not found" });
 
     // Keep the newest messages when a chat is over the limit, shown oldest first.
-    const messages = await database.collection("messages")
-      .find({ conversation_id: conversationId })
-      .sort({ created_at: -1, _id: -1 })
-      .limit(1000)
-      .toArray();
+    const newestFirst = { created_at: -1, _id: -1 };
+    const byConversation = { conversation_id: conversationId };
+    const [messages, notes, activity, alerts] = await Promise.all([
+      database.collection("messages").find(byConversation).sort(newestFirst).limit(1000).toArray(),
+      database.collection("whatsapp_chat_notes").find(byConversation).sort(newestFirst).limit(HISTORY_LIMIT).toArray(),
+      database.collection("whatsapp_chat_activity").find(byConversation).sort(newestFirst).limit(HISTORY_LIMIT).toArray(),
+      database.collection("whatsapp_handoff_alerts").find(byConversation).sort(newestFirst).limit(HISTORY_LIMIT).toArray(),
+    ]);
 
-    res.json({ conversation: serialize(conversation), messages: serialize(messages.reverse()) });
+    res.json({
+      conversation: serialize(conversation),
+      messages: serialize(messages.reverse()),
+      notes: serialize(notes),
+      activity: serialize([...activity, ...alertEvents(alerts)]
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))),
+    });
   } catch (error) {
     console.error("Get WhatsApp chat failed:", error.message);
     res.status(500).json({ message: "Could not load this WhatsApp chat" });
@@ -242,15 +336,16 @@ export const updateWhatsAppChat = async (req, res) => {
   const conversationId = parseConversationId(req.params.id);
   if (!conversationId) return res.status(400).json({ message: "Invalid conversation id" });
 
-  const { leadStatus, conversationStatus, leadNote, assignToMe, handoffStatus, confirmTakeover } = req.body || {};
+  const { leadStatus, conversationStatus, assignTo, assignToMe, handoffStatus, confirmTakeover } = req.body || {};
   if (leadStatus !== undefined && !LEAD_STATUSES.has(leadStatus)) {
     return res.status(400).json({ message: "Invalid lead status" });
   }
   if (conversationStatus !== undefined && !CONVERSATION_STATUSES.has(conversationStatus)) {
     return res.status(400).json({ message: "Invalid conversation status" });
   }
-  if (leadNote !== undefined && typeof leadNote !== "string") {
-    return res.status(400).json({ message: "Lead note must be text" });
+  const assigneeId = assignTo === undefined ? null : parseConversationId(assignTo);
+  if (assignTo !== undefined && !assigneeId) {
+    return res.status(400).json({ message: "Invalid team member" });
   }
   if (handoffStatus !== undefined && !HANDOFF_STATUSES.has(handoffStatus)) {
     return res.status(400).json({ message: "Invalid handoff status" });
@@ -263,6 +358,17 @@ export const updateWhatsAppChat = async (req, res) => {
   }
 
   try {
+    const database = mongoose.connection.db;
+    let owner = req.user;
+    if (assigneeId) {
+      owner = await database.collection("users").findOne(
+        { _id: assigneeId, role: "admin" },
+        { projection: { name: 1, email: 1 } }
+      );
+      if (!owner) return res.status(400).json({ message: "That team member isn't an admin." });
+    }
+    const ownerName = displayName(owner);
+
     const now = new Date();
     const set = { updated_at: now };
     if (leadStatus !== undefined) {
@@ -275,45 +381,43 @@ export const updateWhatsAppChat = async (req, res) => {
       set.handoff_status = "resolved";
       set.handoff_resolved_at = now;
     }
-    if (leadNote !== undefined) set.lead_note = leadNote.trim().slice(0, 2000);
     if (handoffStatus !== undefined) set.handoff_status = handoffStatus;
-    const takeOver = assignToMe || conversationStatus === "handoff";
+    const takeOver = assignToMe || conversationStatus === "handoff" || Boolean(assigneeId);
     if (takeOver) {
       set.handoff_status = "assigned";
-      set.handoff_assigned_to = req.user._id;
-      set.handoff_assigned_name = req.user.name || req.user.email || "Admin";
+      set.handoff_assigned_to = owner._id;
+      set.handoff_assigned_name = ownerName;
       set.handoff_assigned_at = now;
       set.status = "handoff";
     }
 
-    const database = mongoose.connection.db;
     const filter = { _id: conversationId, channel: "whatsapp" };
     // Checked in the update itself, so two admins claiming at once can't both win.
     if (takeOver && !confirmTakeover) {
       filter.$nor = [{
         status: "handoff",
         handoff_status: "assigned",
-        handoff_assigned_to: { $nin: [req.user._id, String(req.user._id), null] },
+        handoff_assigned_to: { $nin: [req.user._id, String(req.user._id), owner._id, String(owner._id), null] },
       }];
     }
     const result = await database.collection("conversations").findOneAndUpdate(
       filter,
       { $set: set },
-      { returnDocument: "after" }
+      { returnDocument: "before" }
     );
     // Older MongoDB drivers wrap the document as { value }.
-    const conversation = result && "value" in result ? result.value : result;
-    if (!conversation) {
+    const before = result && "value" in result ? result.value : result;
+    if (!before) {
       const existing = await database.collection("conversations").findOne(
         { _id: conversationId, channel: "whatsapp" },
         { projection: { handoff_assigned_name: 1 } }
       );
       if (!existing) return res.status(404).json({ message: "WhatsApp chat not found" });
-      const ownerName = existing.handoff_assigned_name || "Another team member";
+      const currentOwner = existing.handoff_assigned_name || "Another team member";
       return res.status(409).json({
         code: "owned_by_other",
-        owner_name: ownerName,
-        message: `${ownerName} already owns this chat.`,
+        owner_name: currentOwner,
+        message: `${currentOwner} already owns this chat.`,
       });
     }
 
@@ -323,8 +427,8 @@ export const updateWhatsAppChat = async (req, res) => {
         { $set: {
           status: takeOver ? "assigned" : handoffStatus,
           ...(takeOver ? {
-            assigned_to: req.user._id,
-            assigned_name: req.user.name || req.user.email || "Admin",
+            assigned_to: owner._id,
+            assigned_name: ownerName,
             assigned_at: now,
           } : {}),
           updated_at: now,
@@ -333,17 +437,17 @@ export const updateWhatsAppChat = async (req, res) => {
       );
       if (takeOver && !alertUpdate.matchedCount) {
         await database.collection("whatsapp_handoff_alerts").insertOne({
-          business_id: conversation.business_id,
+          business_id: before.business_id,
           conversation_id: conversationId,
           channel: "whatsapp",
-          customer_name: conversation.customer_name,
-          external_customer_ref: conversation.external_customer_ref,
+          customer_name: before.customer_name,
+          external_customer_ref: before.external_customer_ref,
           status: "assigned",
           reason: "team_paused_ai",
           summary: "The team paused the AI from the dashboard.",
           urgency: "normal",
-          assigned_to: req.user._id,
-          assigned_name: req.user.name || req.user.email || "Admin",
+          assigned_to: owner._id,
+          assigned_name: ownerName,
           assigned_at: now,
           created_at: now,
           updated_at: now,
@@ -375,11 +479,58 @@ export const updateWhatsAppChat = async (req, res) => {
       );
     }
 
+    const log = (type, details) => logActivity(database, conversationId, req.user, type, details, now);
+    if (leadStatus !== undefined && leadStatus !== (before.lead_status || "new")) {
+      await log("lead_status", { to_status: leadStatus });
+    }
+    if (takeOver) {
+      const event = ownershipEvent(before, owner, req.user);
+      if (event) await log(event.type, event);
+    }
+    if (conversationStatus === "closed") await log("closed");
+    if (conversationStatus === "open" && before.status === "closed") await log("reopened");
+    if (conversationStatus === "open" && before.status === "handoff") await log("ai_resumed");
+
     const refreshed = await database.collection("conversations").findOne({ _id: conversationId });
     res.json({ conversation: serialize(refreshed) });
   } catch (error) {
     console.error("Update WhatsApp chat failed:", error.message);
     res.status(500).json({ message: "Could not update this WhatsApp chat" });
+  }
+};
+
+export const addWhatsAppChatNote = async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const conversationId = parseConversationId(req.params.id);
+  if (!conversationId) return res.status(400).json({ message: "Invalid conversation id" });
+  const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+  if (!text || text.length > NOTE_MAX_LENGTH) {
+    return res.status(400).json({ message: `Write a note of up to ${NOTE_MAX_LENGTH} characters.` });
+  }
+
+  try {
+    const database = mongoose.connection.db;
+    const conversation = await database.collection("conversations").findOne(
+      { _id: conversationId, channel: "whatsapp" },
+      { projection: { _id: 1 } }
+    );
+    if (!conversation) return res.status(404).json({ message: "WhatsApp chat not found" });
+
+    await ensureHistoryIndexes(database);
+    const now = new Date();
+    const note = {
+      conversation_id: conversationId,
+      text,
+      author_id: req.user._id,
+      author_name: displayName(req.user),
+      created_at: now,
+    };
+    await database.collection("whatsapp_chat_notes").insertOne(note);
+    await logActivity(database, conversationId, req.user, "note_added", {}, now);
+    res.status(201).json({ note: serialize(note) });
+  } catch (error) {
+    console.error("Add WhatsApp chat note failed:", error.message);
+    res.status(500).json({ message: "Could not save this note" });
   }
 };
 
@@ -391,12 +542,21 @@ export const sendWhatsAppReply = async (req, res) => {
   if (!text || text.length > 4096) return res.status(400).json({ message: "Write a reply of up to 4096 characters." });
 
   try {
+    const database = mongoose.connection.db;
+    const before = await database.collection("conversations").findOne(
+      { _id: conversationId, channel: "whatsapp" },
+      { projection: { handoff_status: 1 } }
+    );
     const { status, data } = await callWhatsAppService("team-reply", {
       conversation_id: String(conversationId),
       text,
       admin_id: String(req.user._id),
       admin_name: req.user.name || req.user.email || "Store team",
     });
+    // The AI service makes the first person to reply the owner of an unowned chat.
+    if (status < 300 && before && before.handoff_status !== "assigned") {
+      await logActivity(database, conversationId, req.user, "claimed", { via: "reply" });
+    }
     return res.status(status).json(data);
   } catch (error) {
     console.error("Send WhatsApp reply failed:", error.message);

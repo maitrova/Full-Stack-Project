@@ -22,6 +22,7 @@ import { Badge, Button, EmptyState, Modal, Select, Skeleton, Textarea, cx } from
 import { selectCurrentToken, selectCurrentUser } from "../redux/slices/Userslice.js";
 import {
   QUEUES,
+  activityLabel,
   aiStatus,
   formatDuration,
   inQueue,
@@ -197,11 +198,16 @@ const MessageBubble = ({ message, conversationId, headers, showDebug, onImageLoa
 
 // Follows new messages unless the admin has scrolled up to read older ones.
 // Mounted once per chat (keyed by id), so it always opens at the newest message.
-const Thread = ({ conversationId, messages, headers, showDebug }) => {
+const Thread = ({ conversationId, messages, activity, userId, headers, showDebug }) => {
   const scrollRef = useRef(null);
   const [pinned, setPinned] = useState(true);
   const lastId = messages.at(-1)?._id;
   const [seenId, setSeenId] = useState(lastId);
+  const timeline = useMemo(() => [
+    ...messages.map((item) => ({ kind: "message", item })),
+    ...activity.map((item) => ({ kind: "activity", item })),
+  ].sort((a, b) => new Date(a.item.created_at) - new Date(b.item.created_at)), [activity, messages]);
+  const lastEntryId = timeline.at(-1)?.item._id;
 
   const scrollToEnd = useCallback(() => {
     const element = scrollRef.current;
@@ -210,7 +216,7 @@ const Thread = ({ conversationId, messages, headers, showDebug }) => {
 
   useLayoutEffect(() => {
     if (pinned) scrollToEnd();
-  }, [lastId, pinned, scrollToEnd]);
+  }, [lastEntryId, pinned, scrollToEnd]);
 
   const handleScroll = (event) => {
     const element = event.currentTarget;
@@ -227,20 +233,26 @@ const Thread = ({ conversationId, messages, headers, showDebug }) => {
     <div className="relative min-h-0 flex-1">
       <div ref={scrollRef} onScroll={handleScroll} className="h-full space-y-2 overflow-y-auto bg-mt-bg p-3 sm:p-5" aria-live="polite">
         {messages.length === 0 && <p className="py-10 text-center text-sm text-mt-muted">No messages in this chat yet.</p>}
-        {messages.map((message, index) => {
-          const newDay = index === 0 || dayKey(messages[index - 1].created_at) !== dayKey(message.created_at);
+        {timeline.map(({ kind, item }, index) => {
+          const newDay = index === 0 || dayKey(timeline[index - 1].item.created_at) !== dayKey(item.created_at);
           return (
-            <div key={message._id}>
+            <div key={`${kind}-${item._id}`}>
               {newDay && (
-                <p className="py-3 text-center text-xs text-mt-subtle">{formatDay(message.created_at)}</p>
+                <p className="py-3 text-center text-xs text-mt-subtle">{formatDay(item.created_at)}</p>
               )}
-              <MessageBubble
-                message={message}
-                conversationId={conversationId}
-                headers={headers}
-                showDebug={showDebug}
-                onImageLoad={handleImageLoad}
-              />
+              {kind === "activity" ? (
+                <p className="py-1 text-center text-xs text-mt-muted">
+                  {activityLabel(item, userId)} · {formatTime(item.created_at)}
+                </p>
+              ) : (
+                <MessageBubble
+                  message={item}
+                  conversationId={conversationId}
+                  headers={headers}
+                  showDebug={showDebug}
+                  onImageLoad={handleImageLoad}
+                />
+              )}
             </div>
           );
         })}
@@ -331,16 +343,103 @@ const Composer = ({ conversation, messages, now, userId, value, onChange, onSubm
   );
 };
 
+const COLLAPSED_ACTIVITY_COUNT = 5;
+
+const OwnerSelect = ({ conversation, admins, userId, disabled, onAssign }) => {
+  const claimed = isClaimed(conversation);
+  const ownerId = claimed ? String(conversation.handoff_assigned_to) : "";
+  const options = admins.map((admin) => ({
+    value: admin._id,
+    label: String(admin._id) === String(userId) ? `${admin.name} (you)` : admin.name,
+  }));
+  // The owner may no longer be an admin, but the chat should still show who has it.
+  if (ownerId && !options.some((option) => option.value === ownerId)) {
+    options.unshift({ value: ownerId, label: conversation.handoff_assigned_name || "Team", disabled: true });
+  }
+  return (
+    <Select
+      label="Owner"
+      hint="Assigning pauses the AI. The new owner isn't notified, but the chat appears in their Mine queue."
+      value={ownerId}
+      placeholder="Unassigned"
+      options={options}
+      disabled={disabled}
+      onChange={(event) => onAssign(event.target.value)}
+    />
+  );
+};
+
+const NotesSection = ({ conversation, notes, value, onChange, onAdd, saving }) => (
+  <section aria-labelledby="chat-notes-heading" className="space-y-2">
+    <h2 id="chat-notes-heading" className="text-sm font-medium text-mt-text">Team notes</h2>
+    <Textarea
+      aria-label="New team note"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      rows={3}
+      maxLength={2000}
+      placeholder="Sizing, design, budget or follow-up notes"
+      textareaClassName="resize-none"
+    />
+    <Button variant="outline" size="sm" fullWidth disabled={saving || !value.trim()} onClick={onAdd}>
+      Add note
+    </Button>
+    {notes.length > 0 && (
+      <ul className="space-y-2 pt-1">
+        {notes.map((note) => (
+          <li key={note._id} className="rounded-mt-card border border-mt-line p-2.5 text-xs">
+            <p className="whitespace-pre-wrap break-words leading-relaxed text-mt-text">{note.text}</p>
+            <p className="mt-1 text-mt-subtle">{note.author_name} · {formatDay(note.created_at)}, {formatTime(note.created_at)}</p>
+          </li>
+        ))}
+      </ul>
+    )}
+    {conversation.lead_note && (
+      <div className="rounded-mt-card border border-mt-line p-2.5 text-xs">
+        <p className="whitespace-pre-wrap break-words leading-relaxed text-mt-text">{conversation.lead_note}</p>
+        <p className="mt-1 text-mt-subtle">Earlier note, author not recorded</p>
+      </div>
+    )}
+  </section>
+);
+
+const ActivitySection = ({ activity, userId }) => {
+  const [expanded, setExpanded] = useState(false);
+  if (activity.length === 0) return null;
+  const newestFirst = [...activity].reverse();
+  const visible = expanded ? newestFirst : newestFirst.slice(0, COLLAPSED_ACTIVITY_COUNT);
+  return (
+    <section aria-labelledby="chat-activity-heading" className="space-y-2">
+      <h2 id="chat-activity-heading" className="text-sm font-medium text-mt-text">Activity</h2>
+      <ol className="space-y-2 border-l border-mt-line pl-3 text-xs">
+        {visible.map((event) => (
+          <li key={event._id}>
+            <p className="break-words text-mt-text">{activityLabel(event, userId)}</p>
+            <p className="text-mt-subtle">{formatDay(event.created_at)}, {formatTime(event.created_at)}</p>
+          </li>
+        ))}
+      </ol>
+      {newestFirst.length > COLLAPSED_ACTIVITY_COUNT && (
+        <Button variant="link" className="text-xs" onClick={() => setExpanded((value) => !value)}>
+          {expanded ? "Show less" : `Show all ${newestFirst.length}`}
+        </Button>
+      )}
+    </section>
+  );
+};
+
 const DetailsPanel = ({
   conversation,
   leadType,
   userId,
   now,
   saving,
-  note,
+  admins,
+  notes,
+  activity,
+  noteDraft,
   onNoteChange,
-  onSaveNote,
-  noteChanged,
+  onAddNote,
   onUpdate,
   onOpenWhatsApp,
   showDebug,
@@ -373,6 +472,15 @@ const DetailsPanel = ({
           <Button size="sm" fullWidth disabled={saving} onClick={() => onUpdate({ assignToMe: true })}>
             Claim chat and pause AI
           </Button>
+        )}
+        {!closed && admins.length > 0 && (
+          <OwnerSelect
+            conversation={conversation}
+            admins={admins}
+            userId={userId}
+            disabled={saving}
+            onAssign={(id) => onUpdate({ assignTo: id })}
+          />
         )}
         {!closed && (
           <Button variant="ghost" size="sm" fullWidth disabled={saving} onClick={() => onUpdate({ conversationStatus: "closed" })}>
@@ -431,20 +539,16 @@ const DetailsPanel = ({
         onChange={(event) => onUpdate({ leadStatus: event.target.value })}
       />
 
-      <div className="space-y-2">
-        <Textarea
-          label="Team note"
-          value={note}
-          onChange={(event) => onNoteChange(event.target.value)}
-          rows={4}
-          maxLength={2000}
-          placeholder="Sizing, design, budget or follow-up notes"
-          textareaClassName="resize-none"
-        />
-        <Button variant="outline" size="sm" fullWidth disabled={saving || !noteChanged} onClick={onSaveNote}>
-          Save note
-        </Button>
-      </div>
+      <NotesSection
+        conversation={conversation}
+        notes={notes}
+        value={noteDraft}
+        onChange={onNoteChange}
+        onAdd={onAddNote}
+        saving={saving}
+      />
+
+      <ActivitySection activity={activity} userId={userId} />
 
       {showDebug && (
         <section className="rounded-mt-card bg-black/80 p-3 font-mono text-[11px] text-white">
@@ -535,6 +639,7 @@ export default function WhatsAppChatAdmin() {
   const [healthOpen, setHealthOpen] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [takeover, setTakeover] = useState(null);
+  const [admins, setAdmins] = useState([]);
   const [now, setNow] = useState(() => Date.now());
   // Unsent text is kept per chat, so refreshes can't wipe it and a draft can't
   // follow the admin to a different customer.
@@ -567,6 +672,21 @@ export default function WhatsAppChatAdmin() {
     } catch {
       // Chat management remains available if monitoring is temporarily unavailable.
     }
+  }, [headers, token]);
+
+  useEffect(() => {
+    if (!token) return undefined;
+    let active = true;
+    axios.get(`${API_URL}/admin/whatsapp-chats/admins`, { headers })
+      .then(({ data }) => {
+        if (active) setAdmins(Array.isArray(data?.admins) ? data.admins : []);
+      })
+      .catch(() => {
+        // Assigning stays hidden; claiming and replying don't need the team list.
+      });
+    return () => {
+      active = false;
+    };
   }, [headers, token]);
 
   const loadDetail = useCallback(async (id) => {
@@ -641,8 +761,9 @@ export default function WhatsAppChatAdmin() {
   const messages = activeDetail?.messages || [];
   const selectedRow = conversations.find((chat) => chat._id === selectedId);
   const replyText = replyDrafts[selectedId] ?? "";
-  const savedNote = selectedConversation?.lead_note || "";
-  const noteText = noteDrafts[selectedId] ?? savedNote;
+  const noteDraft = noteDrafts[selectedId] ?? "";
+  const notes = activeDetail?.notes || [];
+  const activity = activeDetail?.activity || [];
 
   const refreshAfterChange = (id) => Promise.all([loadChats({ quiet: true }), loadDetail(id)]);
 
@@ -657,7 +778,9 @@ export default function WhatsAppChatAdmin() {
     } catch (requestError) {
       const response = requestError.response;
       if (response?.status === 409 && response.data?.code === "owned_by_other") {
-        setTakeover({ changes, ownerName: response.data.owner_name });
+        const target = admins.find((admin) => admin._id === changes.assignTo);
+        const toOtherAdmin = target && String(target._id) !== String(userId);
+        setTakeover({ changes, ownerName: response.data.owner_name, targetName: toOtherAdmin ? target.name : null });
       } else {
         setActionError(response?.data?.message || "Could not update the conversation.");
       }
@@ -673,10 +796,21 @@ export default function WhatsAppChatAdmin() {
     await updateConversation({ ...changes, confirmTakeover: true });
   };
 
-  const saveNote = async () => {
+  const addNote = async () => {
     const id = selectedId;
-    const saved = await updateConversation({ leadNote: noteText });
-    if (saved) setNoteDrafts((drafts) => withoutKey(drafts, id));
+    const text = noteDraft.trim();
+    if (!id || !text) return;
+    setSaving(true);
+    try {
+      await axios.post(`${API_URL}/admin/whatsapp-chats/${id}/notes`, { text }, { headers });
+      setNoteDrafts((drafts) => withoutKey(drafts, id));
+      await loadDetail(id);
+      setActionError("");
+    } catch (requestError) {
+      setActionError(requestError.response?.data?.message || "Could not save the note.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const openTeamWhatsApp = async () => {
@@ -825,7 +959,7 @@ export default function WhatsAppChatAdmin() {
                   Details
                 </Button>
               </div>
-              <Thread key={selectedId} conversationId={selectedId} messages={messages} headers={headers} showDebug={showDebug} />
+              <Thread key={selectedId} conversationId={selectedId} messages={messages} activity={activity} userId={userId} headers={headers} showDebug={showDebug} />
               <Composer
                 conversation={selectedConversation}
                 messages={messages}
@@ -850,15 +984,18 @@ export default function WhatsAppChatAdmin() {
           )}
           {selectedConversation ? (
             <DetailsPanel
+              key={selectedId}
               conversation={selectedConversation}
               leadType={selectedRow?.lead_type || selectedConversation.lead_type}
               userId={userId}
               now={now}
               saving={saving}
-              note={noteText}
-              noteChanged={noteText.trim() !== savedNote.trim()}
+              admins={admins}
+              notes={notes}
+              activity={activity}
+              noteDraft={noteDraft}
               onNoteChange={(text) => setNoteDrafts((drafts) => ({ ...drafts, [selectedId]: text }))}
-              onSaveNote={saveNote}
+              onAddNote={addNote}
               onUpdate={updateConversation}
               onOpenWhatsApp={openTeamWhatsApp}
               showDebug={showDebug}
@@ -874,17 +1011,19 @@ export default function WhatsAppChatAdmin() {
       <Modal
         open={Boolean(takeover)}
         onClose={() => setTakeover(null)}
-        title="Take over this chat?"
+        title={takeover?.targetName ? "Reassign this chat?" : "Take over this chat?"}
         size="sm"
         footer={(
           <>
             <Button variant="ghost" onClick={() => setTakeover(null)}>Cancel</Button>
-            <Button onClick={confirmTakeover}>Take over</Button>
+            <Button onClick={confirmTakeover}>{takeover?.targetName ? "Reassign" : "Take over"}</Button>
           </>
         )}
       >
         <p className="text-sm leading-relaxed text-mt-muted">
-          {takeover?.ownerName} owns this chat. If you take over, you become the owner instead and they won't be notified.
+          {takeover?.targetName
+            ? `${takeover.ownerName} owns this chat. It will move to ${takeover.targetName}, and neither of them will be notified.`
+            : `${takeover?.ownerName} owns this chat. If you take over, you become the owner instead and they won't be notified.`}
         </p>
       </Modal>
     </main>
