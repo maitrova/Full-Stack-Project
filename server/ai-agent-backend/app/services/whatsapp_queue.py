@@ -10,6 +10,9 @@ from app.utils.object_id import parse_object_id
 
 logger = logging.getLogger(__name__)
 
+TRACKED_STATUSES = ("sent", "delivered", "read", "failed")
+STATUS_RETENTION = timedelta(days=180)
+
 
 async def enqueue(db, payload):
     count = 0
@@ -19,6 +22,7 @@ async def enqueue(db, payload):
         for change in entry.get("changes", []):
             value = change.get("value", {})
             await record_delivery_failures(db, value.get("statuses") or [])
+            await record_message_statuses(db, value.get("statuses") or [])
             for message in value.get("messages", []):
                 if not message.get("id") or not message.get("from"):
                     continue
@@ -54,6 +58,49 @@ async def record_delivery_failures(db, statuses: list[dict]) -> None:
             })
         except DuplicateKeyError:
             pass
+
+
+def _status_time(value, fallback: datetime) -> datetime:
+    try:
+        return datetime.fromtimestamp(int(value), timezone.utc)
+    except (TypeError, ValueError, OverflowError, OSError):
+        return fallback
+
+
+async def record_message_statuses(db, statuses: list[dict]) -> None:
+    """Keep when each outbound message was sent, delivered, read or failed (no text or phone).
+
+    Meta can send these out of order and before the chat message is saved, so
+    each one is stored by WhatsApp message ID with its own timestamp. A problem
+    here must never stop the customer messages in the same webhook.
+    """
+    for status in statuses:
+        name = status.get("status")
+        message_id = status.get("id")
+        if name not in TRACKED_STATUSES or not message_id:
+            continue
+        now = datetime.now(timezone.utc)
+        update = {
+            "$min": {f"{name}_at": _status_time(status.get("timestamp"), now)},
+            "$setOnInsert": {"created_at": now, "expires_at": now + STATUS_RETENTION},
+        }
+        if name == "failed":
+            error = (status.get("errors") or [{}])[0]
+            update["$set"] = {
+                "error_code": error.get("code"),
+                "error_title": str(error.get("title") or "")[:200],
+            }
+        for attempt in range(2):
+            try:
+                await db.whatsapp_message_status.update_one({"_id": str(message_id)}, update, upsert=True)
+                break
+            except DuplicateKeyError:
+                # Two statuses for a new message raced to create its record; the retry updates it.
+                if attempt:
+                    logger.warning("Could not record WhatsApp status after retry")
+            except Exception as exc:
+                logger.warning("Could not record WhatsApp status (%s)", type(exc).__name__)
+                break
 
 
 async def worker(db):

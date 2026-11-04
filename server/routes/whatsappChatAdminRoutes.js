@@ -7,6 +7,7 @@ import {
   getWhatsAppOverview,
   listWhatsAppAdmins,
   listWhatsAppChats,
+  retryWhatsAppReply,
   sendWhatsAppReply,
   updateWhatsAppChat,
 } from "../controllers/whatsappChatAdminController.js";
@@ -21,5 +22,6 @@ router.get("/:id/media/:messageId", protect, getWhatsAppChatMedia);
 router.patch("/:id", protect, updateWhatsAppChat);
 router.post("/:id/notes", protect, addWhatsAppChatNote);
 router.post("/:id/reply", protect, sendWhatsAppReply);
+router.post("/:id/messages/:messageId/retry", protect, retryWhatsAppReply);
 
 export default router;

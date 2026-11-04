@@ -4,6 +4,7 @@ import {
   AI_REPLY_GRACE_MS,
   activityLabel,
   aiStatus,
+  deliveryFailureReason,
   inQueue,
   isClosed,
   needsReply,
@@ -83,4 +84,17 @@ test("system events have no person, and unknown events still read properly", () 
   assert.equal(activityLabel({ type: "ai_auto_resumed" }, "me"), "AI resumed because the team went quiet");
   assert.equal(activityLabel({ type: "team_requested" }, undefined), "Customer asked for the team");
   assert.equal(activityLabel({ type: "something_new" }, "me"), "A team member updated this chat");
+});
+
+test("a last reply that wasn't delivered needs the team, until the chat is closed", () => {
+  const failed = { status: "open", last_message_failed: true, ...lastFrom("ai", 1) };
+  assert.equal(needsReply(failed, NOW), true);
+  assert.equal(inQueue("needs_reply", failed, { now: NOW }), true);
+  assert.equal(needsReply({ ...failed, status: "closed", closed_at: ago(0) }, NOW), false);
+});
+
+test("delivery failures explain known codes and fall back to what WhatsApp said", () => {
+  assert.match(deliveryFailureReason({ error_code: 131047 }), /24 hours/);
+  assert.equal(deliveryFailureReason({ error_code: 999, error_title: "Odd problem" }), "Odd problem (code 999)");
+  assert.equal(deliveryFailureReason({}), "WhatsApp reported a delivery failure");
 });

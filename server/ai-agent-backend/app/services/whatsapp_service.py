@@ -819,6 +819,7 @@ class WhatsAppService:
                 self._product_ids_mentioned(response),
                 outbound_kind,
             )
+            await self._link_outbound_message(sent, response)
             await self.deliveries.update_one(
                 {"_id": message_id},
                 {"$set": {"text_sent": True}, "$inc": {"outbound_messages": 1}},
@@ -906,6 +907,23 @@ class WhatsAppService:
             if (name and name in body) or (url and url in body):
                 mentioned.append(str(product.id))
         return mentioned if len(mentioned) == 1 else [str(product.id) for product in products]
+
+    async def _link_outbound_message(self, sent: dict, response) -> None:
+        """Save WhatsApp's ID on the AI's chat message so the inbox can show its delivery status."""
+        if not hasattr(self, "message_repository"):
+            return
+        outbound_id = ((sent.get("messages") or [{}])[0]).get("id")
+        chat_message_id = getattr(response.ai_message, "id", None)
+        if not outbound_id or not chat_message_id:
+            return
+        try:
+            await self.message_repository.collection.update_one(
+                {"_id": parse_object_id(chat_message_id)},
+                {"$set": {"metadata.whatsapp_message_id": str(outbound_id)}},
+            )
+        except Exception as exc:
+            # The customer already has the reply; only its ticks are missing.
+            logger.warning("Could not link WhatsApp message to chat (%s)", type(exc).__name__)
 
     async def _remember_outbound_context(self, sent: dict, to: str, product_ids: list[str], kind: str) -> None:
         if not product_ids or not hasattr(self, "outbound_context"):

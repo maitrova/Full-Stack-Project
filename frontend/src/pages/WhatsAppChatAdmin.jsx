@@ -2,10 +2,13 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import axios from "axios";
 import {
   Activity,
+  AlertCircle,
   ArrowDown,
   ArrowLeft,
   Bot,
   Bug,
+  Check,
+  CheckCheck,
   ChevronLeft,
   ExternalLink,
   Info,
@@ -24,6 +27,7 @@ import {
   QUEUES,
   activityLabel,
   aiStatus,
+  deliveryFailureReason,
   formatDuration,
   inQueue,
   isClaimed,
@@ -121,7 +125,8 @@ const ChatImage = ({ conversationId, messageId, headers, onLoad }) => {
 };
 
 const ChatRow = ({ chat, selected, now, userId, onSelect }) => {
-  const waiting = needsReply(chat, now) ? now - new Date(waitingSince(chat)).getTime() : null;
+  const since = needsReply(chat, now) ? waitingSince(chat) : null;
+  const waiting = since ? now - new Date(since).getTime() : null;
   const name = chat.customer_name || phoneLabel(chat.external_customer_ref);
   const prefix = previewPrefix[chat.last_message?.sender] || "";
   return (
@@ -143,6 +148,7 @@ const ChatRow = ({ chat, selected, now, userId, onSelect }) => {
       </span>
       <span className="mt-2 flex flex-wrap items-center gap-1.5">
         {waiting != null && <Badge variant={waitTone(waiting)}>Waiting {formatDuration(waiting)}</Badge>}
+        {chat.last_message_failed && <Badge variant="danger">Not delivered</Badge>}
         {isUnclaimed(chat) && <Badge variant="danger">Unclaimed</Badge>}
         {isClaimed(chat) && (
           <Badge variant="outline">{isMine(chat, userId) ? "You" : chat.handoff_assigned_name || "Team"}</Badge>
@@ -160,12 +166,54 @@ const senderLabel = (message) => {
   return "AI assistant";
 };
 
-const MessageBubble = ({ message, conversationId, headers, showDebug, onImageLoad }) => {
+const DELIVERY_DISPLAY = {
+  sent: { icon: Check, label: "Sent", timeKey: "sent_at" },
+  delivered: { icon: CheckCheck, label: "Delivered", timeKey: "delivered_at" },
+  read: { icon: CheckCheck, label: "Read", timeKey: "read_at" },
+};
+
+const DeliveryTick = ({ delivery }) => {
+  const display = DELIVERY_DISPLAY[delivery?.status];
+  if (!display) return null;
+  const Icon = display.icon;
+  const at = delivery[display.timeKey];
+  return (
+    <span
+      className={cx("inline-flex items-center gap-0.5", delivery.status === "read" && "font-medium")}
+      title={at ? `${display.label} ${formatDay(at)}, ${formatTime(at)}` : display.label}
+    >
+      <Icon className="h-3 w-3" aria-hidden="true" />
+      {display.label}
+    </span>
+  );
+};
+
+const DeliveryFailure = ({ message, canRetry, retrying, onRetry }) => {
+  const retried = Boolean(message.metadata?.retried_at);
+  const canRetryThis = canRetry && message.sender === "human" && !retried;
+  return (
+    <div className="mt-1 flex items-start gap-1.5 text-xs text-mt-danger" role="status">
+      <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      <p className="min-w-0 flex-1 break-words">
+        <span className="font-medium">Not delivered.</span> {deliveryFailureReason(message.delivery)}
+        {retried && <span className="text-mt-muted"> Retried by {message.metadata.retried_by || "the team"}.</span>}
+      </p>
+      {canRetryThis && (
+        <Button variant="outline" size="sm" className="shrink-0" loading={retrying} onClick={() => onRetry(message._id)}>
+          Retry
+        </Button>
+      )}
+    </div>
+  );
+};
+
+const MessageBubble = ({ message, conversationId, headers, showDebug, onImageLoad, canRetry, retryingId, onRetry }) => {
   const customer = message.sender === "customer";
   const human = message.sender === "human";
   const SenderIcon = customer ? UserRound : human ? Users : Bot;
+  const failed = message.delivery?.status === "failed";
   return (
-    <div className={cx("flex", customer ? "justify-start" : "justify-end")}>
+    <div className={cx("flex flex-col", customer ? "items-start" : "items-end")}>
       <div
         className={cx(
           "max-w-[88%] rounded-mt-card px-3 py-2 sm:max-w-[72%]",
@@ -190,15 +238,23 @@ const MessageBubble = ({ message, conversationId, headers, showDebug, onImageLoa
             <p>tools: {(message.metadata?.tool_calls || []).map((item) => item.name).join(", ") || "none"}</p>
           </div>
         )}
-        <p className={cx("mt-1 text-right text-[11px]", human ? "opacity-75" : "text-mt-subtle")}>{formatTime(message.created_at)}</p>
+        <p className={cx("mt-1 flex justify-end gap-1.5 text-[11px]", human ? "opacity-75" : "text-mt-subtle")}>
+          {formatTime(message.created_at)}
+          <DeliveryTick delivery={message.delivery} />
+        </p>
       </div>
+      {failed && (
+        <div className="w-full max-w-[88%] sm:max-w-[72%]">
+          <DeliveryFailure message={message} canRetry={canRetry} retrying={retryingId === message._id} onRetry={onRetry} />
+        </div>
+      )}
     </div>
   );
 };
 
 // Follows new messages unless the admin has scrolled up to read older ones.
 // Mounted once per chat (keyed by id), so it always opens at the newest message.
-const Thread = ({ conversationId, messages, activity, userId, headers, showDebug }) => {
+const Thread = ({ conversationId, messages, activity, userId, headers, showDebug, canRetry, retryingId, onRetry }) => {
   const scrollRef = useRef(null);
   const [pinned, setPinned] = useState(true);
   const lastId = messages.at(-1)?._id;
@@ -251,6 +307,9 @@ const Thread = ({ conversationId, messages, activity, userId, headers, showDebug
                   headers={headers}
                   showDebug={showDebug}
                   onImageLoad={handleImageLoad}
+                  canRetry={canRetry}
+                  retryingId={retryingId}
+                  onRetry={onRetry}
                 />
               )}
             </div>
@@ -632,6 +691,7 @@ export default function WhatsAppChatAdmin() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
+  const [retryingId, setRetryingId] = useState("");
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [mobilePane, setMobilePane] = useState("list");
@@ -738,7 +798,7 @@ export default function WhatsAppChatAdmin() {
 
   const oldestWaitMs = useMemo(() => {
     const waits = conversations
-      .filter((chat) => needsReply(chat, now))
+      .filter((chat) => needsReply(chat, now) && waitingSince(chat))
       .map((chat) => now - new Date(waitingSince(chat)).getTime());
     return waits.length ? Math.max(...waits) : null;
   }, [conversations, now]);
@@ -841,6 +901,21 @@ export default function WhatsAppChatAdmin() {
       setActionError(requestError.response?.data?.message || "Could not send the reply.");
     } finally {
       setSending(false);
+    }
+  };
+
+  const retryReply = async (messageId) => {
+    const id = selectedId;
+    if (!id || retryingId) return;
+    setRetryingId(messageId);
+    try {
+      await axios.post(`${API_URL}/admin/whatsapp-chats/${id}/messages/${messageId}/retry`, {}, { headers });
+      await refreshAfterChange(id);
+      setActionError("");
+    } catch (requestError) {
+      setActionError(requestError.response?.data?.message || "Could not retry the reply.");
+    } finally {
+      setRetryingId("");
     }
   };
 
@@ -959,7 +1034,7 @@ export default function WhatsAppChatAdmin() {
                   Details
                 </Button>
               </div>
-              <Thread key={selectedId} conversationId={selectedId} messages={messages} activity={activity} userId={userId} headers={headers} showDebug={showDebug} />
+              <Thread key={selectedId} conversationId={selectedId} messages={messages} activity={activity} userId={userId} headers={headers} showDebug={showDebug} canRetry={!isClosed(selectedConversation) && replyWindow(messages, now).open} retryingId={retryingId} onRetry={retryReply} />
               <Composer
                 conversation={selectedConversation}
                 messages={messages}

@@ -77,6 +77,41 @@ const alertEvents = (alerts) => alerts.flatMap((alert) => {
   return events;
 });
 
+// Statuses can arrive in any order, so the furthest step reached wins.
+const deliveryState = (row) => {
+  if (!row) return null;
+  let status = "sent";
+  if (row.read_at) status = "read";
+  else if (row.delivered_at) status = "delivered";
+  else if (row.failed_at) status = "failed";
+  return {
+    status,
+    sent_at: row.sent_at,
+    delivered_at: row.delivered_at,
+    read_at: row.read_at,
+    failed_at: row.failed_at,
+    error_code: row.error_code,
+    error_title: row.error_title,
+  };
+};
+
+const outboundId = (message) => (
+  message.sender !== "customer" ? message.metadata?.whatsapp_message_id : null
+);
+
+const withDelivery = async (database, messages) => {
+  const ids = messages.map(outboundId).filter(Boolean).map(String);
+  if (!ids.length) return messages;
+  const rows = await database.collection("whatsapp_message_status").find({ _id: { $in: ids } }).toArray();
+  const byId = new Map(rows.map((row) => [String(row._id), row]));
+  return messages.map((message) => {
+    const id = outboundId(message);
+    if (!id) return message;
+    // WhatsApp accepted it, so it counts as sent until the first status arrives.
+    return { ...message, delivery: deliveryState(byId.get(String(id))) || { status: "sent" } };
+  });
+};
+
 const ownershipEvent = (before, owner, actor) => {
   const previousOwner = isOwned(before) ? before.handoff_assigned_to : null;
   if (previousOwner && String(previousOwner) === String(owner._id)) return null;
@@ -210,12 +245,20 @@ export const listWhatsAppChats = async (req, res) => {
             { $match: { $expr: { $eq: ["$conversation_id", "$$conversationId"] } } },
             { $sort: { created_at: -1 } },
             { $limit: 1 },
-            { $project: { sender: 1, content: 1, message_type: 1, created_at: 1 } },
+            { $project: { sender: 1, content: 1, message_type: 1, created_at: 1, "metadata.whatsapp_message_id": 1 } },
           ],
           as: "last_message",
         },
       },
       { $set: { last_message: { $arrayElemAt: ["$last_message", 0] } } },
+      {
+        $lookup: {
+          from: "whatsapp_message_status",
+          localField: "last_message.metadata.whatsapp_message_id",
+          foreignField: "_id",
+          as: "last_delivery",
+        },
+      },
       {
         $project: {
           business_id: 1,
@@ -256,11 +299,18 @@ export const listWhatsAppChats = async (req, res) => {
           updated_at: 1,
           last_message_at: 1,
           last_message: 1,
+          last_delivery: 1,
         },
       },
     ]).toArray();
 
-    res.json({ conversations: serialize(rows) });
+    const chats = rows.map(({ last_delivery: lastDelivery, ...row }) => ({
+      ...row,
+      last_message_failed: Boolean(row.last_message)
+        && row.last_message.sender !== "customer"
+        && deliveryState(lastDelivery?.[0])?.status === "failed",
+    }));
+    res.json({ conversations: serialize(chats) });
   } catch (error) {
     console.error("List WhatsApp chats failed:", error.message);
     res.status(500).json({ message: "Could not load WhatsApp chats" });
@@ -292,7 +342,7 @@ export const getWhatsAppChat = async (req, res) => {
 
     res.json({
       conversation: serialize(conversation),
-      messages: serialize(messages.reverse()),
+      messages: serialize(await withDelivery(database, messages.reverse())),
       notes: serialize(notes),
       activity: serialize([...activity, ...alertEvents(alerts)]
         .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))),
@@ -534,6 +584,25 @@ export const addWhatsAppChatNote = async (req, res) => {
   }
 };
 
+const sendTeamReply = async (req, conversationId, text) => {
+  const database = mongoose.connection.db;
+  const before = await database.collection("conversations").findOne(
+    { _id: conversationId, channel: "whatsapp" },
+    { projection: { handoff_status: 1 } }
+  );
+  const result = await callWhatsAppService("team-reply", {
+    conversation_id: String(conversationId),
+    text,
+    admin_id: String(req.user._id),
+    admin_name: req.user.name || req.user.email || "Store team",
+  });
+  // The AI service makes the first person to reply the owner of an unowned chat.
+  if (result.status < 300 && before && before.handoff_status !== "assigned") {
+    await logActivity(database, conversationId, req.user, "claimed", { via: "reply" });
+  }
+  return result;
+};
+
 export const sendWhatsAppReply = async (req, res) => {
   if (!requireAdmin(req, res)) return;
   const conversationId = parseConversationId(req.params.id);
@@ -542,24 +611,58 @@ export const sendWhatsAppReply = async (req, res) => {
   if (!text || text.length > 4096) return res.status(400).json({ message: "Write a reply of up to 4096 characters." });
 
   try {
-    const database = mongoose.connection.db;
-    const before = await database.collection("conversations").findOne(
-      { _id: conversationId, channel: "whatsapp" },
-      { projection: { handoff_status: 1 } }
-    );
-    const { status, data } = await callWhatsAppService("team-reply", {
-      conversation_id: String(conversationId),
-      text,
-      admin_id: String(req.user._id),
-      admin_name: req.user.name || req.user.email || "Store team",
-    });
-    // The AI service makes the first person to reply the owner of an unowned chat.
-    if (status < 300 && before && before.handoff_status !== "assigned") {
-      await logActivity(database, conversationId, req.user, "claimed", { via: "reply" });
-    }
+    const { status, data } = await sendTeamReply(req, conversationId, text);
     return res.status(status).json(data);
   } catch (error) {
     console.error("Send WhatsApp reply failed:", error.message);
+    return res.status(502).json({ message: "Could not reach the WhatsApp service. Please try again." });
+  }
+};
+
+export const retryWhatsAppReply = async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const conversationId = parseConversationId(req.params.id);
+  const messageId = parseConversationId(req.params.messageId);
+  if (!conversationId || !messageId) return res.status(400).json({ message: "Invalid message id" });
+
+  const database = mongoose.connection.db;
+  const messages = database.collection("messages");
+  const release = () => messages.updateOne(
+    { _id: messageId },
+    { $unset: { "metadata.retried_at": "", "metadata.retried_by": "" } }
+  );
+  let claimed = false;
+
+  try {
+    const message = await messages.findOne({ _id: messageId, conversation_id: conversationId, sender: "human" });
+    if (!message) return res.status(404).json({ message: "Team reply not found" });
+
+    const statusRow = message.metadata?.whatsapp_message_id
+      ? await database.collection("whatsapp_message_status").findOne({ _id: String(message.metadata.whatsapp_message_id) })
+      : null;
+    if (deliveryState(statusRow)?.status !== "failed") {
+      return res.status(409).json({ message: "Only replies that failed to deliver can be retried." });
+    }
+
+    // Claimed in the update itself, so a double click can't send the reply twice.
+    const result = await messages.findOneAndUpdate(
+      { _id: messageId, "metadata.retried_at": { $exists: false } },
+      { $set: { "metadata.retried_at": new Date(), "metadata.retried_by": displayName(req.user) } }
+    );
+    const unclaimed = result && "value" in result ? !result.value : !result;
+    if (unclaimed) return res.status(409).json({ message: "This reply has already been retried." });
+    claimed = true;
+
+    const { status, data } = await sendTeamReply(req, conversationId, message.content);
+    if (status >= 300) {
+      await release();
+      return res.status(status).json(data);
+    }
+    await logActivity(database, conversationId, req.user, "reply_retried");
+    return res.status(status).json(data);
+  } catch (error) {
+    console.error("Retry WhatsApp reply failed:", error.message);
+    if (claimed) await release().catch(() => {});
     return res.status(502).json({ message: "Could not reach the WhatsApp service. Please try again." });
   }
 };

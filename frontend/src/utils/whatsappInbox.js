@@ -38,7 +38,10 @@ export const isOwnedByOther = (chat, userId) => isClaimed(chat) && !isMine(chat,
 export const waitingSince = (chat) =>
   !isClosed(chat) && chat?.last_message?.sender === "customer" ? chat.last_message.created_at : null;
 
+// A customer who never received the last reply is waiting too, even though
+// nothing shows it on their side.
 export const needsReply = (chat, now) => {
+  if (!isClosed(chat) && chat?.last_message_failed) return true;
   const since = time(waitingSince(chat));
   if (since == null) return false;
   return chat.status === "handoff" || now - since >= AI_REPLY_GRACE_MS;
@@ -123,6 +126,22 @@ export const activityLabel = (event, userId) => {
     case "reopened": return `${actor} reopened this chat`;
     case "lead_status": return `${actor} changed the lead status to ${event.to_status}`;
     case "note_added": return `${actor} added a note`;
+    case "reply_retried": return `${actor} retried a failed reply`;
     default: return `${actor} updated this chat`;
   }
+};
+
+const DELIVERY_FAILURE_REASONS = {
+  130429: "WhatsApp is limiting how fast messages can be sent. Try again shortly.",
+  131026: "WhatsApp couldn't deliver this. The number may not be on WhatsApp, or they may need to update the app.",
+  131047: "More than 24 hours have passed since the customer's last message.",
+  131049: "WhatsApp held this back to protect the customer from too many business messages.",
+  131056: "Too many messages were sent to this customer in a short time. Try again shortly.",
+};
+
+export const deliveryFailureReason = (delivery) => {
+  const known = DELIVERY_FAILURE_REASONS[delivery?.error_code];
+  if (known) return known;
+  const code = delivery?.error_code ? ` (code ${delivery.error_code})` : "";
+  return `${delivery?.error_title || "WhatsApp reported a delivery failure"}${code}`;
 };
