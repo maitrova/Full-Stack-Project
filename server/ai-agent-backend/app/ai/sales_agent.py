@@ -29,7 +29,9 @@ from app.schemas.ai import AiChatRequest, AiChatResponse, IntentResult
 from app.schemas.conversation import ConversationPublic, MessagePublic
 from app.schemas.user import UserPublic
 from app.services.conversation_flow import reset_search_context, sync_flow_state
+from app.services.handoff_email import notify_admin_of_handoff
 from app.services.policy_search import search_policies
+from app.services.team_hours import with_team_hours_note
 from app.services.pricing import verified_discount, verified_price_text
 from app.tools.product_tools import ProductSearchParams, ProductTools
 from app.utils.object_id import object_id_to_str, parse_object_id
@@ -931,6 +933,9 @@ class SalesAgent:
         if conversation.get("channel") == "whatsapp":
             ai_text = self._compact_whatsapp_reply(ai_text)
 
+        if updated_state.get("handoff_requested") and not (conversation.get("conversation_state") or {}).get("handoff_requested"):
+            ai_text = with_team_hours_note(ai_text, intent.language)
+
         updated_state["recent_turns"] = (updated_state.get("recent_turns", []) + [
             {"customer": payload.message[:1000], "reply": ai_text[:1500]}
         ])[-12:]
@@ -1032,7 +1037,7 @@ class SalesAgent:
                 "product, image-upload, or pricing questions as needed."
             )
             lead_urgency = handoff_context.get("urgency") if updated_state.get("handoff_requested") else "normal"
-            await self.conversation_repository.collection.database.whatsapp_handoff_alerts.update_one(
+            alert_result = await self.conversation_repository.collection.database.whatsapp_handoff_alerts.update_one(
                 {"conversation_id": conversation["_id"], "status": {"$in": ["open", "assigned"]}},
                 {
                     "$set": {"updated_at": ai_message["created_at"]},
@@ -1052,6 +1057,9 @@ class SalesAgent:
                 },
                 upsert=True,
             )
+            notify_admin_of_handoff(alert_result, conversation, lead_reason or "customer_requested_team",
+                                    lead_summary, lead_urgency or "normal",
+                                    message=payload.message, state=updated_state)
         if tool_calls:
             try:
                 await self.conversation_repository.collection.database.ai_action_audit.insert_many([

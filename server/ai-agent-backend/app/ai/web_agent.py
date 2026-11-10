@@ -30,9 +30,11 @@ from app.schemas.ai import AiChatRequest, AiChatResponse, IntentResult
 from app.schemas.conversation import ConversationPublic, MessagePublic
 from app.schemas.product import ProductPublic
 from app.schemas.user import UserPublic
+from app.services.handoff_email import notify_admin_of_handoff
 from app.services.offers import active_combo_offers
 from app.services.order_lookup import IST, OrderLookup, normalize_reference
 from app.services.policy_search import search_policies
+from app.services.team_hours import with_team_hours_note
 from app.services.whatsapp_shop import WhatsAppShop
 from app.services.pricing import verified_discount
 from app.tools.product_tools import ProductSearchParams, ProductTools
@@ -315,10 +317,10 @@ NEEDS_PERSON_RE = re.compile(
     re.IGNORECASE,
 )
 
-OPTED_OUT_REPLY = ("Done. WhatsApp order updates are turned off and your store account is disconnected from this number. "
+OPTED_OUT_REPLY = ("Done. WhatsApp order updates and follow-up messages are turned off and your store account is disconnected from this number. "
                    "Message us anytime to shop.")
-NOT_SUBSCRIBED_REPLY = ("Done. This number isn't signed up for order updates or connected to a store account, "
-                        "so we won't send you anything unless you message us. Message us anytime to shop.")
+NOT_SUBSCRIBED_REPLY = ("Done. Follow-up messages are turned off. This number isn't signed up for order updates or connected "
+                        "to a store account, so we won't send you anything unless you message us. Message us anytime to shop.")
 
 # STOP / unlinking (order-update opt-out) stays on the existing commerce flow.
 WHATSAPP_COMMERCE_RE = re.compile(
@@ -1516,6 +1518,10 @@ Style: plain text only, no markdown headings, tables, or bold. Use short paragra
     async def _persist(self, payload, message, reply, conversation, state, business, session: _ToolSession,
                        shown, page_product, request_id, started_at, grounding_failures, rate_limited: bool = False,
                        timed_out: bool = False) -> AiChatResponse:
+        if session.handoff:
+            default = settings.whatsapp_default_language if conversation.get("channel") == "whatsapp" else None
+            language = (state.get("reply_language") or detect_customer_language(message, default))["language"]
+            reply = with_team_hours_note(reply, language)
         repo = self.sales_agent.conversation_repository
         messages = self.sales_agent.message_repository
         business_id = str(business["_id"])
@@ -1605,7 +1611,7 @@ Style: plain text only, no markdown headings, tables, or bold. Use short paragra
                 "handoff_urgency": session.handoff["urgency"],
                 "handoff_requested_at": ai_message["created_at"],
             })
-            await database.whatsapp_handoff_alerts.update_one(
+            alert_result = await database.whatsapp_handoff_alerts.update_one(
                 {"conversation_id": conversation["_id"], "status": {"$in": ["open", "assigned"]}},
                 {
                     "$set": {"updated_at": ai_message["created_at"]},
@@ -1627,6 +1633,9 @@ Style: plain text only, no markdown headings, tables, or bold. Use short paragra
                 },
                 upsert=True,
             )
+            notify_admin_of_handoff(alert_result, conversation, session.handoff["reason"], session.handoff["summary"],
+                                    session.handoff["urgency"], session.handoff.get("contact"),
+                                    message=message, state=state)
         await repo.collection.update_one({"_id": conversation["_id"], "business_id": business["_id"]}, {"$set": updates})
 
         if session.tool_calls:

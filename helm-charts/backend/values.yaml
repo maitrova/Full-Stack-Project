@@ -38,6 +38,9 @@ envVars:
   ADMIN_NOTIFICATION_EMAIL:  orders@maitrova.in
   ADMIN_NOTIFICATION_EMAILS:  orders@maitrova.in,founder@maitrova.in,nagalahemanth411@gmail.com
   ADMIN_NOTIFICATION_NAME: Maitrova Admin
+  # Email to the team when a customer asks for a person in chat.
+  BREVO_HANDOFF_ADMIN_TEMPLATE_ID: 31
+  ADMIN_HANDOFF_EMAIL: support@maitrova.in
   # The AI service sends all WhatsApp messages (dashboard replies, order updates).
   AI_SERVICE_URL: "http://ai-agent:8000/api"
 

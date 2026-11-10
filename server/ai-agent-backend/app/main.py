@@ -3,6 +3,7 @@ import logging
 import asyncio
 from contextlib import suppress
 from app.services.whatsapp_queue import worker
+from app.services.whatsapp_followup import followup_worker
 from app.services.catalog_indexer import catalog_index_worker
 from app.services.website_knowledge import website_knowledge_worker
 
@@ -68,16 +69,20 @@ async def lifespan(app: FastAPI):
     await get_database().ai_action_audit.create_index([("business_id", 1), ("created_at", -1)])
     await get_database().merchant_prompt_versions.create_index([("business_id", 1), ("version", -1)], unique=True)
     whatsapp_worker = asyncio.create_task(worker(get_database()))
+    whatsapp_followups = asyncio.create_task(followup_worker(get_database()))
     catalogue_worker = asyncio.create_task(catalog_index_worker(get_ecommerce_database()))
     website_knowledge_task = asyncio.create_task(website_knowledge_worker(get_ecommerce_database()))
     try:
         yield
     finally:
         whatsapp_worker.cancel()
+        whatsapp_followups.cancel()
         catalogue_worker.cancel()
         website_knowledge_task.cancel()
         with suppress(asyncio.CancelledError):
             await whatsapp_worker
+        with suppress(asyncio.CancelledError):
+            await whatsapp_followups
         with suppress(asyncio.CancelledError):
             await catalogue_worker
         with suppress(asyncio.CancelledError):

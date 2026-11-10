@@ -8,6 +8,7 @@ import { addToCart, removeCartItem, updateCartItemQty } from "../controllers/car
 import { Cart } from "../models/Cart.js";
 import ReadymadeProduct from "../models/readymadeproducts.js";
 import { getReadymadePricing } from "../utils/readymadePricing.js";
+import { sendHandoffEmail } from "../services/handoffEmailService.js";
 
 const router = express.Router();
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -139,6 +140,16 @@ router.use((req, res, next) => {
   const received = String(req.headers["x-commerce-key"] || "");
   if (!expected || Buffer.byteLength(received) !== Buffer.byteLength(expected) || !timingSafeEqual(Buffer.from(received), Buffer.from(expected))) return res.sendStatus(401);
   next();
+});
+
+// The AI service reports a new "customer wants a person" request here.
+router.post("/handoff-email", async (req, res) => {
+  try {
+    return res.json(await sendHandoffEmail(req.body));
+  } catch (error) {
+    console.error("Handoff email failed:", error?.message || error);
+    return res.status(502).json({ sent: false, reason: "email_failed" });
+  }
 });
 
 // Issue tokens on the same backend/database that will complete them. This must

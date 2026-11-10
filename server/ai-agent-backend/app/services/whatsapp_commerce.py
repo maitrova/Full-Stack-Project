@@ -319,7 +319,7 @@ class WhatsAppCommerce:
             )
             await self.db.whatsapp_account_links.delete_one({"_id": account})
             state.pop("purchase", None)
-            return result("WhatsApp order updates and connected-account access are turned off. Message us again anytime to shop.")
+            return result("WhatsApp order updates, follow-up messages and connected-account access are turned off. Message us again anytime to shop.")
         if action == "human_handoff" or re.search(r"\b(human|real person|speak to staff|talk to staff|agent please)\b", text):
             state["handoff_requested"] = True
             state["handoff_context"] = {

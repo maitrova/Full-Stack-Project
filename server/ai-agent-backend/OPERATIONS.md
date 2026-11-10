@@ -316,3 +316,16 @@ to the rules agent on their next message, and nothing else changes (carts, links
 **Before stage 2:** move Gemini to a paid tier. WhatsApp and the website share the same quota, and the free tier
 allows 500 requests a day per model.
 
+# WhatsApp follow-ups
+
+One text reminder to a shopper who saw a product and then went quiet. It needs no
+Meta template because it only goes out within 22 hours of their last message.
+
+- `WHATSAPP_FOLLOWUP_MODE`: `off` (default), `allowlist` or `on`. Test with `allowlist` first.
+- `WHATSAPP_FOLLOWUP_ALLOWLIST`: comma-separated numbers for `allowlist` mode.
+- `WHATSAPP_FOLLOWUP_DELAY_HOURS`: quiet time before the reminder (default 4).
+
+Sends only 09:00-21:00 IST, at most 20 per 5-minute pass, and once per customer per
+7 days. Skips customers who sent STOP, declined, ordered since, have an open handoff,
+or whose product is out of stock. Failed sends are not retried. Check results on
+`conversations.followup_status` (`sent` / `failed`).

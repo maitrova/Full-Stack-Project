@@ -61,6 +61,10 @@ envVars:
   WHATSAPP_AGENT_ALLOWLIST: ""
   WHATSAPP_AGENT_ROLLOUT_PERCENT: "0"
   WHATSAPP_HANDOFF_IDLE_HOURS: "12"
+  # Reminder to shoppers who go quiet (see OPERATIONS.md): off -> allowlist -> on.
+  WHATSAPP_FOLLOWUP_MODE: "off"
+  WHATSAPP_FOLLOWUP_ALLOWLIST: ""
+  WHATSAPP_FOLLOWUP_DELAY_HOURS: "4"
   # Set to "order_update" once Meta approves the template.
   WHATSAPP_ORDER_UPDATE_TEMPLATE: ""
   GEMINI_INPUT_COST_PER_MILLION: "0"

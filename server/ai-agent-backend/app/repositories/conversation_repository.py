@@ -12,6 +12,7 @@ class ConversationRepository:
     async def ensure_indexes(self) -> None:
         await self.collection.create_index([("business_id", ASCENDING), ("last_message_at", DESCENDING)])
         await self.collection.create_index([("business_id", ASCENDING), ("channel", ASCENDING)])
+        await self.collection.create_index([("channel", ASCENDING), ("status", ASCENDING), ("last_message_at", DESCENDING)])
         await self.collection.create_index([("business_id", ASCENDING), ("status", ASCENDING)])
         await self.collection.create_index([("channel", ASCENDING), ("lead_type", ASCENDING), ("last_message_at", DESCENDING)])
         await self.collection.create_index([("channel", ASCENDING), ("lead_status", ASCENDING), ("last_message_at", DESCENDING)])

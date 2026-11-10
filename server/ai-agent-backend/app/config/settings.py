@@ -104,6 +104,11 @@ class Settings(BaseSettings):
     whatsapp_order_update_template: str | None = None
     whatsapp_template_language: str = "en"
     whatsapp_default_language: str = "Roman Telugu"
+    # Reminder to shoppers who go quiet: "off", "allowlist" (only the numbers
+    # below, for testing) or "on".
+    whatsapp_followup_mode: str = "off"
+    whatsapp_followup_allowlist: str = ""
+    whatsapp_followup_delay_hours: float = 4
 
     model_config = SettingsConfigDict(
         # When this service lives at server/ai-agent-backend, also read server/.env.

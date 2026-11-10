@@ -116,6 +116,10 @@ async function setup() {
     }},
     '../models/Cart.js': {Cart: {collection: {name: 'carts'}}},
     '../utils/readymadePricing.js': {getReadymadePricing: () => ({effectivePrice: 120})},
+    '../services/handoffEmailService.js': {sendHandoffEmail: async body => {
+      if (body.fail) throw new Error('brevo down');
+      return {sent: true};
+    }},
     '../controllers/cartController.js': {
       addToCart: async (req, res) => {additions++; res.status(201).json({message: 'Added'});},
       removeCartItem: async (_req, res) => res.status(200).json({message: 'Removed'}),
@@ -208,6 +212,18 @@ test('multi-item endpoint adds nothing when any requested size is unavailable', 
   }, res);
   assert.equal(res.code, 409);
   assert.equal(s.activeCart(), null);
+});
+
+test('handoff email reports success and a Brevo failure without crashing', async () => {
+  const s = await setup();
+  const send = s.handlers.get('POST /handoff-email')[0];
+  const ok = s.response();
+  await send({body: {reason: 'customer_asked'}}, ok);
+  assert.deepEqual(ok.body, {sent: true});
+  const failed = s.response();
+  await send({body: {fail: true}}, failed);
+  assert.equal(failed.code, 502);
+  assert.equal(failed.body.sent, false);
 });
 
 test('secret and linked account required; orders scoped to linked user', async () => {

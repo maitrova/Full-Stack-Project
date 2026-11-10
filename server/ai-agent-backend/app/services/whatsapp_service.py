@@ -25,6 +25,7 @@ from app.repositories.message_repository import MessageRepository
 from app.repositories.ecommerce_product_repository import EcommerceProductRepository
 from app.tools.product_tools import ProductTools
 from app.services.whatsapp_commerce import WhatsAppCommerce
+from app.services.whatsapp_followup import is_opt_out, record_opt_out
 from app.services.remote_media import fetch_remote_image
 from app.schemas.ai import AiChatResponse
 from app.utils.object_id import parse_object_id
@@ -453,6 +454,10 @@ class WhatsAppService:
                     if not text:
                         logger.info("Ignoring unsupported WhatsApp message type %s", message.get("type"))
                         continue
+
+                    # Here, not in a chat flow, so STOP works whichever engine replies.
+                    if is_opt_out(text):
+                        await record_opt_out(self.conversation_repository.collection.database, business["_id"], from_phone)
 
                     try:
                         quoted_message_id = str((message.get("context") or {}).get("id") or "") or None
