@@ -1,6 +1,6 @@
 # AI Agent Workflow
 
-This document explains how a customer message travels through the AI sales agent, where deterministic code is used, where Gemini/OpenAI are used, how product search works, and how fallback responses are selected.
+This document explains how a customer message travels through the AI sales agent, where deterministic code is used, where Claude, Gemini and OpenAI are used, how product search works, and how fallback responses are selected.
 
 ## 1. Complete request flow
 
@@ -12,8 +12,8 @@ flowchart TD
     D --> E[IntentParser]
     E --> F{Deterministic rules clear?}
     F -- Yes --> G[Structured intent]
-    F -- No --> H[Gemini text intent parser]
-    H --> I{Gemini available?}
+    F -- No --> H[Claude text intent parser]
+    H --> I{Claude available?}
     I -- No or error --> J[Rule-parser fallback]
     I -- Yes --> G
     J --> G
@@ -99,7 +99,7 @@ The parser extracts structured fields:
 }
 ```
 
-The parser first uses deterministic rules. Gemini is used only when the rules cannot safely understand the message or when the message is ambiguous.
+The parser first uses deterministic rules. Claude is used only when the rules cannot safely understand the message or when the message is ambiguous.
 
 ### C. Route classification
 
@@ -183,7 +183,7 @@ Text semantic search uses:
 
 Image search uses:
 
-1. Gemini or OpenAI vision analysis to identify the uploaded item.
+1. Claude (or OpenAI fallback) vision analysis to identify the uploaded item.
 2. Gemini image embedding when available.
 3. Catalogue image/text/index attributes.
 4. Hard filters.
@@ -193,25 +193,34 @@ If the image does not match a product strongly enough, the agent should say that
 
 ## 5. Where AI models are used
 
-### Gemini
+### Claude (primary)
 
-File: `app/ai/gemini_client.py`
+Files: `app/ai/anthropic_provider.py` (shared request helper), `app/ai/tool_calling.py`
+(tool-calling agent), `app/ai/gemini_client.py` (text and vision).
 
 Used for:
 
-- Ambiguous intent parsing
+- The tool-calling agents (website chat and WhatsApp)
+- Ambiguous intent parsing and reply wording
 - Vision analysis of uploaded images
-- Text embeddings
-- Image embeddings
-- Website/catalogue semantic understanding
 
-The configured model is controlled by `GEMINI_MODEL`.
+The model is `ANTHROPIC_MODEL` (default `claude-haiku-5-5`), with thinking depth set by
+`ANTHROPIC_EFFORT` (default `low`). `ANTHROPIC_FALLBACK_MODELS` lists backup Claude models
+tried when the main one is rate-limited or overloaded. A safety refusal is treated as a
+provider error, so the OpenAI fallback or deterministic path takes over.
+
+### Gemini (embeddings only)
+
+File: `app/ai/gemini_client.py` (`embed_content`).
+
+Used for text and image embeddings behind catalogue, image and website-knowledge search.
+Anthropic has no embeddings API, so `GEMINI_API_KEY` stays required.
 
 ### OpenAI fallback
 
-Also in `app/ai/gemini_client.py`.
+In `app/ai/tool_calling.py` and `app/ai/gemini_client.py`.
 
-OpenAI is used as a secondary provider when Gemini fails and an OpenAI key is configured. It is not the primary decision-maker when deterministic rules already resolve the request.
+OpenAI is used as a secondary provider when Claude fails and an OpenAI key is configured. It is not the primary decision-maker when deterministic rules already resolve the request.
 
 ### No model is needed for
 
@@ -276,7 +285,7 @@ Agent: Does not claim the exact product exists. Routes to customization.
 
 | Situation | Safe behavior |
 |---|---|
-| Gemini unavailable | Use deterministic parser and explicit clarification when needed |
+| Claude unavailable | Use OpenAI if configured, else the deterministic parser and explicit clarification when needed |
 | No product match | Say no exact match was found; offer similar/custom products |
 | Low intent confidence | Ask a short clarification question |
 | Missing product selection | Ask the customer to choose an option |
@@ -329,7 +338,7 @@ The agent should not:
 | Catalogue normalization/search | `app/repositories/ecommerce_product_repository.py` |
 | Product embeddings | `app/services/catalog_indexer.py` |
 | Website knowledge | `app/services/website_knowledge.py` |
-| AI provider calls | `app/ai/gemini_client.py` |
+| AI provider calls | `app/ai/anthropic_provider.py`, `app/ai/tool_calling.py`, `app/ai/gemini_client.py` |
 | Response wording | `app/ai/response_generator.py`, `app/ai/sales_agent.py` |
 | Conversation state | `app/services/conversation_flow.py` |
 | Evaluation | `scripts/evaluate_agent_dataset.py`, `app/services/agent_evaluation.py` |

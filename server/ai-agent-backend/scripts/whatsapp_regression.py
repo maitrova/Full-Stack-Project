@@ -289,7 +289,7 @@ def main() -> int:
     parser.add_argument("--meta-port", type=int, default=8020)
     parser.add_argument("--groups")
     parser.add_argument("--ids")
-    parser.add_argument("--delay", type=float, default=3.0, help="seconds between messages (Gemini per-minute limits)")
+    parser.add_argument("--delay", type=float, default=3.0, help="seconds between messages (provider per-minute limits)")
     parser.add_argument("--min-pass", type=float, default=0.9)
     parser.add_argument("--save", action="store_true", help="store the run in ai_agent_evaluations for the admin page")
     args = parser.parse_args()

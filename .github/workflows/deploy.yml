@@ -226,6 +226,7 @@ jobs:
       - name: Deploy AI agent to VPS
         uses: appleboy/ssh-action@v1.2.0
         env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
@@ -236,15 +237,16 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           port: ${{ secrets.VPS_PORT }}
           password: ${{ secrets.VPS_PASSWORD }}
-          envs: GEMINI_API_KEY,OPENAI_API_KEY,JWT_SECRET,AI_EVALUATION_KEY,WHATSAPP_COMMERCE_KEY
+          envs: ANTHROPIC_API_KEY,GEMINI_API_KEY,OPENAI_API_KEY,JWT_SECRET,AI_EVALUATION_KEY,WHATSAPP_COMMERCE_KEY
           script: |
             set -e
-            if [ -z "${GEMINI_API_KEY:-}" ] || [ -z "${JWT_SECRET:-}" ] || [ -z "${AI_EVALUATION_KEY:-}" ] || [ -z "${WHATSAPP_COMMERCE_KEY:-}" ]; then
-              echo "ERROR: GEMINI_API_KEY, JWT_SECRET, AI_EVALUATION_KEY and WHATSAPP_COMMERCE_KEY GitHub Actions secrets are required for the AI agent deployment" >&2
+            if [ -z "${ANTHROPIC_API_KEY:-}" ] || [ -z "${GEMINI_API_KEY:-}" ] || [ -z "${JWT_SECRET:-}" ] || [ -z "${AI_EVALUATION_KEY:-}" ] || [ -z "${WHATSAPP_COMMERCE_KEY:-}" ]; then
+              echo "ERROR: ANTHROPIC_API_KEY, GEMINI_API_KEY, JWT_SECRET, AI_EVALUATION_KEY and WHATSAPP_COMMERCE_KEY GitHub Actions secrets are required for the AI agent deployment" >&2
               exit 1
             fi
             set --
-            set -- --set-string "envSecrets.GEMINI_API_KEY=${GEMINI_API_KEY}"
+            set -- --set-string "envSecrets.ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}"
+            set -- "$@" --set-string "envSecrets.GEMINI_API_KEY=${GEMINI_API_KEY}"
             set -- "$@" --set-string "envSecrets.JWT_SECRET=${JWT_SECRET}"
             set -- "$@" --set-string "envSecrets.AI_EVALUATION_KEY=${AI_EVALUATION_KEY}"
             set -- "$@" --set-string "envSecrets.WHATSAPP_COMMERCE_KEY=${WHATSAPP_COMMERCE_KEY}"

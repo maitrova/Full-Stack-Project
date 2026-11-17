@@ -28,7 +28,7 @@ inbound customer message refreshes that 24-hour window. Meta does not allow
 free-form business messages outside it, so updates outside the window are skipped
 until at least one approved template is configured.
 
-Existing WhatsApp credentials and Gemini settings remain required. Do not expose
+Existing WhatsApp credentials, `ANTHROPIC_API_KEY` (replies) and `GEMINI_API_KEY` (search embeddings) remain required. Do not expose
 server secrets through Vite environment variables. Restart both application servers.
 
 Maitrova URL configuration (agent environment):
@@ -158,11 +158,12 @@ It falls back to the rules agent for images, model errors, timeouts and replies
 that fail the grounding check, and sends a short "busy" reply when the AI
 provider rate-limits or a reply takes longer than the time limit.
 
-Gemini free-tier quotas are per model (500 requests/day each). When the main
-model (`GEMINI_MODEL`) is rate-limited or its daily quota is spent, the agent
-moves to `GEMINI_FALLBACK_MODELS` (default `gemini-3.5-flash-lite`) and skips
-the exhausted model for an hour. Each chat message uses 2-3 requests, so for
-real traffic enable billing on the Google project rather than relying on this.
+Replies use Claude (`ANTHROPIC_MODEL`, default `claude-haiku-5-5`). On a rate
+limit the agent backs off twice on the same model, then tries the models in
+`ANTHROPIC_FALLBACK_MODELS` (empty by default), and skips the wait when it would
+run past the reply deadline. Each chat message uses 2-3 requests. Anthropic rate
+limits rise with the organization's usage tier, so check the tier in the Claude
+Console before increasing the rollout.
 
 ## Regression test set
 
@@ -186,7 +187,7 @@ unless `--allow-remote`, closes the alerts it created, writes a JSON report to
 `outputs/`, and exits 1 below `--min-pass` (default 90%). `--save` stores the run
 in `ai_agent_evaluations`, so it appears on the admin AI evaluation page.
 Run it before every deploy that touches the agent, its prompt, the catalogue
-schema, or the Gemini model; a full run makes about 250 model calls.
+schema, or the Claude model; a full run makes about 250 model calls.
 
 ## Monitoring
 
@@ -197,7 +198,7 @@ latency, and cost per conversation. Its alerts are merged into `alerts`:
 
 | Alert | Fires at | Usual cause |
 |---|---|---|
-| `ai_provider_rate_limited` (critical) | 5% of replies busy | Gemini quota or billing |
+| `ai_provider_rate_limited` (critical) | 5% of replies busy | Anthropic rate limits or billing |
 | `ai_provider_slow` | 5% of messages timed out | provider latency; the shopper was asked to resend (limit: `WEB_AGENT_TOTAL_TIMEOUT_SECONDS`, default 60) |
 | `high_fallback_rate` | 15% of replies | provider errors/timeouts, or grounding failures (see `fallback_reasons`) |
 | `high_grounding_retry_rate` | 20% of replies | the model inventing prices/links; check prompt or catalogue data |
@@ -274,7 +275,7 @@ python scripts/whatsapp_regression.py --groups cart,handoff --save
 Test customers use numbers starting 999 (no such country code), so nothing can reach a real person. The run creates a
 temporary shopper and removes it afterwards, along with the account links, carts and subscriptions it created, and it
 closes the alerts it opened. It exits 1 below a 90% pass rate (`--min-pass`). With `--save`, the report appears with the
-website runs on the AI evaluation page. A run uses about 150 Gemini calls.
+website runs on the AI evaluation page. A run uses about 150 Claude calls.
 
 ### Monitoring
 
@@ -313,8 +314,8 @@ restarting the AI service:
 **Rollback:** `WHATSAPP_AGENT_MODE=rules`, `WHATSAPP_AGENT_ROLLOUT_PERCENT=0`, and an empty allowlist. Customers go back
 to the rules agent on their next message, and nothing else changes (carts, links and handoffs are shared).
 
-**Before stage 2:** move Gemini to a paid tier. WhatsApp and the website share the same quota, and the free tier
-allows 500 requests a day per model.
+**Before stage 2:** check the Anthropic usage tier and rate limits in the Claude Console. WhatsApp and the website
+share the same limits.
 
 # WhatsApp follow-ups
 

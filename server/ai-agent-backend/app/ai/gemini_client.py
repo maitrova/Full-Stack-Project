@@ -1,43 +1,60 @@
-import asyncio
 import logging
 import base64
 from typing import Any
 
 import httpx
 
+from app.ai.anthropic_provider import create_message, make_client, response_text
 from app.config.settings import settings
 from app.services.remote_media import fetch_remote_image
 from app.ai.usage import record_usage
 
 logger = logging.getLogger(__name__)
 
+# Room for adaptive thinking plus the answer (thinking counts toward the cap).
+TEXT_MAX_TOKENS = 4096
+CLAUDE_TIMEOUT_SECONDS = 45
+
 
 class GeminiClient:
-    def __init__(self, api_key: str | None = None, model: str | None = None):
+    """Text and vision go to Claude (OpenAI as backup); embeddings stay on Gemini.
+
+    The class keeps its historical name so existing callers need no changes.
+    ``api_key`` is the Gemini key, used only for embeddings.
+    """
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str | None = None,
+        anthropic_api_key: str | None = None,
+    ):
         self.api_key = settings.gemini_api_key if api_key is None else api_key
-        self.model = settings.gemini_model if model is None else model
+        self.anthropic_api_key = settings.anthropic_api_key if anthropic_api_key is None else anthropic_api_key
+        self.model = settings.anthropic_model if model is None else model
         logger.info(
-            "Gemini client configured=%s model=%s",
+            "AI client configured claude=%s embeddings=%s model=%s",
+            bool(self.anthropic_api_key),
             bool(self.api_key),
             self.model,
         )
 
     @property
     def is_configured(self) -> bool:
-        return bool(self.api_key or settings.openai_api_key)
+        return bool(self.anthropic_api_key or settings.openai_api_key)
 
     @property
     def supports_embeddings(self) -> bool:
         return bool(self.api_key)
 
     async def generate_text(self, prompt: str) -> str:
-        if self.api_key:
+        if self.anthropic_api_key:
             try:
-                return await self._create_interaction(prompt, "text")
+                return await self._create_claude_message([{"type": "text", "text": prompt}], "text")
             except Exception as exc:
                 if not settings.openai_api_key:
                     raise
-                logger.warning("Gemini text unavailable; trying secondary provider: %s", exc.__class__.__name__)
+                logger.warning("Claude text unavailable; trying secondary provider: %s", exc.__class__.__name__)
         if settings.openai_api_key:
             return await self._create_openai_response(prompt, "text")
         raise RuntimeError("No AI provider is configured")
@@ -56,17 +73,17 @@ class GeminiClient:
             image_url, image_data, mime_type
         )
 
-        gemini_input = [
-            {"type": "text", "text": prompt},
-            {"type": "image", "mime_type": resolved_mime_type, "data": resolved_image_data},
-        ]
-        if self.api_key:
+        if self.anthropic_api_key:
+            claude_content = [
+                {"type": "image", "source": {"type": "base64", "media_type": resolved_mime_type, "data": resolved_image_data}},
+                {"type": "text", "text": prompt},
+            ]
             try:
-                return await self._create_interaction(gemini_input, "vision")
+                return await self._create_claude_message(claude_content, "vision")
             except Exception as exc:
                 if not settings.openai_api_key:
                     raise
-                logger.warning("Gemini vision unavailable; trying secondary provider: %s", exc.__class__.__name__)
+                logger.warning("Claude vision unavailable; trying secondary provider: %s", exc.__class__.__name__)
         if settings.openai_api_key:
             openai_input = [{
                 "role": "user",
@@ -78,56 +95,18 @@ class GeminiClient:
             return await self._create_openai_response(openai_input, "vision")
         raise RuntimeError("No AI provider is configured")
 
-    async def _create_interaction(self, input_data: str | list[dict[str, Any]], operation: str) -> str:
-        """Use Google's current stateless API for text and multimodal understanding."""
-        url = "https://generativelanguage.googleapis.com/v1beta/interactions"
-        models = list(dict.fromkeys([self.model, "gemini-3.1-flash-lite", "gemini-3.8-flash"]))
-        async with httpx.AsyncClient(timeout=45) as client:
-            for model_index, model in enumerate(models):
-                payload = {"model": model, "input": input_data, "store": False}
-                # Reset per model: a network error leaves no response, and the
-                # next model must be tried instead of reading a stale/unset one.
-                response = None
-                for attempt in range(2):
-                    try:
-                        response = await client.post(
-                            url,
-                            headers={"Content-Type": "application/json", "x-goog-api-key": self.api_key},
-                            json=payload,
-                        )
-                    except httpx.TransportError:
-                        if attempt or model_index == len(models) - 1:
-                            raise
-                        await asyncio.sleep(1)
-                        break
-                    if response.status_code in {429, 500, 502, 503, 504} and not attempt:
-                        await asyncio.sleep(1)
-                        continue
-                    break
-                if response is None:
-                    continue
-                if not response.is_error or response.status_code not in {404, 429, 500, 502, 503, 504}:
-                    break
-                if model_index < len(models) - 1:
-                    logger.info("Gemini %s model %s unavailable; trying fallback", operation, model)
-        if response is None:
-            raise RuntimeError(f"Gemini {operation} unreachable")
-        if response.is_error:
-            self._log_api_error(response, operation, model)
-        response.raise_for_status()
-        data = response.json()
-        record_usage("gemini", model, operation, data.get("usage") or data.get("usageMetadata"))
-        text = data.get("output_text") or "".join(
-            content.get("text", "")
-            for step in data.get("steps", [])
-            if step.get("type") == "model_output"
-            for content in step.get("content", [])
-            if content.get("type") == "text"
-        )
-        if not isinstance(text, str) or not text.strip():
-            logger.warning("Unexpected Gemini %s interaction response shape", operation)
-            raise RuntimeError(f"Invalid Gemini {operation} response")
-        return text.strip()
+    async def _create_claude_message(self, content: list[dict[str, Any]], operation: str) -> str:
+        async with make_client(self.anthropic_api_key, CLAUDE_TIMEOUT_SECONDS) as client:
+            message = await create_message(
+                client, operation,
+                max_tokens=TEXT_MAX_TOKENS,
+                messages=[{"role": "user", "content": content}],
+            )
+        text = response_text(message)
+        if not text:
+            logger.warning("Empty Claude %s response (stop_reason=%s)", operation, message.stop_reason)
+            raise RuntimeError(f"Invalid Claude {operation} response")
+        return text
 
     async def _create_openai_response(self, input_data: Any, operation: str) -> str:
         payload = {"model": settings.openai_model, "input": input_data, "store": False}

@@ -68,7 +68,7 @@ async def ai_workflow(current_user: UserPublic = Depends(get_current_user)):
             {"id": "state", "label": "Load conversation state", "type": "state", "file": "app/ai/sales_agent.py"},
             {"id": "language", "label": "Language and text normalization", "type": "parser", "file": "app/ai/language.py"},
             {"id": "intent", "label": "Intent and entity extraction", "type": "parser", "file": "app/ai/intent_parser.py"},
-            {"id": "model", "label": "Gemini / OpenAI fallback", "type": "model", "file": "app/ai/gemini_client.py"},
+            {"id": "model", "label": "Claude / OpenAI fallback", "type": "model", "file": "app/ai/anthropic_provider.py"},
             {"id": "route", "label": "Route classification", "type": "router", "file": "app/ai/tool_router.py"},
             {"id": "policy", "label": "Action authorization", "type": "guard", "file": "app/ai/action_policy.py"},
             {"id": "catalogue", "label": "Catalogue search", "type": "tool", "file": "app/tools/product_tools.py"},
@@ -100,7 +100,7 @@ async def ai_workflow(current_user: UserPublic = Depends(get_current_user)):
             {"from": "fallback", "to": "response"},
         ],
         "models": {
-            "primary_text_and_vision": "GEMINI_MODEL",
+            "primary_text_and_vision": "ANTHROPIC_MODEL",
             "secondary_text_and_vision": "OPENAI_MODEL",
             "embedding": "GEMINI_EMBEDDING_MODEL",
             "fallback_policy": "deterministic rules and verified catalogue facts",
@@ -111,7 +111,7 @@ async def ai_workflow(current_user: UserPublic = Depends(get_current_user)):
             "order_tracking", "human_handoff", "unsupported",
         ],
         "fallbacks": [
-            "Gemini unavailable -> deterministic parser",
+            "Claude unavailable -> deterministic parser",
             "No product match -> no-match response plus similar/custom option",
             "Missing product selection -> ask for option or product name",
             "Unsafe cart action -> block and ask for required details",

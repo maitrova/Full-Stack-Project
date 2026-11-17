@@ -40,7 +40,7 @@ async def readiness_check():
         raise HTTPException(status_code=503, detail="database unavailable") from exc
 
     missing = []
-    if not settings.gemini_api_key and not settings.openai_api_key:
+    if not settings.anthropic_api_key and not settings.openai_api_key:
         missing.append("AI provider")
     if not settings.whatsapp_access_token or not settings.whatsapp_phone_number_id:
         missing.append("WhatsApp")

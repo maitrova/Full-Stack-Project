@@ -1681,7 +1681,7 @@ Style: plain text only, no markdown headings, tables, or bold. Use short paragra
                 "slowest_model_call_ms": max((int(item.get("latency_ms") or 0) for item in model_calls), default=0),
                 "model_retries": sum(max(0, int(item.get("attempts") or 1) - 1) for item in model_calls),
                 "backup_model_used": any(
-                    item.get("provider") != "gemini" or item.get("model") != settings.gemini_model for item in model_calls
+                    item.get("provider") != "anthropic" or item.get("model") != settings.anthropic_model for item in model_calls
                 ),
                 "tool_ms": sum(int(call.get("latency_ms") or 0) for call in session.tool_calls),
                 "tool_names": [call["name"] for call in session.tool_calls],

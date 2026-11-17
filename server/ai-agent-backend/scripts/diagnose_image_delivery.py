@@ -12,7 +12,8 @@ from app.config.settings import settings
 
 async def main():
     print(json.dumps({"configured": {
-        "gemini": bool(settings.gemini_api_key),
+        "claude": bool(settings.anthropic_api_key),
+        "embeddings": bool(settings.gemini_api_key),
         "whatsapp_sender": bool(settings.whatsapp_access_token and settings.whatsapp_phone_number_id),
         "business": bool(settings.whatsapp_business_id),
     }}))

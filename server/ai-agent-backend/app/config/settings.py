@@ -35,6 +35,17 @@ class Settings(BaseSettings):
     jwt_access_token_expire_minutes: int = 60
 
     frontend_origin: str = "http://localhost:5173"
+    # Primary provider for text, vision and tool calling.
+    anthropic_api_key: str | None = None
+    anthropic_model: str = "claude-haiku-5-5"
+    # Tried in order when the main model is rate-limited or overloaded. Each
+    # must accept output_config.effort (Haiku 5.5, Sonnet 5.5, Opus 5.5).
+    anthropic_fallback_models: str = ""
+    # low | medium | high. Low keeps shopper replies fast and cheap.
+    anthropic_effort: str = "low"
+    anthropic_input_cost_per_million: float = 0.10
+    anthropic_output_cost_per_million: float = 0.50
+    # Gemini is kept for embeddings (catalogue, image and store-info search).
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-3.1-flash-lite"
     # Tried in order when the main model is rate-limited or unavailable.
