@@ -944,7 +944,7 @@ const AIShoppingChat = () => {
                 <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white" aria-hidden="true" />
               </span>
               <div className="min-w-0">
-                <h2 className="truncate text-sm font-semibold text-gray-950">Maitrova Assistant</h2>
+                <h2 className="truncate text-sm font-semibold text-gray-950">Closet AI</h2>
                 <p className="truncate text-xs text-gray-500">Online · replies instantly</p>
               </div>
             </div>
@@ -1190,7 +1190,7 @@ const AIShoppingChat = () => {
         type="button"
         onClick={() => setIsOpen((currentValue) => !currentValue)}
         className="relative ml-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-950 text-white shadow-[0_12px_32px_-8px_rgba(0,0,0,0.45)] transition hover:scale-105 hover:bg-gray-800 focus:outline-none focus-visible:ring-4 focus-visible:ring-gray-950/20"
-        aria-label={isOpen ? "Close chat" : "Chat with the Maitrova assistant"}
+        aria-label={isOpen ? "Close chat" : "Chat with Closet AI"}
         aria-expanded={isOpen}
       >
         {recommendationNoticeCount > 0 && !isOpen && (
