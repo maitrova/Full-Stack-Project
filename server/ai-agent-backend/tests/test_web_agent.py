@@ -174,16 +174,93 @@ class ToolSessionTests(unittest.IsolatedAsyncioTestCase):
         session.page_product = hoodie
         with patch("app.ai.web_agent._load_design_files", AsyncMock(side_effect=lambda folder: files[folder])):
             listing = await session.execute("browse_design_library", {})
-            self.assertEqual(listing["designer_url"], "https://maitrova.in/products/hoodie/customize")
+            self.assertEqual(listing["all_designs"], {
+                "design_count": 8, "designer_url": "https://maitrova.in/products/hoodie/customize",
+            })
             self.assertEqual(listing["collections"], [{
-                "collection": "anime", "design_count": 8,
+                "collection": "Anime", "design_count": 8,
                 "designer_url": "https://maitrova.in/products/hoodie/customize?collection=anime",
             }])
-            self.assertEqual(session.design_previews, [])
+            self.assertEqual([preview["name"] for preview in session.design_previews], ["Naruto 0"])
             detail = await session.execute("browse_design_library", {"collection": "Anime"})
         self.assertEqual(detail["design_count"], 8)
         self.assertEqual(len(session.design_previews), 6)
         self.assertTrue(session.design_previews[0]["url"].endswith("?collection=anime"))
+
+    def designer_products(self):
+        def custom(name, slug, **extra):
+            return product(name, source="customization", customizable=True,
+                           product_url=f"https://www.maitrova.in/products/{slug}/customize", **extra)
+        return {
+            "crop": custom("Womens Crop Top", "womens-crop-top"),
+            "classic": custom("Classic Round Tee", "classic-round-tee"),
+            "hoodie": custom("Hoodie", "hoodie"),
+            "readymade": product("Iron Man Tee"),
+        }
+
+    async def library_listing(self, search_order, selected=None, page_product=None, details=None):
+        agent, sales_agent, _ = make_agent(FakeClient([], ["ok"]))
+        sales_agent.product_tools.search_products = AsyncMock(return_value=search_order)
+        sales_agent.product_tools.get_product_details = AsyncMock(return_value=details)
+        sales_agent._load_design_library_folders = AsyncMock(
+            return_value=["all-readymade-designs", "anime", "gym-fitness", "typography", "zodiac", "vintage"])
+        files = {folder: [{"name": f"{folder} {n}", "image": f"/outputs/adminuploadeddesigns/{folder}/{n}.webp"}
+                          for n in range(3)] for folder in ["anime", "gym-fitness", "typography", "zodiac", "vintage"]}
+        files["all-readymade-designs"] = [design for designs in list(files.values()) for design in designs]
+        session = _ToolSession(agent, BUSINESS)
+        session.page_product = page_product
+        if selected:
+            session.state["selected_product_id"] = selected
+        with patch("app.ai.web_agent._load_design_files", AsyncMock(side_effect=lambda folder: files[folder])):
+            return await session.execute("browse_design_library", {}), session
+
+    async def test_design_links_open_the_classic_round_tee_whatever_the_search_order(self):
+        items = self.designer_products()
+        for order in ([items["crop"], items["classic"]], [items["classic"], items["crop"]]):
+            listing, _ = await self.library_listing(order)
+            self.assertEqual(listing["all_designs"]["designer_url"],
+                             "https://www.maitrova.in/products/classic-round-tee/customize?collection=all-readymade-designs")
+
+    async def test_design_links_follow_the_customizable_product_being_discussed(self):
+        items = self.designer_products()
+        listing, _ = await self.library_listing([items["crop"], items["classic"]], selected="h1", details=items["hoodie"])
+        self.assertIn("/products/hoodie/customize", listing["all_designs"]["designer_url"])
+        listing, _ = await self.library_listing([items["crop"], items["classic"]], selected="r1", details=items["readymade"])
+        self.assertIn("/products/classic-round-tee/customize", listing["all_designs"]["designer_url"])
+
+    async def test_without_the_default_product_any_customizable_one_is_used(self):
+        items = self.designer_products()
+        with patch("app.ai.sales_agent.settings.design_library_default_product", "no-such-product"):
+            listing, _ = await self.library_listing([items["readymade"], items["hoodie"]])
+        self.assertIn("/products/hoodie/customize", listing["all_designs"]["designer_url"])
+
+    async def test_general_designs_answer_lists_themes_with_an_all_designs_link_and_samples(self):
+        listing, session = await self.library_listing([self.designer_products()["classic"]])
+        self.assertEqual(listing["all_designs"]["design_count"], 15)
+        self.assertEqual([item["collection"] for item in listing["collections"]],
+                         ["Anime", "Gym fitness", "Typography", "Zodiac", "Vintage"])
+        self.assertEqual(len(session.design_previews), 4)
+        self.assertEqual(session.design_previews[1]["collection"], "Gym fitness")
+        self.assertTrue(session.design_previews[1]["url"].endswith("?collection=gym-fitness"))
+
+    async def test_a_design_name_search_skips_the_all_designs_folder(self):
+        agent, sales_agent, _ = make_agent(FakeClient([], ["ok"]))
+        sales_agent.product_tools.search_products = AsyncMock(return_value=[self.designer_products()["classic"]])
+        sales_agent._load_design_library_folders = AsyncMock(return_value=["all-readymade-designs", "anime-naruto"])
+        naruto = {"name": "Naruto run", "image": "/outputs/x.webp"}
+        files = {"all-readymade-designs": [naruto], "anime-naruto": [naruto]}
+        session = _ToolSession(agent, BUSINESS)
+        with patch("app.ai.web_agent._load_design_files", AsyncMock(side_effect=lambda folder: files[folder])):
+            result = await session.execute("browse_design_library", {"collection": "run"})
+        self.assertEqual(result["matching_design_count"], 1)
+        self.assertEqual([item["collection"] for item in result["found_in_collections"]], ["anime-naruto"])
+
+    def test_prompt_separates_designs_from_customizable_products(self):
+        import inspect
+        prompt = inspect.getsource(WebAgent._web_system_prompt)
+        self.assertIn("Designs mean the design library, not clothing", prompt)
+        self.assertIn("Don't explain how links or collection filters work", prompt)
+        self.assertIn("Customizing means the products", prompt)
 
     def cart_session(self, product_list, message, cart=None):
         agent, sales_agent, _ = make_agent(FakeClient([], ["ok"]), product_list)

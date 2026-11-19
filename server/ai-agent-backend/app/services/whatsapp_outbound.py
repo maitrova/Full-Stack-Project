@@ -18,6 +18,7 @@ from pymongo.errors import DuplicateKeyError
 
 from app.config.settings import settings
 from app.repositories.message_repository import MessageRepository
+from app.services.whatsapp_history import record_outbound_notice
 from app.services.whatsapp_service import WhatsAppClient
 
 logger = logging.getLogger(__name__)
@@ -183,6 +184,11 @@ class WhatsAppOutbound:
             await self._log(log_id, "failed", reason="not_configured")
             return {"sent": False, "reason": "not_configured"}
         await self._log(log_id, "sent", kind=kind)
+        # A template carries the same facts, so the inbox shows the readable text either way.
+        await record_outbound_notice(
+            self.db, str(subscription["recipient"]), order_update_text(event, number, total or ""), sent,
+            "order_update", extra={"order_number": number, "order_event": event, "sent_as": kind},
+        )
         return {"sent": True, "kind": kind}
 
     async def _log(self, log_id: str, status: str, **fields) -> None:

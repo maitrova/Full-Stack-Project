@@ -840,7 +840,9 @@ class EcommerceProductRepository:
             return None
         return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
 
-    def _public_image_url(self, value: str) -> str | None:
+    @staticmethod
+    def _public_image_url(value: str) -> str | None:
+        """Absolute public URL for a stored image path (also used for design-library art)."""
         value = value.strip()
         if value.lower().startswith(("http://", "https://")):
             return value

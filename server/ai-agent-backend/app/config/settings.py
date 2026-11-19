@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     ecommerce_outputs_path: str | None = None
     ecommerce_storefront_url: str | None = None
     ecommerce_customization_url: str | None = None
+    # Customizable product whose designer opens design-library links when the
+    # shopper hasn't picked one (its URL slug, e.g. /products/classic-round-tee).
+    design_library_default_product: str = "classic-round-tee"
     ecommerce_api_url: str = "http://127.0.0.1:5000/api"
     remote_image_allowed_hosts: str = ""
     remote_image_max_bytes: int = 10 * 1024 * 1024

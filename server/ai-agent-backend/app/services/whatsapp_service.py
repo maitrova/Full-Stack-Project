@@ -26,11 +26,20 @@ from app.repositories.ecommerce_product_repository import EcommerceProductReposi
 from app.tools.product_tools import ProductTools
 from app.services.whatsapp_commerce import WhatsAppCommerce
 from app.services.whatsapp_followup import is_opt_out, record_opt_out
+from app.services.whatsapp_history import outbound_message_id, record_outbound_notice
 from app.services.remote_media import fetch_remote_image
 from app.schemas.ai import AiChatResponse
 from app.utils.object_id import parse_object_id
 
 logger = logging.getLogger(__name__)
+
+# Design-library samples sent as photos with a designs answer.
+WHATSAPP_DESIGN_PHOTOS = 4
+IMAGE_ACK_TEXT ="Thanks for the photo. I'm checking it against our catalogue."
+IMAGE_FAILURE_TEXT = (
+    "I couldn't finish checking your photo right now. Tell me the product name or type "
+    "and color, and I'll help you search. You can also send 'human' to speak with our team."
+)
 
 
 class WhatsAppClient:
@@ -440,7 +449,9 @@ class WhatsAppService:
                     )
 
                     if await self._rate_limited(from_phone):
-                        await self.client.send_text(from_phone, "You are sending messages too quickly. Please wait a minute and try again.")
+                        notice = "You are sending messages too quickly. Please wait a minute and try again."
+                        sent = await self.client.send_text(from_phone, notice)
+                        await self._record_notice(from_phone, notice, sent, "rate_limited")
                         if whatsapp_message_id:
                             await self.deliveries.update_one(
                                 {"_id": whatsapp_message_id},
@@ -478,8 +489,9 @@ class WhatsAppService:
                             continue
 
                         await self._show_typing(whatsapp_message_id)
+                        image_ack = None
                         if message.get("type") == "image":
-                            await self._acknowledge_image(from_phone, whatsapp_message_id)
+                            image_ack = await self._acknowledge_image(from_phone, whatsapp_message_id)
                         try:
                             ai_response = await asyncio.wait_for(self._process_inbound_chat(
                                 business=business,
@@ -505,9 +517,15 @@ class WhatsAppService:
                             await self.deliveries.update_one(
                                 {"_id": whatsapp_message_id}, {"$set": failure_details}, upsert=True,
                             )
+                            await self._record_notice(from_phone, IMAGE_ACK_TEXT, image_ack, "photo_received")
                             await self._send_image_failure(from_phone, whatsapp_message_id, type(exc).__name__)
                             processed += 1
                             continue
+                        # Recorded now, once the customer's photo is in the chat to sit after.
+                        await self._record_notice(
+                            from_phone, IMAGE_ACK_TEXT, image_ack, "photo_received",
+                            after_whatsapp_message_id=whatsapp_message_id,
+                        )
                         await self.deliveries.update_one({"_id": whatsapp_message_id}, {"$set": {"response": ai_response.model_dump(mode="json")}}, upsert=True)
                         await self._deliver(from_phone, whatsapp_message_id, ai_response)
                         processed += 1
@@ -523,6 +541,10 @@ class WhatsAppService:
                         )
                         try:
                             sent = await self.client.send_text(from_phone, fallback, whatsapp_message_id)
+                            await self._record_notice(
+                                from_phone, fallback, sent, "processing_failed",
+                                after_whatsapp_message_id=whatsapp_message_id,
+                            )
                             await self.deliveries.update_one(
                                 {"_id": whatsapp_message_id},
                                 {
@@ -554,26 +576,32 @@ class WhatsAppService:
         except Exception as exc:
             logger.info("WhatsApp typing indicator skipped (%s)", type(exc).__name__)
 
-    async def _acknowledge_image(self, to: str, message_id: str) -> None:
+    def _history_database(self):
+        """The chat database, or None in tests that build the service bare."""
+        repository = getattr(self, "message_repository", None)
+        return getattr(getattr(repository, "collection", None), "database", None)
+
+    async def _record_notice(self, to: str, text: str, sent, notice: str, **kwargs) -> None:
+        await record_outbound_notice(self._history_database(), to, text, sent, notice, **kwargs)
+
+    async def _acknowledge_image(self, to: str, message_id: str) -> dict | None:
+        """Send the photo acknowledgement once; returns what was sent, or None if it went earlier."""
         delivery = await self.deliveries.find_one({"_id": message_id}) or {}
         if delivery.get("image_ack_sent"):
-            return
-        sent = await self.client.send_text(to, "Thanks for the photo. I'm checking it against our catalogue.", message_id)
+            return None
+        sent = await self.client.send_text(to, IMAGE_ACK_TEXT, message_id)
         if not sent:
             raise RuntimeError("WhatsApp sender is not configured")
         await self.deliveries.update_one(
             {"_id": message_id}, {"$set": {"image_ack_sent": True}, "$inc": {"outbound_messages": 1}}, upsert=True,
         )
+        return sent
 
     async def _send_image_failure(self, to: str, message_id: str, error_type: str) -> None:
-        sent = await self.client.send_text(
-            to,
-            "I couldn't finish checking your photo right now. Tell me the product name or type "
-            "and color, and I'll help you search. You can also send 'human' to speak with our team.",
-            message_id,
-        )
+        sent = await self.client.send_text(to, IMAGE_FAILURE_TEXT, message_id)
         if not sent:
             raise RuntimeError("WhatsApp sender is not configured")
+        await self._record_notice(to, IMAGE_FAILURE_TEXT, sent, "photo_check_failed")
         await self.deliveries.update_one(
             {"_id": message_id},
             {"$set": {"complete": True, "text_sent": True, "processing_error": error_type}, "$inc": {"outbound_messages": 1}},
@@ -824,41 +852,52 @@ class WhatsAppService:
                 self._product_ids_mentioned(response),
                 outbound_kind,
             )
-            await self._link_outbound_message(sent, response)
+            await self._link_outbound_message(sent, response, outbound_kind)
             await self.deliveries.update_one(
                 {"_id": message_id},
                 {"$set": {"text_sent": True}, "$inc": {"outbound_messages": 1}},
             )
         mode = response.ai_message.metadata.get("media_mode", "recommendations")
         if mode != "none":
-            await self._send_recommended_product_images(to, response.recommended_products, gallery=mode == "gallery", delivery_id=message_id)
+            await self._send_recommended_product_images(
+                to, response.recommended_products, gallery=mode == "gallery", delivery_id=message_id,
+                chat_message_id=getattr(response.ai_message, "id", None),
+            )
+        previews = response.ai_message.metadata.get("design_previews") or []
+        if previews:
+            await self._send_design_previews(
+                to, previews, delivery_id=message_id, chat_message_id=getattr(response.ai_message, "id", None),
+            )
         await self.deliveries.update_one({"_id": message_id}, {"$set": {"complete": True}})
 
-    async def _send_primary_response(self, to: str, message_id: str, response) -> tuple[dict | None, str]:
+    @staticmethod
+    def _interactive_plan(response) -> tuple[str, list[str]]:
+        """How the AI reply goes out: plain text, reply buttons, or a list, and
+        the choices the customer sees. Shared by sending and the inbox copy."""
         body = response.ai_message.content
         products = response.recommended_products
         state = response.conversation.conversation_state or {}
+        if len(body) > 1024:
+            return "text", []
+        choosing = re.search(r"\b(?:option|choose|which one|reply with)\b", body.lower())
+        if state.get("purchase") and re.search(r"\b(?:would you like me to add|add it to your cart|confirm)\b", body.lower()):
+            return "buttons", ["Yes, add it", "Change sizes", "No"]
+        if choosing and 2 <= len(products) <= 3:
+            return "buttons", [f"Option {index}" for index in range(1, len(products) + 1)]
+        if choosing and 4 <= len(products) <= 5:
+            return "list", [f"Option {index} · {product.name}" for index, product in enumerate(products[:5], start=1)]
+        if response.ai_message.metadata.get("offer_human"):
+            return "buttons", ["Talk to a person"]
+        return "text", []
+
+    async def _send_primary_response(self, to: str, message_id: str, response) -> tuple[dict | None, str]:
+        body = response.ai_message.content
+        kind, choices = self._interactive_plan(response)
         try:
-            if len(body) <= 1024 and state.get("purchase") and re.search(
-                r"\b(?:would you like me to add|add it to your cart|confirm)\b",
-                body.lower(),
-            ):
-                return await self.client.send_reply_buttons(
-                    to, body, ["Yes, add it", "Change sizes", "No"], message_id
-                ), "buttons"
-            if len(body) <= 1024 and 2 <= len(products) <= 3 and re.search(
-                r"\b(?:option|choose|which one|reply with)\b",
-                body.lower(),
-            ):
-                titles = [f"Option {index}" for index in range(1, len(products) + 1)]
-                return await self.client.send_reply_buttons(to, body, titles, message_id), "buttons"
-            if len(body) <= 1024 and 4 <= len(products) <= 5 and re.search(
-                r"\b(?:option|choose|which one|reply with)\b",
-                body.lower(),
-            ):
-                return await self.client.send_option_list(to, body, products, message_id), "list"
-            if len(body) <= 1024 and response.ai_message.metadata.get("offer_human"):
-                return await self.client.send_reply_buttons(to, body, ["Talk to a person"], message_id), "buttons"
+            if kind == "buttons":
+                return await self.client.send_reply_buttons(to, body, choices, message_id), "buttons"
+            if kind == "list":
+                return await self.client.send_option_list(to, body, response.recommended_products, message_id), "list"
         except httpx.HTTPStatusError:
             logger.warning("Interactive WhatsApp reply failed; falling back to text")
         return await self.client.send_text(to, body, message_id), "text"
@@ -913,18 +952,24 @@ class WhatsAppService:
                 mentioned.append(str(product.id))
         return mentioned if len(mentioned) == 1 else [str(product.id) for product in products]
 
-    async def _link_outbound_message(self, sent: dict, response) -> None:
-        """Save WhatsApp's ID on the AI's chat message so the inbox can show its delivery status."""
+    async def _link_outbound_message(self, sent: dict, response, kind: str = "text") -> None:
+        """Save WhatsApp's ID on the AI's chat message so the inbox can show its
+        delivery status, plus any buttons or list the customer was given."""
         if not hasattr(self, "message_repository"):
             return
-        outbound_id = ((sent.get("messages") or [{}])[0]).get("id")
+        outbound_id = outbound_message_id(sent)
         chat_message_id = getattr(response.ai_message, "id", None)
         if not outbound_id or not chat_message_id:
             return
+        # An empty photo list tells the inbox this reply's photos are recorded
+        # (the ones sent next are pushed onto it), unlike older replies.
+        fields = {"metadata.whatsapp_message_id": outbound_id, "metadata.whatsapp_images": []}
+        if kind in {"buttons", "list"}:
+            fields["metadata.whatsapp_interactive"] = {"type": kind, "choices": self._interactive_plan(response)[1]}
         try:
             await self.message_repository.collection.update_one(
                 {"_id": parse_object_id(chat_message_id)},
-                {"$set": {"metadata.whatsapp_message_id": str(outbound_id)}},
+                {"$set": fields},
             )
         except Exception as exc:
             # The customer already has the reply; only its ticks are missing.
@@ -973,7 +1018,26 @@ class WhatsAppService:
             # handling; returning None obscures authentication and download errors.
             raise
 
-    async def _send_recommended_product_images(self, to: str, products: list[Any], gallery: bool = False, delivery_id=None) -> None:
+    async def _record_sent_image(self, chat_message_id, sent: dict, image_url: str, caption: str, product_id: str) -> None:
+        """Add a product photo we sent to the AI reply, so the inbox shows it."""
+        if not chat_message_id or not hasattr(self, "message_repository"):
+            return
+        try:
+            await self.message_repository.collection.update_one(
+                {"_id": parse_object_id(chat_message_id)},
+                {"$push": {"metadata.whatsapp_images": {
+                    "url": image_url,
+                    "caption": caption,
+                    "product_id": product_id,
+                    "whatsapp_message_id": outbound_message_id(sent),
+                }}},
+            )
+        except Exception as exc:
+            logger.warning("Could not record WhatsApp product photo in the inbox (%s)", type(exc).__name__)
+
+    async def _send_recommended_product_images(
+        self, to: str, products: list[Any], gallery: bool = False, delivery_id=None, chat_message_id=None,
+    ) -> None:
         sent = 0
         seen_image_urls = set()
         if delivery_id:
@@ -997,6 +1061,7 @@ class WhatsAppService:
                     if sent_response.get("skipped"):  # better no photo than an upside-down one
                         continue
                     await self._remember_outbound_context(sent_response, to, [str(product.id)], "product_image")
+                    await self._record_sent_image(chat_message_id, sent_response, image_url, caption, str(product.id))
                     if delivery_id:
                         await self.deliveries.update_one(
                             {"_id": delivery_id},
@@ -1010,6 +1075,37 @@ class WhatsAppService:
                         raise
             if gallery:
                 break
+
+    async def _send_design_previews(self, to: str, previews: list[dict], delivery_id=None, chat_message_id=None) -> None:
+        """Send a few design-library samples as photos, each with its designer link.
+        A sample that fails is skipped: the reply's links already cover the library."""
+        sent_keys = set()
+        if delivery_id:
+            previous = await self.deliveries.find_one({"_id": delivery_id}) or {}
+            sent_keys.update(previous.get("sent_images", []))
+        for preview in previews[:WHATSAPP_DESIGN_PHOTOS]:
+            stored = str(preview.get("image") or "")
+            image_url = EcommerceProductRepository._public_image_url(stored) if stored else None
+            key = f"design|{stored}"
+            if not self._is_public_image_url(image_url) or key in sent_keys:
+                continue
+            caption = "\n".join(line for line in (
+                preview.get("name"),
+                f"Collection: {preview['collection']}" if preview.get("collection") else None,
+                f"Try it in the designer: {preview['url']}" if preview.get("url") else None,
+            ) if line)
+            try:
+                sent = await self.client.send_image(to, image_url, caption)
+                if not sent or sent.get("skipped"):
+                    continue
+                await self._record_sent_image(chat_message_id, sent, image_url, caption, None)
+                if delivery_id:
+                    await self.deliveries.update_one(
+                        {"_id": delivery_id}, {"$addToSet": {"sent_images": key}, "$inc": {"outbound_messages": 1}},
+                    )
+                sent_keys.add(key)
+            except Exception as exc:
+                logger.warning("WhatsApp design sample send failed: %s", exc.__class__.__name__)
 
     def _product_image_caption(self, product: Any) -> str:
         price = product.sale_price if product.sale_price is not None else product.price

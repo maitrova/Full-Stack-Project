@@ -114,8 +114,9 @@ TOOLS = [
         name="browse_design_library",
         description=(
             "The store's design library: ready-made artwork collections (for example anime) that shoppers can place on "
-            "customizable products in the designer. Without a collection it lists the collections with design counts; "
-            "with a collection it returns that collection's designs, shown to the shopper as thumbnails."
+            "customizable products in the designer. Without a collection it returns an all-designs link and the "
+            "collections with design counts and links, plus a few sample designs shown as pictures; with a collection "
+            "it returns that collection's designs, shown to the shopper as thumbnails."
         ),
         parameters={
             "type": "object",
@@ -436,6 +437,21 @@ def _searchable_text(product: ProductPublic) -> str:
     return " ".join(values)
 
 
+# Sample designs sent with a general "what designs do you have" answer.
+DESIGN_SAMPLE_COUNT = 4
+
+
+def _is_all_designs_folder(folder: str) -> bool:
+    """The library keeps every design in one extra folder ("all-readymade-designs")."""
+    return str(folder).lower().startswith("all-")
+
+
+def _collection_title(folder: str) -> str:
+    """'gym-fitness' -> 'Gym fitness', for listing collections to shoppers."""
+    words = str(folder).replace("_", " ").replace("-", " ").strip()
+    return words[:1].upper() + words[1:] if words else str(folder)
+
+
 def _design_name(filename: str) -> str:
     """'naruto-anime-kid-1783058561659-802568349-md.webp' -> 'Naruto anime kid'."""
     stem = re.sub(r"\.[a-z0-9]+$", "", str(filename or ""), flags=re.IGNORECASE)
@@ -750,9 +766,11 @@ class _ToolSession:
                 # Not a collection name: look for it among design names
                 # ("naruto" lives inside the anime collection).
                 terms = _query_terms(collection) - {"design", "designs", "collection", "print"}
-                all_designs = await asyncio.gather(*[_load_design_files(name) for name in folders])
+                # The all-designs folder repeats every design; search the themed ones.
+                searched = [name for name in folders if not _is_all_designs_folder(name)] or folders
+                all_designs = await asyncio.gather(*[_load_design_files(name) for name in searched])
                 matches = [
-                    (name, design) for name, designs in zip(folders, all_designs) for design in designs
+                    (name, design) for name, designs in zip(searched, all_designs) for design in designs
                     if terms and terms <= _query_terms(design["name"])
                 ]
                 if not matches:
@@ -779,24 +797,40 @@ class _ToolSession:
                 "note": "The first designs are shown to the shopper as thumbnails; don't list every name.",
             }
 
-        counts = await asyncio.gather(*[_load_design_files(folder) for folder in folders])
+        all_designs = await asyncio.gather(*[_load_design_files(folder) for folder in folders])
+        everything = next((folder for folder in folders if _is_all_designs_folder(folder)), None)
+        themed = [(folder, designs) for folder, designs in zip(folders, all_designs)
+                  if designs and folder != everything]
+        # One sample from each of the first few collections, so a general
+        # "what designs do you have" always comes with pictures.
+        self.design_previews = [
+            {"name": designs[0]["name"], "image": designs[0]["image"], "url": link(folder), "collection": _collection_title(folder)}
+            for folder, designs in themed[:DESIGN_SAMPLE_COUNT]
+        ]
         return {
-            "designer_url": base_url,
+            "all_designs": {
+                "design_count": len(dict(zip(folders, all_designs)).get(everything) or [])
+                if everything else sum(len(designs) for _, designs in themed),
+                "designer_url": link(everything) if everything else base_url,
+            },
             "collections": [
-                {"collection": folder, "design_count": len(designs), "designer_url": link(folder)}
-                for folder, designs in zip(folders, counts) if designs
+                {"collection": _collection_title(folder), "design_count": len(designs), "designer_url": link(folder)}
+                for folder, designs in themed
             ],
+            "note": (
+                "Reply with the all_designs link first, then the collections as a short list (title, count, link). "
+                "A few sample designs are shown to the shopper as pictures. Don't explain how the links work."
+            ),
         }
 
     async def _designer_base_url(self) -> str | None:
-        """Designer page to open collections in: the open customizable product, else any."""
-        if self.page_product is not None and self.page_product.attributes.get("customizable"):
-            return self.page_product.attributes.get("product_url")
-        products = await self.agent.product_tools.search_products(ProductSearchParams(
-            business_id=self.business_id, attributes={"catalog_type": "customization"}, limit=5,
-        ))
-        return next((product.attributes.get("product_url") for product in products
-                     if product.stock > 0 and product.attributes.get("product_url")), None)
+        """Designer page to open collections in: the customizable product on
+        screen, else the one being discussed, else the store default."""
+        sales_agent = self.agent.sales_agent
+        on_page = sales_agent._designer_url_of(self.page_product)
+        if on_page:
+            return on_page
+        return await sales_agent._designer_product_url(self.business_id, self.state.get("selected_product_id"))
 
     def take_shown_products(self, reply: str) -> str:
         """Strip the reply's [[show: id, ...]] line and keep ids that tools returned."""
@@ -1408,7 +1442,9 @@ Using tools:
 - search_products: set category whenever you can tell the garment type. Use product_type "customizable" for printing, designing, personalising, or "my own logo/photo" requests; "drop" for drops or limited editions; otherwise "any". If nothing is found, try once more with fewer filters before telling the shopper.
 - Only use product ids that appear in the page context or in a tool result. Never make up an id; search first.
 - For customization questions (printing, logos, photos, names, bulk custom orders), call search_products with product_type "customizable" first and explain using those products: what can be customized, sizes, colours, price, and the designer link. Offer the team for bulk quotes or anything the data doesn't cover.
-- The store has a design library of ready-made artwork collections that shoppers can place on customizable products, as well as uploading their own images. For "what designs do you have", "show me designs", "design library", or a theme like "anime designs", call browse_design_library (with the collection when one is named) and share the designer_url. Never say there is no design library without checking it.
+- The store has a design library of ready-made artwork collections that shoppers can place on customizable products, as well as uploading their own images. Never say there is no design library without checking it.
+- Designs mean the design library, not clothing. For "what designs do you have", "latest designs", "T-shirt designs", "show me designs", "design library", or a theme like "anime designs", call browse_design_library (with the collection when one is named), not search_products. Answer the same way every time: one short line, the all_designs link, then the collections as a short list (title, design count, its designer_url). Say a few sample designs are shown as pictures. Don't explain how links or collection filters work, and don't list garments or prices in a designs answer.
+- Customizing means the products. For "custom printed T-shirt", "customise a hoodie", or "print my own design", follow the customization rule above (search_products with product_type "customizable"), then add one line offering the design library's ready-made designs.
 - If the shopper is on a product page, "this", "it", and "this product" mean the product in the page context. Its full details are already in the context, so answer from them without calling get_product_details.
 - "The first one", "option 2", "the black one" refer to earlier products listed in the context.
 - To compare products, call get_product_details for each and compare only the returned facts.

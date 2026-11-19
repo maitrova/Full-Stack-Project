@@ -1504,6 +1504,36 @@ class SalesAgent:
             )
         )
 
+    @staticmethod
+    def _designer_url_of(product: ProductPublic | None) -> str | None:
+        """The product's designer link, if it is a customizable product in stock."""
+        if product is None or product.stock <= 0:
+            return None
+        attributes = product.attributes or {}
+        if not (attributes.get("customizable") or attributes.get("catalog_type") == "customization"):
+            return None
+        return attributes.get("product_url") or None
+
+    async def _designer_product_url(self, business_id: str, selected_id: str | None = None) -> str | None:
+        """Designer page that design-library links open in: the customizable
+        product being discussed, else the configured default (classic round
+        tee), else any customizable product in stock. Never left to search order."""
+        if selected_id:
+            chosen = self._designer_url_of(await self.product_tools.get_product_details(business_id, str(selected_id)))
+            if chosen:
+                return chosen
+        custom_products = await self.product_tools.search_products(
+            ProductSearchParams(business_id=business_id, attributes={"catalog_type": "customization"}, limit=50)
+        )
+        urls = [url for url in (self._designer_url_of(product) for product in custom_products) if url]
+        slug = (settings.design_library_default_product or "").strip().strip("/").lower()
+        if slug:
+            default = next((url for url in urls if f"/products/{slug}/" in f"{urlsplit(url).path.lower().rstrip('/')}/"), None)
+            if default:
+                return default
+            logger.warning("Default design-library product %r is not an in-stock customizable product", slug)
+        return urls[0] if urls else None
+
     async def _design_library_presentation(
         self,
         business_id: str,
@@ -1512,30 +1542,7 @@ class SalesAgent:
         state: dict,
     ) -> tuple[str, list[ProductPublic], str]:
         selected_id = conversation.get("selected_product_id") or state.get("selected_product_id")
-        base_product = None
-        if selected_id:
-            candidate = await self.product_tools.get_product_details(business_id, str(selected_id))
-            if candidate and candidate.attributes.get("customizable") and candidate.stock > 0:
-                base_product = candidate
-
-        if base_product is None:
-            custom_products = await self.product_tools.search_products(
-                ProductSearchParams(
-                    business_id=business_id,
-                    attributes={"catalog_type": "customization"},
-                    limit=5,
-                )
-            )
-            base_product = next(
-                (
-                    product
-                    for product in custom_products
-                    if product.stock > 0 and product.attributes.get("product_url")
-                ),
-                None,
-            )
-
-        base_url = base_product.attributes.get("product_url") if base_product else None
+        base_url = await self._designer_product_url(business_id, selected_id)
         if not base_url:
             origin = (settings.ecommerce_storefront_url or "").rstrip("/")
             fallback_url = f"{origin}/customproducts" if origin.startswith("https://") else None

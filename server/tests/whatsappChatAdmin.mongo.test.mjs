@@ -186,6 +186,51 @@ mongoTest("the chat view picks the furthest delivery step, whatever order status
   assert.equal(byId.get(String(customerId)).delivery, undefined);
 });
 
+mongoTest("product photos sent with a reply get their own delivery ticks", async () => {
+  const me = admin("Me");
+  const id = await makeChat();
+  const at = new Date();
+  const messageId = new ObjectId();
+  await db.collection("messages").insertOne({
+    _id: messageId, conversation_id: id, sender: "ai", content: "Here are two tees", message_type: "text", created_at: at,
+    metadata: {
+      whatsapp_message_id: "wamid.reply",
+      whatsapp_images: [
+        { url: "https://cdn.test/1.jpg", caption: "Option 1", whatsapp_message_id: "wamid.photo1" },
+        { url: "https://cdn.test/2.jpg", caption: "Option 2", whatsapp_message_id: "wamid.photo2" },
+        { url: "https://cdn.test/3.jpg", caption: "Option 3" },
+      ],
+    },
+  });
+  await db.collection("whatsapp_message_status").insertMany([
+    { _id: "wamid.photo1", read_at: at },
+    { _id: "wamid.photo2", failed_at: at, error_code: 131026 },
+  ]);
+
+  const res = await call(getWhatsAppChat, { id, user: me });
+  const message = res.body.messages.find((item) => item._id === String(messageId));
+  assert.equal(message.delivery.status, "sent");
+  const [first, second, third] = message.metadata.whatsapp_images;
+  assert.equal(first.delivery.status, "read");
+  assert.equal(second.delivery.status, "failed");
+  assert.equal(third.delivery, undefined);
+  assert.equal(third.url, "https://cdn.test/3.jpg");
+});
+
+mongoTest("the chat list shows which kind of automatic message came last", async () => {
+  const me = admin("Me");
+  const id = await makeChat({ last_message_at: new Date(Date.now() + 9000) });
+  await db.collection("messages").insertOne({
+    conversation_id: id, sender: "ai", content: "I couldn't process that request right now.", message_type: "text",
+    metadata: { system_notice: "processing_failed", whatsapp_message_id: "wamid.notice", tool_calls: ["hidden"] },
+    created_at: new Date(Date.now() + 9000),
+  });
+  const res = await call(listWhatsAppChats, { user: me });
+  const chat = res.body.conversations.find((item) => item._id === String(id));
+  assert.equal(chat.last_message.metadata.system_notice, "processing_failed");
+  assert.equal(chat.last_message.metadata.tool_calls, undefined);
+});
+
 mongoTest("the chat list flags a last message that failed, and only that", async () => {
   const me = admin("Me");
   const failedChat = await makeChat({ last_message_at: new Date(Date.now() + 5000) });

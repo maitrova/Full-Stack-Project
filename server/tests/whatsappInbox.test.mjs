@@ -8,7 +8,9 @@ import {
   inQueue,
   isClosed,
   needsReply,
+  noticeLabel,
   replyWindow,
+  sentPhotos,
   sortForQueue,
 } from "../../frontend/src/utils/whatsappInbox.js";
 
@@ -97,4 +99,40 @@ test("delivery failures explain known codes and fall back to what WhatsApp said"
   assert.match(deliveryFailureReason({ error_code: 131047 }), /24 hours/);
   assert.equal(deliveryFailureReason({ error_code: 999, error_title: "Odd problem" }), "Odd problem (code 999)");
   assert.equal(deliveryFailureReason({}), "WhatsApp reported a delivery failure");
+});
+
+test("an error notice from the service still leaves the customer waiting", () => {
+  const notice = (kind) => ({ status: "open", last_message: { sender: "ai", created_at: ago(0), metadata: { system_notice: kind } }, last_message_at: ago(0) });
+  assert.equal(needsReply(notice("processing_failed"), NOW), true);
+  assert.equal(needsReply(notice("photo_check_failed"), NOW), true);
+  assert.equal(needsReply(notice("rate_limited"), NOW), true);
+  assert.equal(needsReply(notice("order_update"), NOW), false);
+  assert.equal(needsReply({ ...notice("processing_failed"), status: "closed", closed_at: ago(0) }, NOW), false);
+});
+
+test("automatic messages get a readable label and AI replies don't", () => {
+  assert.equal(noticeLabel({ metadata: { system_notice: "order_update" } }), "Order update");
+  assert.equal(noticeLabel({ metadata: { system_notice: "something_new" } }), "Automatic message");
+  assert.equal(noticeLabel({ metadata: {} }), null);
+});
+
+test("recorded product photos are shown exactly, even when none were sent", () => {
+  const photo = { url: "https://cdn.test/a.jpg", caption: "Option 1\nTee", whatsapp_message_id: "wamid.p1" };
+  assert.deepEqual(sentPhotos({ sender: "ai", metadata: { whatsapp_images: [photo] } }), { photos: [photo], rebuilt: false });
+  const products = [{ id: "p1", name: "Tee", image: "https://cdn.test/a.jpg" }];
+  assert.deepEqual(sentPhotos({ sender: "ai", metadata: { whatsapp_images: [], recommended_products: products } }), { photos: [], rebuilt: false });
+});
+
+test("older replies rebuild their photos the way the service sent them", () => {
+  const products = [1, 2, 3, 4, 5, 6].map((n) => ({ id: `p${n}`, name: `Tee ${n}`, image: `https://cdn.test/${n}.jpg` }));
+  const list = sentPhotos({ sender: "ai", metadata: { recommended_products: products } });
+  assert.equal(list.rebuilt, true);
+  assert.equal(list.photos.length, 5);
+  assert.equal(list.photos[1].caption, "Option 2\nTee 2");
+  const gallery = sentPhotos({ sender: "ai", metadata: { media_mode: "gallery", recommended_products: products } });
+  assert.deepEqual(gallery.photos.map((photo) => photo.url), ["https://cdn.test/1.jpg"]);
+  assert.equal(sentPhotos({ sender: "ai", metadata: { media_mode: "none", recommended_products: products } }).photos.length, 0);
+  const noImage = [{ id: "p1", name: "Tee", image: null }, { id: "p2", name: "Polo", image: "/local.jpg" }];
+  assert.equal(sentPhotos({ sender: "ai", metadata: { recommended_products: noImage } }).photos.length, 0);
+  assert.equal(sentPhotos({ sender: "customer", metadata: { recommended_products: products } }).photos.length, 0);
 });

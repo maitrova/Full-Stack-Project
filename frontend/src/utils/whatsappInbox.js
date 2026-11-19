@@ -35,13 +35,20 @@ export const isMine = (chat, userId) =>
 
 export const isOwnedByOther = (chat, userId) => isClaimed(chat) && !isMine(chat, userId);
 
-export const waitingSince = (chat) =>
-  !isClosed(chat) && chat?.last_message?.sender === "customer" ? chat.last_message.created_at : null;
+// Notices sent when the AI couldn't answer: the customer still needs a real reply.
+const UNANSWERED_NOTICES = new Set(["processing_failed", "photo_check_failed", "rate_limited"]);
+export const isUnansweredNotice = (message) => UNANSWERED_NOTICES.has(message?.metadata?.system_notice);
+
+export const waitingSince = (chat) => {
+  if (isClosed(chat)) return null;
+  const last = chat?.last_message;
+  return last?.sender === "customer" || isUnansweredNotice(last) ? last.created_at : null;
+};
 
 // A customer who never received the last reply is waiting too, even though
-// nothing shows it on their side.
+// nothing shows it on their side. So is one who only got an error notice.
 export const needsReply = (chat, now) => {
-  if (!isClosed(chat) && chat?.last_message_failed) return true;
+  if (!isClosed(chat) && (chat?.last_message_failed || isUnansweredNotice(chat?.last_message))) return true;
   const since = time(waitingSince(chat));
   if (since == null) return false;
   return chat.status === "handoff" || now - since >= AI_REPLY_GRACE_MS;
@@ -129,6 +136,45 @@ export const activityLabel = (event, userId) => {
     case "reply_retried": return `${actor} retried a failed reply`;
     default: return `${actor} updated this chat`;
   }
+};
+
+// Labels for messages the service sent outside the AI's own reply.
+const NOTICE_LABELS = {
+  photo_received: "Photo acknowledgement",
+  photo_check_failed: "Photo check failed",
+  processing_failed: "AI couldn't answer",
+  rate_limited: "Rate limit notice",
+  order_update: "Order update",
+};
+export const noticeLabel = (message) => {
+  const kind = message?.metadata?.system_notice;
+  return kind ? NOTICE_LABELS[kind] || "Automatic message" : null;
+};
+
+// Product photos sent with an AI reply. Replies recorded since photo history
+// existed carry the exact list (possibly empty). Older replies are rebuilt the
+// way the service sent them: one photo per product (up to 5) captioned
+// "Option N", or a single product's photo for a gallery.
+export const sentPhotos = (message) => {
+  const metadata = message?.metadata || {};
+  if (message?.sender === "customer") return { photos: [], rebuilt: false };
+  if (Array.isArray(metadata.whatsapp_images)) {
+    return { photos: metadata.whatsapp_images.filter((image) => image?.url), rebuilt: false };
+  }
+  const mode = metadata.media_mode || "recommendations";
+  const products = Array.isArray(metadata.recommended_products) ? metadata.recommended_products : [];
+  if (mode === "none" || !products.length) return { photos: [], rebuilt: false };
+  const gallery = mode === "gallery";
+  const photos = products
+    .slice(0, gallery ? 1 : 5)
+    .map((product, index) => ({ product, number: index + 1 }))
+    .filter(({ product }) => /^https?:\/\//i.test(String(product?.image || "")))
+    .map(({ product, number }) => ({
+      url: product.image,
+      caption: gallery ? product.name : `Option ${number}\n${product.name}`,
+      product_id: product.id,
+    }));
+  return { photos, rebuilt: photos.length > 0 };
 };
 
 const DELIVERY_FAILURE_REASONS = {

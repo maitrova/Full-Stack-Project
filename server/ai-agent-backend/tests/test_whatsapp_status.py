@@ -131,7 +131,7 @@ class LinkOutboundMessageTests(unittest.IsolatedAsyncioTestCase):
         await self.service._link_outbound_message({"messages": [{"id": "wamid.ai"}]}, self.response)
         target, update = self.update_one.await_args.args
         self.assertEqual(target, {"_id": ObjectId(self.chat_id)})
-        self.assertEqual(update, {"$set": {"metadata.whatsapp_message_id": "wamid.ai"}})
+        self.assertEqual(update, {"$set": {"metadata.whatsapp_message_id": "wamid.ai", "metadata.whatsapp_images": []}})
 
     async def test_nothing_is_written_without_a_whatsapp_id(self):
         await self.service._link_outbound_message({"messages": []}, self.response)
@@ -150,7 +150,7 @@ class LinkOutboundMessageTests(unittest.IsolatedAsyncioTestCase):
         self.service._send_recommended_product_images = AsyncMock()
         response = SimpleNamespace(ai_message=SimpleNamespace(id=self.chat_id, metadata={"media_mode": "none"}), recommended_products=[])
         await self.service._deliver("919000011111", "in.1", response)
-        self.assertEqual(self.update_one.await_args.args[1], {"$set": {"metadata.whatsapp_message_id": "wamid.ai"}})
+        self.assertEqual(self.update_one.await_args.args[1], {"$set": {"metadata.whatsapp_message_id": "wamid.ai", "metadata.whatsapp_images": []}})
 
 
 if __name__ == "__main__":

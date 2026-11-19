@@ -36,7 +36,9 @@ import {
   isOwnedByOther,
   isUnclaimed,
   needsReply,
+  noticeLabel,
   replyWindow,
+  sentPhotos,
   sortForQueue,
   waitTone,
   waitingSince,
@@ -49,6 +51,7 @@ const LEAD_STATUS_OPTIONS = ["new", "contacted", "qualified", "converted", "clos
 }));
 const CHAT_REFRESH_MS = 10000;
 const LIST_REFRESH_MS = 15000;
+const OWNERSHIP_CLICK_GUARD_MS = 1200;
 
 const QUICK_REPLIES = [
   { label: "Greeting", text: (name) => `Hi${name ? ` ${name}` : ""}, this is the Maitrova team. How can we help you today?` },
@@ -207,10 +210,59 @@ const DeliveryFailure = ({ message, canRetry, retrying, onRetry }) => {
   );
 };
 
+// The choices WhatsApp showed under the reply, as the customer saw them.
+const SentChoices = ({ interactive }) => {
+  const choices = Array.isArray(interactive?.choices) ? interactive.choices : [];
+  if (!choices.length) return null;
+  return (
+    <div className="mt-2 border-t border-mt-line pt-2">
+      <p className="mb-1.5 text-[11px] text-mt-subtle">{interactive.type === "list" ? "Sent as a list" : "Sent with buttons"}</p>
+      <ul className="flex flex-wrap gap-1.5">
+        {choices.map((choice) => (
+          <li key={choice} className="rounded-full border border-mt-line bg-mt-surface px-2.5 py-0.5 text-xs text-mt-text">
+            {choice}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+// Product photos and design samples sent to WhatsApp as separate messages after the reply.
+const SentPhotos = ({ message, onImageLoad }) => {
+  const { photos, rebuilt } = sentPhotos(message);
+  if (!photos.length) return null;
+  return (
+    <div className="mt-2 w-full">
+      <p className="mb-1.5 text-[11px] text-mt-subtle">
+        {photos.length === 1 ? "1 photo sent" : `${photos.length} photos sent`}
+        {rebuilt && " · rebuilt from the reply's products"}
+      </p>
+      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {photos.map((photo, index) => (
+          <li key={`${photo.url}-${index}`} className="overflow-hidden rounded-mt-card border border-mt-line bg-mt-surface">
+            <img src={photo.url} alt={photo.caption?.split("\n").find((line) => !/^Option \d/.test(line)) || "Product photo"}
+              loading="lazy" onLoad={onImageLoad} className="aspect-square w-full object-cover" />
+            <div className="space-y-0.5 p-1.5">
+              <p className="line-clamp-2 whitespace-pre-line break-words text-[11px] leading-snug text-mt-text">
+                {(photo.caption || "").split("\n").slice(0, 2).join("\n")}
+              </p>
+              {photo.delivery && (
+                <p className="flex justify-end text-[10px] text-mt-subtle"><DeliveryTick delivery={photo.delivery} /></p>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
 const MessageBubble = ({ message, conversationId, headers, showDebug, onImageLoad, canRetry, retryingId, onRetry }) => {
   const customer = message.sender === "customer";
   const human = message.sender === "human";
-  const SenderIcon = customer ? UserRound : human ? Users : Bot;
+  const notice = noticeLabel(message);
+  const SenderIcon = customer ? UserRound : human ? Users : notice ? Info : Bot;
   const failed = message.delivery?.status === "failed";
   return (
     <div className={cx("flex flex-col", customer ? "items-start" : "items-end")}>
@@ -219,17 +271,20 @@ const MessageBubble = ({ message, conversationId, headers, showDebug, onImageLoa
           "max-w-[88%] rounded-mt-card px-3 py-2 sm:max-w-[72%]",
           customer && "border border-mt-line bg-mt-surface text-mt-text",
           human && "bg-mt-btn text-mt-btn-text",
-          !customer && !human && "bg-mt-surface-raised text-mt-text"
+          notice && "border border-dashed border-mt-line bg-transparent text-mt-muted",
+          !customer && !human && !notice && "bg-mt-surface-raised text-mt-text"
         )}
       >
         <p className={cx("mb-1 flex items-center gap-1.5 text-xs font-medium", human ? "opacity-75" : "text-mt-muted")}>
           <SenderIcon className="h-3 w-3" aria-hidden="true" />
-          {senderLabel(message)}
+          {notice ? `Automatic · ${notice}` : senderLabel(message)}
         </p>
         {message.message_type === "image" && (
           <ChatImage conversationId={conversationId} messageId={message._id} headers={headers} onLoad={onImageLoad} />
         )}
         <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{message.content}</p>
+        {!customer && <SentChoices interactive={message.metadata?.whatsapp_interactive} />}
+        {!customer && <SentPhotos message={message} onImageLoad={onImageLoad} />}
         {showDebug && !customer && (
           <div className="mt-2 rounded-mt-card bg-black/80 p-2 font-mono text-[10px] text-white">
             <p>phase: {message.metadata?.flow_phase || "unknown"}</p>
@@ -504,8 +559,25 @@ const DetailsPanel = ({
   showDebug,
 }) => {
   const closed = isClosed(conversation);
+  const claimed = isClaimed(conversation);
   const status = aiStatus(conversation);
   const statusColor = { success: "text-mt-success", warning: "text-mt-warning", danger: "text-mt-danger", neutral: "text-mt-muted" }[status.tone];
+
+  // A double click on Claim must not land on the button that replaces it, so
+  // clicks right after the chat changes hands are ignored.
+  const ownershipKey = `${conversation._id}:${claimed}:${conversation.handoff_assigned_to || ""}`;
+  const lastOwnershipKey = useRef(ownershipKey);
+  const ownershipChangedAt = useRef(0);
+  useEffect(() => {
+    if (lastOwnershipKey.current === ownershipKey) return;
+    const sameChat = lastOwnershipKey.current.split(":")[0] === String(conversation._id);
+    lastOwnershipKey.current = ownershipKey;
+    if (sameChat) ownershipChangedAt.current = Date.now();
+  }, [conversation._id, ownershipKey]);
+  const update = (changes) => {
+    if (Date.now() - ownershipChangedAt.current < OWNERSHIP_CLICK_GUARD_MS) return;
+    onUpdate(changes);
+  };
 
   return (
     <div className="space-y-6 p-4">
@@ -518,17 +590,12 @@ const DetailsPanel = ({
         )}
 
         {isOwnedByOther(conversation, userId) && (
-          <Button variant="outline" size="sm" fullWidth disabled={saving} onClick={() => onUpdate({ assignToMe: true })}>
+          <Button variant="outline" size="sm" fullWidth disabled={saving} onClick={() => update({ assignToMe: true })}>
             Take over chat
           </Button>
         )}
-        {isClaimed(conversation) && (
-          <Button variant="outline" size="sm" fullWidth disabled={saving} onClick={() => onUpdate({ conversationStatus: "open" })}>
-            Resume AI
-          </Button>
-        )}
-        {!closed && !isClaimed(conversation) && (
-          <Button size="sm" fullWidth disabled={saving} onClick={() => onUpdate({ assignToMe: true })}>
+        {!closed && !claimed && (
+          <Button size="sm" fullWidth disabled={saving} onClick={() => update({ assignToMe: true })}>
             Claim chat and pause AI
           </Button>
         )}
@@ -538,11 +605,17 @@ const DetailsPanel = ({
             admins={admins}
             userId={userId}
             disabled={saving}
-            onAssign={(id) => onUpdate({ assignTo: id })}
+            onAssign={(id) => update({ assignTo: id })}
           />
         )}
+        {/* Kept away from the Claim button's spot, so a second click can't undo a claim. */}
+        {claimed && (
+          <Button variant="outline" size="sm" fullWidth leadingIcon={Bot} disabled={saving} onClick={() => update({ conversationStatus: "open" })}>
+            Resume AI
+          </Button>
+        )}
         {!closed && (
-          <Button variant="ghost" size="sm" fullWidth disabled={saving} onClick={() => onUpdate({ conversationStatus: "closed" })}>
+          <Button variant="ghost" size="sm" fullWidth disabled={saving} onClick={() => update({ conversationStatus: "closed" })}>
             Close chat
           </Button>
         )}

@@ -99,16 +99,37 @@ const outboundId = (message) => (
   message.sender !== "customer" ? message.metadata?.whatsapp_message_id : null
 );
 
+// Product photos the AI sent alongside a reply, each with its own WhatsApp id.
+const sentImages = (message) => (
+  message.sender !== "customer" && Array.isArray(message.metadata?.whatsapp_images)
+    ? message.metadata.whatsapp_images
+    : []
+);
+
 const withDelivery = async (database, messages) => {
-  const ids = messages.map(outboundId).filter(Boolean).map(String);
+  const ids = messages
+    .flatMap((message) => [outboundId(message), ...sentImages(message).map((image) => image?.whatsapp_message_id)])
+    .filter(Boolean)
+    .map(String);
   if (!ids.length) return messages;
   const rows = await database.collection("whatsapp_message_status").find({ _id: { $in: ids } }).toArray();
   const byId = new Map(rows.map((row) => [String(row._id), row]));
+  // WhatsApp accepted it, so it counts as sent until the first status arrives.
+  const stateOf = (id) => deliveryState(byId.get(String(id))) || { status: "sent" };
   return messages.map((message) => {
     const id = outboundId(message);
-    if (!id) return message;
-    // WhatsApp accepted it, so it counts as sent until the first status arrives.
-    return { ...message, delivery: deliveryState(byId.get(String(id))) || { status: "sent" } };
+    const images = sentImages(message);
+    if (!id && !images.length) return message;
+    const next = id ? { ...message, delivery: stateOf(id) } : { ...message };
+    if (images.length) {
+      next.metadata = {
+        ...message.metadata,
+        whatsapp_images: images.map((image) => (
+          image?.whatsapp_message_id ? { ...image, delivery: stateOf(image.whatsapp_message_id) } : image
+        )),
+      };
+    }
+    return next;
   });
 };
 
@@ -245,7 +266,7 @@ export const listWhatsAppChats = async (req, res) => {
             { $match: { $expr: { $eq: ["$conversation_id", "$$conversationId"] } } },
             { $sort: { created_at: -1 } },
             { $limit: 1 },
-            { $project: { sender: 1, content: 1, message_type: 1, created_at: 1, "metadata.whatsapp_message_id": 1 } },
+            { $project: { sender: 1, content: 1, message_type: 1, created_at: 1, "metadata.whatsapp_message_id": 1, "metadata.system_notice": 1 } },
           ],
           as: "last_message",
         },
