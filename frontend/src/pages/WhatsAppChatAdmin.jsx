@@ -10,6 +10,7 @@ import {
   Check,
   CheckCheck,
   ChevronLeft,
+  Download,
   ExternalLink,
   Info,
   Loader2,
@@ -765,6 +766,7 @@ export default function WhatsAppChatAdmin() {
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [retryingId, setRetryingId] = useState("");
+  const [exporting, setExporting] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [mobilePane, setMobilePane] = useState("list");
@@ -796,6 +798,32 @@ export default function WhatsAppChatAdmin() {
       if (!quiet) setLoading(false);
     }
   }, [headers, token]);
+
+  const exportCustomers = async () => {
+    setExporting(true);
+    setActionError("");
+    try {
+      const response = await axios.get(`${API_URL}/admin/whatsapp-chats/export`, { headers, responseType: "blob" });
+      const match = /filename="?([^";]+)"?/.exec(response.headers?.["content-disposition"] || "");
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = match?.[1] || `whatsapp-customers-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (requestError) {
+      let message = "Could not export WhatsApp customers.";
+      try {
+        const body = JSON.parse(await requestError.response?.data?.text?.());
+        if (body?.message) message = body.message;
+      } catch { /* the error body was not JSON */ }
+      setActionError(message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const loadOverview = useCallback(async () => {
     if (!token) return;
@@ -1026,6 +1054,9 @@ export default function WhatsAppChatAdmin() {
           </Button>
           <Button variant="ghost" size="sm" leadingIcon={Bug} aria-pressed={showDebug} onClick={() => setShowDebug((value) => !value)}>
             <span className="sr-only sm:not-sr-only">{showDebug ? "Hide flow" : "Debug flow"}</span>
+          </Button>
+          <Button variant="ghost" size="sm" leadingIcon={Download} disabled={exporting} onClick={exportCustomers} title="Download customers, orders and addresses as Excel">
+            <span className="sr-only sm:not-sr-only">{exporting ? "Exporting…" : "Export"}</span>
           </Button>
           <Button variant="ghost" size="sm" leadingIcon={RefreshCw} onClick={() => { loadChats(); loadOverview(); if (selectedId) loadDetail(selectedId); }}>
             <span className="sr-only sm:not-sr-only">Refresh</span>

@@ -11,12 +11,14 @@ import {
   sendWhatsAppReply,
   updateWhatsAppChat,
 } from "../controllers/whatsappChatAdminController.js";
+import { exportWhatsAppCustomers } from "../controllers/whatsappCustomerExportController.js";
 
 const router = express.Router();
 
 router.get("/", protect, listWhatsAppChats);
 router.get("/overview", protect, getWhatsAppOverview);
 router.get("/admins", protect, listWhatsAppAdmins);
+router.get("/export", protect, exportWhatsAppCustomers);
 router.get("/:id", protect, getWhatsAppChat);
 router.get("/:id/media/:messageId", protect, getWhatsAppChatMedia);
 router.patch("/:id", protect, updateWhatsAppChat);
